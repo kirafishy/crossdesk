@@ -65,6 +65,7 @@
 #include "signal_server_settings.h"
 #include "signal_server_address.h"
 #include "ui/announcement_text.h"
+#include "ui/release_notes_text.h"
 #include "ui/ui_localization.h"
 #include "update_checker.h"
 #include "window_geometry.h"
@@ -308,73 +309,6 @@ std::string Trim(std::string value) {
     return {};
   }
   return std::string(first, last);
-}
-
-struct ParsedReleaseNoteBlock {
-  slint::StyledText content;
-  bool section_gap = false;
-};
-
-std::vector<ParsedReleaseNoteBlock> ParseReleaseNotesMarkdownForSlint(
-    std::string_view markdown) {
-  std::vector<ParsedReleaseNoteBlock> blocks;
-  bool section_gap = false;
-
-  size_t line_start = 0;
-  while (line_start < markdown.size()) {
-    const size_t newline = markdown.find('\n', line_start);
-    const size_t line_end =
-        newline == std::string_view::npos ? markdown.size() : newline;
-    std::string_view line = markdown.substr(line_start, line_end - line_start);
-    if (!line.empty() && line.back() == '\r') {
-      line.remove_suffix(1);
-    }
-
-    if (std::all_of(line.begin(), line.end(),
-                    [](unsigned char ch) { return std::isspace(ch) != 0; })) {
-      section_gap = !blocks.empty();
-      if (newline == std::string_view::npos) {
-        break;
-      }
-      line_start = newline + 1;
-      continue;
-    }
-
-    size_t heading_end = 0;
-    while (heading_end < line.size() && heading_end < 6 &&
-           line[heading_end] == '#') {
-      ++heading_end;
-    }
-    const bool is_heading =
-        heading_end > 0 && heading_end < line.size() &&
-        std::isspace(static_cast<unsigned char>(line[heading_end])) != 0;
-    if (is_heading) {
-      if (newline == std::string_view::npos) {
-        break;
-      }
-      line_start = newline + 1;
-      continue;
-    }
-
-    const std::string block_markdown(line);
-    ParsedReleaseNoteBlock block;
-    if (const auto parsed = slint::StyledText::from_markdown(block_markdown)) {
-      block.content = *parsed;
-    } else {
-      LOG_WARN(
-          "Failed to parse a release-note Markdown block; using plain text");
-      block.content = slint::StyledText::from_plain_text(block_markdown);
-    }
-    block.section_gap = section_gap;
-    blocks.push_back(std::move(block));
-    section_gap = false;
-
-    if (newline == std::string_view::npos) {
-      break;
-    }
-    line_start = newline + 1;
-  }
-  return blocks;
 }
 
 std::string DecodeDroppedPath(std::string text) {
@@ -1983,7 +1917,7 @@ void GuiApplication::PollUpdateCheck() {
   release_date_ = info.release_date;
   update_available_ = update_checker_->update_available();
   std::vector<ui::ReleaseNoteBlock> blocks;
-  for (const auto& parsed : ParseReleaseNotesMarkdownForSlint(release_notes_)) {
+  for (const auto& parsed : release_notes_text::Parse(release_notes_)) {
     ui::ReleaseNoteBlock block;
     block.content = parsed.content;
     block.section_gap = parsed.section_gap;
