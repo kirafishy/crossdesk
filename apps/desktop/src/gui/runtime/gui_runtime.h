@@ -51,13 +51,16 @@ class GuiRuntime : protected gui_detail::GuiState {
 
   int CreateConnectionPeer();
   int ConnectTo(const std::string& remote_id, const char* password,
-                bool remember_password, bool bypass_presence_check = false);
+                bool remember_password, bool bypass_presence_check = false,
+                bool background = false);
   int RequestSingleDevicePresence(const std::string& remote_id,
                                   const char* password, bool remember_password);
   int ForceSignalReconnect();
 
   void HandleRecentConnections();
   void HandleConnectionStatusChange();
+  void HandlePendingRejoins();
+  void CancelPendingConnection(const std::string& remote_id);
   void HandlePendingPresenceProbe();
   void HandlePresenceProbeTimeout();
   bool HasActiveSession();

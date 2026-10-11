@@ -71,6 +71,8 @@ struct FileTransferState {
 // Runtime state for one connected or connecting remote endpoint. It groups the
 // connection, media, input, window and transfer data that share one lifetime.
 struct RemoteSession {
+  // Wall membership, stream-window visibility and input ownership are separate.
+  std::atomic<bool> wall_managed_{false};
   std::atomic<bool> preview_subscription_supported_{false};
   std::atomic<uint32_t> preview_ack_{0};
   std::atomic<bool> preview_accepted_{false};
@@ -136,7 +138,7 @@ struct RemoteSession {
   std::shared_ptr<VideoLatencyStats> video_latency_ =
       std::make_shared<VideoLatencyStats>();
   bool tab_selected_ = false;
-  bool tab_opened_ = true;
+  std::atomic<bool> tab_opened_{true};
   std::string remote_host_name_;
   // Host metadata and dismissal state belong to this connection and are
   // protected by remote_version_mutex_.

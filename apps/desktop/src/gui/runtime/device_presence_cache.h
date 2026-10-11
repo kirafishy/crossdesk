@@ -9,6 +9,7 @@
 
 #include <chrono>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -33,12 +34,19 @@ public:
     }
   }
 
-  bool IsOnline(const std::string &device_id,
-                Clock::time_point now = Clock::now()) const {
+  std::optional<bool> GetOnline(const std::string &device_id,
+                               Clock::time_point now = Clock::now()) const {
     std::lock_guard<std::mutex> lock(mutex_);
     const auto it = cache_.find(device_id);
-    return signal_connected_ && it != cache_.end() && it->second.online &&
-           now - it->second.updated_at < kMaxAge;
+    if (!signal_connected_ || it == cache_.end() ||
+        now - it->second.updated_at >= kMaxAge)
+      return std::nullopt;
+    return it->second.online;
+  }
+
+  bool IsOnline(const std::string &device_id,
+                Clock::time_point now = Clock::now()) const {
+    return GetOnline(device_id, now).value_or(false);
   }
 
   void Clear() {

@@ -1867,13 +1867,7 @@ void GuiApplication::Tick() {
 
   if (need_to_rejoin_ && now - last_rejoin_check_time_ >= 1s) {
     last_rejoin_check_time_ = now;
-    need_to_rejoin_ = false;
-    for (const auto& [_, props] : remote_sessions_) {
-      if (props && props->rejoin_) {
-        ConnectTo(props->remote_id_, props->remote_password_,
-                  props->remember_password_);
-      }
-    }
+    HandlePendingRejoins();
   }
 
   const bool was_reloading_recent_connections = reload_recent_connections_;
@@ -3703,6 +3697,7 @@ void GuiApplication::CloseRemoteClosedTabs() {
 }
 
 void GuiApplication::CloseStreamTab(const std::string& remote_id) {
+  CancelPendingConnection(remote_id);
   std::shared_ptr<RemoteSession> props;
   {
     std::shared_lock lock(remote_sessions_mutex_);

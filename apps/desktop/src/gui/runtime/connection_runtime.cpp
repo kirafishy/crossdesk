@@ -51,12 +51,46 @@ void GuiRuntime::HandleConnectionStatusChange() {
   }
   last_presence_request_attempt_at_ = now;
   const auto message =
-      BuildDevicePresenceRequest(client_id_, recent_connection_ids_, true).dump();
+      BuildDevicePresenceRequest(client_id_, recent_connection_ids_, true, {},
+                                 gallery_presence_ids_).dump();
   if (SendSignalMessage(peer_, message.data(), message.size()) == 0) {
     next_presence_refresh_at_ = now + kPresenceRefreshInterval;
   } else {
     need_to_send_recent_connections_ = true;
   }
+}
+
+void GuiRuntime::HandlePendingRejoins() {
+  need_to_rejoin_ = false;
+  std::vector<std::shared_ptr<RemoteSession>> pending;
+  {
+    std::shared_lock lock(remote_sessions_mutex_);
+    for (const auto& [_, props] : remote_sessions_) {
+      if (props && props->rejoin_ && !props->closing_)
+        pending.push_back(props);
+    }
+  }
+  for (const auto& props : pending) {
+    // Password submission already entered the validating state. Let Join
+    // report its result even when this device is absent from the presence
+    // cache (for example, a newly added DeskHub device). A failed presence
+    // probe has no auth callback and would leave the prompt validating forever.
+    ConnectTo(props->remote_id_, props->remote_password_,
+              props->remember_password_, true, props->wall_managed_.load());
+  }
+}
+
+void GuiRuntime::CancelPendingConnection(const std::string& remote_id) {
+  pending_reconnects_.erase(remote_id);
+  if (auto props = FindRemoteSession(remote_id)) props->rejoin_ = false;
+  std::lock_guard lock(pending_presence_probe_mutex_);
+  if (pending_presence_remote_id_ != remote_id) return;
+  pending_presence_probe_ = false;
+  pending_presence_result_ready_ = false;
+  pending_presence_online_ = false;
+  pending_presence_remote_id_.clear();
+  pending_presence_password_.clear();
+  pending_presence_remember_password_ = false;
 }
 
 void GuiRuntime::HandlePendingPresenceProbe() {
@@ -211,7 +245,8 @@ int GuiRuntime::RequestSingleDevicePresence(const std::string& remote_id,
   }
 
   const auto s = BuildDevicePresenceRequest(
-                     client_id_, recent_connection_ids_, false, remote_id)
+                     client_id_, recent_connection_ids_, false, remote_id,
+                     gallery_presence_ids_)
                      .dump();
 
   int ret = SendSignalMessage(peer_, s.data(), s.size());
@@ -418,7 +453,8 @@ void GuiRuntime::HandleSessionCleanup() {
     recent_connection_image_save_time_ = 0;
   }
   for (const auto& [id, request] : reconnects) {
-    ConnectTo(id, request.password.c_str(), request.remember_password);
+    ConnectTo(id, request.password.c_str(), request.remember_password, false,
+              request.background);
   }
 }
 
@@ -487,23 +523,28 @@ std::shared_ptr<GuiRuntime::RemoteSession> GuiRuntime::FindRemoteSession(
 }
 
 int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
-                          bool remember_password, bool bypass_presence_check) {
+                          bool remember_password, bool bypass_presence_check,
+                          bool background) {
   // Do not recreate a failed peer or send another probe during a server cooldown.
   if (const auto current = FindRemoteSession(remote_id);
       current && current->connection_auth_.Get().retry_after > 0) {
-    focused_remote_id_ = remote_id;
-    show_connection_status_window_ = true;
+    if (!background) focused_remote_id_ = remote_id;
+    if (!background) show_connection_status_window_ = true;
     current->rejoin_ = false;
     return 0;
   }
   if (session_cleanup_tasks_.count(remote_id)) {
-    pending_reconnects_[remote_id] = {password ? password : "", remember_password};
+    pending_reconnects_[remote_id] = {password ? password : "",
+                                      remember_password, background};
     LOG_INFO("[{}] Reconnect queued until previous peer is destroyed", remote_id);
     return 0;
   }
-  if (!bypass_presence_check && !device_presence_cache_.IsOnline(remote_id)) {
-    int ret =
-        RequestSingleDevicePresence(remote_id, password, remember_password);
+  // Wall requests, including deferred reconnects, must not replace the single
+  // interactive presence probe. Join reports availability for each session.
+  if (!background && !bypass_presence_check &&
+      !device_presence_cache_.IsOnline(remote_id)) {
+    int ret = RequestSingleDevicePresence(remote_id, password,
+                                          remember_password);
     if (ret != 0) {
       offline_warning_text_ =
           localization::device_offline[localization_language_index_];
@@ -516,7 +557,7 @@ int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
   }
 
   LOG_INFO("Connect to [{}]", remote_id);
-  focused_remote_id_ = remote_id;
+  if (!background) focused_remote_id_ = remote_id;
 
   auto stale = FindRemoteSession(remote_id);
   bool exists = stale != nullptr;
@@ -546,7 +587,7 @@ int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
         pending_reconnects_[remote_id] = {
             keep_stored_password ? std::string(stale->remote_password_)
                                  : std::string(password),
-            remember_password};
+            remember_password, background};
         CloseRemoteSession(stale);
         LOG_INFO("[{}] Reconnecting after terminal peer status {}", remote_id,
                  static_cast<int>(status));
@@ -566,6 +607,11 @@ int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
         auto props = remote_sessions_[remote_id];
         props->local_id_ = "C-" + std::string(client_id_);
         props->remote_id_ = remote_id;
+        props->wall_managed_ = background;
+        props->tab_opened_ = !background;
+        props->control_mouse_ = !background;
+        props->enable_mouse_control_ = !background;
+        props->audio_capture_button_pressed_ = !background;
         memcpy(&props->params_, &params_, sizeof(Params));
         props->params_.user_id = props->local_id_.c_str();
         props->peer_events_ = std::make_shared<PeerEventHandler>(*this);
@@ -573,7 +619,7 @@ int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
         props->peer_ = CreatePeer(&props->params_);
 
         props->connection_status_.store(ConnectionStatus::Connecting);
-        show_connection_status_window_ = true;
+        if (!background) show_connection_status_window_ = true;
 
         if (!props->peer_) {
           LOG_INFO("Create peer [{}] instance failed", props->local_id_);
@@ -612,7 +658,7 @@ int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
   auto props = FindRemoteSession(remote_id);
   if (!props || props->closing_) return -1;
   if (!props->connection_established_) {
-    show_connection_status_window_ = true;
+    if (!background) show_connection_status_window_ = true;
 
     props->remember_password_ = remember_password;
     if (password && *password &&

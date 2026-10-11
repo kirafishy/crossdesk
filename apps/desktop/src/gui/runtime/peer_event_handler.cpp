@@ -268,7 +268,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
 
   if (props) {
     runtime->is_client_mode_ = true;
-    runtime->show_connection_status_window_ = true;
+    if (!props->wall_managed_) runtime->show_connection_status_window_ = true;
     props->connection_status_.store(status);
     if (status != ConnectionStatus::Connecting && status != ConnectionStatus::Gathering)
       props->connection_auth_.Complete();
@@ -304,13 +304,13 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
           FreeRemoteAction(remote_action);
         }
 
-        if (!runtime->need_to_create_stream_window_) {
+        if (!props->wall_managed_ && !runtime->need_to_create_stream_window_) {
           runtime->need_to_create_stream_window_ = true;
         }
         props->connection_established_ = true;
         props->was_connected_ = true;
         props->recent_connection_dirty_ = true;
-        runtime->start_keyboard_capturer_ = true;
+        if (!props->wall_managed_) runtime->start_keyboard_capturer_ = true;
         break;
       }
       case ConnectionStatus::Disconnected:
