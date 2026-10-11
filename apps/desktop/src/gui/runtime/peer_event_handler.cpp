@@ -308,6 +308,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
         }
         props->connection_established_ = true;
         props->was_connected_ = true;
+        props->recent_connection_dirty_ = true;
         runtime->start_keyboard_capturer_ = true;
         break;
       }

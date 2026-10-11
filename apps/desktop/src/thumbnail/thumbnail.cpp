@@ -203,16 +203,15 @@ int Thumbnail::SaveToThumbnail(const char* nv12, int width, int height,
                                const std::string& password,
                                HostPlatform platform) {
   std::lock_guard lock(mutex_);
-  // Preserve the existing opt-in via Remember password for recent connections.
-  if (password.empty()) return 0;
+  // Successful connections are history even without saved credentials.
   if (!IsRemoteId(remote_id)) return -1;
   RecentConnection connection;
   ReadRecord(std::filesystem::path(save_path_) / (remote_id + ".json"),
              &connection);
   connection.remote_id = remote_id;
-  connection.remote_host_name = host_name;
+  if (!host_name.empty()) connection.remote_host_name = host_name;
   connection.password = password;
-  connection.remember_password = true;
+  connection.remember_password = !password.empty();
   if (platform != HostPlatform::Unknown) connection.platform = platform;
   if (!WriteRecord(connection)) return -1;
 

@@ -41,6 +41,8 @@ class Thumbnail {
   // Serialized with writes so disabling also clears any in-flight preview.
   int SetSavePreviews(bool enabled);
 
+  // Also records metadata without an image. Empty password means do not store
+  // credentials (and clears any remembered password from a previous session).
   int SaveToThumbnail(const char* nv12, int width, int height,
                       const std::string& remote_id,
                       const std::string& host_name,

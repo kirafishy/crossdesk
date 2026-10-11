@@ -206,6 +206,35 @@ int GuiRuntime::CreateConnectionPeer() {
 }
 
 void GuiRuntime::HandleRecentConnections() {
+  if (thumbnail_ && session_cleanup_tasks_.empty()) {
+    std::vector<std::shared_ptr<RemoteSession>> sessions;
+    {
+      std::shared_lock lock(remote_sessions_mutex_);
+      for (const auto& [_, props] : remote_sessions_)
+        if (props && !props->closing_ && props->was_connected_ &&
+            props->recent_connection_dirty_.exchange(false))
+          sessions.push_back(props);
+    }
+    for (const auto& props : sessions) {
+      std::string host_name;
+      HostPlatform platform;
+      {
+        std::lock_guard lock(props->remote_version_mutex_);
+        host_name = props->remote_host_name_;
+        platform = props->recent_platform_;
+      }
+      // Record a successful connection before a preview or host info arrives.
+      // The close path still updates its final thumbnail. Remember password
+      // controls only credential storage, not whether this device is listed.
+      if (thumbnail_->SaveToThumbnail(
+              nullptr, 0, 0, props->remote_id_, host_name,
+              props->remember_password_ ? props->remote_password_ : "",
+              platform) == 0)
+        reload_recent_connections_ = true;
+      else
+        LOG_ERROR("[{}] Failed to save recent connection", props->remote_id_);
+    }
+  }
   if (session_cleanup_tasks_.empty() && reload_recent_connections_ && thumbnail_) {
     uint32_t now_time = SDL_GetTicks();
     if (now_time - recent_connection_image_save_time_ >= 50) {

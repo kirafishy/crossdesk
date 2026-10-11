@@ -91,6 +91,8 @@ struct RemoteSession {
   SignalStatus signal_status_ = SignalStatus::SignalClosed;
   bool connection_established_ = false;
   std::atomic<bool> was_connected_{false};
+  // Transport callbacks publish changes; the UI thread persists history.
+  std::atomic<bool> recent_connection_dirty_{false};
   bool rejoin_ = false;
   bool net_traffic_stats_button_pressed_ = false;
   bool enable_mouse_control_ = true;

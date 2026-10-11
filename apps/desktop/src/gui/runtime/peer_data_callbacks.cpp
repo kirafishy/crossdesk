@@ -357,17 +357,21 @@ void PeerEventHandler::OnReceiveDataBuffer(
         }
       }
       // client mode
-      if (props && props->remote_host_name_.empty()) {
-        props->remote_host_name_ = std::string(remote_action.i.host_name,
-                                               remote_action.i.host_name_size);
-        LOG_INFO("Remote hostname: [{}]", props->remote_host_name_);
+      if (props) {
+        std::lock_guard lock(props->remote_version_mutex_);
+        if (props->remote_host_name_.empty()) {
+          props->remote_host_name_ = std::string(remote_action.i.host_name,
+                                                 remote_action.i.host_name_size);
+          LOG_INFO("Remote hostname: [{}]", props->remote_host_name_);
 
-        for (int i = 0; i < remote_action.i.display_num; i++) {
-          props->display_info_list_.push_back(
-              DisplayInfo(remote_action.i.display_list[i],
-                          remote_action.i.left[i], remote_action.i.top[i],
-                          remote_action.i.right[i], remote_action.i.bottom[i]));
+          for (int i = 0; i < remote_action.i.display_num; i++) {
+            props->display_info_list_.push_back(
+                DisplayInfo(remote_action.i.display_list[i],
+                            remote_action.i.left[i], remote_action.i.top[i],
+                            remote_action.i.right[i], remote_action.i.bottom[i]));
+          }
         }
+        props->recent_connection_dirty_ = true;
       }
       FreeRemoteAction(remote_action);
     } else {
