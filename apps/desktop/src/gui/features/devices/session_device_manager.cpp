@@ -49,7 +49,14 @@ SessionDeviceManager::SessionDeviceManager(GuiRuntime &owner)
             frame.data = reinterpret_cast<const char *>(data);
             frame.size = size;
             frame.captured_timestamp = GetSystemTimeMicros(owner_.peer_);
-            SendAudioFrame(owner_.peer_, &frame, owner_.audio_label_.c_str());
+            std::shared_lock lock(owner_.connection_status_mutex_);
+            for (const auto& [id, status] : owner_.connection_status_) {
+              if (status == ConnectionStatus::Connected &&
+                  owner_.preview_subscriptions_.ShouldSendAudio(id))
+                SendAudioFrameToPeer(owner_.peer_, &frame,
+                                     owner_.audio_label_.c_str(), id.data(),
+                                     id.size());
+            }
           }) {}
 
 SessionDeviceManager::~SessionDeviceManager() { speaker_capture_.Shutdown(); }
@@ -245,6 +252,8 @@ int SessionDeviceManager::InitializeScreenCapturer() {
         const auto send_started = std::chrono::steady_clock::now();
         uint64_t send_errors = 0;
         for (const std::string &remote_id : connected_remote_ids) {
+          if (!owner_.preview_subscriptions_.ShouldSend(remote_id, now_time,
+                                                        stream_id)) continue;
           if (SendVideoFrameToPeer(owner_.peer_, &frame, stream_id.c_str(),
                                    remote_id.data(), remote_id.size()) != 0)
             ++send_errors;

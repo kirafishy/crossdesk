@@ -25,6 +25,7 @@
 #include "common/task_queue_lock_free.h"
 #include "path_manager.h"
 #include "runtime/device_presence_cache.h"
+#include "runtime/preview_subscriptions.h"
 #include "runtime/remote_session.h"
 #include "runtime/session_lifecycle.h"
 #include "thumbnail.h"
@@ -36,6 +37,7 @@
 namespace crossdesk::gui_detail {
 
 struct InfrastructureState {
+  PreviewSubscriptions preview_subscriptions_;
   std::unique_ptr<ConfigCenter> config_center_;
   ConfigCenter::LANGUAGE localization_language_ =
       ConfigCenter::LANGUAGE::CHINESE;

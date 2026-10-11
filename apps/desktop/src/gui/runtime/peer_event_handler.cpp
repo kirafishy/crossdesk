@@ -288,6 +288,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               /*supports_privacy_screen=*/!runtime->unattended_host_,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
+          remote_action.i.supports_deskhub_preview = true;
           for (std::size_t i = 0; i < remote_action.i.display_num; i++) {
             LOG_INFO("Local display [{}:{}]", i + 1,
                      remote_action.i.display_list[i]);
@@ -327,6 +328,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
         }
         props->net_traffic_stats_.Reset();
         props->enable_mouse_control_ = false;
+        props->preview_subscription_supported_ = false;
         runtime->ResetRemoteServiceStatus(*props);
         {
           std::lock_guard lock(props->video_settings_mutex_);
@@ -414,6 +416,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
 
     switch (status) {
       case ConnectionStatus::Connected: {
+        runtime->preview_subscriptions_.Remove(remote_id);
 #if _WIN32
         runtime->last_windows_service_status_tick_ = 0;
 #endif
@@ -423,6 +426,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               /*supports_privacy_screen=*/!runtime->unattended_host_,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
+          remote_action.i.supports_deskhub_preview = true;
           for (std::size_t i = 0; i < remote_action.i.display_num; i++) {
             LOG_INFO("Local display [{}:{}]", i + 1,
                      remote_action.i.display_list[i]);

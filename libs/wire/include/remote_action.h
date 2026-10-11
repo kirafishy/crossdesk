@@ -137,6 +137,7 @@ struct HostInfo {
   // Optional capability; absent in legacy desktop and web host information.
   bool supports_privacy_screen;
   bool supports_video_settings;
+  bool supports_deskhub_preview;
 };
 
 struct ServiceStatus {

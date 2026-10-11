@@ -130,6 +130,7 @@ void GuiRuntime::HandlePresenceProbeTimeout() {
 
 void GuiRuntime::HandleServerControllerDisconnected(
     const std::string& remote_id, const char* reason) {
+  preview_subscriptions_.Remove(remote_id);
   keyboard_.ReleaseRemotePressedKeys(remote_id, reason);
 #ifdef _WIN32
   devices_.ReleaseRemoteMouseButtons();

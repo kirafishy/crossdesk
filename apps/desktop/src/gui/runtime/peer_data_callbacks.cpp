@@ -151,14 +151,67 @@ void PeerEventHandler::OnReceiveDataBuffer(
     return;
   }
 
+  const std::string remote_id(user_id, user_id_size);
   std::string json_str(data, size);
+  const auto preview_json =
+      json_str.find("\"deskhub_preview") != std::string::npos
+          ? nlohmann::json::parse(json_str, nullptr, false)
+          : nlohmann::json{};
+  if (preview_json.is_object() &&
+      preview_json.value("type", nlohmann::json{}) == "deskhub_preview") {
+    if (source_id != runtime->control_data_label_ ||
+        !runtime->IsAuthorizedController(remote_id))
+      return;
+    const auto subscription = PreviewSubscription::Parse(preview_json);
+    if (!subscription) return;
+    bool accepted = true;
+    // Apply encoder quality to this controller only; other controllers retain
+    // their own demand. Frame gating happens before encoding and transmission.
+    if (subscription->fps > 0 && runtime->preview_subscriptions_.IsNewer(
+                                     remote_id, subscription->request_id))
+      accepted = UpdateVideoSettings(
+                     runtime->peer_, remote_id.data(), remote_id.size(),
+                     static_cast<VideoQuality>(subscription->quality),
+                     subscription->frame_rate,
+                     static_cast<VideoDegradationPreference>(
+                         subscription->EncoderPreference())) == 0;
+    if (accepted && runtime->preview_subscriptions_.Set(remote_id, *subscription) &&
+        subscription->fps > 0)
+      RequestAllVideoKeyFrames(runtime->peer_);
+    const auto reply = nlohmann::json{
+        {"type", "deskhub_preview_status"},
+        {"version", 1},
+        {"request_id", subscription->request_id},
+        {"accepted",
+         accepted}}.dump();
+    SendReliableDataFrameToPeer(runtime->peer_, reply.data(), reply.size(),
+                                runtime->control_data_label_.c_str(),
+                                remote_id.data(), remote_id.size());
+    return;
+  }
+  if (preview_json.is_object() &&
+      preview_json.value("type", nlohmann::json{}) ==
+          "deskhub_preview_status") {
+    if (auto props = runtime->FindRemoteSession(remote_id);
+        props && source_id == props->control_data_label_) {
+      try {
+        if (preview_json.at("version") == 1 &&
+            preview_json.at("request_id").is_number_unsigned() &&
+            preview_json.at("accepted").is_boolean()) {
+          props->preview_accepted_ = preview_json.at("accepted").get<bool>();
+          props->preview_ack_ = preview_json.at("request_id").get<uint32_t>();
+        }
+      } catch (...) {
+      }
+    }
+    return;
+  }
   RemoteAction remote_action{};
   if (!remote_action.from_json(json_str)) {
     LOG_ERROR("Failed to parse RemoteAction JSON payload");
     return;
   }
 
-  std::string remote_id(user_id, user_id_size);
   if (remote_action.type == ControlType::video_settings_status) {
     if (auto props = runtime->FindRemoteSession(remote_id)) {
       if (source_id != props->control_data_label_) return;
@@ -342,6 +395,8 @@ void PeerEventHandler::OnReceiveDataBuffer(
       if (props && source_id == props->control_data_label_) {
         std::lock_guard lock(props->video_settings_mutex_);
         const bool first_advertisement = !props->video_settings_supported_;
+        props->preview_subscription_supported_ =
+            remote_action.i.supports_deskhub_preview;
         props->video_settings_supported_ =
             remote_action.i.supports_video_settings;
         if (first_advertisement && props->video_settings_supported_) {

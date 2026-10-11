@@ -20,6 +20,7 @@
 #include <vector>
 
 #include <remote_action.h>
+#include <preview_subscription.h>
 #include <stream_names.h>
 #include "display_info.h"
 #include "cursor_presentation.h"
@@ -70,6 +71,12 @@ struct FileTransferState {
 // Runtime state for one connected or connecting remote endpoint. It groups the
 // connection, media, input, window and transfer data that share one lifetime.
 struct RemoteSession {
+  std::atomic<bool> preview_subscription_supported_{false};
+  std::atomic<uint32_t> preview_ack_{0};
+  std::atomic<bool> preview_accepted_{false};
+  uint32_t preview_request_ = 0;
+  PreviewSubscription preview_requested_;
+  std::chrono::steady_clock::time_point preview_request_at_{};
   Params params_;
   PeerPtr* peer_ = nullptr;
   std::shared_ptr<PeerEventHandler> peer_events_;

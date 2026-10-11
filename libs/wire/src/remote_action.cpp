@@ -26,6 +26,7 @@ void ResetHostInfo(HostInfo& info) {
   info.bottom = nullptr;
   info.supports_privacy_screen = false;
   info.supports_video_settings = false;
+  info.supports_deskhub_preview = false;
 }
 
 bool AllocateHostDisplays(HostInfo& info, std::size_t count) {
@@ -219,7 +220,8 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
           {"display_num", action.i.display_num},
           {"displays", displays},
           {"supports_privacy_screen", action.i.supports_privacy_screen},
-          {"supports_video_settings", action.i.supports_video_settings}};
+          {"supports_video_settings", action.i.supports_video_settings},
+          {"supports_deskhub_preview", action.i.supports_deskhub_preview}};
       break;
     }
     case ControlType::invalid:
@@ -412,6 +414,8 @@ bool RemoteAction::FromJson(const std::string& json_string,
             privacy_support->is_boolean() && privacy_support->get<bool>();
         output.i.supports_video_settings =
             host_info_object.value("supports_video_settings", false);
+        output.i.supports_deskhub_preview =
+            host_info_object.value("supports_deskhub_preview", false);
         const std::string host_name =
             host_info_object.at("host_name").get<std::string>();
         std::strncpy(output.i.host_name, host_name.c_str(),
