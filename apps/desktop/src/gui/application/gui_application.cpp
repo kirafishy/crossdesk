@@ -74,10 +74,6 @@ namespace {
 
 using namespace std::chrono_literals;
 
-// Median reconnect to the signal server lands around 7 s on a lossy path, so a
-// drop shorter than this is almost always already being recovered from.
-constexpr auto kSignalOfflineGrace = 10s;
-
 std::optional<std::string> GenerateRandomPassword(std::string_view current) {
   constexpr std::string_view alphabet =
       "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -1890,6 +1886,7 @@ void GuiApplication::Tick() {
   HandlePasswordChangeResult();
   HandleCredentialRecovery();
   if (!peer_) {
+    signal_connection_indicator_.Reset();
     CreateConnectionPeer();
   }
 #ifdef __linux__
@@ -2482,20 +2479,9 @@ void GuiApplication::SyncMainWindow() {
     ui_->main->set_password_change_pending(password_change_pending_);
   }
   const bool signal_online = signal_connected_.load();
-  if (signal_online) {
-    signal_lost_at_valid_ = false;
-  } else if (!signal_lost_at_valid_) {
-    signal_lost_at_ = std::chrono::steady_clock::now();
-    signal_lost_at_valid_ = true;
-  }
-  // Reconnects routinely take several seconds on a lossy path; only report
-  // offline once the connection has stayed down long enough to be a real
-  // outage rather than a blip the reconnect is already recovering from.
-  const bool signal_offline =
-      !signal_online && signal_lost_at_valid_ &&
-      std::chrono::steady_clock::now() - signal_lost_at_ >
-          kSignalOfflineGrace;
-  ui_->main->set_signal_connected(!signal_offline);
+  ui_->main->set_signal_connected(signal_online);
+  ui_->main->set_signal_reconnecting(
+      signal_connection_indicator_.Update(signal_online));
   ui_->main->set_signal_tls_error(signal_status_ ==
                                   SignalStatus::SignalTlsCertError);
   ui_->main->set_update_available(update_available_);
