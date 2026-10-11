@@ -60,6 +60,18 @@ private:
   void HandlePasswordChangeResult();
   void HandleCredentialRecovery();
   void SyncMainWindow();
+  void ChangeMainMode(bool gallery);
+  void ToggleGalleryFullscreen();
+  void RestoreMainWindowGeometry(bool before_show = false);
+  void SyncGallery();
+  void GalleryAction(const std::string& action, const std::string& value);
+  bool AddGalleryDevice(const std::string& id, const std::string& password,
+                        const std::string& group, bool remember_password);
+  bool ImportGalleryRecent(const std::string& group);
+  void DeviceGroupAction(const std::string& action, const std::string& value);
+  bool SaveDeviceGroups(const std::string& new_group);
+  void ReleaseControl();
+  void SaveGalleryWindowState();
   void SyncAnnouncements();
   void SyncConnectionDialog();
   void SyncPlatformDialogs();

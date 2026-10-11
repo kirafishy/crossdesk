@@ -1,3 +1,6 @@
+#include <libyuv.h>
+
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <memory>
@@ -5,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "nv12_scaler.h"
 #include "platform/video_renderer.h"
 #include "runtime/gui_runtime.h"
 #include "runtime/peer_event_handler.h"
@@ -46,6 +50,68 @@ void PeerEventHandler::OnReceiveVideoBuffer(
 
   if (props->connection_established_) {
     const auto timing_now = VideoLatencyFrame::Clock::now();
+    // Convert only visible thumbnails, off the UI thread. A session retains
+    // one latest RGBA image, not an unbounded queue of frames.
+    const int preview_width = props->gallery_preview_width_.load();
+    // Multiple video streams may decode concurrently for the same session.
+    // Serialize access to the shared conversion buffers. Visible previews
+    // consume incoming frames at the negotiated interactive cadence.
+    std::unique_lock conversion_lock(props->gallery_conversion_mutex_,
+                                     std::defer_lock);
+    if (preview_width > 0) conversion_lock.lock();
+    if (conversion_lock.owns_lock()) {
+      const auto* native = GetNativeVideoFrame(video_frame);
+      const int w = native ? native->width : video_frame->width;
+      const int h = native ? native->height : video_frame->height;
+      if (w > 0 && h > 0 && w <= 16384 && h <= 16384 && !(w % 2) && !(h % 2)) {
+        const size_t bytes = static_cast<size_t>(w) * h * 3 / 2;
+        const uint8_t* data =
+            reinterpret_cast<const uint8_t*>(video_frame->data);
+        if (native) {
+          props->gallery_nv12_.resize(bytes);
+          data = native->copy_to_nv12(native->owner,
+                                      props->gallery_nv12_.data(), bytes) == 0
+                     ? props->gallery_nv12_.data()
+                     : nullptr;
+        } else if (video_frame->size < bytes)
+          data = nullptr;
+        if (data) {
+          const double scale = std::min(
+              {1.0, double(preview_width) / w, double(preview_width) / h});
+          const int dw = std::max(2, int(w * scale) & ~1);
+          const int dh = std::max(2, int(h * scale) & ~1);
+          auto& scaled = props->gallery_scaled_;
+          scaled.resize(static_cast<size_t>(dw) * dh * 3 / 2);
+          if (ScaleNv12ViaI420(data, w, data + w * h, w, w, h, scaled.data(),
+                               dw, scaled.data() + dw * dh, dw, dw, dh,
+                               libyuv::kFilterBilinear,
+                               &props->gallery_scratch_) == 0) {
+            auto rgba = std::make_shared<std::vector<unsigned char>>(
+                static_cast<size_t>(dw) * dh * 4);
+            if (libyuv::NV12ToABGR(scaled.data(), dw, scaled.data() + dw * dh,
+                                   dw, rgba->data(), dw * 4, dw, dh) == 0) {
+              std::lock_guard lock(props->gallery_frame_mutex_);
+              props->gallery_rgba_ = std::move(rgba);
+              props->gallery_width_ = dw;
+              props->gallery_height_ = dh;
+              props->gallery_frame_at_ = timing_now;
+              ++props->gallery_sequence_;
+            }
+          }
+        }
+      }
+    }
+    if (conversion_lock.owns_lock()) conversion_lock.unlock();
+    // A wall-only session does not need a second full-resolution CPU buffer.
+    if (props->wall_managed_ && !props->tab_opened_) {
+      {
+        std::lock_guard lock(props->video_frame_mutex_);
+        props->video_width_ = video_frame->width;
+        props->video_height_ = video_frame->height;
+      }
+      props->streaming_ = true;
+      return;
+    }
     const auto timing = props->video_latency_->Frame(
         video_frame->captured_timestamp, GetSystemTimeMicros(props->peer_),
         timing_now);
@@ -205,6 +271,10 @@ void PeerEventHandler::OnReceiveAudioBuffer(
     return;
   }
 
+  std::lock_guard delivery_lock(runtime->audio_delivery_mutex_);
+  const auto session =
+      runtime->FindRemoteSession(std::string(user_id, user_id_size));
+  if (!session || !session->audio_allowed_.load()) return;
   runtime->audio_buffer_fresh_ = true;
 
   runtime->devices_.PushAudio(data, size);

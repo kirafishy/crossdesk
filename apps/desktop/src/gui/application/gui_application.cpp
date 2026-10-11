@@ -1,11 +1,9 @@
 #include "application/gui_application.h"
 
-#include <remote_action.h>
-
 #include <SDL3/SDL.h>
 #include <openssl/rand.h>
+#include <remote_action.h>
 #include <slint.h>
-#include <nlohmann/json.hpp>
 #include <tinyfiledialogs.h>
 
 #include <algorithm>
@@ -18,10 +16,13 @@
 #include <cstring>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <random>
+#include <set>
 #include <shared_mutex>
 #include <sstream>
 #include <string>
@@ -33,6 +34,9 @@
 
 #include "crossdesk_ui.h"
 #include "fa_solid_900.h"
+#include "features/gallery/gallery_fullscreen_transition.h"
+#include "features/gallery/gallery_window_state.h"
+#include "features/gallery/gallery_workspace.h"
 #include "localization.h"
 #include "platform.h"
 #include "platform/video_renderer.h"
@@ -273,13 +277,11 @@ std::string FormatPeerId(const char* id) {
 }
 
 std::string FormatRemotePeerIdInput(std::string_view input) {
-  std::string digits;
-  digits.reserve(9);
-  for (const unsigned char ch : input) {
-    if (std::isdigit(ch) != 0 && digits.size() < 9) {
-      digits.push_back(static_cast<char>(ch));
-    }
-  }
+  std::string digits = gallery::Workspace::NormalizeId(std::string(input));
+  if (digits.size() > 9 ||
+      !std::all_of(digits.begin(), digits.end(),
+                   [](unsigned char c) { return c >= '0' && c <= '9'; }))
+    return digits;
   if (digits.size() > 3) {
     digits.insert(3, " ");
   }
@@ -290,11 +292,7 @@ std::string FormatRemotePeerIdInput(std::string_view input) {
 }
 
 std::string CompactPeerId(std::string id) {
-  id.erase(
-      std::remove_if(id.begin(), id.end(),
-                     [](unsigned char ch) { return std::isspace(ch) != 0; }),
-      id.end());
-  return id;
+  return gallery::Workspace::NormalizeId(id);
 }
 
 std::string Trim(std::string value) {
@@ -848,6 +846,51 @@ void DragWindow(WindowHandle& component, int phase, float mouse_x,
 }  // namespace
 
 struct GuiApplication::SlintUi {
+  gallery::Workspace gallery;
+  std::filesystem::path gallery_path;
+  std::vector<std::string> gallery_ids;
+  std::set<std::string> gallery_hidden_active_ids;
+  std::string group_edit_id;
+  std::shared_ptr<slint::VectorModel<ui::DeviceGroupOption>> group_options =
+      std::make_shared<slint::VectorModel<ui::DeviceGroupOption>>();
+  // Snapshot while the import picker is open; never includes credentials.
+  std::shared_ptr<slint::VectorModel<ui::GalleryRecentDevice>> gallery_recent_model =
+      std::make_shared<slint::VectorModel<ui::GalleryRecentDevice>>();
+  std::string gallery_focus, gallery_auth_id, gallery_requested_auth,
+      gallery_control_id;
+  std::chrono::steady_clock::time_point gallery_synced{};
+  gallery::WindowState gallery_window;
+  gallery::FullscreenTransition gallery_transition;
+  int main_restore_ticks = 0;
+  float loaded_window_scale = 0;
+  std::optional<slint::PhysicalSize> observed_main_size;
+  struct Preview {
+    std::weak_ptr<RemoteSession> session;
+    uint64_t sequence = 0;
+    slint::Image image;
+  };
+  std::unordered_map<std::string, Preview> gallery_previews;
+  struct BatchOperation {
+    std::string id, action, file;
+    // Only explicit add-device requests carry credentials; never persisted.
+    std::optional<std::string> password;
+    bool remember_password = false;
+    enum class State { Queued, Running, AwaitingPassword, Finished };
+    State state = State::Queued;
+    size_t file_index = 0;
+    std::weak_ptr<RemoteSession> session;
+    std::chrono::steady_clock::time_point started{};
+  };
+  // Transient concurrency control only; completed operations are discarded.
+  std::vector<BatchOperation> batch_operations;
+  std::string saved_window_signature;
+  std::chrono::steady_clock::time_point window_saved{};
+  std::shared_ptr<slint::VectorModel<ui::GalleryTile>> gallery_model =
+      std::make_shared<slint::VectorModel<ui::GalleryTile>>();
+  std::shared_ptr<slint::VectorModel<ui::GalleryActionDevice>> gallery_selected_model =
+      std::make_shared<slint::VectorModel<ui::GalleryActionDevice>>();
+  float pointer_x = 0, pointer_y = 0;
+  std::set<int> pressed_mouse_buttons;
   uint64_t announcement_version = UINT64_MAX;
   std::string announcement_selected_id, announcement_selected_revision;
   slint::ComponentHandle<ui::MainWindow> main = ui::MainWindow::create();
@@ -879,6 +922,8 @@ struct GuiApplication::SlintUi {
   bool connection_password_initialized = false;
   bool portable_service_dialog_initialized = false;
   std::string recent_model_signature;
+  std::optional<std::string> recent_group_filter;
+  std::vector<std::string> recent_filter_groups;
   slint::Timer timer;
   slint::Timer server_file_dialog_timer;
   WindowDragState main_drag;
@@ -971,6 +1016,9 @@ int GuiApplication::Run() {
   InitializeModules();
   update_checker_ = std::make_unique<UpdateChecker>(CROSSDESK_VERSION);
   InitializeUi();
+  // Configure the initial geometry before the native window becomes visible.
+  // Subsequent ticks only acknowledge that placement and its resolved DPI.
+  RestoreMainWindowGeometry(true);
 
   ui_->timer.start(slint::TimerMode::Repeated, 16ms, [this] { Tick(); });
   ScheduleNextVideoFrame();
@@ -981,7 +1029,8 @@ int GuiApplication::Run() {
 #if _WIN32
   ConfigureWindowsWindowIcons(ui_->main->window().win32_hwnd());
 #elif defined(__APPLE__)
-  ConfigureMainWindowChrome(ui_->main->window().appkit_view());
+  ConfigureMainWindowChrome(ui_->main->window().appkit_view(),
+                            ui_->main->get_gallery_mode());
 #endif
   slint::run_event_loop(slint::EventLoopMode::RunUntilQuit);
   Cleanup();
@@ -1108,6 +1157,48 @@ void GuiApplication::InitializeUi() {
   ui_->main->set_release_note_blocks(ui_->release_note_blocks_model);
   RegisterFontAwesome(ui_->main->window());
   ui_->main->set_recent_connections(ui_->recent_model);
+  ui_->gallery_path = std::filesystem::path(cache_path_) / "deskhub.json";
+  if (!ui_->gallery.Load(ui_->gallery_path))
+    LOG_WARN("Could not load DeskHub workspace; original file retained");
+  ui_->main->set_gallery_tiles(ui_->gallery_model);
+  ui_->main->set_gallery_selected_devices(ui_->gallery_selected_model);
+  // Always start on Connection; saved wall geometry is restored only when
+  // the user switches to DeskHub, regardless of the previous launch's mode.
+  ui_->main->set_gallery_mode(false);
+  try {
+    std::ifstream file(ui_->gallery_path.string() + ".window");
+    if (file) {
+      const auto saved = nlohmann::json::parse(file);
+      const float scale = std::max(ui_->main->window().scale_factor(), 1.0f);
+      ui_->loaded_window_scale = scale;
+      const int width = std::clamp(saved.value("width", 640), 640, 7680);
+      const int height = std::clamp(saved.value("height", 486), 486, 4320);
+      ui_->gallery_window.wall_size =
+          slint::LogicalSize(slint::Size<float>{float(width), float(height)});
+      ui_->gallery_window.wall_fullscreen = saved.value("fullscreen", false);
+      ui_->gallery_window.wall_maximized = saved.value("maximized", false);
+#if defined(__APPLE__)
+      // Older state used Slint's cached zoom flag, which could misclassify the
+      // fixed-size connection window as maximized. Keep its geometry/fullscreen
+      // state, but only trust the maximized flag written by the native check.
+      if (saved.value("version", 1) < 2)
+        ui_->gallery_window.wall_maximized = false;
+#endif
+      if (saved.contains("wall_x"))
+        ui_->gallery_window.wall_position =
+            slint::PhysicalPosition(slint::Point<int32_t>{
+                int(saved.at("wall_x").get<float>() * scale),
+                int(saved.at("wall_y").get<float>() * scale)});
+      if (saved.contains("connection_x"))
+        ui_->gallery_window.connection_position =
+            slint::PhysicalPosition(slint::Point<int32_t>{
+                int(saved.at("connection_x").get<float>() * scale),
+                int(saved.at("connection_y").get<float>() * scale)});
+      ui_->gallery_window.BeginRestore();
+    }
+  } catch (...) {
+    LOG_WARN("Could not restore DeskHub window state");
+  }
   ResetSettingsUi();
   BindMainCallbacks();
   InitializeSystemTray();
@@ -1130,7 +1221,8 @@ void GuiApplication::InitializeSystemTray() {
 #endif
     ui_->main->window().set_minimized(false);
 #if defined(__APPLE__)
-    ConfigureMainWindowChrome(ui_->main->window().appkit_view());
+    ConfigureMainWindowChrome(ui_->main->window().appkit_view(),
+                              ui_->main->get_gallery_mode());
     MacActivateWindow(ui_->main->window().appkit_view());
     // A window restored from the tray may only obtain its NSWindow after the
     // callback returns, so let the regular UI tick configure it.
@@ -1224,6 +1316,50 @@ void GuiApplication::ResetSettingsUi() {
 }
 
 void GuiApplication::BindMainCallbacks() {
+  ui_->main->on_gallery_pointer([this](slint::PointerEventButton button,
+                                       slint::PointerEventKind kind, float x,
+                                       float y) {
+    if (!ui_->gallery_control_id.empty())
+      SendPointerInput(static_cast<int>(button), static_cast<int>(kind), x, y);
+  });
+  ui_->main->on_gallery_scroll([this](float dx, float dy, float x, float y) {
+    if (!ui_->gallery_control_id.empty()) SendScrollInput(dx, dy, x, y);
+  });
+  ui_->main->on_gallery_key([this](slint::SharedString text, bool pressed,
+                                   bool ctrl, bool alt, bool shift, bool meta) {
+    if (!ui_->gallery_control_id.empty())
+      SendKeyInput(std::string(text), pressed, ctrl, alt, shift, meta);
+  });
+  ui_->main->on_change_mode([this](bool wall) { ChangeMainMode(wall); });
+  ui_->main->on_toggle_gallery_fullscreen(
+      [this] { ToggleGalleryFullscreen(); });
+  ui_->main->on_gallery_action(
+      [this](slint::SharedString action, slint::SharedString value) {
+        GalleryAction(std::string(action), std::string(value));
+      });
+  ui_->main->on_gallery_add_device(
+      [this](slint::SharedString id, slint::SharedString password,
+             slint::SharedString group, bool remember) {
+        return AddGalleryDevice(std::string(id), std::string(password),
+                                std::string(group), remember);
+      });
+  ui_->main->on_gallery_import_recent([this](slint::SharedString group) {
+    return ImportGalleryRecent(std::string(group));
+  });
+  ui_->main->on_device_group_action(
+      [this](slint::SharedString action, slint::SharedString value) {
+        DeviceGroupAction(std::string(action), std::string(value));
+      });
+  ui_->main->on_device_group_save([this](slint::SharedString group) {
+    return SaveDeviceGroups(std::string(group));
+  });
+  ui_->main->on_recent_group_selected([this](int index) {
+    if (index == 1) ui_->recent_group_filter = "";
+    else if (index >= 2 && index - 2 < int(ui_->recent_filter_groups.size()))
+      ui_->recent_group_filter = ui_->recent_filter_groups[index - 2];
+    else ui_->recent_group_filter.reset();
+    SyncMainWindow();
+  });
   ui_->main->on_delete_announcement([this](slint::SharedString id,
                                           slint::SharedString revision) {
     const auto parse = [](const slint::SharedString& value)
@@ -1295,7 +1431,9 @@ void GuiApplication::BindMainCallbacks() {
   main->on_copy_local_id([this] {
     if (!SDL_SetClipboardText(client_id_)) {
       LOG_WARN("Copy local id failed: {}", SDL_GetError());
+      return false;
     }
+    return true;
   });
   main->on_signal_reconnect_requested([this] {
     LOG_INFO("Signal reconnect requested from the status bar");
@@ -1327,6 +1465,15 @@ void GuiApplication::BindMainCallbacks() {
   });
   main->on_recent_connect(
       [this](slint::SharedString id) { ConnectFromUi(std::string(id)); });
+  main->on_recent_disconnect([this](slint::SharedString id) {
+    const std::string remote_id(id);
+    if (auto props = FindRemoteSession(remote_id);
+        props && props->connection_status_ == ConnectionStatus::Connected &&
+        !props->closing_) {
+      CloseStreamTab(remote_id);
+      SyncMainWindow();
+    }
+  });
   main->on_recent_edit_alias(
       [this](slint::SharedString id, slint::SharedString alias) {
         const std::string remote_id(id);
@@ -1338,6 +1485,7 @@ void GuiApplication::BindMainCallbacks() {
         }
         settings_.SaveRecentConnectionAliases();
         reload_recent_connections_ = true;
+        ui_->gallery_synced = {};
       });
   main->on_recent_delete([this](slint::SharedString id) {
     const std::string remote_id(id);
@@ -1490,9 +1638,13 @@ void GuiApplication::BindStreamCallbacks() {
     {
       std::shared_lock lock(remote_sessions_mutex_);
       for (const auto& [id, _] : remote_sessions_) {
-        ids.push_back(id);
+        if (!_->wall_managed_)
+          ids.push_back(id);
+        else
+          _->tab_opened_ = false;
       }
     }
+    ReleaseControl();
     for (const auto& id : ids) {
       CloseStreamTab(id);
     }
@@ -1529,8 +1681,14 @@ void GuiApplication::BindStreamCallbacks() {
   stream->on_reorder_tab([this](int from, float drop_x, float tab_width) {
     ReorderStreamTab(from, drop_x, tab_width);
   });
-  stream->on_close_tab(
-      [this](slint::SharedString id) { CloseStreamTab(std::string(id)); });
+  stream->on_close_tab([this](slint::SharedString id) {
+    auto props = FindRemoteSession(std::string(id));
+    if (props && props->wall_managed_) {
+      ReleaseControl();
+      props->tab_opened_ = false;
+    } else
+      CloseStreamTab(std::string(id));
+  });
   stream->on_switch_display([this](int index) {
     auto props = SelectedSession();
     if (!props || index < 0 ||
@@ -1601,10 +1759,7 @@ void GuiApplication::BindStreamCallbacks() {
     props->control_mouse_ = !props->control_mouse_;
     props->enable_mouse_control_ = props->control_mouse_;
     start_keyboard_capturer_ = props->control_mouse_;
-    if (!props->control_mouse_) {
-      devices_.StopKeyboardCapturer();
-      keyboard_.ForceReleasePressedKeys();
-    }
+    if (!props->control_mouse_) ReleaseControl();
   });
   stream->on_change_video_settings([this](int quality, int frame_rate_index,
                                           int preference) {
@@ -1722,8 +1877,9 @@ void GuiApplication::BindStreamCallbacks() {
                               bool control, bool alt, bool shift, bool meta) {
     SendKeyInput(std::string(text), pressed, control, alt, shift, meta);
   });
-  stream->on_keyboard_focus_changed(
-      [this](bool focused) { SetStreamKeyboardFocus(focused); });
+  stream->on_keyboard_focus_changed([this](bool focused) {
+    if (ui_->gallery_control_id.empty()) SetStreamKeyboardFocus(focused);
+  });
 }
 
 void GuiApplication::BindServerCallbacks() {
@@ -1886,11 +2042,13 @@ void GuiApplication::Tick() {
   SyncStreamKeyboardFocus();
 #endif
   devices_.UpdateInteractions();
+  if (!ui_->gallery_control_id.empty()) keyboard_.SendHeartbeat(false);
   ShareLocalCursorState();
 
   CloseRemoteClosedTabs();
   UpdateLocalization();
   SyncMainWindow();
+  SyncGallery();
   SyncConnectionDialog();
   SyncPlatformDialogs();
   SyncStreamWindow();
@@ -2388,7 +2546,8 @@ void GuiApplication::SyncMainWindow() {
 #endif
 #if defined(__APPLE__)
   if (ui_->main_native_titlebar_attempts > 0) {
-    if (ConfigureMainWindowChrome(ui_->main->window().appkit_view())) {
+    if (ConfigureMainWindowChrome(ui_->main->window().appkit_view(),
+                                  ui_->main->get_gallery_mode())) {
       ui_->main_native_titlebar_attempts = 0;
     } else {
       --ui_->main_native_titlebar_attempts;
@@ -2440,15 +2599,68 @@ void GuiApplication::SyncMainWindow() {
     show_offline_warning_window_ = false;
   }
 
+  // Keep this filter separate from DeskHub's current group, keyed by name so
+  // adding/removing groups does not silently select a different one by index.
+  const auto tr_group = [this](const char* zh, const char* en, const char* ru) {
+    return UiText(localization_language_index_ == 0 ? zh
+                  : localization_language_index_ == 2 ? ru : en);
+  };
+  std::vector<slint::SharedString> recent_groups{
+      tr_group("全部设备", "All devices", "Все устройства"),
+      tr_group("未分组", "Ungrouped", "Без группы")};
+  int recent_group_index = 0;
+  if (ui_->recent_group_filter) {
+    if (ui_->recent_group_filter->empty()) recent_group_index = 1;
+    else {
+      const auto found = std::find(ui_->gallery.groups.begin(),
+                                  ui_->gallery.groups.end(), *ui_->recent_group_filter);
+      if (found == ui_->gallery.groups.end()) ui_->recent_group_filter.reset();
+      else recent_group_index = int(found - ui_->gallery.groups.begin()) + 2;
+    }
+  }
+  ui_->recent_filter_groups = ui_->gallery.groups;
+  for (const auto& group : ui_->recent_filter_groups)
+    recent_groups.push_back(UiText(group));
+  const auto old_recent_groups = ui_->main->get_recent_groups();
+  bool recent_groups_changed = !old_recent_groups ||
+      old_recent_groups->row_count() != recent_groups.size();
+  if (!recent_groups_changed)
+    for (size_t i = 0; i < recent_groups.size(); ++i)
+      recent_groups_changed |= old_recent_groups->row_data(i) != recent_groups[i];
+  if (recent_groups_changed)
+    ui_->main->set_recent_groups(
+        std::make_shared<slint::VectorModel<slint::SharedString>>(recent_groups));
+  ui_->main->set_recent_group_index(recent_group_index);
+
+  // Derive group labels from the shared workspace, including devices with
+  // multiple memberships. No separate grouping metadata is stored in history.
+  std::unordered_map<std::string, std::string> group_labels;
+  for (const auto& member : ui_->gallery.members) {
+    if (member.group.empty()) continue;
+    auto& label = group_labels[member.id];
+    if (!label.empty()) label += " · ";
+    label += member.group;
+  }
+  const auto is_connected = [this](const std::string& id) {
+    const auto props = FindRemoteSession(id);
+    return props && props->connection_status_ == ConnectionStatus::Connected &&
+           !props->closing_;
+  };
   std::ostringstream signature_builder;
-  signature_builder << config_center_->IsSaveRemotePreviews() << '\n';
+  signature_builder << config_center_->IsSaveRemotePreviews() << '\n'
+                    << bool(ui_->recent_group_filter) << '\0'
+                    << ui_->recent_group_filter.value_or("") << '\n';
   for (const auto& [key, connection] : recent_connections_) {
     signature_builder << key << '\0' << connection.remote_id << '\0'
                       << connection.remote_host_name << '\0'
                       << static_cast<int>(connection.platform) << '\0'
                       << settings_.RecentConnectionDisplayName(connection)
                       << '\0'
+                      << group_labels[connection.remote_id] << '\0'
+                      << ui_->gallery.MatchesGroup(connection.remote_id,
+                                                   ui_->recent_group_filter) << '\0'
                       << device_presence_cache_.IsOnline(connection.remote_id)
+                      << '\0' << is_connected(connection.remote_id)
                       << '\n';
   }
   const std::string signature = signature_builder.str();
@@ -2460,14 +2672,18 @@ void GuiApplication::SyncMainWindow() {
   std::vector<ui::RecentConnection> model;
   model.reserve(recent_connections_.size());
   for (const auto& [_, connection] : recent_connections_) {
+    if (!ui_->gallery.MatchesGroup(connection.remote_id, ui_->recent_group_filter))
+      continue;
     // Slint-generated scalar fields have no defaults. With no image,
     // has_thumbnail must remain false so the remote platform is rendered.
     ui::RecentConnection item{};
     item.remote_id = UiText(connection.remote_id);
     item.host_name = UiText(connection.remote_host_name);
+    item.group_names = UiText(group_labels[connection.remote_id]);
     item.display_name =
         UiText(settings_.RecentConnectionDisplayName(connection));
     item.online = device_presence_cache_.IsOnline(connection.remote_id);
+    item.connected = is_connected(connection.remote_id);
     item.platform = UiText(HostPlatformName(connection.platform));
     std::vector<unsigned char> rgba;
     int image_width = 0;
@@ -2501,7 +2717,8 @@ void GuiApplication::SyncConnectionDialog() {
     return;
   }
 
-  auto props = FindRemoteSession(focused_remote_id_);
+  auto props = FindRemoteSession(
+      ui_->gallery_auth_id.empty() ? focused_remote_id_ : ui_->gallery_auth_id);
   if (!props) {
     ui_->main->set_connection_dialog_open(false);
     return;
@@ -2512,6 +2729,12 @@ void GuiApplication::SyncConnectionDialog() {
   }
   ui_->connection_dialog_remote_id = props->remote_id_;
   const ConnectionStatus status = props->connection_status_.load();
+  if (status == ConnectionStatus::Connected && !ui_->gallery_auth_id.empty()) {
+    ui_->gallery_auth_id.clear();
+    show_connection_status_window_ = false;
+    ui_->main->set_connection_dialog_open(false);
+    return;
+  }
   const auto auth = props->connection_auth_.Get();
   const bool password_required = auth.password_required ||
       (status == ConnectionStatus::IncorrectPassword && auth.validating);
@@ -2632,12 +2855,16 @@ void GuiApplication::SyncXWaylandWindowActivation() {
   Display* display = ui_->x11_focus_display;
   const ::Window active_window = X11GetActiveWindow(display);
   if (!active_window) {
+    if (!ui_->gallery_control_id.empty())
+      ReleaseControl();
     SetStreamKeyboardFocus(false);
     return;
   }
 
   if (const auto process_id = X11GetWindowProcessId(display, active_window);
       process_id && *process_id != static_cast<unsigned long>(getpid())) {
+    if (!ui_->gallery_control_id.empty())
+      ReleaseControl();
     ui_->main->set_window_active(false);
     if (ui_->stream) {
       (*ui_->stream)->set_window_active(false);
@@ -2648,6 +2875,11 @@ void GuiApplication::SyncXWaylandWindowActivation() {
 
   ui_->main->set_window_active(
       X11WindowMatches(display, active_window, ui_->main->window()));
+  if (!ui_->gallery_control_id.empty()) {
+    if (!X11WindowMatches(display, active_window, ui_->main->window()))
+      ReleaseControl();
+    return;
+  }
   if (ui_->stream) {
     const bool stream_active =
         X11WindowMatches(display, active_window, (*ui_->stream)->window());
@@ -2671,12 +2903,20 @@ void GuiApplication::SetStreamKeyboardFocus(bool focused) {
 
   focus_on_stream_window_ = focused;
   if (!focused) {
-    devices_.StopKeyboardCapturer();
-    keyboard_.ForceReleasePressedKeys();
+    ReleaseControl();
   }
 }
 
 void GuiApplication::SyncStreamKeyboardFocus() {
+  if (ui_ && !ui_->gallery_control_id.empty()) {
+#if defined(__APPLE__)
+    if (!IsMainWindowActive()) ReleaseControl();
+#elif defined(_WIN32)
+    if (GetForegroundWindow() != ui_->main->window().win32_hwnd())
+      ReleaseControl();
+#endif
+    return;
+  }
   if (!ui_ || !ui_->stream || !(*ui_->stream)->window().is_visible()) {
     SetStreamKeyboardFocus(false);
     return;
@@ -2692,10 +2932,14 @@ void GuiApplication::SyncStreamKeyboardFocus() {
 }
 
 void GuiApplication::SyncStreamWindow() {
+  if (!ui_->gallery_control_id.empty()) return;
   bool has_sessions = false;
   {
     std::shared_lock lock(remote_sessions_mutex_);
-    has_sessions = !remote_sessions_.empty();
+    has_sessions = std::any_of(remote_sessions_.begin(), remote_sessions_.end(),
+                               [](const auto& item) {
+                                 return item.second && item.second->tab_opened_;
+                               });
   }
   if (!has_sessions) need_to_create_stream_window_ = false;
   if (need_to_create_stream_window_ && !ui_->stream) {
@@ -2726,6 +2970,13 @@ void GuiApplication::SyncStreamWindow() {
   }
   if (!ui_->stream) {
     return;
+  }
+  // A wall takeover hides an existing stream window without destroying it.
+  // Opening a recent device must also restore that existing window.
+  if (need_to_create_stream_window_) {
+    (*ui_->stream)->window().set_minimized(false);
+    (*ui_->stream)->show();
+    need_to_create_stream_window_ = false;
   }
 #if _WIN32
   ConfigureWindowsWindowIcons((*ui_->stream)->window().win32_hwnd());
@@ -3103,6 +3354,7 @@ void GuiApplication::SyncStreamWindow() {
 }
 
 void GuiApplication::SyncStreamVideoFrame() {
+  if (ui_ && !ui_->gallery_control_id.empty()) return;
   if (!ui_ || !ui_->stream || !ui_->video_presenter) {
     return;
   }
@@ -3598,12 +3850,21 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
 }
 
 void GuiApplication::ConnectFromUi(const std::string& input) {
+  ui_->gallery_auth_id.clear();
   const std::string remote_id = CompactPeerId(input);
-  if (remote_id.empty()) {
+  if (!gallery::Workspace::ValidId(remote_id)) {
+    ui_->main->set_connection_input_error(
+        UiText(localization_language_index_ == 0 ? "请输入有效的 9 位设备 ID"
+               : localization_language_index_ == 2
+                   ? "Введите корректный 9-значный ID устройства"
+                   : "Enter a valid 9-digit device ID"));
     return;
   }
+  ui_->main->set_connection_input_error("");
   if (auto existing = FindRemoteSession(remote_id);
-      existing && existing->connection_established_) {
+      existing && !existing->closing_ && existing->connection_established_) {
+    ReleaseControl();
+    existing->tab_opened_ = true;
     focused_remote_id_ = remote_id;
     need_to_create_stream_window_ = true;
     return;
@@ -3627,10 +3888,8 @@ void GuiApplication::SelectStreamTab(int index) {
   const bool selection_changed = focused_remote_id_ != selected_remote_id;
   bool renderer_selection_changed = false;
   if (!controlled_remote_id_.empty() &&
-      controlled_remote_id_ != selected_remote_id) {
-    devices_.StopKeyboardCapturer();
-    keyboard_.ForceReleasePressedKeys();
-  }
+      controlled_remote_id_ != selected_remote_id)
+    ReleaseControl();
   focused_remote_id_ = selected_remote_id;
   controlled_remote_id_ = selected_remote_id;
   if (ui_->video_presenter) {
@@ -3645,10 +3904,17 @@ void GuiApplication::SelectStreamTab(int index) {
   }
   std::shared_ptr<RemoteSession> selected_session;
   {
+    std::lock_guard delivery_lock(audio_delivery_mutex_);
     std::shared_lock lock(remote_sessions_mutex_);
     for (auto& [id, props] : remote_sessions_) {
       if (props) {
         props->tab_selected_ = id == focused_remote_id_;
+        props->clipboard_allowed_ = props->tab_selected_ &&
+                                    props->control_mouse_ &&
+                                    focus_on_stream_window_;
+        props->audio_allowed_ =
+            (props->tab_selected_ && props->audio_capture_button_pressed_ &&
+             focus_on_stream_window_);
       }
     }
     const auto selected = remote_sessions_.find(selected_remote_id);
@@ -3697,7 +3963,21 @@ void GuiApplication::CloseRemoteClosedTabs() {
 }
 
 void GuiApplication::CloseStreamTab(const std::string& remote_id) {
+  // A user disconnect also cancels work that could reconnect this device.
+  // Mark in place: this can run while SyncGallery is iterating the queue.
+  for (auto& operation : ui_->batch_operations) {
+    if (operation.id == remote_id) {
+      operation.state = SlintUi::BatchOperation::State::Finished;
+      operation.password.reset();
+    }
+  }
   CancelPendingConnection(remote_id);
+  if (ui_->gallery_requested_auth == remote_id)
+    ui_->gallery_requested_auth.clear();
+  if (ui_->gallery_auth_id == remote_id) {
+    ui_->gallery_auth_id.clear();
+    show_connection_status_window_ = false;
+  }
   std::shared_ptr<RemoteSession> props;
   {
     std::shared_lock lock(remote_sessions_mutex_);
@@ -3709,6 +3989,8 @@ void GuiApplication::CloseStreamTab(const std::string& remote_id) {
   if (!props) {
     return;
   }
+  if (controlled_remote_id_ == remote_id)
+    ReleaseControl();
   keyboard_.ReleaseRemotePressedKeys(remote_id, "stream_tab_closed");
   CloseRemoteSession(props);
   ResetRemoteSessionResources(props);
@@ -3730,6 +4012,8 @@ void GuiApplication::CloseStreamTab(const std::string& remote_id) {
 
 std::shared_ptr<GuiApplication::RemoteSession>
 GuiApplication::SelectedSession() {
+  if (ui_ && !ui_->gallery_control_id.empty())
+    return FindRemoteSession(ui_->gallery_control_id);
   std::shared_lock lock(remote_sessions_mutex_);
   auto found = remote_sessions_.find(focused_remote_id_);
   if (found != remote_sessions_.end()) {
@@ -3745,19 +4029,31 @@ GuiApplication::SelectedSession() {
 
 void GuiApplication::SendPointerInput(int button, int kind, float x, float y) {
   auto props = SelectedSession();
-  if (!props || !props->peer_ || !props->control_mouse_ || !ui_->stream) {
+  if (!props || !props->peer_ || !props->control_mouse_ ||
+      (!ui_->stream && ui_->gallery_control_id.empty())) {
     return;
   }
 
   std::optional<VideoPoint> point;
   {
     std::lock_guard lock(props->video_frame_mutex_);
-    point = MapVideoPoint(x, y, (*ui_->stream)->get_video_area_width(),
-                          (*ui_->stream)->get_video_area_height(),
+    point = MapVideoPoint(x, y,
+                          ui_->gallery_control_id.empty()
+                              ? (*ui_->stream)->get_video_area_width()
+                              : ui_->main->get_gallery_video_width(),
+                          ui_->gallery_control_id.empty()
+                              ? (*ui_->stream)->get_video_area_height()
+                              : ui_->main->get_gallery_video_height(),
                           props->video_width_, props->video_height_);
   }
-  if (!point) {
+  if (kind == 0) {
+    ReleaseControl();
     return;
+  }
+  if (kind == 2 && !ui_->pressed_mouse_buttons.count(button)) return;
+  if (!point) {
+    if (kind != 2) return;
+    point = VideoPoint{ui_->pointer_x, ui_->pointer_y};
   }
 
   RemoteAction action{};
@@ -3790,6 +4086,10 @@ void GuiApplication::SendPointerInput(int button, int kind, float x, float y) {
     return;
   }
 
+  if (kind == 1) ui_->pressed_mouse_buttons.insert(button);
+  if (kind == 2) ui_->pressed_mouse_buttons.erase(button);
+  ui_->pointer_x = point->x;
+  ui_->pointer_y = point->y;
   controlled_remote_id_ = props->remote_id_;
   const std::string message = action.to_json();
   {
@@ -3803,14 +4103,20 @@ void GuiApplication::SendPointerInput(int button, int kind, float x, float y) {
 void GuiApplication::SendScrollInput(float delta_x, float delta_y, float x,
                                      float y) {
   auto props = SelectedSession();
-  if (!props || !props->peer_ || !props->control_mouse_ || !ui_->stream) {
+  if (!props || !props->peer_ || !props->control_mouse_ ||
+      (!ui_->stream && ui_->gallery_control_id.empty())) {
     return;
   }
   std::optional<VideoPoint> point;
   {
     std::lock_guard lock(props->video_frame_mutex_);
-    point = MapVideoPoint(x, y, (*ui_->stream)->get_video_area_width(),
-                          (*ui_->stream)->get_video_area_height(),
+    point = MapVideoPoint(x, y,
+                          ui_->gallery_control_id.empty()
+                              ? (*ui_->stream)->get_video_area_width()
+                              : ui_->main->get_gallery_video_width(),
+                          ui_->gallery_control_id.empty()
+                              ? (*ui_->stream)->get_video_area_height()
+                              : ui_->main->get_gallery_video_height(),
                           props->video_width_, props->video_height_);
   }
   if (!point) {
@@ -3882,6 +4188,1038 @@ bool GuiApplication::OpenUrl(const std::string& url) {
   return SDL_OpenURL(url.c_str());
 }
 
+void GuiApplication::ReleaseControl() {
+  const auto gallery_target = ui_->gallery_control_id;
+  devices_.StopKeyboardCapturer();
+  keyboard_.ForceReleasePressedKeys();
+  if (auto props = FindRemoteSession(controlled_remote_id_);
+      props && props->peer_) {
+    for (int button : ui_->pressed_mouse_buttons) {
+      RemoteAction action{};
+      action.type = ControlType::mouse;
+      action.m.x = ui_->pointer_x;
+      action.m.y = ui_->pointer_y;
+      action.m.flag = button == 1   ? MouseFlag::left_up
+                      : button == 2 ? MouseFlag::right_up
+                                    : MouseFlag::middle_up;
+      const auto message = action.to_json();
+      SendReliableDataFrame(props->peer_, message.data(), message.size(),
+                            props->mouse_label_.c_str());
+    }
+  }
+  if (!ui_->gallery_control_id.empty()) {
+    ui_->gallery_control_id.clear();
+    ui_->main->set_gallery_controlling(false);
+  }
+  ui_->pressed_mouse_buttons.clear();
+  std::lock_guard delivery_lock(audio_delivery_mutex_);
+  devices_.ClearAudio();
+  std::shared_lock lock(remote_sessions_mutex_);
+  for (const auto& [id, props] : remote_sessions_) {
+    ++props->input_generation_;
+    props->clipboard_allowed_ = false;
+    props->audio_allowed_ = false;
+    if (id == gallery_target) {
+      props->control_mouse_ = false;
+      props->enable_mouse_control_ = false;
+      props->audio_capture_button_pressed_ = false;
+    }
+  }
+  controlled_remote_id_.clear();
+  start_keyboard_capturer_ = false;
+}
+
+void GuiApplication::ChangeMainMode(bool wall) {
+  if (!ui_ || ui_->main->get_gallery_mode() == wall) return;
+  ui_->gallery_transition.Cancel();
+  ui_->main->set_gallery_transitioning(false);
+  ui_->main->set_gallery_content_visible(true);
+  ReleaseControl();
+  auto& window = ui_->main->window();
+#if defined(__APPLE__)
+  const bool fullscreen = IsMainWindowFullscreen();
+  const bool maximized = IsMainWindowMaximized();
+#else
+  const bool fullscreen = window.is_fullscreen();
+  const bool maximized = window.is_maximized();
+#endif
+  ui_->gallery_window.BeginModeChange(wall, window.position(), window.size(),
+                                      window.scale_factor(), fullscreen, maximized,
+                                      ui_->main->get_wayland_titlebar() ? 518.0f
+                                      : ui_->main->get_custom_titlebar() ? 517.0f : 486.0f);
+  LOG_INFO("DeskHub mode requested: {}; client={}x{} scale={}",
+           wall ? "wall" : "connection", window.size().width,
+           window.size().height, window.scale_factor());
+  if (!wall) {
+#if defined(__APPLE__)
+    SetMainWindowFullscreen(false);
+#else
+    window.set_fullscreen(false);
+    window.set_maximized(false);
+#endif
+  }
+  ui_->gallery.selected.clear();
+  ui_->gallery_auth_id.clear();
+  ui_->gallery_requested_auth.clear();
+  show_connection_status_window_ = false;
+  ui_->main->invoke_reset_gallery_transient();
+  ui_->main->set_gallery_fullscreen(false);
+  ui_->main->set_gallery_mode(wall);
+  if (wall) need_to_send_recent_connections_ = true;
+  // Geometry is recorded again only after the native window acknowledges it.
+  ui_->main_restore_ticks = 0;
+  ui_->main_native_titlebar_attempts = 30;
+  ui_->gallery_synced = {};
+  show_password_ = false;
+}
+
+void GuiApplication::ToggleGalleryFullscreen() {
+  if (!ui_ || !ui_->main->get_gallery_mode() ||
+      ui_->gallery_transition.Active()) return;
+#if defined(__APPLE__)
+  const bool fullscreen = IsMainWindowFullscreen();
+#else
+  const bool fullscreen = ui_->main->window().is_fullscreen();
+#endif
+  const bool target = !(ui_->gallery_window.Restoring()
+                            ? ui_->gallery_window.wall_fullscreen : fullscreen);
+  ui_->gallery_transition.Begin(target, std::chrono::steady_clock::now());
+  ReleaseControl();
+  ui_->main->set_gallery_transitioning(true);
+  ui_->main->set_gallery_content_visible(false);
+  ui_->gallery_synced = {};
+}
+
+void GuiApplication::SaveGalleryWindowState() {
+  if (ui_->gallery_window.Restoring() || ui_->gallery_transition.Active()) return;
+  const auto now = std::chrono::steady_clock::now();
+  if (now - ui_->window_saved > 1s || exit_) {
+    const float scale = std::max(ui_->main->window().scale_factor(), 1.0f);
+    nlohmann::json state{{"version", 2},
+                         {"fullscreen", ui_->gallery_window.wall_fullscreen},
+                         {"maximized", ui_->gallery_window.wall_maximized}};
+    if (ui_->gallery_window.wall_size) {
+      state["width"] = int(std::lround(ui_->gallery_window.wall_size->width));
+      state["height"] = int(std::lround(ui_->gallery_window.wall_size->height));
+    }
+    if (ui_->gallery_window.wall_position) {
+      state["wall_x"] = ui_->gallery_window.wall_position->x / scale;
+      state["wall_y"] = ui_->gallery_window.wall_position->y / scale;
+    }
+    if (ui_->gallery_window.connection_position) {
+      state["connection_x"] =
+          ui_->gallery_window.connection_position->x / scale;
+      state["connection_y"] =
+          ui_->gallery_window.connection_position->y / scale;
+    }
+    const auto text = state.dump();
+    if (text != ui_->saved_window_signature &&
+        gallery::WriteAtomically(ui_->gallery_path.string() + ".window", text))
+      ui_->saved_window_signature = text;
+    ui_->window_saved = now;
+  }
+}
+
+bool GuiApplication::AddGalleryDevice(const std::string& input,
+                                      const std::string& password,
+                                      const std::string& group,
+                                      bool remember_password) {
+  const auto error = [this](const char* zh, const char* en, const char* ru) {
+    ui_->main->set_gallery_notice(UiText(
+        localization_language_index_ == 0 ? zh
+        : localization_language_index_ == 2 ? ru : en));
+    return false;
+  };
+  const auto id = gallery::Workspace::NormalizeId(input);
+  if (!gallery::Workspace::ValidId(id))
+    return error("请输入有效的 9 位设备 ID",
+                 "Enter a valid 9-digit device ID",
+                 "Введите корректный 9-значный ID устройства");
+  if (password.empty() || password.size() > 6 ||
+      password.find_first_not_of(
+          "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") !=
+          std::string::npos)
+    return error("请输入不超过 6 位的字母或数字密码",
+                 "Use a password of 1–6 letters or digits",
+                 "Пароль: 1–6 латинских букв или цифр");
+  if (!signal_connected_)
+    return error("尚未连接服务器，请稍后重试",
+                 "Not connected to the server; try again shortly",
+                 "Нет соединения с сервером. Повторите позже");
+  using State = SlintUi::BatchOperation::State;
+  for (const auto& operation : ui_->batch_operations)
+    if (operation.id == id && operation.action == "connect" &&
+        (operation.state == State::Queued || operation.state == State::Running))
+      return error("该设备正在连接，请稍候",
+                   "This device is already connecting",
+                   "Устройство уже подключается");
+
+  auto updated = ui_->gallery;
+  updated.Add(id, Trim(group));
+  if (!updated.Save(ui_->gallery_path))
+    return error("保存失败，请重试", "Could not save; try again",
+                 "Не удалось сохранить");
+  ui_->gallery = std::move(updated);
+  ui_->gallery_hidden_active_ids.erase(id);
+  if (auto props = FindRemoteSession(id)) props->wall_managed_ = true;
+  for (auto& operation : ui_->batch_operations)
+    if (operation.id == id && operation.action == "connect" &&
+        operation.state == State::AwaitingPassword)
+      operation.state = State::Finished;
+  SlintUi::BatchOperation operation;
+  operation.id = id;
+  operation.action = "connect";
+  operation.password = password;
+  operation.remember_password = remember_password;
+  ui_->batch_operations.push_back(std::move(operation));
+  ui_->gallery_requested_auth = id;
+  ui_->gallery_focus.clear();
+  ui_->main->set_gallery_group_index(0);
+  const auto ids = ui_->gallery.Ids();
+  ui_->gallery.page = (std::find(ids.begin(), ids.end(), id) - ids.begin()) /
+                      ui_->gallery.capacity;
+  ui_->gallery_synced = {};
+  ui_->main->set_gallery_notice("");
+  return true;
+}
+
+bool GuiApplication::ImportGalleryRecent(const std::string& input_group) {
+  std::vector<std::string> ids;
+  for (size_t i = 0; i < ui_->gallery_recent_model->row_count(); ++i) {
+    const auto device = ui_->gallery_recent_model->row_data(i);
+    if (device && device->selected) ids.emplace_back(device->id);
+  }
+  if (ids.empty()) return false;
+  const auto group = Trim(input_group);
+  auto updated = ui_->gallery;
+  updated.AddMany(ids, group);
+  if (!updated.Save(ui_->gallery_path)) {
+    ui_->main->set_gallery_notice(UiText(
+        localization_language_index_ == 0 ? "保存失败，请重试"
+        : localization_language_index_ == 2 ? "Не удалось сохранить"
+                                            : "Could not save; try again"));
+    return false;
+  }
+  ui_->gallery = std::move(updated);
+  // Import only membership. Existing recent credentials remain in their own
+  // store and are looked up by the normal connect action when requested.
+  for (const auto& id : ids) {
+    ui_->gallery_hidden_active_ids.erase(id);
+    if (auto props = FindRemoteSession(id)) props->wall_managed_ = true;
+  }
+  ui_->gallery_focus.clear();
+  ui_->gallery.selected.clear();
+  ui_->main->set_gallery_batch(false);
+  const int group_index = group.empty() ? 0 :
+      int(std::find(ui_->gallery.groups.begin(), ui_->gallery.groups.end(), group) -
+          ui_->gallery.groups.begin()) + 1;
+  ui_->main->set_gallery_group_index(group_index);
+  const auto visible = ui_->gallery.Ids(group);
+  ui_->gallery.page = (std::find(visible.begin(), visible.end(), ids.front()) -
+                      visible.begin()) / ui_->gallery.capacity;
+  ui_->gallery_synced = {};
+  ui_->main->set_gallery_notice("");
+  return true;
+}
+
+void GuiApplication::DeviceGroupAction(const std::string& action,
+                                       const std::string& value) {
+  ui_->main->set_device_group_error("");
+  if (action == "close") {
+    ui_->group_edit_id.clear();
+    ui_->group_options->set_vector({});
+  } else if (action == "open") {
+    ui_->group_edit_id = value;
+    std::vector<ui::DeviceGroupOption> options;
+    options.push_back({"", true});
+    for (const auto& name : ui_->gallery.groups) {
+      const bool selected = std::any_of(
+          ui_->gallery.members.begin(), ui_->gallery.members.end(),
+          [&](const auto& m) { return m.id == value && m.group == name; });
+      options.push_back({UiText(name), selected});
+      if (selected) options.front().selected = false;
+    }
+    ui_->group_options->set_vector(options);
+    ui_->main->set_device_group_options(ui_->group_options);
+  } else if (action == "toggle" && !ui_->group_edit_id.empty()) {
+    bool grouped = false;
+    for (size_t i = 1; i < ui_->group_options->row_count(); ++i) {
+      auto option = *ui_->group_options->row_data(i);
+      if (value.empty()) option.selected = false;
+      else if (std::string(option.name) == value) option.selected = !option.selected;
+      grouped |= option.selected;
+      ui_->group_options->set_row_data(i, option);
+    }
+    ui_->group_options->set_row_data(0, {"", !grouped});
+    if (value.empty()) ui_->main->set_device_group_new_name("");
+  }
+}
+
+bool GuiApplication::SaveDeviceGroups(const std::string& new_group) {
+  const auto& id = ui_->group_edit_id;
+  if (!gallery::Workspace::ValidId(id)) return false;
+  std::vector<std::string> names;
+  for (size_t i = 0; i < ui_->group_options->row_count(); ++i) {
+    const auto option = *ui_->group_options->row_data(i);
+    if (option.selected && !option.name.empty()) names.emplace_back(option.name);
+  }
+  if (const auto name = Trim(new_group); !name.empty()) names.push_back(name);
+
+  auto updated = ui_->gallery;
+  if (!updated.SetGroups(id, names) || !updated.Save(ui_->gallery_path)) {
+    ui_->main->set_device_group_error(UiText(
+        localization_language_index_ == 0 ? "保存失败，请重试"
+        : localization_language_index_ == 2 ? "Не удалось сохранить"
+                                            : "Could not save; try again"));
+    return false;
+  }
+  // Removing an empty group shifts indices. Retain the filter by name instead
+  // of accidentally switching to a different group at the old index.
+  const int index = ui_->main->get_gallery_group_index();
+  const auto current = index > 0 && index <= int(ui_->gallery.groups.size())
+                           ? ui_->gallery.groups[index - 1] : std::string{};
+  ui_->gallery = std::move(updated);
+  const auto found = std::find(ui_->gallery.groups.begin(),
+                               ui_->gallery.groups.end(), current);
+  ui_->main->set_gallery_group_index(
+      found == ui_->gallery.groups.end() ? 0
+      : int(found - ui_->gallery.groups.begin()) + 1);
+  // Group edits never enroll or unhide a device, or take ownership of an
+  // existing session. Only the explicit wall-add actions do that.
+  ui_->gallery_synced = {};
+  ui_->main->set_device_group_error("");
+  SyncGallery();
+  return true;
+}
+
+void GuiApplication::GalleryAction(const std::string& action,
+                                   const std::string& value) {
+  using OperationState = SlintUi::BatchOperation::State;
+  auto& wall = ui_->gallery;
+  ui_->gallery_synced = {};
+  const auto tr = [this](const char* zh, const char* en, const char* ru) {
+    return UiText(localization_language_index_ == 0   ? zh
+                  : localization_language_index_ == 2 ? ru
+                                                      : en);
+  };
+  if (action == "recent-open") {
+    ReleaseControl();
+    need_to_send_recent_connections_ = true;
+    ui_->main->set_gallery_notice("");
+    const int group_index = ui_->main->get_gallery_group_index();
+    ui_->main->set_gallery_import_group(UiText(
+        group_index > 0 && group_index <= int(wall.groups.size())
+            ? wall.groups[group_index - 1] : ""));
+    std::vector<ui::GalleryRecentDevice> devices;
+    std::set<std::string> seen;
+    for (const auto& [_, recent] : recent_connections_) {
+      if (!gallery::Workspace::ValidId(recent.remote_id) ||
+          !seen.insert(recent.remote_id).second)
+        continue;
+      ui::GalleryRecentDevice device{};
+      device.id = UiText(recent.remote_id);
+      device.name = UiText(settings_.RecentConnectionDisplayName(recent));
+      device.online = device_presence_cache_.IsOnline(recent.remote_id);
+      devices.push_back(std::move(device));
+    }
+    ui_->gallery_recent_model->set_vector(std::move(devices));
+    ui_->main->set_gallery_recent_devices(ui_->gallery_recent_model);
+    ui_->main->set_gallery_recent_selected(0);
+    return;
+  }
+  if (action == "recent-close") {
+    ui_->gallery_recent_model->set_vector({});
+    ui_->main->set_gallery_recent_selected(0);
+    ui_->main->set_gallery_notice("");
+    return;
+  }
+  if (action == "recent-select" || action == "recent-all") {
+    const bool select_all = ui_->main->get_gallery_recent_selected() <
+                           int(ui_->gallery_recent_model->row_count());
+    int count = 0;
+    for (size_t i = 0; i < ui_->gallery_recent_model->row_count(); ++i) {
+      auto device = *ui_->gallery_recent_model->row_data(i);
+      if (action == "recent-all" || std::string(device.id) == value) {
+        device.selected = action == "recent-all" ? select_all : !device.selected;
+        ui_->gallery_recent_model->set_row_data(i, device);
+      }
+      if (device.selected) ++count;
+    }
+    ui_->main->set_gallery_recent_selected(count);
+    return;
+  }
+  if (action == "add-open") {
+    ui_->main->set_gallery_notice("");
+    return;
+  } else if (action == "group") {
+    ReleaseControl();
+    wall.page = 0;
+    wall.selected.clear();
+    ui_->gallery_focus.clear();
+  } else if (action == "selection") {
+    ReleaseControl();
+    wall.selected.clear();
+    ui_->gallery_focus.clear();
+  } else if (action == "select") {
+    if (!wall.selected.erase(value)) wall.selected.insert(value);
+  } else if (action == "all-select") {
+    wall.ToggleSelectAll(ui_->gallery_ids);
+  } else if (action == "page") {
+    ReleaseControl();
+    wall.page += value == "next" ? 1 : -1;
+    ui_->gallery_focus.clear();
+  } else if (action == "focus") {
+    ReleaseControl();
+    ui_->gallery_focus = value;
+  } else if (action == "control") {
+    ReleaseControl();
+    auto props = FindRemoteSession(value);
+    if (!props || props->connection_status_ != ConnectionStatus::Connected)
+      return;
+    {
+      std::lock_guard lock(props->gallery_frame_mutex_);
+      if (!props->gallery_rgba_ ||
+          std::chrono::steady_clock::now() - props->gallery_frame_at_ > 5s)
+        return;
+    }
+    ui_->gallery_control_id = value;
+    controlled_remote_id_ = value;
+    props->control_mouse_ = true;
+    props->enable_mouse_control_ = true;
+    props->clipboard_allowed_ = true;
+    if (ui_->stream) (*ui_->stream)->hide();
+    // The main-window FocusScope owns keyboard input. Native capture stays off
+    // so local toolbar/menu events can never leak into this remote session.
+    start_keyboard_capturer_ = false;
+    ui_->main->set_gallery_controlling(true);
+  } else if (action == "remove") {
+    ReleaseControl();
+    auto updated = wall;
+    const int group_index = ui_->main->get_gallery_group_index();
+    const std::string group =
+        group_index > 0 && group_index <= int(wall.groups.size())
+            ? wall.groups[group_index - 1]
+            : "";
+    updated.Remove(value, group);
+    if (updated.Save(ui_->gallery_path)) {
+      wall = std::move(updated);
+      const auto retained =
+          std::find(wall.groups.begin(), wall.groups.end(), group);
+      ui_->main->set_gallery_group_index(
+          retained == wall.groups.end() ? 0
+          : int(retained - wall.groups.begin()) + 1);
+      // Only removing from All devices hides an active session. Removing a
+      // group assignment still leaves the device enrolled in the wall.
+      if (group.empty())
+        ui_->gallery_hidden_active_ids.insert(value);
+      ui_->gallery_focus.clear();
+    }
+  } else if (action == "release") {
+    ReleaseControl();
+  } else if (action == "connect" || action == "disconnect" || action == "file") {
+    std::vector<std::string> ids;
+    if (!value.empty())
+      ids.push_back(value);
+    else
+      for (const auto& id : ui_->gallery_ids)
+        if (wall.selected.count(id)) ids.push_back(id);
+    if (ids.empty()) return;
+    if (action == "connect" && !value.empty())
+      ui_->gallery_requested_auth = value;
+    ReleaseControl();
+    if (action == "disconnect") {
+      // Disconnect must not wait for long-running file transfers to finish.
+      for (const auto& id : ids) CloseStreamTab(id);
+      SyncGallery();
+      return;
+    }
+    // Retain IDs before the modal file picker can process another UI event.
+    std::string file;
+    if (action == "file") {
+      file = OpenFileDialog(
+          std::string(tr("选择分发文件", "Select a file", "Выберите файл")));
+      if (file.empty()) return;
+    }
+    for (const auto& id : ids) {
+      if (action == "connect" && !value.empty()) {
+        if (auto props = FindRemoteSession(id);
+            props && props->connection_auth_.Get().password_required) {
+          ui_->gallery_auth_id = id;
+          show_connection_status_window_ = true;
+        }
+      }
+      const bool pending =
+          std::any_of(ui_->batch_operations.begin(),
+                      ui_->batch_operations.end(), [&](const auto& t) {
+                        return t.id == id && t.action == action &&
+                               (t.state == OperationState::Queued ||
+                                t.state == OperationState::Running ||
+                                t.state == OperationState::AwaitingPassword);
+                      });
+      if (pending) continue;
+      SlintUi::BatchOperation operation;
+      operation.id = id;
+      operation.action = action;
+      operation.file = file;
+      ui_->batch_operations.push_back(std::move(operation));
+    }
+  }
+  SyncGallery();
+}
+
+void GuiApplication::RestoreMainWindowGeometry(bool before_show) {
+  if (!ui_ || !ui_->gallery_window.RestoringNormal()) return;
+  auto& window = ui_->main->window();
+  auto& placement = ui_->gallery_window;
+  const auto current_size = window.size();
+  const bool wall_mode = ui_->main->get_gallery_mode();
+  const float compact_height = ui_->main->get_wayland_titlebar() ? 518.0f
+                               : ui_->main->get_custom_titlebar() ? 517.0f : 486.0f;
+  if (!before_show && ui_->loaded_window_scale > 0) {
+    const float ratio = window.scale_factor() / ui_->loaded_window_scale;
+    if (ui_->gallery_window.wall_position) {
+      ui_->gallery_window.wall_position->x *= ratio;
+      ui_->gallery_window.wall_position->y *= ratio;
+    }
+    if (ui_->gallery_window.connection_position) {
+      ui_->gallery_window.connection_position->x *= ratio;
+      ui_->gallery_window.connection_position->y *= ratio;
+    }
+    ui_->loaded_window_scale = 0;
+  }
+  auto target_size = placement.RestoreSize(wall_mode, window.scale_factor(), compact_height);
+  const auto& position = ui_->main->get_gallery_mode()
+                             ? ui_->gallery_window.wall_position
+                             : ui_->gallery_window.connection_position;
+  auto restore_position = position;
+  if (position) {
+    auto safe_position = *position;
+    // Clamp the requested geometry, never a stale size read immediately
+    // after set_size while the compositor is still applying constraints.
+    auto safe_size = target_size;
+    SDL_Rect available{};
+    int display_count = 0;
+    SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+    bool found = false;
+    for (int i = 0; displays && i < display_count; ++i) {
+      SDL_Rect bounds{};
+      if (!SDL_GetDisplayUsableBounds(displays[i], &bounds)) continue;
+#if defined(__APPLE__)
+      const float scale = window.scale_factor();
+      bounds.x *= scale;
+      bounds.y *= scale;
+      bounds.w *= scale;
+      bounds.h *= scale;
+#endif
+      if (i == 0) available = bounds;
+      if (position->x < bounds.x + bounds.w - 60 &&
+          position->x + int(safe_size.width) > bounds.x + 60 &&
+          position->y >= bounds.y && position->y < bounds.y + bounds.h - 60) {
+        available = bounds;
+        found = true;
+        break;
+      }
+    }
+    SDL_free(displays);
+    // Preserve a reachable window's anchor, including intentional edge
+    // placement. Only recover coordinates when its display is unavailable.
+    if (!found && available.w > 0 && available.h > 0) {
+      const auto margin = uint32_t(32 * window.scale_factor());
+      const auto minimum = placement.RestoreSize(false, window.scale_factor(), compact_height);
+      safe_size.width = std::max(minimum.width,
+          std::min(safe_size.width, uint32_t(available.w)));
+      safe_size.height = std::max(minimum.height, std::min(
+          safe_size.height, uint32_t(std::max(1, available.h - int(margin)))));
+      safe_position.x = std::clamp(
+          safe_position.x, available.x,
+          available.x + std::max(0, available.w - int(safe_size.width)));
+      safe_position.y = std::clamp(
+          safe_position.y, available.y,
+          available.y +
+              std::max(0, available.h - int(safe_size.height) - int(margin)));
+      if (wall_mode) target_size = safe_size;
+    }
+    restore_position = safe_position;
+  }
+  if (before_show) {
+    float initial_y_offset = 0;
+#if defined(__APPLE__)
+    initial_y_offset = MainWindowInitialPositionYOffset();
+#endif
+    placement.PrepareForShow(window, wall_mode, target_size, restore_position,
+                            initial_y_offset);
+    return;
+  }
+  const bool normal_restored = placement.NormalSizeRestored(current_size, target_size);
+  if (!normal_restored) window.set_size(target_size);
+  if (restore_position) window.set_position(*restore_position);
+  if (normal_restored && wall_mode) {
+    if (ui_->gallery_window.wall_maximized &&
+        !ui_->gallery_window.wall_fullscreen) {
+#if defined(__APPLE__)
+      MaximizeMainWindowWithoutAnimation();
+#else
+      window.set_maximized(true);
+#endif
+    }
+    if (ui_->gallery_window.wall_fullscreen) {
+#if defined(__APPLE__)
+      ConfigureMainWindowChrome(window.appkit_view(), true);
+      SetMainWindowFullscreen(true);
+#else
+      window.set_fullscreen(true);
+#endif
+    }
+  }
+}
+
+void GuiApplication::SyncGallery() {
+  using OperationState = SlintUi::BatchOperation::State;
+  if (!ui_) return;
+  auto& window = ui_->main->window();
+  const auto current_size = window.size();
+  if (ui_->observed_main_size &&
+      (current_size.width != ui_->observed_main_size->width ||
+       current_size.height != ui_->observed_main_size->height)) {
+    if (!ui_->gallery_control_id.empty()) ReleaseControl();
+    // Native resize can redraw before the usual 200ms preview refresh.
+    ui_->gallery_synced = {};
+  }
+  ui_->observed_main_size = current_size;
+  const bool visible = ui_->main->get_gallery_mode() && window.is_visible() &&
+                       !window.is_minimized();
+  auto& placement = ui_->gallery_window;
+  const bool wall_mode = ui_->main->get_gallery_mode();
+  auto& transition = ui_->gallery_transition;
+  if (!visible) transition.Cancel();
+  const float compact_height = ui_->main->get_wayland_titlebar() ? 518.0f
+                               : ui_->main->get_custom_titlebar() ? 517.0f : 486.0f;
+#if defined(__APPLE__)
+  const bool fullscreen = IsMainWindowFullscreen();
+  const bool maximized = IsMainWindowMaximized();
+#else
+  const bool fullscreen = window.is_fullscreen();
+  const bool maximized = window.is_maximized();
+#endif
+  if (!transition.Active() && placement.RecoverUndersized(wall_mode, window.position(), current_size,
+                                 window.scale_factor(), window.is_visible(),
+                                 window.is_minimized(), fullscreen, maximized,
+                                 compact_height)) {
+    ui_->main_restore_ticks = 0;
+    const auto target = placement.RestoreSize(wall_mode, window.scale_factor(),
+                                               compact_height);
+    LOG_WARN("DeskHub undersized window: wall={} client={}x{} scale={}; restoring={}x{}",
+             wall_mode, current_size.width, current_size.height,
+             window.scale_factor(), target.width, target.height);
+  }
+  if (placement.Restoring() && ++ui_->main_restore_ticks == 120) {
+    const auto target = placement.RestoreSize(wall_mode, window.scale_factor(), compact_height);
+    LOG_WARN("DeskHub window restore delayed: wall={} client={}x{} target={}x{} scale={} fullscreen={} maximized={}",
+             wall_mode, current_size.width, current_size.height, target.width,
+             target.height, window.scale_factor(), fullscreen, maximized);
+  }
+  if (placement.RestoringNormal()) {
+    RestoreMainWindowGeometry();
+  } else if (placement.Restoring()) {
+    if (placement.FinishRestore(wall_mode, current_size, fullscreen, maximized))
+      LOG_INFO("DeskHub window restored: {}; client={}x{} scale={} fullscreen={} maximized={}",
+               wall_mode ? "wall" : "connection", current_size.width,
+               current_size.height, window.scale_factor(), fullscreen, maximized);
+  } else if (window.is_visible() && !window.is_minimized() && !transition.Active()) {
+    placement.Observe(wall_mode, window.position(), current_size, window.scale_factor(),
+                      fullscreen, maximized, compact_height);
+  }
+  if (wall_mode && !placement.Restoring()) {
+    if (fullscreen != ui_->main->get_gallery_fullscreen()) ReleaseControl();
+    ui_->main->set_gallery_fullscreen(fullscreen);
+  }
+  if (!ui_->gallery_control_id.empty()) {
+    auto controlled = FindRemoteSession(ui_->gallery_control_id);
+    if (!visible || !controlled || controlled->closing_ ||
+        controlled->connection_status_ != ConnectionStatus::Connected)
+      ReleaseControl();
+  }
+  const auto now = std::chrono::steady_clock::now();
+  const auto action = transition.Advance(now, current_size.width, current_size.height,
+                                         window.scale_factor(), fullscreen, placement.Restoring());
+  if (action == gallery::FullscreenTransition::Action::Apply) {
+    // Update custom chrome before native resizing; keep content hidden until
+    // both the compositor geometry and the gallery model have settled.
+    ui_->main->set_gallery_fullscreen(transition.Target());
+#if defined(__APPLE__)
+    if (!SetMainWindowFullscreen(transition.Target())) {
+      ui_->main->set_gallery_fullscreen(fullscreen);
+      transition.Reveal(now);
+    } else
+#else
+    window.set_fullscreen(transition.Target());
+#endif
+    {
+      placement.wall_fullscreen = transition.Target();
+    }
+    ui_->gallery_synced = {};
+  }
+  ui_->main->set_gallery_transitioning(transition.Active());
+  ui_->main->set_gallery_content_visible(transition.ContentVisible());
+  if (!transition.Active() && now - ui_->gallery_synced <
+      (visible ? 16ms : 200ms))
+    return;
+  ui_->gallery_synced = now;
+  // Track every group, including devices that have never connected, without
+  // replacing the recent-device subscription or starting an interactive probe.
+  const auto presence_ids = ui_->gallery.Ids();
+  if (gallery_presence_ids_ != presence_ids) {
+    gallery_presence_ids_ = presence_ids;
+    need_to_send_recent_connections_ = true;
+  }
+  if (ui_->main->get_gallery_importing()) {
+    // Keep the picker selection and ordering stable when presence changes.
+    for (size_t i = 0; i < ui_->gallery_recent_model->row_count(); ++i) {
+      auto device = *ui_->gallery_recent_model->row_data(i);
+      const bool online = device_presence_cache_.IsOnline(std::string(device.id));
+      if (device.online != online) {
+        device.online = online;
+        ui_->gallery_recent_model->set_row_data(i, device);
+      }
+    }
+  }
+  const auto tr = [this](const char* zh, const char* en,
+                         const char* ru) -> std::string {
+    return localization_language_index_ == 0   ? zh
+           : localization_language_index_ == 2 ? ru
+                                               : en;
+  };
+  const auto name = [this](const std::string& id) {
+    for (const auto& [_, recent] : recent_connections_)
+      if (recent.remote_id == id)
+        return settings_.RecentConnectionDisplayName(recent);
+    Thumbnail::RecentConnection device{};
+    device.remote_id = id;
+    if (auto props = FindRemoteSession(id)) {
+      std::lock_guard lock(props->remote_version_mutex_);
+      device.remote_host_name = props->remote_host_name_;
+    }
+    return settings_.RecentConnectionDisplayName(device);
+  };
+  // Limit simultaneous operations without keeping a user-facing operation list
+  // or operation history. Targets stay fixed when the selection changes.
+  int running = std::count_if(
+      ui_->batch_operations.begin(), ui_->batch_operations.end(),
+      [](const auto& t) { return t.state == OperationState::Running; });
+  for (auto& operation : ui_->batch_operations) {
+    if (operation.state == OperationState::Queued && running < 4) {
+      if (operation.action == "connect" &&
+          session_cleanup_tasks_.count(operation.id))
+        continue;
+      operation.started = now;
+      operation.state = OperationState::Running;
+      ++running;
+      auto props = FindRemoteSession(operation.id);
+      if (operation.action == "connect") {
+        const auto status = props ? props->connection_status_.load()
+                                  : ConnectionStatus::Closed;
+        const bool usable = props && props->peer_ && !props->closing_;
+        const bool connecting = usable &&
+            (status == ConnectionStatus::Connecting ||
+             status == ConnectionStatus::Gathering);
+        if (!signal_connected_)
+          operation.state = OperationState::Finished;
+        else if (!(usable && status == ConnectionStatus::Connected) &&
+                 (!connecting || operation.password)) {
+          std::string password = operation.password.value_or("");
+          bool remember = operation.remember_password;
+          if (!operation.password)
+            for (const auto& [_, recent] : recent_connections_)
+              if (recent.remote_id == operation.id) {
+                password = recent.password;
+                remember = recent.remember_password;
+                break;
+              }
+          // Join itself determines availability. Background probes must never
+          // overwrite the interactive page's single pending presence probe.
+          ConnectTo(operation.id, password.c_str(), remember, true, true);
+          props = FindRemoteSession(operation.id);
+          if (props && props->closing_) {
+            // ConnectTo retained these credentials in pending_reconnects_.
+            operation.password.reset();
+            operation.state = OperationState::Queued;
+            --running;
+            continue;
+          }
+          operation.password.reset();
+        }
+      } else if (!props || !props->peer_ ||
+                 props->connection_status_ != ConnectionStatus::Connected) {
+        operation.state = OperationState::Finished;
+      } else if (operation.action == "file") {
+        {
+          std::lock_guard lock(props->file_transfer_.file_transfer_list_mutex_);
+          operation.file_index =
+              props->file_transfer_.file_transfer_list_.size();
+        }
+        transfers_.ProcessSelectedFile(operation.file, props,
+                                       props->file_label_);
+        {
+          std::lock_guard lock(props->file_transfer_.file_transfer_list_mutex_);
+          if (operation.file_index >=
+              props->file_transfer_.file_transfer_list_.size())
+            operation.state = OperationState::Finished;
+        }
+      }
+      operation.session = props;
+    }
+    auto props = operation.session.lock();
+    if (props && ui_->gallery_requested_auth == operation.id &&
+        props->connection_auth_.Get().password_required) {
+      ui_->gallery_auth_id = operation.id;
+      ui_->gallery_requested_auth.clear();
+      show_connection_status_window_ = true;
+    }
+    if (operation.state == OperationState::Running ||
+        operation.state == OperationState::AwaitingPassword) {
+      if (!props || props->closing_)
+        operation.state = OperationState::Finished;
+      else if (operation.action == "connect") {
+        const auto status = props->connection_status_.load();
+        const auto auth = props->connection_auth_.Get();
+        if (status == ConnectionStatus::Connected)
+          operation.state = OperationState::Finished;
+        else if (auth.password_required && !auth.validating)
+          operation.state = OperationState::AwaitingPassword;
+        else if (status != ConnectionStatus::Connecting &&
+                 status != ConnectionStatus::Gathering && !auth.validating)
+          operation.state = OperationState::Finished;
+        else if (operation.state == OperationState::AwaitingPassword) {
+          operation.state = OperationState::Running;
+          operation.started = now;
+        } else if (now - operation.started > 30s) {
+          operation.state = OperationState::Finished;
+          CloseStreamTab(operation.id);
+        }
+      } else if (props->connection_status_ != ConnectionStatus::Connected)
+        operation.state = OperationState::Finished;
+      else if (operation.action == "file") {
+        std::lock_guard lock(props->file_transfer_.file_transfer_list_mutex_);
+        const auto& files = props->file_transfer_.file_transfer_list_;
+        if (operation.file_index >= files.size())
+          operation.state = OperationState::Finished;
+        else if (files[operation.file_index].status ==
+                 gui_detail::FileTransferState::FileTransferStatus::Completed)
+          operation.state = OperationState::Finished;
+        else if (files[operation.file_index].status ==
+                 gui_detail::FileTransferState::FileTransferStatus::Failed)
+          operation.state = OperationState::Finished;
+      }
+    }
+  }
+  std::erase_if(ui_->batch_operations, [](const auto& operation) {
+    return operation.state == OperationState::Finished;
+  });
+  SaveGalleryWindowState();
+
+  auto& wall = ui_->gallery;
+  std::vector<slint::SharedString> groups{
+      UiText(tr("全部设备", "All devices", "Все устройства"))};
+  for (const auto& group : wall.groups) groups.push_back(UiText(group));
+  const auto old_groups = ui_->main->get_gallery_groups();
+  bool changed_groups = !old_groups || old_groups->row_count() != groups.size();
+  if (!changed_groups)
+    for (size_t i = 0; i < groups.size(); ++i)
+      changed_groups |= old_groups->row_data(i) != groups[i];
+  if (changed_groups)
+    ui_->main->set_gallery_groups(
+        std::make_shared<slint::VectorModel<slint::SharedString>>(groups));
+  const int group_index = std::clamp(ui_->main->get_gallery_group_index(), 0,
+                                     int(wall.groups.size()));
+  auto ids = wall.Ids(group_index == 0 ? "" : wall.groups[group_index - 1]);
+  if (group_index == 0) {
+    std::shared_lock lock(remote_sessions_mutex_);
+    std::vector<std::string> active;
+    for (const auto& [id, props] : remote_sessions_)
+      if (props && !props->closing_ && !ui_->gallery_hidden_active_ids.count(id) &&
+          std::find(ids.begin(), ids.end(), id) == ids.end())
+        active.push_back(id);
+    std::sort(active.begin(), active.end());
+    ids.insert(ids.end(), active.begin(), active.end());
+  }
+  ui_->gallery_ids = ids;
+  std::erase_if(wall.selected, [&](const auto& id) {
+    return std::find(ids.begin(), ids.end(), id) == ids.end();
+  });
+  const int columns =
+      std::max(1, int((ui_->main->get_gallery_width() - 46) / 196));
+  const int rows =
+      std::max(1, int((ui_->main->get_gallery_height() - 114) / 144));
+  wall.ResizePage(columns * rows, ids.size());
+  // Resizing/fullscreen changes page capacity. Keep the focused device in
+  // the page model so the rail can still display and reveal its current card.
+  if (!ui_->gallery_focus.empty()) {
+    const auto focused = std::find(ids.begin(), ids.end(), ui_->gallery_focus);
+    if (focused != ids.end())
+      wall.page = std::distance(ids.begin(), focused) / wall.capacity;
+    else {
+      ReleaseControl();
+      ui_->gallery_focus.clear();
+    }
+  }
+  ui_->main->set_gallery_columns(columns);
+  ui_->main->set_gallery_rows(rows);
+  ui_->main->set_gallery_page(wall.page);
+  ui_->main->set_gallery_pages(
+      std::max(1, (int(ids.size()) + wall.capacity - 1) / wall.capacity));
+  ui_->main->set_gallery_count(ids.size());
+  int connected = 0, selected_on_page = 0;
+  std::set<std::string> preview_ids;
+  std::vector<ui::GalleryTile> tiles;
+  const auto make_tile = [&](const std::string& id, bool preview) {
+    ui::GalleryTile tile{};
+    tile.id = UiText(id);
+    tile.name = UiText(name(id));
+    tile.selected = wall.selected.count(id);
+    auto props = FindRemoteSession(id);
+    tile.connected = props &&
+                     props->connection_status_ == ConnectionStatus::Connected &&
+                     !props->closing_;
+    const auto online = device_presence_cache_.GetOnline(id);
+    tile.online = tile.connected || online.value_or(false);
+    tile.presence_known = tile.connected || online.has_value();
+    tile.status = UiText(
+        tile.connected ? tr("等待画面", "Waiting for video", "Ожидание видео")
+                       : tr("未连接", "Not connected", "Нет соединения"));
+    const bool queued = !tile.connected && std::any_of(
+        ui_->batch_operations.begin(), ui_->batch_operations.end(),
+        [&](const auto& operation) {
+          return operation.id == id && operation.action == "connect" &&
+                 operation.state == OperationState::Queued;
+        });
+    // A queued retry takes precedence over errors from the previous session.
+    if (queued)
+      tile.status = UiText(tr("排队中", "Queued", "В очереди"));
+    else if (props && props->connection_auth_.Get().password_required)
+      tile.status = UiText(tr("需要密码", "Password required", "Нужен пароль"));
+    else if (props && !tile.connected)
+      tile.status = UiText(ConnectionStatusText(
+          props->connection_status_.load(), localization_language_index_));
+    if (preview && visible && tile.connected) {
+      preview_ids.insert(id);
+      props->gallery_preview_width_ = ui_->gallery_focus == id ? 960 : 320;
+      std::lock_guard lock(props->gallery_frame_mutex_);
+      if (props->gallery_rgba_) {
+        auto& cached = ui_->gallery_previews[id];
+        if (cached.sequence != props->gallery_sequence_ ||
+            cached.session.lock() != props) {
+          slint::SharedPixelBuffer<slint::Rgba8Pixel> pixels(
+              props->gallery_width_, props->gallery_height_);
+          std::memcpy(pixels.begin(), props->gallery_rgba_->data(),
+                      props->gallery_rgba_->size());
+          cached.image = slint::Image(std::move(pixels));
+          cached.sequence = props->gallery_sequence_;
+          cached.session = props;
+        }
+        tile.frame = cached.image;
+        tile.has_frame = true;
+        tile.stale = now - props->gallery_frame_at_ > 5s;
+        tile.status =
+            UiText(tile.stale ? tr("画面已停留", "Frame stale", "Кадр устарел")
+                              : tr("只读预览", "View only", "Просмотр"));
+      }
+    }
+    return tile;
+  };
+  for (size_t i = 0; i < ids.size(); ++i) {
+    const auto props = FindRemoteSession(ids[i]);
+    if (props && props->connection_status_ == ConnectionStatus::Connected &&
+        !props->closing_) {
+      ++connected;
+    }
+    if (i >= size_t(wall.page * wall.capacity) &&
+        i < size_t((wall.page + 1) * wall.capacity)) {
+      if (wall.selected.count(ids[i])) ++selected_on_page;
+      tiles.push_back(make_tile(ids[i], true));
+    }
+  }
+  if (ui_->gallery_model->row_count() != tiles.size())
+    ui_->gallery_model->set_vector(std::move(tiles));
+  else
+    for (size_t i = 0; i < tiles.size(); ++i)
+      ui_->gallery_model->set_row_data(i, tiles[i]);
+  ui_->main->set_gallery_focused(ui_->gallery_focus.empty()
+                                     ? ui::GalleryTile{}
+                                     : make_tile(ui_->gallery_focus, true));
+  ui_->main->set_gallery_connected(connected);
+  if (!ui_->main->get_gallery_adding() && !ui_->main->get_gallery_importing())
+    ui_->main->set_gallery_notice("");
+  ui_->main->set_gallery_selected(wall.selected.size());
+  ui_->main->set_gallery_hidden_selected(wall.selected.size() -
+                                         selected_on_page);
+  std::vector<ui::GalleryActionDevice> selected_devices;
+  for (const auto& id : ids)
+    if (wall.selected.count(id)) {
+      ui::GalleryActionDevice device{};
+      device.id = UiText(id);
+      device.name = UiText(name(id));
+      const auto props = FindRemoteSession(id);
+      device.connected = props && !props->closing_ &&
+                         props->connection_status_ == ConnectionStatus::Connected;
+      selected_devices.push_back(std::move(device));
+    }
+  if (ui_->gallery_selected_model->row_count() != selected_devices.size())
+    ui_->gallery_selected_model->set_vector(std::move(selected_devices));
+  else
+    for (size_t i = 0; i < selected_devices.size(); ++i) {
+      const auto old = *ui_->gallery_selected_model->row_data(i);
+      const auto& device = selected_devices[i];
+      if (old.id != device.id || old.name != device.name ||
+          old.connected != device.connected)
+        ui_->gallery_selected_model->set_row_data(i, device);
+    }
+  {
+    std::shared_lock lock(remote_sessions_mutex_);
+    for (const auto& [id, props] : remote_sessions_) {
+      if (!preview_ids.count(id)) {
+        props->gallery_preview_width_ = 0;
+        std::unique_lock conversion_lock(props->gallery_conversion_mutex_,
+                                         std::try_to_lock);
+        if (conversion_lock.owns_lock()) {
+          std::vector<unsigned char>().swap(props->gallery_nv12_);
+          std::vector<unsigned char>().swap(props->gallery_scaled_);
+          std::vector<unsigned char>().swap(props->gallery_scratch_);
+        }
+        std::lock_guard frame_lock(props->gallery_frame_mutex_);
+        props->gallery_rgba_.reset();
+      }
+      if (props->preview_subscription_supported_ &&
+          props->connection_status_ == ConnectionStatus::Connected) {
+        // Every connected device retains its interactive video settings,
+        // including devices on other pages or behind a hidden wall window.
+        PreviewSubscription demand;
+        {
+          std::lock_guard settings_lock(props->video_settings_mutex_);
+          demand = PreviewSubscription::Interactive(
+              props->video_settings_.quality, props->video_settings_.frame_rate,
+              props->video_settings_.preference, props->audio_allowed_.load());
+        }
+        const bool acknowledged =
+            props->preview_ack_.load() == props->preview_request_ &&
+            props->preview_accepted_.load();
+        if (!demand.SameSettings(props->preview_requested_) ||
+            (!acknowledged && now - props->preview_request_at_ > 5s)) {
+          demand.request_id = ++props->preview_request_;
+          const auto message = demand.ToJson().dump();
+          if (SendReliableDataFrame(props->peer_, message.data(),
+                                    message.size(),
+                                    props->control_data_label_.c_str()) == 0)
+            props->preview_requested_ = demand;
+          props->preview_request_at_ = now;
+        }
+      }
+    }
+  }
+  std::erase_if(ui_->gallery_previews, [&](const auto& item) {
+    return !preview_ids.count(item.first);
+  });
+}
+
 void GuiApplication::Cleanup() {
 #ifdef __linux__
   HeadlessConsole::Instance().BindSettings(nullptr, {}, {});
@@ -3890,6 +5228,10 @@ void GuiApplication::Cleanup() {
     SDL_Quit();
     return;
   }
+  SaveGalleryWindowState();
+#if defined(__APPLE__)
+  SetMainWindowFullscreen(false);
+#endif
   ui_->timer.stop();
   ui_->server_file_dialog_timer.stop();
   ui_->video_timer.stop();

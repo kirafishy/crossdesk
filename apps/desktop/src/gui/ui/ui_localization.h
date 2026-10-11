@@ -40,6 +40,7 @@ inline int ApplyMainWindowStrings(
     int language_index) {
   const int language =
       localization::detail::ClampLanguageIndex(language_index);
+  window->global<ui::GalleryStrings>().set_language(language);
   auto& strings = window->global<ui::UiStrings>();
   auto& messages = window->global<ui::MessageStrings>();
   messages.set_messages(Text(localization::messages[language]));

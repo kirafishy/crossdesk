@@ -1,3 +1,8 @@
+import { GalleryStrings } from "device_strings.slint";
+import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
+import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint";
+import { GalleryView, GalleryTile, GalleryRecentDevice, GalleryActionDevice } from "gallery_view.slint";
+import { GroupFilter } from "group_filter.slint";
 import { LineEdit, ScrollView } from "std-widgets.slint";
 import { AnnouncementItem, MessagePanel, MessageStrings } from "message_panel.slint";
 import { FontAwesomeIcons, IconButton, CompactComboBox, ImGuiCheckBox, MiniToggleSwitch, CompactButton, PrimaryButton, SecondaryButton, ToggleSwitch, SectionTitle, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
@@ -6,7 +11,9 @@ export struct RecentConnection {
     remote-id: string,
     display-name: string,
     host-name: string,
+    group-names: string,
     online: bool,
+    connected: bool,
     thumbnail: image,
     has-thumbnail: bool,
     platform: string,
@@ -286,20 +293,86 @@ export component MainWindow inherits Window {
     title: "CrossDesk";
     icon: @image-url("../../../resources/linux/crossdesk_256x256.png");
     preferred-width: 640px;
-    preferred-height: 450px + root.titlebar-height;
+    preferred-height: 486px + root.titlebar-height;
     min-width: 640px;
-    max-width: 640px;
-    min-height: 450px + root.titlebar-height;
-    max-height: 450px + root.titlebar-height;
+    max-width: root.gallery-mode ? 16384px : 640px;
+    min-height: 486px + root.titlebar-height;
+    max-height: root.gallery-mode ? 16384px : 486px + root.titlebar-height;
     no-frame: root.custom-titlebar;
     background: root.wayland-titlebar ? transparent : white;
     default-font-size: ImGuiFontStyle.base;
 
+    in-out property <bool> gallery-mode: false;
+    in property <bool> gallery-fullscreen: false;
+    in property <bool> gallery-transitioning: false;
+    in property <bool> gallery-content-visible: true;
+    changed gallery-transitioning => {
+        if root.gallery-transitioning {
+            focus-sink.focus();
+            root.menu-open = false;
+            root.recent-tooltip-visible = false;
+        }
+    }
+    in-out property <string> connection-input-error;
+    in property <bool> gallery-controlling: false;
+    out property <float> gallery-video-width: gallery.video-width;
+    out property <float> gallery-video-height: gallery.video-height;
+    callback gallery-pointer(PointerEventButton, PointerEventKind, length, length);
+    callback gallery-scroll(length, length, length, length);
+    callback gallery-key(string, bool, bool, bool, bool, bool);
+    in property <[GalleryTile]> gallery-tiles;
+    in property <[string]> gallery-groups;
+    in-out property <int> gallery-group-index: 0;
+    in property <int> gallery-columns: 3;
+    in property <int> gallery-rows: 2;
+    in property <int> gallery-page: 0;
+    in property <int> gallery-pages: 1;
+    in property <int> gallery-count: 0;
+    in property <int> gallery-connected: 0;
+    in property <int> gallery-selected: 0;
+    in property <int> gallery-hidden-selected: 0;
+    in property <string> gallery-notice;
+    in property <[GalleryActionDevice]> gallery-selected-devices;
+    in property <GalleryTile> gallery-focused;
+    in-out property <bool> gallery-batch: false;
+    in-out property <bool> gallery-adding: false;
+    in-out property <bool> gallery-importing: false;
+    in property <[GalleryRecentDevice]> gallery-recent-devices;
+    in property <int> gallery-recent-selected: 0;
+    in property <string> gallery-import-group;
+    out property <float> gallery-width: root.width / 1px;
+    out property <float> gallery-height: gallery.height / 1px;
+    callback change-mode(bool);
+    callback toggle-gallery-fullscreen();
+    callback gallery-action(string, string);
+    callback gallery-add-device(string, string, string, bool) -> bool;
+    callback gallery-import-recent(string) -> bool;
+    in-out property <bool> device-group-open: false;
+    private property <string> device-group-id;
+    private property <string> device-group-name;
+    in property <[DeviceGroupOption]> device-group-options;
+    in property <string> device-group-error;
+    in-out property <string> device-group-new-name;
+    callback device-group-action(string, string);
+    callback device-group-save(string) -> bool;
+    function open-device-groups(id: string, name: string) {
+        root.gallery-action("release", "");
+        focus-sink.focus();
+        root.recent-tooltip-visible = false;
+        root.device-group-id = id;
+        root.device-group-name = name;
+        root.device-group-new-name = "";
+        root.device-group-action("open", id);
+        root.device-group-open = true;
+    }
+
+    public function reset-gallery-transient() { gallery.reset-transient(); root.menu-open = false; }
     in property <bool> custom-titlebar: false;
     in property <bool> wayland-titlebar: false;
     in property <bool> window-active: true;
     private property <length> titlebar-height:
-        root.custom-titlebar ? (root.wayland-titlebar ? 32px : 31px) : 0px;
+        root.custom-titlebar && !root.gallery-fullscreen ? (root.wayland-titlebar ? 32px : 31px) : 0px;
+    private property <length> content-header-height: 38px;
     private property <length> wayland-corner-radius: 12px;
     in property <string> local-id: "";
     in property <string> local-password: "";
@@ -310,6 +383,13 @@ export component MainWindow inherits Window {
     in property <bool> signal-reconnecting: false;
     in property <bool> signal-tls-error: false;
     in property <[RecentConnection]> recent-connections;
+    in property <[string]> recent-groups: [GalleryStrings.tr("全部设备", "All devices", "Все устройства"), GalleryStrings.tr("未分组", "Ungrouped", "Без группы")];
+    in-out property <int> recent-group-index: 0;
+    callback recent-group-selected(int);
+    changed recent-group-index => {
+        root.recent-tooltip-visible = false;
+        recent-scroll.viewport-x = 0px;
+    }
     in property <[AnnouncementItem]> announcements;
     in property <int> announcement-unread;
     private property <string> announcement-unread-label:
@@ -389,13 +469,14 @@ export component MainWindow inherits Window {
     // as disabled so the fixed settings layout never turns into a blank row.
     in property <bool> hardware-codec-available: true;
 
-    callback copy-local-id;
+    callback copy-local-id() -> bool;
     callback toggle-password-visibility;
     callback refresh-password;
     callback reset-password(string) -> bool;
     callback format-remote-id(string) -> string;
     callback connect-requested(string);
     callback recent-connect(string);
+    callback recent-disconnect(string);
     callback recent-edit-alias(string, string);
     callback recent-delete(string);
     callback save-settings() -> bool;
@@ -439,29 +520,28 @@ export component MainWindow inherits Window {
     in-out property <string> alias-input: "";
     in-out property <bool> delete-open: false;
     private property <string> delete-remote-id: "";
+    private property <bool> delete-from-gallery: false;
     private property <bool> copy-toast: false;
     private property <bool> compact-language: root.language-index == 0;
     private property <bool> recent-tooltip-visible: false;
     private property <string> recent-tooltip-name: "";
     private property <string> recent-tooltip-host: "";
     private property <string> recent-tooltip-id: "";
+    private property <string> recent-tooltip-groups: "";
     private property <bool> recent-tooltip-online: false;
     private property <length> recent-tooltip-pointer-x: 0px;
     private property <length> recent-tooltip-pointer-y: 0px;
     private property <length> recent-tooltip-width: 260px;
-    private property <length> recent-tooltip-height:
-        root.recent-tooltip-host != "" && root.recent-tooltip-host != root.recent-tooltip-name
-            ? 80px : 64px;
     private property <length> recent-tooltip-x: min(
         root.width - root.recent-tooltip-width - 8px,
         max(8px,
             root.recent-tooltip-pointer-x > root.width * 0.7
                 ? root.recent-tooltip-pointer-x - root.recent-tooltip-width - 12px
                 : root.recent-tooltip-pointer-x + 12px));
-    private property <length> recent-tooltip-y: min(
-        root.height - root.titlebar-height - root.recent-tooltip-height - 8px,
-        max(8px, root.recent-tooltip-pointer-y - root.recent-tooltip-height - 8px));
 
+    changed menu-open => { if root.menu-open { root.gallery-action("release", ""); } }
+    changed connection-dialog-open => { if root.connection-dialog-open { root.gallery-action("release", ""); } }
+    changed permission-dialog-open => { if root.permission-dialog-open { root.gallery-action("release", ""); } }
     changed settings-open => {
         if root.settings-open {
             root.settings-scroll-y = 0px;
@@ -490,7 +570,7 @@ export component MainWindow inherits Window {
             root.wayland-titlebar ? root.wayland-corner-radius : 0px;
         clip: root.wayland-titlebar;
 
-        if root.custom-titlebar && root.wayland-titlebar: Rectangle {
+        if root.custom-titlebar && root.wayland-titlebar && !root.gallery-fullscreen: Rectangle {
             x: 0px;
             y: 0px;
             width: parent.width;
@@ -583,7 +663,7 @@ export component MainWindow inherits Window {
             }
         }
 
-    if root.custom-titlebar && !root.wayland-titlebar: Rectangle {
+    if root.custom-titlebar && !root.wayland-titlebar && !root.gallery-fullscreen: Rectangle {
         x: 0px;
         y: 0px;
         width: root.width;
@@ -673,6 +753,12 @@ export component MainWindow inherits Window {
         width: root.width;
         height: root.height - self.y;
         clip: true;
+        opacity: root.gallery-content-visible || !root.gallery-mode ? 1 : 0;
+        animate opacity {
+            duration: 60ms;
+            easing: ease-in-out;
+            enabled: root.gallery-mode;
+        }
 
     Rectangle {
         width: parent.width;
@@ -714,10 +800,10 @@ export component MainWindow inherits Window {
         // App actions live in the content header; window controls and dragging
         // remain in the native or Windows-specific title bar above it.
         menu-button := IconButton {
-            x: parent.width - 40px;
-            y: 4px;
-            width: 32px;
-            height: 32px;
+            x: parent.width - mode-switch.x - self.width;
+            y: mode-switch.y;
+            width: mode-switch.height;
+            height: mode-switch.height;
             icon: FontAwesomeIcons.bars;
             icon-size: 14px;
             hover-background: #e1e5eb;
@@ -726,7 +812,7 @@ export component MainWindow inherits Window {
                 ? MessageStrings.unread + " " + root.announcement-unread + (root.update-available ? " · " + UiStrings.update-available : "")
                 : root.update-available ? UiStrings.update-available : "";
             z: 8;
-            clicked => { root.menu-open = !root.menu-open; }
+            clicked => { root.gallery-action("release", ""); root.menu-open = !root.menu-open; }
         }
         // Unread messages take precedence so the menu has only one indicator.
         if root.update-available && root.announcement-unread <= 0: Rectangle {
@@ -767,7 +853,7 @@ export component MainWindow inherits Window {
             }
             TouchArea {
                 mouse-cursor: pointer;
-                clicked => { root.menu-open = !root.menu-open; }
+                clicked => { root.gallery-action("release", ""); root.menu-open = !root.menu-open; }
             }
         }
         if root.announcement-unread > 0: Rectangle {
@@ -794,10 +880,51 @@ export component MainWindow inherits Window {
             }
             TouchArea {
                 mouse-cursor: pointer;
-                clicked => { root.menu-open = !root.menu-open; }
+                clicked => { root.gallery-action("release", ""); root.menu-open = !root.menu-open; }
             }
         }
 
+        mode-switch := Rectangle {
+            x: 29px; y: root.content-header-height - self.height; width: 164px; height: 24px;
+            background: #eef1f5;
+            border-width: 0.5px; border-color: #d5dbe3; border-radius: 6px;
+            Rectangle {
+                x: root.gallery-mode ? 82px : 2px;
+                y: 2px; width: 80px; height: parent.height - 4px;
+                background: @linear-gradient(180deg, #c4e0fd, #abd0f8);
+                border-width: 0.5px; border-color: #97bde5; border-radius: 4px;
+                drop-shadow-color: #315b8b20;
+                drop-shadow-blur: 2px; drop-shadow-offset-y: 1px;
+                Rectangle {
+                    x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
+                    border-width: 0.5px; border-color: #ffffff70; border-radius: 3px;
+                }
+                animate x { duration: 160ms; easing: ease-out; }
+            }
+            for label[index] in [GalleryStrings.tr("连接", "Connect", "Связь"), GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub")]: Rectangle {
+                x: 2px + index * 80px; y: 2px; width: 80px; height: parent.height - 4px;
+                Text {
+                    text: label;
+                    color: (index == 1) == root.gallery-mode ? #234b75 : #697483;
+                    font-weight: (index == 1) == root.gallery-mode ? 600 : 400;
+                    horizontal-alignment: center; vertical-alignment: center; font-size: 12px;
+                    animate color { duration: 120ms; easing: ease-out; }
+                }
+                TouchArea {
+                    clicked => { root.change-mode(index == 1); }
+                }
+            }
+        }
+        if root.gallery-mode: CompactButton {
+            x: menu-button.x - self.width - 8px;
+            y: mode-switch.y;
+            width: 87px;
+            height: mode-switch.height;
+            text: root.gallery-fullscreen ? GalleryStrings.tr("退出全屏", "Exit full", "Выйти") : GalleryStrings.tr("全屏", "Fullscreen", "На весь экран");
+            clicked => { root.toggle-gallery-fullscreen(); }
+        }
+        Rectangle {
+            y: root.content-header-height; height: parent.height - self.y - 24px; visible: !root.gallery-mode;
         // Local and remote desktop panels.
         Rectangle {
             y: 0px;
@@ -856,13 +983,14 @@ export component MainWindow inherits Window {
                                 y: 46px;
                                 width: 29px;
                                 height: 30px;
-                                icon: FontAwesomeIcons.copy;
+                                icon: root.copy-toast ? FontAwesomeIcons.check : FontAwesomeIcons.copy;
                                 icon-size: 16px;
                                 tooltip: UiStrings.copied;
                                 clicked => {
-                                    root.copy-local-id();
-                                    root.copy-toast = true;
-                                    copy-timer.restart();
+                                    if root.copy-local-id() {
+                                        root.copy-toast = true;
+                                        copy-timer.restart();
+                                    }
                                 }
                     }
                     Rectangle { x: 8px; y: 88px; width: 240px; height: 1px; background: ImGuiLineStyle.separator; }
@@ -921,7 +1049,7 @@ export component MainWindow inherits Window {
                     }
             }
 
-            Rectangle { x: parent.width / 2; y: 18px; width: 1px; height: 206px; background: ImGuiLineStyle.divider; }
+            Rectangle { x: parent.width / 2; y: 18px; width: 1px; height: 206px; background: ImGuiLineStyle.border; }
 
             SectionTitle { x: 356px; y: 9px; width: 256px; height: 31px; text: UiStrings.remote-desktop; }
             Rectangle {
@@ -959,10 +1087,11 @@ export component MainWindow inherits Window {
                                     // Run formatting after the input event has
                                     // finished so the caret state isn't reset by
                                     // a synchronous two-way binding rewrite.
-                                    edited => { remote-id-format-timer.restart(); }
+                                    edited => { root.connection-input-error = ""; remote-id-format-timer.restart(); }
                                     accepted => { root.connect-requested(root.remote-id-input); }
                                 }
                     }
+                    Text { x: 8px; y: 92px; width: 240px; height: 52px; text: root.connection-input-error; font-size: 12px; color: #a33832; wrap: word-wrap; }
                     IconButton {
                                 x: 175px;
                                 y: 42px;
@@ -982,7 +1111,7 @@ export component MainWindow inherits Window {
         // Recent connections: horizontal cards with thumbnail, state and actions.
         recent-panel := Rectangle {
             y: 234px;
-            height: 192px;
+            height: parent.height - self.y;
             background: white;
             border-width: 0px;
             border-color: ImGuiLineStyle.border;
@@ -990,6 +1119,13 @@ export component MainWindow inherits Window {
             Rectangle { y: 0px; height: 1px; background: ImGuiLineStyle.border; }
 
             SectionTitle { x: 29px; y: 7px; height: 28px; text: UiStrings.recent-connections; }
+            GroupFilter {
+                x: parent.width - self.width - 29px; y: 8px;
+                width: 155px; height: 28px;
+                model: root.recent-groups;
+                current-index <=> root.recent-group-index;
+                selected(index) => { root.recent-group-selected(index); }
+            }
 
             recent-list := Rectangle {
                 x: 29px;
@@ -1002,6 +1138,13 @@ export component MainWindow inherits Window {
                 border-radius: 10px;
                 clip: true;
 
+                if root.recent-connections.length == 0: Text {
+                    text: root.recent-group-index == 0
+                        ? GalleryStrings.tr("暂无近期连接", "No recent connections", "Нет недавних подключений")
+                        : GalleryStrings.tr("该分组暂无近期连接", "No recent connections in this group", "В этой группе нет недавних подключений");
+                    color: #808080; font-size: ImGuiFontStyle.base;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
                 recent-scroll := ScrollView {
                     width: parent.width;
                     height: parent.height;
@@ -1018,7 +1161,7 @@ export component MainWindow inherits Window {
                         height: 117px;
                         background: transparent;
                         private property <length> content-width: self.width - 30px;
-                        private property <length> toolbar-width: 79px;
+                        private property <length> toolbar-width: DeviceCardStyle.toolbar-width;
                         private property <length> toolbar-right-padding: 3px;
 
                         Rectangle {
@@ -1113,12 +1256,19 @@ export component MainWindow inherits Window {
                             image-touch := TouchArea {
                                 width: parent.width;
                                 height: 84px;
+                                private property <string> group-names: connection.group-names;
+                                changed group-names => {
+                                    if self.has-hover && root.recent-tooltip-id == connection.remote-id {
+                                        root.recent-tooltip-groups = self.group-names;
+                                    }
+                                }
                                 clicked => { root.recent-connect(connection.remote-id); }
                                 changed has-hover => {
                                     if self.has-hover {
                                         root.recent-tooltip-name = connection.display-name;
                                         root.recent-tooltip-host = connection.host-name;
                                         root.recent-tooltip-id = connection.remote-id;
+                                        root.recent-tooltip-groups = self.group-names;
                                         root.recent-tooltip-online = connection.online;
                                         root.recent-tooltip-pointer-x = recent-panel.x + recent-list.x
                                             + recent-scroll.x + recent-scroll.viewport-x
@@ -1142,41 +1292,24 @@ export component MainWindow inherits Window {
                                     }
                                 }
                             }
-                            if card-touch.has-hover: Rectangle {
+                            if card-touch.has-hover: DeviceCardActions {
                                 x: parent.width - self.width - connection-card.toolbar-right-padding;
                                 y: 85px;
-                                width: connection-card.toolbar-width;
-                                height: 23px;
-                                background: #4a4e55dc;
-                                border-radius: 5px;
-                                HorizontalLayout {
-                                    spacing: 0px;
-                                    IconButton {
-                                        width: 26px; height: 23px; icon: FontAwesomeIcons.pen; icon-size: 12px; icon-color: white;
-                                        hover-background: #ffffff2e;
-                                        pressed-background: #598cf273;
-                                        clicked => {
-                                            root.alias-remote-id = connection.remote-id;
-                                            root.alias-input = connection.display-name;
-                                            root.alias-open = true;
-                                        }
-                                    }
-                                    IconButton {
-                                        width: 26px; height: 23px; icon: FontAwesomeIcons.trash-can; icon-size: 12px; icon-color: white;
-                                        hover-background: #ffffff2e;
-                                        pressed-background: #598cf273;
-                                        clicked => {
-                                            root.delete-remote-id = connection.remote-id;
-                                            root.delete-open = true;
-                                        }
-                                    }
-                                    IconButton {
-                                        width: 27px; height: 23px; icon: FontAwesomeIcons.arrow-right-long; icon-size: 13px; icon-color: white;
-                                        hover-background: #ffffff2e;
-                                        pressed-background: #598cf273;
-                                        clicked => { root.recent-connect(connection.remote-id); }
-                                    }
+                                remove-label: GalleryStrings.tr("删除记录", "Delete record", "Удалить запись");
+                                connected: connection.connected;
+                                edit-alias => {
+                                    root.alias-remote-id = connection.remote-id;
+                                    root.alias-input = connection.display-name;
+                                    root.alias-open = true;
                                 }
+                                edit-groups => { root.open-device-groups(connection.remote-id, connection.display-name); }
+                                remove-device => {
+                                    root.delete-remote-id = connection.remote-id;
+                                    root.delete-from-gallery = false;
+                                    root.delete-open = true;
+                                }
+                                connect-device => { root.recent-connect(connection.remote-id); }
+                                disconnect-device => { root.recent-disconnect(connection.remote-id); }
                             }
                         }
                         if index < root.recent-connections.length - 1: Rectangle {
@@ -1192,9 +1325,38 @@ export component MainWindow inherits Window {
             }
         }
 
+        }
+        gallery := GalleryView {
+            y: root.content-header-height; width: parent.width; height: parent.height - self.y - 24px;
+            visible: root.gallery-mode;
+            controlling: root.gallery-controlling;
+            pointer-input(button, kind, x, y) => { root.gallery-pointer(button, kind, x, y); }
+            scroll-input(dx, dy, x, y) => { root.gallery-scroll(dx, dy, x, y); }
+            key-input(text, pressed, ctrl, alt, shift, meta) => { root.gallery-key(text, pressed, ctrl, alt, shift, meta); }
+            tiles: root.gallery-tiles; groups: root.gallery-groups;
+            group-index <=> root.gallery-group-index;
+            columns: root.gallery-columns; rows: root.gallery-rows;
+            page: root.gallery-page; pages: root.gallery-pages; count: root.gallery-count;
+            connected-count: root.gallery-connected; selected-count: root.gallery-selected;
+            hidden-selected: root.gallery-hidden-selected; notice: root.gallery-notice;
+            selected-devices: root.gallery-selected-devices;
+            focused: root.gallery-focused; batch <=> root.gallery-batch; adding <=> root.gallery-adding;
+            importing <=> root.gallery-importing; recent-devices: root.gallery-recent-devices;
+            recent-selected: root.gallery-recent-selected; import-group: root.gallery-import-group;
+            action(code, value) => { root.gallery-action(code, value); }
+            add-device(id, password, group, remember) => { root.gallery-add-device(id, password, group, remember) }
+            import-recent(group) => { root.gallery-import-recent(group) }
+            edit-alias(id, name) => {
+                root.alias-remote-id = id; root.alias-input = name; root.alias-open = true;
+            }
+            edit-groups(id, name) => { root.open-device-groups(id, name); }
+            remove-device(id) => {
+                root.delete-remote-id = id; root.delete-from-gallery = true; root.delete-open = true;
+            }
+        }
         // Status bar.
         Rectangle {
-            y: 426px;
+            y: parent.height - 24px;
             height: 24px;
             background: #fafbfc;
             Rectangle {
@@ -1255,9 +1417,11 @@ export component MainWindow inherits Window {
     // pointer can otherwise cover a dialog button and hide it from the user.
     if root.recent-tooltip-visible && !root.connection-dialog-open: Rectangle {
         x: root.recent-tooltip-x;
-        y: root.recent-tooltip-y;
+        y: min(root.height - root.titlebar-height - self.height - 8px,
+               max(8px, root.recent-tooltip-pointer-y - self.height - 8px));
         width: root.recent-tooltip-width;
-        height: root.recent-tooltip-height;
+        height: (root.recent-tooltip-host != "" && root.recent-tooltip-host != root.recent-tooltip-name
+                 ? 80px : 64px) + tooltip-groups.preferred-height + 2px;
         background: #22252bf2;
         border-width: 1px;
         border-color: #ffffff38;
@@ -1284,6 +1448,14 @@ export component MainWindow inherits Window {
                 color: #e1e4e8;
                 font-size: ImGuiFontStyle.small;
                 overflow: elide;
+            }
+            tooltip-groups := Text {
+                text: GalleryStrings.tr("分组", "Groups", "Группы") + ": " +
+                    (root.recent-tooltip-groups == "" ? GalleryStrings.tr("未分组", "Ungrouped", "Без группы") : root.recent-tooltip-groups);
+                color: #e1e4e8;
+                font-size: ImGuiFontStyle.small;
+                wrap: word-wrap;
+                vertical-stretch: 0;
             }
             Text {
                 text: root.recent-tooltip-online ? UiStrings.online : UiStrings.offline;
@@ -1536,14 +1708,32 @@ export component MainWindow inherits Window {
         }
     }
 
+    // One editor and one callback path for recent connections and DeskHub.
+    if root.device-group-open: DeviceGroupDialog {
+        z: 40;
+        device-id: root.device-group-id;
+        device-name: root.device-group-name;
+        options: root.device-group-options;
+        error: root.device-group-error;
+        new-group <=> root.device-group-new-name;
+        toggle-group(name) => { root.device-group-action("toggle", name); }
+        save(name) => {
+            if root.device-group-save(name) {
+                root.device-group-action("close", "");
+                root.device-group-open = false;
+            }
+        }
+        cancel => { root.device-group-action("close", ""); root.device-group-open = false; }
+    }
+
     // Recent connection alias modal.
     if root.alias-open: Rectangle {
         background: #00000042;
         z: 40;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: root.compact-language ? 205px : 160px;
-            y: 145px;
+            x: root.gallery-mode ? (parent.width - self.width) / 2 : root.compact-language ? 205px : 160px;
+            y: root.gallery-mode ? (parent.height - self.height) / 2 : 145px;
             width: root.compact-language ? 230px : 320px;
             height: 160px;
             VerticalLayout {
@@ -1588,16 +1778,16 @@ export component MainWindow inherits Window {
         z: 40;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: root.compact-language ? 205px : 160px;
-            y: 155px;
+            x: root.gallery-mode ? (parent.width - self.width) / 2 : root.compact-language ? 205px : 160px;
+            y: root.gallery-mode ? (parent.height - self.height) / 2 : 155px;
             width: root.compact-language ? 230px : 320px;
             height: 140px;
             VerticalLayout {
                 padding: 20px; spacing: 18px;
-                DialogPromptText { prompt: UiStrings.confirm-delete; }
+                DialogPromptText { prompt: root.delete-from-gallery ? (root.gallery-group-index > 0 ? GalleryStrings.tr("从当前分组移除此设备？", "Remove from this group?", "Убрать из этой группы?") : GalleryStrings.tr("从桌面墙移除此设备？", "Remove from DeskHub?", "Убрать из DeskHub?")) : UiStrings.confirm-delete; }
                 HorizontalLayout {
                     alignment: center; spacing: 8px;
-                    PrimaryButton { text: UiStrings.ok; clicked => { root.recent-delete(root.delete-remote-id); root.delete-open = false; } }
+                    PrimaryButton { text: UiStrings.ok; clicked => { if root.delete-from-gallery { root.gallery-action("remove", root.delete-remote-id); } else { root.recent-delete(root.delete-remote-id); } root.delete-open = false; } }
                     SecondaryButton { text: UiStrings.cancel; clicked => { root.delete-open = false; } }
                 }
             }
@@ -1672,8 +1862,8 @@ export component MainWindow inherits Window {
                     text: UiStrings.ok;
                     clicked => { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
                 }
-                if !root.connection-validating: ConnectionDialogButton {
-                    x: 117px;
+                ConnectionDialogButton {
+                    x: root.connection-validating ? (parent.width - self.width) / 2 : 117px;
                     y: 118px;
                     text: UiStrings.cancel;
                     clicked => { root.connection-cancel(); }
@@ -2263,6 +2453,13 @@ export component MainWindow inherits Window {
             }
         }
     }
+    }
+
+    // Ignore clicks against moving cards and duplicate fullscreen requests.
+    if root.gallery-transitioning: TouchArea {
+        x: 0px; y: root.titlebar-height;
+        width: root.width; height: root.height - self.y;
+        z: 250;
     }
 
     if root.custom-titlebar: Rectangle {

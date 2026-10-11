@@ -1,0 +1,454 @@
+import { GalleryStrings } from "device_strings.slint";
+import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
+import { GroupFilter } from "group_filter.slint";
+import { ScrollView, LineEdit } from "std-widgets.slint";
+import { CompactButton, FontAwesomeIcons, ImGuiCheckBox } from "common.slint";
+
+export struct GalleryTile {
+    id: string,
+    name: string,
+    status: string,
+    connected: bool,
+    online: bool,
+    presence-known: bool,
+    stale: bool,
+    selected: bool,
+    has-frame: bool,
+    frame: image,
+}
+export struct GalleryRecentDevice {
+    id: string,
+    name: string,
+    selected: bool,
+    online: bool,
+}
+export struct GalleryActionDevice {
+    id: string,
+    name: string,
+    connected: bool,
+}
+export component GalleryView inherits Rectangle {
+    in property <bool> controlling: false;
+    // Pointer mapping must use the exact image viewport, including its inset.
+    out property <float> video-width: video.width / 1px;
+    out property <float> video-height: video.height / 1px;
+    private property <bool> vertical-rail: focus-view.width > 840px;
+    private property <int> rail-current-index: 0;
+    changed rail-current-index => { root.reveal-current(); }
+    changed width => { root.reveal-current(); }
+    changed height => { root.reveal-current(); }
+    function reveal-current() {
+        if root.vertical-rail {
+            rail.viewport-x = 0px;
+            let top = root.rail-current-index * 100px;
+            rail.viewport-y = clamp(rail.viewport-y, -top, rail.height - top - 92px);
+            rail.viewport-y = clamp(rail.viewport-y, min(0px, rail.height - rail.viewport-height), 0px);
+        } else {
+            rail.viewport-y = 0px;
+            let left = root.rail-current-index * 144px;
+            rail.viewport-x = clamp(rail.viewport-x, -left, rail.width - left - 136px);
+            rail.viewport-x = clamp(rail.viewport-x, min(0px, rail.width - rail.viewport-width), 0px);
+        }
+    }
+    callback pointer-input(PointerEventButton, PointerEventKind, length, length);
+    callback scroll-input(length, length, length, length);
+    callback key-input(string, bool, bool, bool, bool, bool);
+    in property <[GalleryTile]> tiles;
+    in property <[string]> groups;
+    in-out property <int> group-index: 0;
+    in property <int> columns: 3;
+    in property <int> rows: 2;
+    in property <int> page: 0;
+    in property <int> pages: 1;
+    in property <int> count: 0;
+    in property <int> connected-count: 0;
+    in property <int> selected-count: 0;
+    in property <int> hidden-selected: 0;
+    in property <string> notice;
+    in property <GalleryTile> focused;
+    in-out property <bool> batch: false;
+    in-out property <bool> adding: false;
+    in-out property <bool> importing: false;
+    in property <[GalleryRecentDevice]> recent-devices;
+    in property <int> recent-selected: 0;
+    in property <string> import-group;
+    private property <bool> confirming: false;
+    private property <string> action-name;
+    private property <string> action-code;
+    in property <[GalleryActionDevice]> selected-devices;
+    callback action(string, string);
+    callback add-device(string, string, string, bool) -> bool;
+    callback import-recent(string) -> bool;
+    callback edit-alias(string, string);
+    callback edit-groups(string, string);
+    callback remove-device(string);
+    background: white;
+    changed adding => { if root.adding { root.action("release", ""); } }
+    changed importing => { root.action(root.importing ? "release" : "recent-close", ""); }
+    public function reset-transient() { root.batch = false; root.adding = false; root.importing = false; root.confirming = false; }
+    function confirm-action(code: string, name: string) {
+        root.action-code = code; root.action-name = name; root.confirming = true;
+    }
+    toolbar := HorizontalLayout {
+        x: 29px; y: 12px; width: parent.width - 58px; height: 24px;
+        visible: root.focused.id == "";
+        spacing: 8px;
+        GroupFilter { width: 155px; height: 24px; system-count: 1; model: root.groups; current-index <=> root.group-index;
+            selected(index) => { root.action("group", index); }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        CompactButton { width: 82px; primary: root.batch; text: root.batch ? GalleryStrings.tr("完成", "Done", "Готово") : GalleryStrings.tr("批量选择", "Select", "Выбрать"); clicked => { root.batch = !root.batch; root.action("selection", ""); } }
+        CompactButton { width: 116px; text: GalleryStrings.tr("从最近连接添加", "Add from recent", "Из недавних"); clicked => { root.action("recent-open", ""); root.importing = true; } }
+        CompactButton { width: 90px; primary: true; text: GalleryStrings.tr("添加设备", "Add device", "Добавить"); clicked => { root.action("add-open", ""); root.adding = true; } }
+    }
+    grid := Rectangle {
+        x: toolbar.x; y: toolbar.y + toolbar.height + 12px; width: toolbar.width;
+        height: footer.y - 12px - self.y;
+        visible: root.focused.id == "";
+        for tile[index] in root.tiles: Rectangle {
+            x: mod(index, root.columns) * (grid.width + 12px) / root.columns;
+            y: floor(index / root.columns) * (grid.height + 12px) / root.rows;
+            width: (grid.width - (root.columns - 1) * 12px) / root.columns;
+            height: (grid.height - (root.rows - 1) * 12px) / root.rows;
+            border-radius: 6px; background: tile.selected ? #eaf3ff : #eff0f2;
+            border-width: tile.selected ? 2px : 1px;
+            border-color: tile.selected ? #76aeea : root.batch && tile-touch.has-hover ? #94bdeb : #c9cdd2;
+            Rectangle {
+                x: 6px; y: 6px; width: parent.width - 12px; height: parent.height - 36px;
+                background: #24272d;
+                if tile.has-frame: Image { x: 0px; y: 0px; width: parent.width; height: parent.height; source: tile.frame; image-fit: contain; opacity: tile.stale ? 0.45 : 1; }
+                if !tile.has-frame || !tile.connected || tile.stale: Text {
+                    text: tile.status; color: #ffffff; font-size: 12px;
+                    horizontal-alignment: center; vertical-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+            Text { x: 9px; y: parent.height - 28px; width: (tile-touch.has-hover && !root.batch ? parent.width - DeviceCardStyle.toolbar-width - 6px : presence-badge.x) - 17px; height: 28px; text: tile.name; color: #24272d; font-size: 12px; overflow: elide; vertical-alignment: center; }
+            presence-badge := Rectangle {
+                visible: root.batch || !tile-touch.has-hover;
+                x: parent.width - (root.batch ? 35px : 9px) - self.width; y: parent.height - 23px;
+                width: presence-label.preferred-width + 12px; height: 18px;
+                border-radius: 9px; background: tile.online ? #eaf6ee : #e2e5e9;
+                presence-label := Text {
+                    x: 6px; height: parent.height;
+                    text: tile.online ? GalleryStrings.tr("在线", "Online", "В сети") : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
+                    color: tile.online ? #17854c : #62666d; font-size: 10px; vertical-alignment: center;
+                }
+            }
+            if root.batch: Rectangle {
+                x: parent.width - 27px; y: parent.height - 23px;
+                width: 18px; height: 18px; border-radius: 5px; border-width: 1px;
+                background: tile.selected ? (tile-touch.pressed ? #5c9fdf : tile-touch.has-hover ? #659fe0 : #6dabea) : tile-touch.has-hover ? #f3f8fe : white;
+                border-color: tile.selected ? #6dabea : tile-touch.has-hover ? #76aeea : #b7bec8;
+                animate background, border-color { duration: 120ms; }
+                if tile.selected: Text {
+                    text: FontAwesomeIcons.check; color: white;
+                    font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 11px;
+                    horizontal-alignment: center; vertical-alignment: center;
+                }
+            }
+            tile-touch := TouchArea {
+                clicked => { root.action(root.batch ? "select" : "focus", tile.id); }
+                if tile-touch.has-hover && !root.batch: DeviceCardActions {
+                    x: parent.width - self.width - 6px; y: parent.height - 26px;
+                    remove-label: GalleryStrings.tr("从桌面墙移除", "Remove from DeskHub", "Убрать из DeskHub");
+                    connected: tile.connected;
+                    edit-alias => { root.action("release", ""); root.edit-alias(tile.id, tile.name); }
+                    edit-groups => { root.edit-groups(tile.id, tile.name); }
+                    remove-device => { root.action("release", ""); root.remove-device(tile.id); }
+                    connect-device => { root.action("connect", tile.id); }
+                    disconnect-device => { root.action("disconnect", tile.id); }
+                }
+            }
+        }
+        if root.count == 0: Text {
+            text: GalleryStrings.tr("添加设备，建立你的桌面墙", "Add devices to build your DeskHub", "Добавьте устройства в DeskHub");
+            color: #808080; horizontal-alignment: center; vertical-alignment: center;
+        }
+    }
+    focus-view := Rectangle {
+        visible: root.focused.id != "";
+        x: 29px; y: 7px; width: parent.width - 58px;
+        height: parent.height - 51px;
+        HorizontalLayout {
+            x: 0px; y: 0px; width: parent.width; height: 28px; spacing: 8px;
+            CompactButton { width: 52px; text: GalleryStrings.tr("返回", "Back", "Назад"); clicked => { root.action("focus", ""); } }
+            Rectangle {
+                horizontal-stretch: 1; min-width: 0px;
+                Text { x: 0px; width: parent.width; height: parent.height; text: root.focused.name; color: #303943; font-size: 12px; font-weight: 600; overflow: elide; horizontal-alignment: left; vertical-alignment: center; }
+            }
+            Rectangle {
+                width: min(focus-state.preferred-width + 16px, 110px); height: 22px;
+                border-radius: 5px;
+                background: root.controlling ? #e7f1fd : #f0f2f5;
+                focus-state := Text {
+                    x: 8px; width: parent.width - 16px; height: parent.height;
+                    text: root.controlling ? GalleryStrings.tr("正在操控", "Controlling", "Управление")
+                        : root.focused.connected && root.focused.has-frame && !root.focused.stale
+                            ? GalleryStrings.tr("只读预览", "View only", "Просмотр") : root.focused.status;
+                    font-size: 10px; color: root.controlling ? #3e77b3 : #6b7480; vertical-alignment: center; overflow: elide;
+                }
+            }
+            CompactButton { width: 100px; primary: true; enabled: !root.focused.connected || root.controlling || (root.focused.has-frame && !root.focused.stale); text: root.focused.connected ? (root.controlling ? GalleryStrings.tr("释放操控", "Release", "Отпустить") : GalleryStrings.tr("接管操控", "Control", "Управлять")) : GalleryStrings.tr("连接", "Connect", "Подключить"); clicked => { root.action(root.focused.connected ? (root.controlling ? "release" : "control") : "connect", root.focused.id); } }
+        }
+        Rectangle {
+            x: 0px; y: 36px; width: root.vertical-rail ? parent.width - 158px : parent.width;
+            height: root.vertical-rail ? parent.height - 36px : parent.height - 152px;
+            background: #eff1f4; border-radius: 6px;
+            border-width: root.controlling ? 2px : 1px; border-color: root.controlling ? #76aeea : #d5dbe3;
+            video := Rectangle {
+                x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
+                background: #24272d;
+                if root.focused.has-frame: Image {
+                    width: parent.width; height: parent.height; source: root.focused.frame; image-fit: contain;
+                    opacity: root.focused.stale || !root.focused.connected ? 0.4 : 1;
+                }
+                video-focus := FocusScope {
+                    property <bool> active-control: root.controlling;
+                    changed active-control => { if self.active-control { self.focus(); } }
+                    width: parent.width; height: parent.height;
+                    focus-on-click: true;
+                    focus-lost => { if root.controlling { root.action("release", ""); } }
+                    key-pressed(event) => {
+                        if root.controlling {
+                            if event.text == Key.Escape && event.modifiers.shift && (event.modifiers.control || event.modifiers.meta) {
+                                root.action("release", "");
+                            } else { root.key-input(event.text, true, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta); }
+                        }
+                        accept
+                    }
+                    key-released(event) => {
+                        if root.controlling { root.key-input(event.text, false, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta); }
+                        accept
+                    }
+                    TouchArea {
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.down { video-focus.focus(); }
+                            if root.controlling { root.pointer-input(event.button, event.kind, self.mouse-x, self.mouse-y); }
+                        }
+                        scroll-event(event) => {
+                            if root.controlling { root.scroll-input(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y); }
+                            accept
+                        }
+                    }
+                }
+                if !root.focused.has-frame || root.focused.stale || !root.focused.connected: Text { text: root.focused.status; color: white; horizontal-alignment: center; vertical-alignment: center; }
+            }
+        }
+        rail := ScrollView {
+            x: root.vertical-rail ? parent.width - 148px : 0px;
+            y: root.vertical-rail ? 36px : parent.height - 106px;
+            width: root.vertical-rail ? 148px : parent.width;
+            height: root.vertical-rail ? parent.height - 36px : 106px;
+            // Reserve 14px below or 12px beside cards for the scrollbar.
+            viewport-width: root.vertical-rail ? self.width : max(self.width, root.tiles.length * 144px - 8px);
+            viewport-height: root.vertical-rail ? max(self.height, root.tiles.length * 100px - 8px) : self.height;
+            horizontal-scrollbar-policy: root.vertical-rail ? always-off : as-needed;
+            vertical-scrollbar-policy: root.vertical-rail ? as-needed : always-off;
+            for tile[index] in root.tiles: Rectangle {
+                private property <bool> current: tile.id == root.focused.id;
+                init => { if self.current { root.rail-current-index = index; root.reveal-current(); } }
+                changed current => { if self.current { root.rail-current-index = index; root.reveal-current(); } }
+                x: root.vertical-rail ? 0px : index * 144px;
+                y: root.vertical-rail ? index * 100px : 0px;
+                width: 136px; height: 92px; border-radius: 5px;
+                background: tile.id == root.focused.id ? #edf5ff : #f5f6f8;
+                border-width: tile.id == root.focused.id ? 2px : 1px;
+                border-color: tile.id == root.focused.id ? #76aeea : #d5dbe3;
+                Rectangle {
+                    x: 5px; y: 5px; width: 126px; height: 52px; background: #24272d;
+                    if tile.has-frame: Image { width: parent.width; height: parent.height; source: tile.frame; image-fit: contain; opacity: tile.stale || !tile.connected ? 0.4 : 1; }
+                    if !tile.has-frame || tile.stale || !tile.connected: Text {
+                        text: tile.status; color: #e2e6ed; font-size: 10px; overflow: elide;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
+                }
+                Text { x: 7px; y: 61px; width: 122px; height: 16px; text: tile.name; color: #303943; font-size: 11px; overflow: elide; }
+                Text {
+                    x: 7px; y: 78px; width: 86px; height: 12px; font-size: 9px;
+                    text: tile.online ? GalleryStrings.tr("在线", "Online", "В сети") : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
+                    color: tile.online ? #17854c : #7a828d; overflow: elide;
+                }
+                if tile.id == root.focused.id: Text {
+                    x: 99px; y: 78px; width: 30px; height: 12px;
+                    text: GalleryStrings.tr("当前", "Current", "Выбрано"); color: #4d83bd; font-size: 9px; horizontal-alignment: right; overflow: elide;
+                }
+                TouchArea { clicked => { root.action("focus", tile.id); } }
+            }
+        }
+    }
+    // Reuse the footer for selection actions so entering batch mode never
+    // changes card geometry or moves a device beneath the pointer.
+    footer := HorizontalLayout {
+        x: toolbar.x; y: parent.height - 36px; width: toolbar.width; height: 24px; spacing: 12px;
+        if root.batch: CompactButton {
+            width: 90px; enabled: root.count > 0;
+            text: root.count > 0 && root.selected-count == root.count
+                ? GalleryStrings.tr("取消全选", "Deselect all", "Снять выбор")
+                : GalleryStrings.tr("全选", "Select all", "Выбрать все");
+            clicked => { root.action("all-select", ""); }
+        }
+        Rectangle {
+            horizontal-stretch: 1; min-width: 0px;
+            Text {
+                y: 0px; width: parent.width; height: root.batch && root.hidden-selected > 0 ? 13px : parent.height;
+                text: root.batch ? GalleryStrings.tr("已选 ", "Selected ", "Выбрано ") + root.selected-count : root.connected-count + " / " + root.count + GalleryStrings.tr(" 台已连接", " connected", " подключено");
+                color: #62666d; vertical-alignment: center; font-size: 12px; overflow: elide;
+            }
+            if root.batch && root.hidden-selected > 0: Text {
+                y: 14px; width: parent.width; height: 10px;
+                text: GalleryStrings.tr("跨页 ", "Other pages ", "Другие страницы ") + root.hidden-selected;
+                color: #80858d; font-size: 10px; overflow: elide;
+            }
+        }
+        if root.batch: HorizontalLayout {
+            width: 214px; spacing: 8px;
+            CompactButton { width: 58px; enabled: root.selected-count > 0; text: GalleryStrings.tr("连接", "Connect", "Связь"); clicked => { root.action("connect", ""); } }
+            CompactButton { width: 62px; enabled: root.selected-count > 0; text: GalleryStrings.tr("断开", "Close", "Отключить"); clicked => { root.confirm-action("disconnect", self.text); } }
+            CompactButton { width: 78px; enabled: root.selected-count > 0; text: GalleryStrings.tr("分发文件", "Send file", "Файл"); clicked => { root.confirm-action("file", self.text); } }
+        }
+        HorizontalLayout {
+            width: 112px; height: 24px; spacing: 6px;
+            CompactButton { width: 24px; text: "‹"; text-size: 16px; enabled: root.page > 0; clicked => { root.action("page", "previous"); } }
+            Text { text: (root.page + 1) + " / " + root.pages; min-width: 0px; overflow: elide; horizontal-alignment: center; vertical-alignment: center; }
+            CompactButton { width: 24px; text: "›"; text-size: 16px; enabled: root.page + 1 < root.pages; clicked => { root.action("page", "next"); } }
+        }
+    }
+    if root.adding: Rectangle {
+        background: #00000042;
+        TouchArea {}
+        add-dialog := Rectangle {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 400px; height: 306px;
+            background: white; border-radius: 8px; border-width: 1px; border-color: #b2b2b2;
+            function submit() {
+                if root.add-device(device-id.text, password.text, group.text, remember.checked) {
+                    password.text = "";
+                    root.adding = false;
+                }
+            }
+            Text { x: 18px; y: 16px; height: 24px; text: GalleryStrings.tr("添加设备", "Add device", "Добавить устройство"); font-size: 16px; }
+            Text { x: 18px; y: 56px; width: 72px; height: 30px; text: GalleryStrings.tr("设备 ID", "Device ID", "ID"); vertical-alignment: center; font-size: 12px; }
+            device-id := LineEdit {
+                x: 96px; y: 56px; width: 286px; height: 30px;
+                placeholder-text: GalleryStrings.tr("9 位设备 ID", "9-digit device ID", "ID из 9 цифр");
+                input-type: InputType.number;
+                accepted => { password.focus(); }
+            }
+            Text { x: 18px; y: 100px; width: 72px; height: 30px; text: GalleryStrings.tr("密码", "Password", "Пароль"); vertical-alignment: center; font-size: 12px; }
+            password := LineEdit {
+                x: 96px; y: 100px; width: 286px; height: 30px;
+                placeholder-text: GalleryStrings.tr("设备连接密码", "Device password", "Пароль устройства");
+                input-type: InputType.password;
+                accepted => { group.focus(); }
+            }
+            Text { x: 18px; y: 144px; width: 72px; height: 30px; text: GalleryStrings.tr("分组", "Group", "Группа"); vertical-alignment: center; font-size: 12px; }
+            group := LineEdit {
+                x: 96px; y: 144px; width: 286px; height: 30px;
+                placeholder-text: GalleryStrings.tr("分组名称（可选）", "Group name (optional)", "Группа (необязательно)");
+                accepted => { add-dialog.submit(); }
+            }
+            remember := ImGuiCheckBox { x: 96px; y: 188px; }
+            Text { x: 123px; y: 188px; height: 21px; text: GalleryStrings.tr("记住密码", "Remember password", "Запомнить пароль"); font-size: 12px; vertical-alignment: center;
+                TouchArea { clicked => { remember.checked = !remember.checked; } }
+            }
+            Text { x: 18px; y: 216px; width: 364px; height: 28px; text: root.notice; color: #8e4740; font-size: 11px; wrap: word-wrap; overflow: elide; }
+            CompactButton { x: 172px; y: 260px; width: 72px; height: 28px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { password.text = ""; root.adding = false; } }
+            CompactButton {
+                x: 254px; y: 260px; width: 128px; height: 28px; primary: true;
+                text: GalleryStrings.tr("添加并连接", "Add and connect", "Подключить");
+                enabled: device-id.text != "" && password.text != "";
+                clicked => { add-dialog.submit(); }
+            }
+        }
+    }
+    if root.importing: Rectangle {
+        background: #00000042;
+        TouchArea {}
+        Rectangle {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 440px; height: 378px;
+            background: white; border-radius: 8px; border-width: 1px; border-color: #b2b2b2;
+            Text { x: 18px; y: 16px; height: 24px; text: GalleryStrings.tr("从最近连接添加", "Add from recent connections", "Добавить из недавних"); font-size: 16px; }
+            Text { x: 18px; y: 44px; width: 404px; height: 18px; text: GalleryStrings.tr("加入桌面墙后，可通过批量选择连接", "Add devices, then use Select to connect them.", "После добавления подключайтесь через выбор."); color: #62666d; font-size: 11px; }
+            ImGuiCheckBox { x: 18px; y: 74px; enabled: root.recent-devices.length > 0; checked: root.recent-devices.length > 0 && root.recent-selected == root.recent-devices.length; }
+            Text { x: 45px; y: 74px; height: 21px; text: GalleryStrings.tr("全选", "Select all", "Выбрать все"); font-size: 12px; vertical-alignment: center; }
+            TouchArea { x: 18px; y: 74px; width: 144px; height: 21px; enabled: root.recent-devices.length > 0; clicked => { root.action("recent-all", ""); } }
+            Text { x: 224px; y: 74px; width: 198px; height: 21px; text: GalleryStrings.tr("已选 ", "Selected ", "Выбрано ") + root.recent-selected + " / " + root.recent-devices.length; horizontal-alignment: right; vertical-alignment: center; font-size: 12px; color: #62666d; }
+            Rectangle {
+                x: 18px; y: 102px; width: 404px; height: 160px;
+                border-width: 1px; border-color: #d8dadd; border-radius: 4px; clip: true;
+                recent-list := ScrollView {
+                    x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
+                    viewport-width: self.width - 12px;
+                    viewport-height: max(self.height, root.recent-devices.length * 44px);
+                    for device[index] in root.recent-devices: Rectangle {
+                        y: index * 44px; width: recent-list.viewport-width; height: 44px;
+                        background: device.selected ? #edf5fe : row-touch.has-hover ? #f4f5f6 : white;
+                        ImGuiCheckBox { x: 8px; y: 11px; checked: device.selected; }
+                        Text { x: 36px; y: 3px; width: parent.width - 126px; height: 20px; text: device.name; font-size: 12px; overflow: elide; vertical-alignment: center; }
+                        Text { x: 36px; y: 23px; width: parent.width - 126px; height: 16px; text: device.id; font-size: 11px; color: #808080; }
+                        Rectangle { x: parent.width - 74px; y: 19px; width: 6px; height: 6px; border-radius: 3px; background: device.online ? #21b567 : #92969e; }
+                        Text {
+                            x: parent.width - 61px; y: 12px; width: 57px; height: 20px;
+                            text: device.online ? GalleryStrings.tr("在线", "Online", "В сети") : GalleryStrings.tr("离线", "Offline", "Не в сети");
+                            color: device.online ? #17854c : #808080; font-size: 11px; vertical-alignment: center;
+                        }
+                        row-touch := TouchArea { clicked => { root.action("recent-select", device.id); } }
+                    }
+                }
+                if root.recent-devices.length == 0: Text { text: GalleryStrings.tr("暂无最近连接", "No recent connections", "Нет недавних подключений"); color: #808080; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+            }
+            Text { x: 18px; y: 274px; width: 60px; height: 30px; text: GalleryStrings.tr("分组", "Group", "Группа"); font-size: 12px; vertical-alignment: center; }
+            import-group := LineEdit { x: 84px; y: 274px; width: 338px; height: 30px; text: root.import-group; placeholder-text: GalleryStrings.tr("分组名称（可选）", "Group name (optional)", "Группа (необязательно)"); }
+            Text { x: 18px; y: 309px; width: 404px; height: 20px; text: root.notice; font-size: 11px; color: #8e4740; overflow: elide; }
+            CompactButton { x: 192px; y: 336px; width: 72px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { root.importing = false; } }
+            CompactButton { x: 274px; y: 336px; width: 148px; primary: true; text: GalleryStrings.tr("加入桌面墙", "Add selected", "Добавить"); enabled: root.recent-selected > 0; clicked => { if root.import-recent(import-group.text) { root.importing = false; } } }
+        }
+    }
+    if root.confirming: Rectangle {
+        background: #00000042; TouchArea {}
+        Rectangle {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: 360px; height: confirmation-list.height + 118px;
+            background: white; border-radius: 8px; border-width: 1px; border-color: #b2b2b2;
+            Text {
+                x: 20px; y: 18px; width: parent.width - 132px; height: 24px;
+                text: root.action-code == "disconnect" ? GalleryStrings.tr("断开连接", "Disconnect devices", "Отключение") : root.action-name;
+                color: #24272d; font-size: 16px; font-weight: 600; vertical-alignment: center;
+            }
+            Rectangle {
+                x: parent.width - 108px; y: 20px; width: 88px; height: 22px;
+                background: #eff3f8; border-radius: 11px;
+                Text { text: root.selected-count + GalleryStrings.tr(" 台设备", " devices", " устр."); color: #626e7d; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
+            }
+            confirmation-list := Rectangle {
+                x: 20px; y: 58px; width: parent.width - 40px;
+                height: clamp(root.selected-devices.length * 52px + 2px, 54px, 210px);
+                background: #fcfdfe; border-width: 1px; border-color: #e2e6eb; border-radius: 6px; clip: true;
+                confirmation-scroll := ScrollView {
+                    x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
+                    viewport-width: self.width - 12px;
+                    viewport-height: max(self.height, root.selected-devices.length * 52px);
+                    for device[index] in root.selected-devices: Rectangle {
+                        y: index * 52px; width: confirmation-scroll.viewport-width; height: 52px;
+                        Text { x: 12px; y: 8px; width: parent.width - 32px - connection-badge.width; height: 18px; text: device.name; color: #303740; font-size: 12px; font-weight: 600; overflow: elide; vertical-alignment: center; }
+                        Text { x: 12px; y: 29px; width: parent.width - 32px - connection-badge.width; height: 16px; text: "ID  " + device.id; color: #8a929e; font-size: 11px; vertical-alignment: center; }
+                        connection-badge := Rectangle {
+                            x: parent.width - self.width - 12px; y: 16px;
+                            width: GalleryStrings.language == 0 ? 68px : 104px; height: 20px; border-radius: 10px;
+                            background: device.connected ? #eaf6ee : #f0f2f5;
+                            Rectangle { x: 9px; y: 7px; width: 6px; height: 6px; border-radius: 3px; background: device.connected ? #27a762 : #a0a6b0; }
+                            Text { x: 21px; width: parent.width - 27px; height: parent.height; text: device.connected ? GalleryStrings.tr("已连接", "Connected", "Подключено") : GalleryStrings.tr("未连接", "Not connected", "Нет связи"); color: device.connected ? #348259 : #858d98; font-size: 10px; vertical-alignment: center; }
+                        }
+                        if index + 1 < root.selected-devices.length: Rectangle { x: 12px; y: parent.height - 1px; width: parent.width - 24px; height: 1px; background: #edf0f3; }
+                    }
+                }
+            }
+            CompactButton { x: parent.width - 208px; y: parent.height - 46px; width: 72px; height: 28px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { root.confirming = false; } }
+            CompactButton {
+                x: parent.width - 126px; y: parent.height - 46px; width: 108px; height: 28px; primary: true;
+                text: root.action-code == "disconnect" ? GalleryStrings.tr("确认断开", "Disconnect", "Отключить") : GalleryStrings.tr("确认执行", "Continue", "Продолжить");
+                clicked => { root.confirming = false; root.action(root.action-code, ""); }
+            }
+        }
+    }
+}

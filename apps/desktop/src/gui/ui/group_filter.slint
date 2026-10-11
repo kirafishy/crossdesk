@@ -1,0 +1,161 @@
+import { ScrollView } from "std-widgets.slint";
+import { FontAwesomeIcons } from "common.slint";
+
+// Shared by history and DeskHub; system choices precede the named groups.
+export component GroupFilter inherits Rectangle {
+    in property <[string]> model;
+    in property <int> system-count: 2;
+    in property <bool> enabled: true;
+    in-out property <int> current-index: 0;
+    callback selected(int);
+    private property <bool> has-divider: root.system-count > 0 && root.model.length > root.system-count;
+    private property <length> list-height: root.model.length * 26px + (root.has-divider ? 6px : 0px);
+    private property <length> visible-height: min(root.list-height, 162px);
+    private property <length> scroll-y: 0px;
+    private property <bool> popup-animation-enabled: false;
+    private property <float> popup-progress: 0;
+
+    animate popup-progress {
+        duration: 140ms; easing: ease-out;
+        enabled: root.popup-animation-enabled;
+    }
+
+    width: 155px; height: 28px;
+    background: !root.enabled ? #f3f4f5 : trigger-touch.has-hover ? #f8f9fb : white;
+    border-width: 1px;
+    border-color: popup.is-open || trigger-focus.has-focus ? #8db5df : #c9cdd2;
+    border-radius: 4px;
+    animate background, border-color { duration: 100ms; easing: ease-out; }
+    forward-focus: trigger-focus;
+    accessible-role: combobox;
+    accessible-enabled: root.enabled;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-value: root.model[root.current-index];
+
+    function reveal-selection() {
+        let top = root.current-index * 26px + (root.has-divider && root.current-index >= root.system-count ? 6px : 0px);
+        if top < -root.scroll-y { root.scroll-y = -top; }
+        if top + 26px > -root.scroll-y + root.visible-height {
+            root.scroll-y = root.visible-height - top - 26px;
+        }
+        root.scroll-y = clamp(root.scroll-y, min(0px, root.visible-height - root.list-height), 0px);
+    }
+    function choose(index: int) {
+        if !root.enabled || root.model.length == 0 { return; }
+        root.current-index = clamp(index, 0, root.model.length - 1);
+        root.reveal-selection();
+        root.selected(root.current-index);
+    }
+    function open-menu() {
+        if root.enabled && root.model.length > 0 {
+            popup-open-timer.running = false;
+            root.popup-animation-enabled = false;
+            root.popup-progress = 0;
+            root.reveal-selection();
+            popup.show();
+            popup-open-timer.running = true;
+        }
+    }
+    // Defer until the popup has its initial frame; animate its contents only,
+    // keeping the native popup bounds and scrolling geometry stable.
+    popup-open-timer := Timer {
+        interval: 16ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if popup.is-open {
+                root.popup-animation-enabled = true;
+                root.popup-progress = 1;
+            }
+        }
+    }
+    function handle-key(event: KeyEvent) -> EventResult {
+        if !root.enabled { return reject; }
+        if event.text == Key.UpArrow { root.choose(root.current-index - 1); return accept; }
+        if event.text == Key.DownArrow { root.choose(root.current-index + 1); return accept; }
+        if event.text == Key.Return || event.text == " " {
+            if popup.is-open { popup.close(); } else { root.open-menu(); }
+            return accept;
+        }
+        if event.text == Key.Escape && popup.is-open { popup.close(); return accept; }
+        return reject;
+    }
+    Text {
+        x: 10px; width: parent.width - 36px; height: parent.height;
+        text: root.model[root.current-index];
+        color: root.enabled ? #30343b : #92979f;
+        font-size: 12px; overflow: elide; vertical-alignment: center;
+        accessible-role: none;
+    }
+    Text {
+        x: parent.width - 25px; width: 16px; height: parent.height;
+        text: FontAwesomeIcons.angle-down; font-family: "Font Awesome 6 Free";
+        font-weight: 900; font-size: 10px; color: #858c96;
+        horizontal-alignment: center; vertical-alignment: center;
+        transform-rotation: popup.is-open ? 180deg : 0deg;
+        animate transform-rotation { duration: 140ms; easing: ease-out; }
+        accessible-role: none;
+    }
+    trigger-focus := FocusScope {
+        enabled: root.enabled;
+        key-pressed(event) => { return root.handle-key(event); }
+        trigger-touch := TouchArea {
+            enabled: root.enabled;
+            clicked => { trigger-focus.focus(); root.open-menu(); }
+        }
+    }
+    popup := PopupWindow {
+        x: 0px; y: root.height + 4px;
+        width: root.width; height: root.visible-height + 8px;
+        close-policy: close-on-click-outside;
+        forward-focus: popup-focus;
+        popup-focus := FocusScope {
+            key-pressed(event) => { return root.handle-key(event); }
+            Rectangle {
+                y: (1 - root.popup-progress) * -4px;
+                width: parent.width; height: parent.height;
+                opacity: root.popup-progress;
+                background: white; border-width: 1px;
+                border-color: #c9cdd2; border-radius: 5px;
+                ScrollView {
+                    x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
+                    viewport-width: self.width;
+                    viewport-height: root.list-height;
+                    viewport-y <=> root.scroll-y;
+                    Rectangle {
+                        width: parent.width; height: root.list-height;
+                        if root.has-divider: Rectangle {
+                            x: 6px; y: root.system-count * 26px + 3px;
+                            width: parent.width - 12px; height: 1px; background: #e9ebee;
+                        }
+                        for choice[index] in root.model: Rectangle {
+                            y: index * 26px + (root.has-divider && index >= root.system-count ? 6px : 0px);
+                            width: parent.width; height: 26px; border-radius: 3px;
+                            background: index == root.current-index ? #edf4fc : option-touch.has-hover ? #f1f3f5 : transparent;
+                            animate background { duration: 100ms; easing: ease-out; }
+                            accessible-role: list-item;
+                            accessible-label: choice;
+                            Text {
+                                x: 8px; width: parent.width - 34px; height: parent.height;
+                                text: choice; color: #30343b; font-size: 12px;
+                                overflow: elide; vertical-alignment: center;
+                                accessible-role: none;
+                            }
+                            if index == root.current-index: Text {
+                                x: parent.width - 24px; width: 16px; height: parent.height;
+                                text: FontAwesomeIcons.check; font-family: "Font Awesome 6 Free";
+                                font-weight: 900; font-size: 10px; color: #4e87c0;
+                                horizontal-alignment: center; vertical-alignment: center;
+                                accessible-role: none;
+                            }
+                            option-touch := TouchArea {
+                                clicked => { root.choose(index); popup.close(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

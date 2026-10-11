@@ -1,0 +1,6 @@
+export global GalleryStrings {
+    in-out property <int> language: 0;
+    public pure function tr(zh: string, en: string, ru: string) -> string {
+        return self.language == 0 ? zh : self.language == 2 ? ru : en;
+    }
+}

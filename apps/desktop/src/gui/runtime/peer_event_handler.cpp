@@ -329,6 +329,8 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
         props->net_traffic_stats_.Reset();
         props->enable_mouse_control_ = false;
         props->preview_subscription_supported_ = false;
+        props->audio_allowed_ = false;
+        props->clipboard_allowed_ = false;
         runtime->ResetRemoteServiceStatus(*props);
         {
           std::lock_guard lock(props->video_settings_mutex_);

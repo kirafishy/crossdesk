@@ -585,6 +585,10 @@ int SessionDeviceManager::DestroyAudioOutput() {
   return 0;
 }
 
+void SessionDeviceManager::ClearAudio() {
+  if (output_stream_) SDL_ClearAudioStream(output_stream_);
+}
+
 void SessionDeviceManager::PushAudio(const char *data, size_t size) {
   if (!output_stream_) {
     return;

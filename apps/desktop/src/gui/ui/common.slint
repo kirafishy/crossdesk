@@ -49,6 +49,7 @@ export global FontAwesomeIcons {
     out property <string> signal: "\u{f012}";
     out property <string> shield-halved: "\u{f3ed}";
     out property <string> square-full: "\u{f45c}";
+    out property <string> tags: "\u{f02c}";
     out property <string> trash-can: "\u{f2ed}";
     out property <string> user-secret: "\u{f21b}";
     out property <string> volume-high: "\u{f028}";
@@ -59,6 +60,7 @@ export global FontAwesomeIcons {
 export component IconButton inherits Rectangle {
     in property <string> icon;
     in property <string> tooltip;
+    in property <bool> tooltip-above: false;
     in property <bool> enabled: true;
     in property <bool> danger: false;
     in property <length> icon-size: 16px;
@@ -103,7 +105,7 @@ export component IconButton inherits Rectangle {
 
     if touch.has-hover && root.tooltip != "": Rectangle {
         x: min(root.width - self.width, 0px);
-        y: root.height + 3px;
+        y: root.tooltip-above ? -self.height - 3px : root.height + 3px;
         width: tip.preferred-width + 12px;
         height: 24px;
         background: #22252be8;

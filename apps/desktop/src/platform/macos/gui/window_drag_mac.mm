@@ -2,6 +2,8 @@
 
 #import <AppKit/AppKit.h>
 
+#include <cmath>
+
 @interface CrossDeskStreamFullscreenTarget : NSObject
 - (void)toggleStreamFullscreen:(id)sender;
 @end
@@ -17,6 +19,12 @@
 namespace crossdesk {
 namespace {
 
+__weak NSWindow *main_window = nil;
+bool main_fullscreen = false;
+bool main_gallery = false;
+NSRect main_restore_frame = NSZeroRect;
+NSWindowStyleMask main_restore_style = NSWindowStyleMaskTitled;
+NSApplicationPresentationOptions main_restore_presentation;
 __weak NSWindow *stream_window = nil;
 __weak NSView *stream_slint_view = nil;
 CrossDeskStreamFullscreenTarget *stream_fullscreen_target = nil;
@@ -53,6 +61,14 @@ void SetTitlebarButtonsHidden(NSWindow *window, BOOL hidden) {
   [window standardWindowButton:NSWindowZoomButton].hidden = hidden;
 }
 
+void HideMainWindowZoomButton(NSWindow *window) {
+  NSButton *button = [window standardWindowButton:NSWindowZoomButton];
+  button.target = nil;
+  button.action = nil;
+  button.enabled = NO;
+  button.hidden = YES;
+}
+
 void CenterWindowOnScreen(NSWindow *window, NSScreen *screen) {
   if (window == nil || screen == nil) {
     return;
@@ -80,7 +96,17 @@ bool StartNativeWindowDrag() {
   }
 }
 
-bool ConfigureMainWindowChrome(void *opaque_slint_view) {
+float MainWindowInitialPositionYOffset() {
+  @autoreleasepool {
+    const NSRect content = NSMakeRect(0, 0, 640, 486);
+    const NSRect frame = [NSWindow frameRectForContentRect:content
+        styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                  NSWindowStyleMaskMiniaturizable];
+    return float(NSMaxY(frame) - NSMaxY(content));
+  }
+}
+
+bool ConfigureMainWindowChrome(void *opaque_slint_view, bool gallery) {
   @autoreleasepool {
     NSView *slint_view = (__bridge NSView *)opaque_slint_view;
     NSWindow *window = slint_view.window;
@@ -91,9 +117,19 @@ bool ConfigureMainWindowChrome(void *opaque_slint_view) {
 
     NSButton *zoom_button =
         [window standardWindowButton:NSWindowZoomButton];
-    if (zoom_button == nil || zoom_button.enabled) {
-      return false;
-    }
+    if (zoom_button == nil) return false;
+    main_window = window;
+    main_gallery = gallery;
+    if (main_fullscreen) return true;
+    if (gallery)
+      window.styleMask |= NSWindowStyleMaskResizable;
+    else
+      window.styleMask &= ~NSWindowStyleMaskResizable;
+    window.collectionBehavior =
+        (window.collectionBehavior & ~(NSWindowCollectionBehaviorFullScreenPrimary |
+                                       NSWindowCollectionBehaviorFullScreenAuxiliary |
+                                       NSWindowCollectionBehaviorFullScreenAllowsTiling)) |
+        NSWindowCollectionBehaviorFullScreenNone;
 
     // Winit creates a transparent AppKit backing even when Slint paints an
     // opaque client area. macOS 27 can expose that backing in the titlebar.
@@ -104,12 +140,77 @@ bool ConfigureMainWindowChrome(void *opaque_slint_view) {
     window.titlebarAppearsTransparent = YES;
     window.opaque = YES;
     window.backgroundColor = NSColor.whiteColor;
-    zoom_button.hidden = YES;
+    HideMainWindowZoomButton(window);
 
     NSView *frame_view = window.contentView.superview;
     frame_view.needsLayout = YES;
     [frame_view layoutSubtreeIfNeeded];
     return true;
+  }
+}
+
+bool SetMainWindowFullscreen(bool fullscreen) {
+  @autoreleasepool {
+    if (!main_window || (fullscreen && !main_gallery)) return false;
+    if (main_fullscreen == fullscreen) return true;
+    if (fullscreen) {
+      NSScreen *screen = main_window.screen ?: NSScreen.mainScreen;
+      if (!screen) return false;
+      main_restore_frame = main_window.frame;
+      main_restore_style = main_window.styleMask;
+      main_restore_presentation = NSApp.presentationOptions;
+      main_fullscreen = true;
+      main_window.styleMask |= NSWindowStyleMaskFullSizeContentView;
+      main_window.titleVisibility = NSWindowTitleHidden;
+      main_window.movable = NO;
+      SetTitlebarButtonsHidden(main_window, YES);
+      NSApp.presentationOptions |=
+          NSApplicationPresentationAutoHideDock | NSApplicationPresentationAutoHideMenuBar;
+      // Let the next event-loop frame paint the updated Slint layout. A
+      // synchronous draw here exposes stale grid geometry during the resize.
+      [main_window setFrame:screen.frame display:NO animate:NO];
+    } else {
+      main_fullscreen = false;
+      NSApp.presentationOptions = main_restore_presentation;
+      main_window.styleMask = main_restore_style;
+      main_window.titleVisibility = NSWindowTitleVisible;
+      main_window.movable = YES;
+      [main_window standardWindowButton:NSWindowCloseButton].hidden = NO;
+      [main_window standardWindowButton:NSWindowMiniaturizeButton].hidden = NO;
+      // The main window uses the in-app fullscreen action in both modes.
+      HideMainWindowZoomButton(main_window);
+      [main_window setFrame:main_restore_frame display:NO animate:NO];
+    }
+    main_window.contentView.needsDisplay = YES;
+    return true;
+  }
+}
+bool IsMainWindowFullscreen() { return main_fullscreen; }
+bool IsMainWindowActive() { return main_window && [NSApp isActive] && [main_window isKeyWindow]; }
+
+bool MaximizeMainWindowWithoutAnimation() {
+  @autoreleasepool {
+    if (!main_window || !main_gallery || main_fullscreen) return false;
+    NSScreen *screen = main_window.screen ?: NSScreen.mainScreen;
+    if (!screen) return false;
+    [main_window setFrame:screen.visibleFrame display:YES animate:NO];
+    return true;
+  }
+}
+
+bool IsMainWindowMaximized() {
+  @autoreleasepool {
+    if (!main_window || !main_gallery || main_fullscreen) return false;
+    NSScreen *screen = main_window.screen;
+    if (!screen) return false;
+    // isZoomed can report true for a constrained compact window. Only treat
+    // the ordinary window as maximized when it fills the usable screen.
+    const NSRect frame = main_window.frame;
+    const NSRect available = screen.visibleFrame;
+    return std::abs(frame.origin.x - available.origin.x) < 1 &&
+           std::abs(frame.origin.y - available.origin.y) < 1 &&
+           std::abs(frame.size.width - available.size.width) < 1 &&
+           std::abs(frame.size.height - available.size.height) < 1;
   }
 }
 

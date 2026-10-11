@@ -7,6 +7,8 @@
 #ifndef _RUNTIME_STATE_H_
 #define _RUNTIME_STATE_H_
 
+#include <stream_names.h>
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -19,10 +21,8 @@
 #include <utility>
 #include <vector>
 
-#include <stream_names.h>
-
-#include "config_center.h"
 #include "common/task_queue_lock_free.h"
+#include "config_center.h"
 #include "path_manager.h"
 #include "runtime/device_presence_cache.h"
 #include "runtime/preview_subscriptions.h"
@@ -38,6 +38,7 @@ namespace crossdesk::gui_detail {
 
 struct InfrastructureState {
   PreviewSubscriptions preview_subscriptions_;
+  std::mutex audio_delivery_mutex_;
   std::unique_ptr<ConfigCenter> config_center_;
   ConfigCenter::LANGUAGE localization_language_ =
       ConfigCenter::LANGUAGE::CHINESE;

@@ -79,6 +79,18 @@ struct RemoteSession {
   uint32_t preview_request_ = 0;
   PreviewSubscription preview_requested_;
   std::chrono::steady_clock::time_point preview_request_at_{};
+  std::atomic<bool> clipboard_allowed_{false};
+  std::atomic<uint64_t> input_generation_{0};
+  std::atomic<bool> audio_allowed_{false};
+  std::atomic<int> gallery_preview_width_{0};
+  std::mutex gallery_frame_mutex_;
+  std::shared_ptr<std::vector<unsigned char>> gallery_rgba_;
+  int gallery_width_ = 0, gallery_height_ = 0;
+  uint64_t gallery_sequence_ = 0;
+  std::chrono::steady_clock::time_point gallery_frame_at_{};
+  // Decoder-thread scratch memory, never shared with the UI.
+  std::mutex gallery_conversion_mutex_;
+  std::vector<unsigned char> gallery_nv12_, gallery_scaled_, gallery_scratch_;
   Params params_;
   PeerPtr* peer_ = nullptr;
   std::shared_ptr<PeerEventHandler> peer_events_;

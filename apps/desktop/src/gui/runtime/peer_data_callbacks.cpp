@@ -139,11 +139,12 @@ void PeerEventHandler::OnReceiveDataBuffer(
       std::string remote_user_id(user_id, user_id_size);
       auto props =
           runtime->FindRemoteSession(remote_user_id);
-      if (props && !props->enable_mouse_control_) {
+      if (props && !props->clipboard_allowed_.load()) {
         return;
       }
 
-      runtime->clipboard_.QueueRemoteText(data, size);
+      runtime->clipboard_.QueueRemoteText(
+          data, size, props ? remote_user_id : std::string{});
     }
     return;
   } else if (source_id == runtime->file_feedback_label_) {

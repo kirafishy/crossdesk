@@ -67,6 +67,7 @@ public:
 
   int InitializeAudioOutput();
   int DestroyAudioOutput();
+  void ClearAudio();
   void PushAudio(const char *data, size_t size);
 
   bool SendKeyboardCommand(int key_code, bool is_down, uint32_t scan_code,

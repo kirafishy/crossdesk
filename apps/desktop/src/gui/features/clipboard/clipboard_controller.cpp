@@ -46,7 +46,8 @@ void ClipboardController::Shutdown() {
   pending_remote_text_.reset();
 }
 
-void ClipboardController::QueueRemoteText(const char *data, size_t size) {
+void ClipboardController::QueueRemoteText(const char* data, size_t size,
+                                          const std::string& remote_id) {
   if (!events_enabled_.load(std::memory_order_acquire)) {
     return;
   }
@@ -62,6 +63,11 @@ void ClipboardController::QueueRemoteText(const char *data, size_t size) {
     return;
   }
 
+  const auto session =
+      remote_id.empty() ? nullptr : owner_.FindRemoteSession(remote_id);
+  if (!remote_id.empty() && (!session || !session->clipboard_allowed_.load()))
+    return;
+  const auto generation = session ? session->input_generation_.load() : 0;
   {
     std::lock_guard<std::mutex> lock(pending_mutex_);
     if (!events_enabled_.load(std::memory_order_relaxed)) {
@@ -70,6 +76,9 @@ void ClipboardController::QueueRemoteText(const char *data, size_t size) {
     // Only the newest clipboard value matters. Replacing it also bounds the
     // amount of memory a busy or malicious peer can queue.
     pending_remote_text_ = std::string(data, size);
+    pending_remote_id_ = remote_id;
+    pending_session_ = session;
+    pending_generation_ = generation;
   }
 
   SDL_Event event{};
@@ -87,9 +96,22 @@ void ClipboardController::ApplyPendingRemoteText() {
   }
 
   std::optional<std::string> pending_text;
+  std::string source_id;
+  std::weak_ptr<gui_detail::RemoteSession> source_session;
+  uint64_t generation = 0;
   {
     std::lock_guard<std::mutex> lock(pending_mutex_);
     pending_text.swap(pending_remote_text_);
+    source_id.swap(pending_remote_id_);
+    source_session.swap(pending_session_);
+    generation = pending_generation_;
+  }
+  if (!source_id.empty()) {
+    auto props = owner_.FindRemoteSession(source_id);
+    if (!props || props != source_session.lock() ||
+        !props->clipboard_allowed_.load() ||
+        props->input_generation_.load() != generation)
+      return;
   }
   if (!pending_text || *pending_text == last_text_) {
     return;
@@ -145,7 +167,7 @@ int ClipboardController::SendToPeers(const std::string &text) {
   std::shared_lock lock(owner_.remote_sessions_mutex_);
   for (const auto &[remote_id, props] : owner_.remote_sessions_) {
     if (!props || !props->peer_ || !props->connection_established_ ||
-        !props->enable_mouse_control_) {
+        !props->clipboard_allowed_.load()) {
       continue;
     }
 
