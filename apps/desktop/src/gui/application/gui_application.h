@@ -14,6 +14,7 @@
 
 #include <remote_action.h>
 
+#include "application/signal_connection_indicator.h"
 #include "runtime/cursor_state_provider.h"
 #include "runtime/gui_runtime.h"
 
@@ -106,6 +107,7 @@ private:
       cursor_delivery_states_;
   uint32_t cursor_state_sequence_ = 0;
   std::chrono::steady_clock::time_point next_video_frame_time_{};
+  SignalConnectionIndicator signal_connection_indicator_;
 #if defined(__linux__) && !defined(__APPLE__)
   bool use_xwayland_gui_ = false;
   bool use_x11_custom_titlebar_ = false;
