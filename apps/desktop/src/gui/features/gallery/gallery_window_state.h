@@ -22,26 +22,6 @@ struct WindowState {
   std::optional<slint::LogicalSize> wall_size;
   std::optional<slint::PhysicalPosition> wall_position, connection_position;
 
-  void BeginModeChange(bool wall, slint::PhysicalPosition position,
-                       slint::PhysicalSize size, float scale, bool fullscreen,
-                       bool maximized, float compact_height = 486) {
-    // Never capture a half-applied mode transition as the user's wall geometry.
-    Observe(!wall, position, size, scale, fullscreen, maximized,
-            compact_height);
-    if (wall) {
-      // Modes share the current desktop location. An old wall position must
-      // not undo a move made while the connection page was visible.
-      if (connection_position)
-        wall_position = connection_position;
-    } else {
-      // Fullscreen/maximized coordinates describe the screen, not the ordinary
-      // window. Return to the last normal anchor before restoring compact size.
-      if (wall_position)
-        connection_position = wall_position;
-    }
-    BeginRestore();
-  }
-
   void Observe(bool wall, slint::PhysicalPosition position,
                slint::PhysicalSize size, float scale, bool fullscreen,
                bool maximized, float compact_height = 486) {

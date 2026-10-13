@@ -3,7 +3,7 @@ import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
 import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { GroupFilter } from "group_filter.slint";
 import { ScrollView, LineEdit } from "std-widgets.slint";
-import { CompactButton, FontAwesomeIcons, ImGuiCheckBox } from "common.slint";
+import { CompactButton, SecondaryButton, FontAwesomeIcons, ImGuiCheckBox } from "common.slint";
 
 export struct GalleryTile {
     id: string,
@@ -29,21 +29,72 @@ export struct GalleryActionDevice {
     connected: bool,
 }
 
+component DeviceDetailsTip inherits Rectangle {
+    in property <string> device-name;
+    in property <string> device-id;
+    in property <string> presence;
+    in property <length> available-height;
+    height: min(root.available-height, 58px);
+    background: #22252bf2; border-width: 1px; border-color: #ffffff38; border-radius: 5px;
+    clip: true;
+    tip-name := Text {
+        x: 8px; y: 8px; width: parent.width - 16px;
+        height: 14px;
+        text: root.device-name; color: white; font-size: 11px; overflow: elide; vertical-alignment: top;
+    }
+    Text {
+        x: 8px; y: tip-name.y + tip-name.height; width: parent.width - 16px; height: 14px;
+        text: "ID: " + root.device-id; color: white; font-size: 11px; overflow: elide;
+    }
+    Text {
+        x: 8px; y: tip-name.y + tip-name.height + 14px; width: parent.width - 16px; height: 14px;
+        text: root.presence; color: white; font-size: 11px; overflow: elide;
+    }
+}
+
 export component GalleryView inherits Rectangle {
     in property <bool> controlling: false;
     in property <bool> simplified: false;
-    private property <length> grid-gap: root.simplified ? 6px : 12px;
-    private property <length> rail-card-height: root.simplified ? 92px : 76px;
+    in property <bool> window-active: true;
+    in-out property <float> tile-width: 216;
+    out property <bool> resizing: false;
+    private property <float> preview-aspect-ratio: 16 / 9;
+    private property <length> card-inset: 6px;
+    private property <length> card-chrome-height: root.simplified ? root.card-inset * 2 : 36px;
+    private property <length> max-card-width: max(184px, min(960px, grid.width,
+        (grid.height - root.card-chrome-height) * root.preview-aspect-ratio + root.card-inset * 2));
+    private property <length> card-width: clamp(root.tile-width * 1px, 184px, root.max-card-width);
+    private property <length> card-preview-height: (root.card-width - root.card-inset * 2) / root.preview-aspect-ratio;
+    private property <length> card-height: root.card-preview-height + root.card-chrome-height;
+    private property <length> rail-preview-height: 126px / root.preview-aspect-ratio;
+    private property <length> rail-card-height: root.rail-preview-height + (root.simplified ? 10px : 24px);
     private property <string> focused-id: root.focused.id;
     private property <string> device-tooltip-id;
     private property <string> device-tooltip-text;
     private property <length> device-tooltip-x;
     private property <length> device-tooltip-y;
     private property <bool> device-tooltip-visible: false;
-    changed focused-id => { root.device-tooltip-id = ""; }
-    changed visible => { root.device-tooltip-id = ""; if !root.visible { add-menu.close-menu(); batch-menu.close-menu(); } }
-    changed width => { root.device-tooltip-id = ""; }
-    changed height => { root.device-tooltip-id = ""; }
+    private property <string> drag-source;
+    private property <GalleryTile> dragged-tile;
+    private property <bool> dragging: false;
+    private property <length> drag-start-x;
+    private property <length> drag-start-y;
+    private property <length> drag-x;
+    private property <length> drag-y;
+    private property <int> drag-target: root.drop-index(root.drag-x, root.drag-y);
+    private property <int> drag-page: -1;
+    private property <length> drag-edge-width: 32px;
+    private property <int> drag-page-direction: root.page-direction(root.drag-x, root.drag-y);
+    private property <bool> swap-save-failed: false;
+    changed focused-id => { root.device-tooltip-id = ""; root.resizing = false; root.cancel-device-drag(); }
+    changed visible => { root.device-tooltip-id = ""; if !root.visible { root.resizing = false; root.cancel-device-drag(); add-menu.close-menu(); batch-menu.close-menu(); } }
+    changed width => { root.device-tooltip-id = ""; root.resizing = false; root.cancel-device-drag(); }
+    changed height => { root.device-tooltip-id = ""; root.resizing = false; root.cancel-device-drag(); }
+    changed window-active => { if !root.window-active { root.resizing = false; root.cancel-device-drag(); } }
+    changed page => { if root.page != root.drag-page { root.cancel-device-drag(); } }
+    changed group-index => { root.cancel-device-drag(); }
+    changed card-width => { root.cancel-device-drag(); }
+    changed card-height => { root.cancel-device-drag(); }
     changed device-tooltip-id => {
         root.device-tooltip-visible = false;
         device-tooltip-timer.running = root.device-tooltip-id != "";
@@ -65,8 +116,9 @@ export component GalleryView inherits Rectangle {
     in property <[GalleryTile]> tiles;
     in property <[string]> groups;
     in-out property <int> group-index: 0;
-    in property <int> columns: 3;
-    in property <int> rows: 2;
+    // Pagination and rendering share the same fixed-aspect cell geometry.
+    out property <int> columns: max(1, floor(grid.width / root.card-width));
+    out property <int> rows: max(1, floor(grid.height / root.card-height));
     in property <int> page: 0;
     in property <int> pages: 1;
     in property <int> count: 0;
@@ -91,6 +143,7 @@ export component GalleryView inherits Rectangle {
     private property <string> action-code;
     in property <[GalleryActionDevice]> selected-devices;
     callback action(string, string);
+    callback swap-devices(string, string) -> bool;
     callback add-device(string, string, string, bool) -> bool;
     callback import-recent(string) -> bool;
     callback edit-alias(string, string);
@@ -100,10 +153,89 @@ export component GalleryView inherits Rectangle {
     changed adding => { if root.adding { root.action("release", ""); } }
     changed importing => { root.action(root.importing ? "release" : "recent-close", ""); }
     public function reset-transient() {
+        root.resizing = false;
+        root.cancel-device-drag();
         root.batch = false; root.adding = false; root.importing = false; root.confirming = false;
         root.device-tooltip-id = ""; add-menu.close-menu(); batch-menu.close-menu();
     }
-    changed batch => { root.device-tooltip-id = ""; batch-menu.close-menu(); }
+    changed batch => { root.device-tooltip-id = ""; root.cancel-device-drag(); batch-menu.close-menu(); }
+    function cancel-device-drag() {
+        root.dragging = false; root.drag-source = ""; root.drag-page = -1;
+    }
+    function cell-index(x: length, y: length) -> int {
+        if x < 0px || y < 0px || x >= grid.table-width || y >= grid.table-height { return -1; }
+        let column = floor(x / root.card-width);
+        let row = floor(y / root.card-height);
+        let index = row * root.columns + column;
+        if index >= root.tiles.length { return -1; }
+        // Separators remain resize targets; drop on the device inside a cell.
+        let cell-x = x - column * root.card-width;
+        let cell-y = y - row * root.card-height;
+        if cell-x < 6px || cell-x >= root.card-width - 6px || cell-y < 6px || cell-y >= root.card-height - 6px { return -1; }
+        return index;
+    }
+    function drop-index(x: length, y: length) -> int {
+        let index = root.cell-index(x, y);
+        return !root.dragging || root.drag-page-direction != 0 || index < 0 || root.tiles[index].id == root.drag-source ? -1 : index;
+    }
+    function page-direction(x: length, y: length) -> int {
+        if !root.dragging { return 0; }
+        let view-x = grid.x + x;
+        let view-y = grid.y + y;
+        if view-x < 0px || view-x >= root.width || view-y < 0px || view-y >= root.height { return 0; }
+        if root.page > 0 && view-x < root.drag-edge-width { return -1; }
+        if root.page + 1 < root.pages && view-x >= root.width - root.drag-edge-width { return 1; }
+        // Keep the pager buttons as additional hover targets.
+        let pager-x = view-x - footer.x - pager.x;
+        let pager-y = view-y - footer.y - pager.y;
+        if pager-y < 0px || pager-y >= pager.height { return 0; }
+        if root.page > 0 && pager-x >= previous-page.x && pager-x < previous-page.x + previous-page.width { return -1; }
+        if root.page + 1 < root.pages && pager-x >= next-page.x && pager-x < next-page.x + next-page.width { return 1; }
+        return 0;
+    }
+    changed drag-page-direction => {
+        if root.drag-page-direction != 0 { drag-page-timer.restart(); }
+    }
+    drag-page-timer := Timer {
+        interval: 700ms;
+        running: root.dragging && root.drag-page-direction != 0 && root.page == root.drag-page;
+        triggered => {
+            if !root.dragging || root.drag-page-direction == 0 || root.page != root.drag-page { return; }
+            root.drag-page = root.page + root.drag-page-direction;
+            root.action("page", root.drag-page-direction > 0 ? "next" : "previous");
+        }
+    }
+    function move-device-drag(x: length, y: length) {
+        if root.drag-source == "" { return; }
+        root.drag-x = x; root.drag-y = y;
+        if abs(x - root.drag-start-x) >= 6px || abs(y - root.drag-start-y) >= 6px {
+            root.dragging = true; root.device-tooltip-id = "";
+        }
+    }
+    function finish-device-drag() {
+        let source = root.drag-source;
+        let target = root.drag-target >= 0 ? root.tiles[root.drag-target].id : "";
+        // Clear transient state before the callback can replace the page model.
+        root.cancel-device-drag();
+        if source != "" && target != "" {
+            root.swap-save-failed = !root.swap-devices(source, target);
+            if root.swap-save-failed { swap-error-timer.restart(); }
+        }
+    }
+    drag-focus := FocusScope {
+        x: 0px; y: 0px; width: 0px; height: 0px;
+        key-pressed(event) => {
+            if event.text == Key.Escape && root.drag-source != "" {
+                root.cancel-device-drag(); return accept;
+            }
+            reject
+        }
+        focus-lost => { root.cancel-device-drag(); }
+    }
+    swap-error-timer := Timer {
+        interval: 4s; running: false;
+        triggered => { root.swap-save-failed = false; self.running = false; }
+    }
     function confirm-action(code: string, name: string) {
         root.action-code = code; root.action-name = name; root.confirming = true;
     }
@@ -138,12 +270,104 @@ export component GalleryView inherits Rectangle {
             }
         }
     }
-    grid := Rectangle {
+    grid := TouchArea {
         x: root.simplified ? 12px : toolbar.x;
         y: root.simplified ? 12px : toolbar.y + toolbar.height + 12px;
         width: parent.width - self.x * 2;
         height: footer.y - 12px - self.y;
         visible: root.focused.id == "";
+        private property <length> table-width: root.columns * root.card-width;
+        private property <length> table-height: root.rows * root.card-height;
+        Rectangle {
+            visible: root.count > 0;
+            x: 0px; y: 0px;
+            width: grid.table-width; height: grid.table-height;
+            background: white;
+        }
+        // One stable pointer owner survives page model replacements and cell resizing.
+        private property <int> column-line: clamp(round(self.mouse-x / root.card-width), 0, root.columns);
+        private property <int> row-line: clamp(round(self.mouse-y / root.card-height), 0, root.rows);
+        private property <bool> over-table: root.count > 0
+            && self.mouse-x >= 0px && self.mouse-x <= grid.table-width
+            && self.mouse-y >= 0px && self.mouse-y <= grid.table-height;
+        // Both sides of a shared separator must resize in the same direction.
+        private property <int> edge-x: !self.over-table || abs(self.mouse-x - self.column-line * root.card-width) > 6px
+            ? 0 : self.column-line == 0 ? -1 : 1;
+        private property <int> edge-y: !self.over-table || abs(self.mouse-y - self.row-line * root.card-height) > 6px
+            ? 0 : self.row-line == 0 ? -1 : 1;
+        private property <int> drag-x;
+        private property <int> drag-y;
+        private property <int> drag-columns;
+        private property <int> drag-rows;
+        private property <length> start-x;
+        private property <length> start-y;
+        private property <length> start-width;
+        private property <int> cursor-x: root.resizing ? self.drag-x : self.edge-x;
+        private property <int> cursor-y: root.resizing ? self.drag-y : self.edge-y;
+        private property <int> hover-index: root.cell-index(self.mouse-x, self.mouse-y);
+        mouse-cursor: root.dragging ? (root.drag-target >= 0 || root.drag-page-direction != 0 ? MouseCursor.grabbing : MouseCursor.not-allowed)
+            : self.cursor-x != 0 && self.cursor-y != 0
+            ? (self.cursor-x == self.cursor-y ? MouseCursor.nwse-resize : MouseCursor.nesw-resize)
+            : self.cursor-x != 0 ? MouseCursor.ew-resize : self.cursor-y != 0 ? MouseCursor.ns-resize
+            : self.hover-index >= 0 ? MouseCursor.grab : MouseCursor.default;
+        function show-hint() {
+            if self.has-hover && !self.pressed && (self.edge-x != 0 || self.edge-y != 0) {
+                root.device-tooltip-id = "resize-grid";
+                root.device-tooltip-text = GalleryStrings.tr("拖动表格分隔线，同步调整所有设备大小", "Drag a table divider to resize all devices", "Потяните за разделитель таблицы, чтобы изменить размер всех устройств");
+                root.device-tooltip-x = grid.x + self.mouse-x;
+                root.device-tooltip-y = grid.y + self.mouse-y + 16px;
+            } else if root.device-tooltip-id == "resize-grid" { root.device-tooltip-id = ""; }
+        }
+        function resize-cells() {
+            if !root.resizing { return; }
+            // Distribute the movement across preceding cells so the chosen
+            // divider follows the pointer while every cell stays equal.
+            let dx = (self.mouse-x - self.start-x) * self.drag-x / self.drag-columns;
+            let dy = (self.mouse-y - self.start-y) * self.drag-y / self.drag-rows;
+            let delta = self.drag-x == 0 ? dy * root.preview-aspect-ratio
+                : self.drag-y == 0 ? dx
+                : (dx + dy / root.preview-aspect-ratio) / (1 + 1 / (root.preview-aspect-ratio * root.preview-aspect-ratio));
+            root.tile-width = clamp(self.start-width + delta, 184px, root.max-card-width) / 1px;
+        }
+        changed has-hover => { self.show-hint(); }
+        changed mouse-x => { self.show-hint(); }
+        changed mouse-y => { self.show-hint(); }
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                root.cancel-device-drag();
+                if self.edge-x != 0 || self.edge-y != 0 {
+                    self.drag-x = self.edge-x; self.drag-y = self.edge-y;
+                    self.drag-columns = max(1, self.column-line);
+                    self.drag-rows = max(1, self.row-line);
+                    self.start-x = self.mouse-x; self.start-y = self.mouse-y;
+                    self.start-width = root.card-width;
+                    root.resizing = true; root.device-tooltip-id = "";
+                } else if self.hover-index >= 0 {
+                    drag-focus.focus();
+                    root.dragged-tile = root.tiles[self.hover-index];
+                    root.drag-source = root.dragged-tile.id; root.drag-page = root.page;
+                    root.drag-start-x = self.mouse-x; root.drag-start-y = self.mouse-y;
+                    root.drag-x = self.mouse-x; root.drag-y = self.mouse-y;
+                    root.swap-save-failed = false; root.device-tooltip-id = "";
+                }
+            } else if event.kind == PointerEventKind.cancel {
+                root.resizing = false; root.cancel-device-drag();
+            } else if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                if root.resizing { self.resize-cells(); root.resizing = false; }
+                else if root.drag-source != "" {
+                    root.move-device-drag(self.mouse-x, self.mouse-y);
+                    if !root.dragging && self.hover-index >= 0 && root.tiles[self.hover-index].id == root.drag-source {
+                        let id = root.drag-source;
+                        root.cancel-device-drag();
+                        root.action(root.batch && !root.simplified ? "select" : "focus", id);
+                    } else { root.finish-device-drag(); }
+                }
+            }
+        }
+        moved => {
+            if root.resizing { self.resize-cells(); }
+            else if root.drag-source != "" { root.move-device-drag(self.mouse-x, self.mouse-y); }
+        }
         for tile[index] in root.tiles: tile-card := Rectangle {
             private property <string> presence: tile.online ? GalleryStrings.tr("在线", "Online", "В сети")
                 : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
@@ -151,18 +375,18 @@ export component GalleryView inherits Rectangle {
             accessible-role: button; accessible-label: self.details;
             accessible-action-default => { root.action(root.batch && !root.simplified ? "select" : "focus", tile.id); }
             changed details => { if tile-touch.has-hover { tile-touch.show-details(); } }
-            x: mod(index, root.columns) * (grid.width + root.grid-gap) / root.columns;
-            y: floor(index / root.columns) * (grid.height + root.grid-gap) / root.rows;
-            width: (grid.width - (root.columns - 1) * root.grid-gap) / root.columns;
-            height: (grid.height - (root.rows - 1) * root.grid-gap) / root.rows;
-            border-radius: root.simplified ? 0px : 6px;
-            background: !tile.online ? DeviceCardStyle.offline-background : root.simplified ? #24272d : tile.selected ? #eaf3ff : #eff0f2;
-            border-width: root.simplified ? 0px : tile.selected ? 2px : 1px;
-            border-color: tile.selected ? #76aeea : root.batch && tile-touch.has-hover ? #94bdeb : !tile.online ? DeviceCardStyle.offline-border : #c9cdd2;
+            visible: index < root.columns * root.rows;
+            x: mod(index, root.columns) * root.card-width;
+            y: floor(index / root.columns) * root.card-height;
+            width: root.card-width;
+            height: root.card-height;
+            opacity: root.dragging && root.drag-source == tile.id ? 0.45 : 1;
+            background: !tile.online ? DeviceCardStyle.offline-background
+                : tile.selected ? #eaf3ff : root.batch && tile-touch.has-hover ? #f3f8fe : white;
             Rectangle {
-                x: root.simplified ? 0px : 6px; y: self.x;
+                x: root.card-inset; y: self.x;
                 width: parent.width - self.x * 2;
-                height: root.simplified ? parent.height : parent.height - 36px;
+                height: root.card-preview-height;
                 background: tile.online ? #24272d : DeviceCardStyle.offline-preview;
                 if tile.has-frame && tile.online: Image { x: 0px; y: 0px; width: parent.width; height: parent.height; source: tile.frame; image-fit: contain; opacity: tile.stale ? 0.45 : 1; }
                 if !root.simplified && (!tile.has-frame || !tile.connected || tile.stale): Text {
@@ -170,14 +394,19 @@ export component GalleryView inherits Rectangle {
                     horizontal-alignment: center; vertical-alignment: center;
                     wrap: word-wrap;
                 }
+                if root.device-tooltip-visible && root.device-tooltip-id == tile.id: DeviceDetailsTip {
+                    x: 4px; y: parent.height - self.height - 4px;
+                    width: min(320px, parent.width - 8px); available-height: parent.height - 8px;
+                    device-name: tile.name; device-id: tile.id; presence: tile-card.presence;
+                }
             }
             Text {
-                visible: !root.simplified; x: 9px; y: parent.height - 28px;
+                visible: !root.simplified; x: 9px; y: parent.height - 30px;
                 width: parent.width - self.x - (tile-touch.has-hover && !root.batch ? DeviceCardStyle.toolbar-width + 12px : root.batch ? 35px : 9px);
-                height: 28px; text: tile.name; color: tile.online ? #24272d : DeviceCardStyle.offline-text; font-size: 12px; overflow: elide; vertical-alignment: center;
+                height: 24px; text: tile.name; color: tile.online ? #24272d : DeviceCardStyle.offline-text; font-size: 12px; overflow: elide; vertical-alignment: center;
             }
             if root.batch && !root.simplified: Rectangle {
-                x: parent.width - 27px; y: parent.height - 23px;
+                x: parent.width - 27px; y: parent.height - 27px;
                 width: 18px; height: 18px; border-radius: 5px; border-width: 1px;
                 background: tile.selected ? (tile-touch.pressed ? #5c9fdf : tile-touch.has-hover ? #659fe0 : #6dabea) : tile-touch.has-hover ? #f3f8fe : white;
                 border-color: tile.selected ? #6dabea : tile-touch.has-hover ? #76aeea : #b7bec8;
@@ -188,22 +417,23 @@ export component GalleryView inherits Rectangle {
                     horizontal-alignment: center; vertical-alignment: center;
                 }
             }
-            tile-touch := TouchArea {
+            tile-touch := Rectangle {
+                x: 6px; y: 6px; width: parent.width - 12px; height: parent.height - 12px;
+                private property <bool> has-hover: grid.has-hover && grid.hover-index == index;
+                private property <bool> pressed: grid.pressed && root.drag-source == tile.id;
                 function show-details() {
                     // Avoid covering the per-device action buttons with a tooltip.
-                    if self.mouse-y >= tile-card.height - 28px && !root.simplified { root.device-tooltip-id = ""; return; }
-                    root.device-tooltip-id = tile.id; root.device-tooltip-text = tile-card.details;
-                    root.device-tooltip-x = grid.x + tile-card.x;
-                    root.device-tooltip-y = grid.y + tile-card.y + tile-card.height + 4px;
+                    if root.resizing || root.drag-source != "" || (grid.mouse-y - tile-card.y >= tile-card.height - 30px && !root.simplified) { root.device-tooltip-id = ""; return; }
+                    root.device-tooltip-id = tile.id;
                 }
                 changed has-hover => {
                     if self.has-hover { self.show-details(); }
                     else if root.device-tooltip-id == tile.id { root.device-tooltip-id = ""; }
                 }
-                moved => { self.show-details(); }
-                clicked => { root.device-tooltip-id = ""; root.action(root.batch && !root.simplified ? "select" : "focus", tile.id); }
-                if tile-touch.has-hover && !root.batch && !root.simplified: DeviceCardActions {
-                    x: parent.width - self.width - 6px; y: parent.height - 26px;
+                private property <bool> over-actions: grid.mouse-y - tile-card.y >= tile-card.height - 30px;
+                changed over-actions => { if self.has-hover { self.show-details(); } }
+                if tile-touch.has-hover && !root.dragging && !root.resizing && !root.batch && !root.simplified: DeviceCardActions {
+                    x: parent.width - self.width; y: parent.height - 23px;
                     remove-label: GalleryStrings.tr("从桌面墙移除", "Remove from DeskHub", "Убрать из DeskHub");
                     connected: tile.connected;
                     edit-alias => { root.action("release", ""); root.edit-alias(tile.id, tile.name); }
@@ -213,6 +443,29 @@ export component GalleryView inherits Rectangle {
                     disconnect-device => { root.action("disconnect", tile.id); }
                 }
             }
+        }
+        // Draw each table line once, continuously across occupied and empty cells.
+        for column in root.columns + 1: Rectangle {
+            visible: root.count > 0;
+            x: min(column * root.card-width, grid.table-width - 1px);
+            y: 0px;
+            width: 1px; height: grid.table-height;
+            background: root.resizing || (grid.has-hover && grid.edge-x != 0 && grid.column-line == column)
+                ? #76aeea : #c9cdd2;
+        }
+        for row in root.rows + 1: Rectangle {
+            visible: root.count > 0;
+            x: 0px;
+            y: min(row * root.card-height, grid.table-height - 1px);
+            width: grid.table-width; height: 1px;
+            background: root.resizing || (grid.has-hover && grid.edge-y != 0 && grid.row-line == row)
+                ? #76aeea : #c9cdd2;
+        }
+        if root.drag-target >= 0: Rectangle {
+            x: mod(root.drag-target, root.columns) * root.card-width + 1px;
+            y: floor(root.drag-target / root.columns) * root.card-height + 1px;
+            width: root.card-width - 2px; height: root.card-height - 2px;
+            background: #76aeea26; border-width: 2px; border-color: #4a94de;
         }
         if root.count == 0: Text {
             text: root.simplified
@@ -313,7 +566,7 @@ export component GalleryView inherits Rectangle {
                     // Collapse the focused tile and its gap without changing the page model.
                     width: tile.id == root.focused.id ? 0px : 144px;
                     height: root.rail-card-height; visible: tile.id != root.focused.id;
-                    Rectangle {
+                    rail-card := Rectangle {
                         private property <string> presence: tile.online ? GalleryStrings.tr("在线", "Online", "В сети")
                             : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
                         private property <string> details: tile.name + "\nID: " + tile.id + "\n" + self.presence;
@@ -324,25 +577,27 @@ export component GalleryView inherits Rectangle {
                         accessible-action-default => { root.action("focus", tile.id); }
                         changed details => { if rail-touch.has-hover { rail-touch.show-details(); } }
                         Rectangle {
-                            x: 5px; y: 5px; width: 126px; height: root.simplified ? 82px : 52px; background: tile.online ? #24272d : DeviceCardStyle.offline-preview;
+                            x: 5px; y: 5px; width: 126px; height: root.rail-preview-height; background: tile.online ? #24272d : DeviceCardStyle.offline-preview;
                             if tile.has-frame && tile.online: Image { width: parent.width; height: parent.height; source: tile.frame; image-fit: contain; opacity: tile.stale || !tile.connected ? 0.4 : 1; }
                             if !root.simplified && (!tile.has-frame || tile.stale || !tile.connected): Text {
                                 text: tile.status; color: tile.online ? #e2e6ed : DeviceCardStyle.offline-placeholder; font-size: 10px; overflow: elide;
                                 horizontal-alignment: center; vertical-alignment: center;
                             }
+                            if root.device-tooltip-visible && root.device-tooltip-id == tile.id: DeviceDetailsTip {
+                                x: 4px; y: parent.height - self.height - 4px;
+                                width: parent.width - 8px; available-height: parent.height - 8px;
+                                device-name: tile.name; device-id: tile.id; presence: rail-card.presence;
+                            }
                         }
                         Text {
                             visible: !root.simplified;
-                            x: 7px; y: 58px; width: 122px; height: 16px;
+                            x: 7px; y: root.rail-preview-height + 6px; width: 122px; height: 16px;
                             text: tile.name; color: tile.online ? #303943 : DeviceCardStyle.offline-text; font-size: 11px;
                             overflow: elide; vertical-alignment: center;
                         }
                         rail-touch := TouchArea {
                             function show-details() {
                                 root.device-tooltip-id = tile.id;
-                                root.device-tooltip-text = parent.details;
-                                root.device-tooltip-x = focus-view.x + rail.x + rail.viewport-x + rail-slot.x;
-                                root.device-tooltip-y = focus-view.y + rail.y + rail.height + 4px;
                             }
                             changed has-hover => {
                                 if self.has-hover { self.show-details(); }
@@ -367,29 +622,19 @@ export component GalleryView inherits Rectangle {
         status-area := Rectangle {
             x: 0px; y: 0px; width: parent.width - 124px; height: parent.height;
             visible: !root.batch || root.simplified;
-            border-radius: 3px; background: network-touch.has-hover ? #edf0f4 : transparent;
-            accessible-role: button;
-            accessible-label: GalleryStrings.tr("网络状态", "Network", "Сеть") + ": " + root.connected-summary;
-            accessible-action-default => { root.network-open(); }
-            Text {
-                x: 0px; width: parent.width - 20px; height: parent.height;
-                text: root.connected-summary + " · " + GalleryStrings.tr("网络状态", "Network", "Сеть");
+            connection-count := Text {
+                x: 0px; width: min(self.preferred-width, parent.width - network-button.width - 12px); height: parent.height;
+                text: root.connected-summary;
                 color: #62666d; vertical-alignment: center; font-size: 11px; overflow: elide;
             }
-            Text {
-                x: parent.width - 13px; width: 12px; height: parent.height;
-                text: FontAwesomeIcons.angle-up; font-family: "Font Awesome 6 Free"; font-weight: 900;
-                font-size: 9px; color: #858c96; vertical-alignment: center;
-            }
-            network-touch := TouchArea {
-                mouse-cursor: pointer;
-                changed has-hover => {
-                    if self.has-hover {
-                        root.device-tooltip-id = "network-status";
-                        root.device-tooltip-text = root.connected-summary + "\n" + GalleryStrings.tr("点击查看网络状态", "Click to view network status", "Нажмите для просмотра состояния сети");
-                        root.device-tooltip-x = footer.x; root.device-tooltip-y = footer.y;
-                    } else if root.device-tooltip-id == "network-status" { root.device-tooltip-id = ""; }
-                }
+            network-button := SecondaryButton {
+                x: connection-count.x + connection-count.width + 12px;
+                min-width: 64px; width: 64px; height: parent.height;
+                border-color: #c8cbd0; border-radius: 3px;
+                text: GalleryStrings.tr("网络状态", "Network", "Сеть");
+                accessible-role: button;
+                accessible-label: self.text;
+                accessible-action-default => { self.clicked(); }
                 clicked => { root.device-tooltip-id = ""; root.network-open(); }
             }
         }
@@ -432,15 +677,57 @@ export component GalleryView inherits Rectangle {
                 }
             }
         }
-        HorizontalLayout {
+        pager := HorizontalLayout {
             x: parent.width - self.width; y: 0px; width: 112px; height: 24px; spacing: 6px;
-            CompactButton { width: 24px; text: "‹"; text-size: 16px; enabled: root.page > 0; clicked => { root.action("page", "previous"); } }
+            previous-page := CompactButton { primary: root.drag-page-direction < 0; width: 24px; text: "‹"; text-size: 16px; enabled: root.page > 0; clicked => { root.action("page", "previous"); } }
             Text { text: (root.page + 1) + " / " + root.pages; min-width: 0px; overflow: elide; horizontal-alignment: center; vertical-alignment: center; }
-            CompactButton { width: 24px; text: "›"; text-size: 16px; enabled: root.page + 1 < root.pages; clicked => { root.action("page", "next"); } }
+            next-page := CompactButton { primary: root.drag-page-direction > 0; width: 24px; text: "›"; text-size: 16px; enabled: root.page + 1 < root.pages; clicked => { root.action("page", "next"); } }
         }
     }
-    // Share one delayed tooltip across cards and keep it inside the view.
-    if root.device-tooltip-visible && root.device-tooltip-id != "": Rectangle {
+    for edge in 2: Rectangle {
+        visible: root.dragging && (edge == 0 ? root.page > 0 : root.page + 1 < root.pages);
+        private property <bool> active: root.drag-page-direction == (edge == 0 ? -1 : 1);
+        x: edge == 0 ? 0px : parent.width - self.width; y: 0px;
+        width: root.drag-edge-width; height: parent.height; z: 8;
+        background: self.active ? #76aeea38 : #76aeea14;
+        Text {
+            text: edge == 0 ? "‹" : "›"; font-size: 24px;
+            color: parent.active ? #357bc0 : #7ba2c9;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
+    }
+    if root.dragging: Rectangle {
+        x: clamp(grid.x + root.drag-x + 14px, 8px, parent.width - self.width - 8px);
+        y: clamp(grid.y + root.drag-y + 14px, 8px, footer.y - self.height - 12px);
+        width: 224px; height: 54px; z: 10;
+        background: #fffffff2; border-width: 1px; border-color: #76aeea; border-radius: 4px;
+        Rectangle {
+            x: 8px; y: 9px; width: 64px; height: 36px;
+            background: root.dragged-tile.online ? #24272d : DeviceCardStyle.offline-preview;
+            if root.dragged-tile.has-frame && root.dragged-tile.online: Image {
+                x: 0px; y: 0px; width: parent.width; height: parent.height;
+                source: root.dragged-tile.frame; image-fit: contain;
+            }
+        }
+        Text { x: 80px; y: 8px; width: parent.width - 88px; height: 18px; text: root.dragged-tile.name; font-size: 12px; color: #303943; overflow: elide; }
+        Text {
+            x: 80px; y: 29px; width: parent.width - 88px; height: 16px;
+            text: root.drag-page-direction != 0 ? GalleryStrings.tr("停留翻页，松开取消", "Hold to turn page", "Удерживайте для перелистывания")
+                : root.drag-target >= 0 ? GalleryStrings.tr("松开鼠标交换位置", "Release to swap", "Отпустите для обмена")
+                : GalleryStrings.tr("拖到另一台设备上", "Drag onto another device", "На другое устройство");
+            font-size: 10px; color: #527ca8; overflow: elide;
+        }
+    }
+    if root.swap-save-failed: Rectangle {
+        x: (parent.width - self.width) / 2; y: footer.y - self.height - 14px;
+        width: min(420px, parent.width - 32px); height: 36px; z: 10;
+        background: #fff2f0; border-width: 1px; border-color: #e9b7b0; border-radius: 4px;
+        Text { x: 12px; y: 0px; width: parent.width - 24px; height: parent.height; font-size: 12px; color: #9d4339; vertical-alignment: center;
+            text: GalleryStrings.tr("换位未保存，请重试", "Couldn't save positions. Please try again.", "Не удалось сохранить порядок. Повторите попытку."); overflow: elide;
+        }
+    }
+    // Resize hints follow the pointer; device details stay inside their preview.
+    if root.device-tooltip-visible && root.device-tooltip-id == "resize-grid": Rectangle {
         x: clamp(root.device-tooltip-x, 8px, parent.width - self.width - 8px);
         y: clamp(root.device-tooltip-y + self.height > footer.y ? root.device-tooltip-y - self.height - 8px : root.device-tooltip-y, 4px, parent.height - self.height - 4px);
         width: min(320px, parent.width - 16px); height: device-tooltip-label.preferred-height + 16px;

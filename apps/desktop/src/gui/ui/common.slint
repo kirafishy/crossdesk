@@ -403,6 +403,7 @@ export component PrimaryButton inherits Rectangle {
 
 export component SecondaryButton inherits Rectangle {
     in property <string> text;
+    in property <length> text-size: ImGuiFontStyle.body;
     in property <bool> enabled: true;
     callback clicked;
 
@@ -419,7 +420,7 @@ export component SecondaryButton inherits Rectangle {
     Text {
         text: root.text;
         color: root.enabled ? #24272d : #949aa5;
-        font-size: ImGuiFontStyle.body;
+        font-size: root.text-size;
         horizontal-alignment: center;
         vertical-alignment: center;
     }

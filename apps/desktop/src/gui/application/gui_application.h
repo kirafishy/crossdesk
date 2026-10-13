@@ -50,7 +50,7 @@ private:
   void InitializeUi();
   void InitializeSystemTray();
   bool MinimizeMainWindowToTray();
-  void BindMainCallbacks();
+  void BindMainCallbacks(bool gallery_window = false);
   void BindStreamCallbacks();
   void BindServerCallbacks();
   void Tick();
@@ -60,16 +60,21 @@ private:
   void HandlePasswordChangeResult();
   void HandleCredentialRecovery();
   void SyncMainWindow();
-  void ChangeMainMode(bool gallery);
+  void ShowGalleryWindow();
+  void HideGalleryWindow();
+  void SyncWindowGeometry(bool gallery_window);
   void ToggleGalleryFullscreen();
-  void RestoreMainWindowGeometry(bool before_show = false);
+  void RestoreWindowGeometry(bool before_show = false,
+                             bool gallery_window = false);
   void SyncGallery();
-  void GalleryAction(const std::string& action, const std::string& value);
+  void GalleryAction(const std::string& action, const std::string& value,
+                     bool gallery_window = true);
   bool AddGalleryDevice(const std::string& id, const std::string& password,
                         const std::string& group, bool remember_password);
   bool ImportGalleryRecent(const std::string& group);
-  void DeviceGroupAction(const std::string& action, const std::string& value);
-  bool SaveDeviceGroups(const std::string& new_group);
+  void DeviceGroupAction(const std::string& action, const std::string& value,
+                         bool gallery_window);
+  bool SaveDeviceGroups(const std::string& new_group, bool gallery_window);
   void ReleaseControl();
   void SyncAudioPlayback();
   void SaveGalleryWindowState();
@@ -89,9 +94,9 @@ private:
   void SyncXWaylandWindowActivation();
 #endif
   void UpdateLocalization();
-  void ResetSettingsUi();
-  bool ValidateSelfHostedSettingsFromUi();
-  bool SaveSettingsFromUi();
+  void ResetSettingsUi(bool gallery_window = false);
+  bool ValidateSelfHostedSettingsFromUi(bool gallery_window = false);
+  bool SaveSettingsFromUi(bool gallery_window = false);
   void ApplySettingsFromConfig(bool reconnect);
 #if _WIN32 && CROSSDESK_PORTABLE
   void CheckPortableWindowsService();

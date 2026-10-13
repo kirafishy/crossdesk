@@ -19,12 +19,11 @@
 namespace crossdesk {
 namespace {
 
-__weak NSWindow *main_window = nil;
-bool main_fullscreen = false;
-bool main_gallery = false;
-NSRect main_restore_frame = NSZeroRect;
-NSWindowStyleMask main_restore_style = NSWindowStyleMaskTitled;
-NSApplicationPresentationOptions main_restore_presentation;
+__weak NSWindow *gallery_window = nil;
+bool gallery_fullscreen = false;
+NSRect gallery_restore_frame = NSZeroRect;
+NSWindowStyleMask gallery_restore_style = NSWindowStyleMaskTitled;
+NSApplicationPresentationOptions gallery_restore_presentation;
 __weak NSWindow *stream_window = nil;
 __weak NSView *stream_slint_view = nil;
 CrossDeskStreamFullscreenTarget *stream_fullscreen_target = nil;
@@ -118,9 +117,8 @@ bool ConfigureMainWindowChrome(void *opaque_slint_view, bool gallery) {
     NSButton *zoom_button =
         [window standardWindowButton:NSWindowZoomButton];
     if (zoom_button == nil) return false;
-    main_window = window;
-    main_gallery = gallery;
-    if (main_fullscreen) return true;
+    if (gallery) gallery_window = window;
+    if (gallery && gallery_fullscreen) return true;
     if (gallery)
       window.styleMask |= NSWindowStyleMaskResizable;
     else
@@ -149,63 +147,63 @@ bool ConfigureMainWindowChrome(void *opaque_slint_view, bool gallery) {
   }
 }
 
-bool SetMainWindowFullscreen(bool fullscreen) {
+bool SetGalleryWindowFullscreen(bool fullscreen) {
   @autoreleasepool {
-    if (!main_window || (fullscreen && !main_gallery)) return false;
-    if (main_fullscreen == fullscreen) return true;
+    if (!gallery_window) return false;
+    if (gallery_fullscreen == fullscreen) return true;
     if (fullscreen) {
-      NSScreen *screen = main_window.screen ?: NSScreen.mainScreen;
+      NSScreen *screen = gallery_window.screen ?: NSScreen.mainScreen;
       if (!screen) return false;
-      main_restore_frame = main_window.frame;
-      main_restore_style = main_window.styleMask;
-      main_restore_presentation = NSApp.presentationOptions;
-      main_fullscreen = true;
-      main_window.styleMask |= NSWindowStyleMaskFullSizeContentView;
-      main_window.titleVisibility = NSWindowTitleHidden;
-      main_window.movable = NO;
-      SetTitlebarButtonsHidden(main_window, YES);
+      gallery_restore_frame = gallery_window.frame;
+      gallery_restore_style = gallery_window.styleMask;
+      gallery_restore_presentation = NSApp.presentationOptions;
+      gallery_fullscreen = true;
+      gallery_window.styleMask |= NSWindowStyleMaskFullSizeContentView;
+      gallery_window.titleVisibility = NSWindowTitleHidden;
+      gallery_window.movable = NO;
+      SetTitlebarButtonsHidden(gallery_window, YES);
       NSApp.presentationOptions |=
           NSApplicationPresentationAutoHideDock | NSApplicationPresentationAutoHideMenuBar;
       // Let the next event-loop frame paint the updated Slint layout. A
       // synchronous draw here exposes stale grid geometry during the resize.
-      [main_window setFrame:screen.frame display:NO animate:NO];
+      [gallery_window setFrame:screen.frame display:NO animate:NO];
     } else {
-      main_fullscreen = false;
-      NSApp.presentationOptions = main_restore_presentation;
-      main_window.styleMask = main_restore_style;
-      main_window.titleVisibility = NSWindowTitleVisible;
-      main_window.movable = YES;
-      [main_window standardWindowButton:NSWindowCloseButton].hidden = NO;
-      [main_window standardWindowButton:NSWindowMiniaturizeButton].hidden = NO;
-      // The main window uses the in-app fullscreen action in both modes.
-      HideMainWindowZoomButton(main_window);
-      [main_window setFrame:main_restore_frame display:NO animate:NO];
+      gallery_fullscreen = false;
+      NSApp.presentationOptions = gallery_restore_presentation;
+      gallery_window.styleMask = gallery_restore_style;
+      gallery_window.titleVisibility = NSWindowTitleVisible;
+      gallery_window.movable = YES;
+      [gallery_window standardWindowButton:NSWindowCloseButton].hidden = NO;
+      [gallery_window standardWindowButton:NSWindowMiniaturizeButton].hidden = NO;
+      // DeskHub uses its in-app fullscreen action.
+      HideMainWindowZoomButton(gallery_window);
+      [gallery_window setFrame:gallery_restore_frame display:NO animate:NO];
     }
-    main_window.contentView.needsDisplay = YES;
+    gallery_window.contentView.needsDisplay = YES;
     return true;
   }
 }
-bool IsMainWindowFullscreen() { return main_fullscreen; }
-bool IsMainWindowActive() { return main_window && [NSApp isActive] && [main_window isKeyWindow]; }
+bool IsGalleryWindowFullscreen() { return gallery_fullscreen; }
+bool IsGalleryWindowActive() { return gallery_window && [NSApp isActive] && [gallery_window isKeyWindow]; }
 
-bool MaximizeMainWindowWithoutAnimation() {
+bool MaximizeGalleryWindowWithoutAnimation() {
   @autoreleasepool {
-    if (!main_window || !main_gallery || main_fullscreen) return false;
-    NSScreen *screen = main_window.screen ?: NSScreen.mainScreen;
+    if (!gallery_window || gallery_fullscreen) return false;
+    NSScreen *screen = gallery_window.screen ?: NSScreen.mainScreen;
     if (!screen) return false;
-    [main_window setFrame:screen.visibleFrame display:YES animate:NO];
+    [gallery_window setFrame:screen.visibleFrame display:YES animate:NO];
     return true;
   }
 }
 
-bool IsMainWindowMaximized() {
+bool IsGalleryWindowMaximized() {
   @autoreleasepool {
-    if (!main_window || !main_gallery || main_fullscreen) return false;
-    NSScreen *screen = main_window.screen;
+    if (!gallery_window || gallery_fullscreen) return false;
+    NSScreen *screen = gallery_window.screen;
     if (!screen) return false;
     // isZoomed can report true for a constrained compact window. Only treat
     // the ordinary window as maximized when it fills the usable screen.
-    const NSRect frame = main_window.frame;
+    const NSRect frame = gallery_window.frame;
     const NSRect available = screen.visibleFrame;
     return std::abs(frame.origin.x - available.origin.x) < 1 &&
            std::abs(frame.origin.y - available.origin.y) < 1 &&

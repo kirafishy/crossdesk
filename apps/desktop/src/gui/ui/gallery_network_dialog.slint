@@ -27,18 +27,18 @@ component NetworkRow inherits Rectangle {
         identity := Rectangle {
             horizontal-stretch: 1;
             device-name := Text {
-                y: root.heading ? 0px : 11px; height: root.heading ? parent.height : 20px;
+                y: root.heading ? 0px : 8px; height: root.heading ? parent.height : 20px;
                 width: parent.width; text: root.device.name;
                 font-size: root.heading ? 11px : 12px; font-weight: 600;
                 color: root.heading ? #6b7785 : #293746;
                 vertical-alignment: center; overflow: elide;
             }
             name-hover := TouchArea {
-                y: 11px; height: 20px; width: parent.width;
+                y: 8px; height: 20px; width: parent.width;
                 enabled: !root.heading;
             }
             if !root.heading: HorizontalLayout {
-                x: 0px; y: 34px; width: parent.width; height: 17px; spacing: 4px;
+                x: 0px; y: 30px; width: parent.width; height: 17px; spacing: 4px;
                 id-text := Text {
                     text: root.device.id; font-size: 10px; color: #7a8490;
                     vertical-alignment: center; overflow: elide;
@@ -77,7 +77,7 @@ component NetworkRow inherits Rectangle {
         Rectangle {
             width: max(108px, root.width * 0.19);
             Text {
-                y: root.heading ? 0px : 11px; height: root.heading ? parent.height : 20px;
+                y: root.heading ? 0px : 8px; height: root.heading ? parent.height : 20px;
                 width: parent.width;
                 text: root.heading ? GalleryStrings.tr("画面", "Video", "Видео") : root.device.resolution;
                 font-size: root.heading ? 11px : 12px; font-weight: root.heading ? 600 : 400;
@@ -85,7 +85,7 @@ component NetworkRow inherits Rectangle {
                 vertical-alignment: center; overflow: elide;
             }
             if !root.heading: Text {
-                y: 34px; height: 17px; width: parent.width;
+                y: 30px; height: 17px; width: parent.width;
                 text: root.device.fps; font-size: 11px; color: #7a8490;
                 vertical-alignment: center; overflow: elide;
             }
@@ -99,20 +99,20 @@ component NetworkRow inherits Rectangle {
                 vertical-alignment: center; overflow: elide;
             }
             if !root.heading: Text {
-                x: 0px; y: 11px; height: 20px; width: 14px;
+                x: 0px; y: 8px; height: 20px; width: 14px;
                 text: "↓"; color: #2676b9; font-size: 12px; vertical-alignment: center;
             }
             if !root.heading: Text {
-                x: 17px; y: 11px; height: 20px; width: parent.width - 17px;
+                x: 17px; y: 8px; height: 20px; width: parent.width - 17px;
                 text: root.device.inbound; color: #293746; font-size: 12px;
                 vertical-alignment: center; overflow: elide;
             }
             if !root.heading: Text {
-                x: 0px; y: 34px; height: 17px; width: 14px;
+                x: 0px; y: 30px; height: 17px; width: 14px;
                 text: "↑"; color: #7a8490; font-size: 11px; vertical-alignment: center;
             }
             if !root.heading: Text {
-                x: 17px; y: 34px; height: 17px; width: parent.width - 17px;
+                x: 17px; y: 30px; height: 17px; width: parent.width - 17px;
                 text: root.device.outbound; color: #7a8490; font-size: 11px;
                 vertical-alignment: center; overflow: elide;
             }
@@ -120,7 +120,7 @@ component NetworkRow inherits Rectangle {
         Rectangle {
             width: max(94px, root.width * 0.16);
             Text {
-                y: root.heading ? 0px : 11px; height: root.heading ? parent.height : 20px;
+                y: root.heading ? 0px : 8px; height: root.heading ? parent.height : 20px;
                 width: parent.width;
                 text: root.heading ? GalleryStrings.tr("网络质量", "Network quality", "Качество сети") : "RTT  " + root.device.latency;
                 font-size: 11px; font-weight: root.heading ? 600 : 400;
@@ -128,7 +128,7 @@ component NetworkRow inherits Rectangle {
                 vertical-alignment: center; overflow: elide;
             }
             if !root.heading: Text {
-                y: 34px; height: 17px; width: parent.width;
+                y: 30px; height: 17px; width: parent.width;
                 text: GalleryStrings.tr("丢包  ", "Loss  ", "Потери  ") + root.device.loss;
                 font-size: 11px; color: #7a8490;
                 vertical-alignment: center; overflow: elide;
@@ -162,14 +162,16 @@ component NetworkEmptyState inherits Rectangle {
 
 export component GalleryNetworkDialog inherits Rectangle {
     in property <[GalleryNetworkDevice]> devices;
+    private property <length> row-height: 56px;
+    private property <length> list-height: max(2, min(root.devices.length, 6)) * root.row-height;
     callback close();
     background: #00000042;
     TouchArea { clicked => { root.close(); } }
     Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        width: min(960px, parent.width - 32px);
-        height: min(560px, parent.height - 24px);
+        width: min(760px, parent.width - 32px);
+        height: min(120px + root.list-height, parent.height - 32px);
         background: white; border-radius: 8px;
         border-width: 1px; border-color: #c6cdd5;
         TouchArea {}
@@ -210,10 +212,10 @@ export component GalleryNetworkDialog inherits Rectangle {
             x: 12px; y: 108px; width: parent.width - 24px;
             height: parent.height - self.y - 12px;
             viewport-width: self.width - 14px;
-            viewport-height: max(self.height, root.devices.length * 62px);
+            viewport-height: max(self.height, root.devices.length * root.row-height);
             horizontal-scrollbar-policy: always-off;
             for device[index] in root.devices: NetworkRow {
-                y: index * 62px; width: list.viewport-width; height: 62px;
+                y: index * root.row-height; width: list.viewport-width; height: root.row-height;
                 device: device; background: mod(index, 2) == 0 ? white : #f8fafc;
                 Rectangle { y: parent.height - 1px; height: 1px; background: #edf0f4; }
             }

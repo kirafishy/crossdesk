@@ -82,7 +82,39 @@ struct Workspace {
       if (wall_ids_.count(m.id) && (group.empty() || m.group == group) &&
           seen.insert(m.id).second)
         ids.push_back(m.id);
-    return ids;
+    return OrderIds(ids);
+  }
+  // Order is independent of membership, group assignments and live sessions.
+  std::vector<std::string> OrderIds(const std::vector<std::string> &ids) const {
+    if (device_order_.empty())
+      return ids;
+    std::set<std::string> remaining(ids.begin(), ids.end());
+    std::vector<std::string> ordered;
+    ordered.reserve(ids.size());
+    for (const auto &id : device_order_)
+      if (remaining.erase(id)) ordered.push_back(id);
+    for (const auto &id : ids)
+      if (remaining.erase(id)) ordered.push_back(id);
+    return ordered;
+  }
+  bool SwapPositions(const std::string &source, const std::string &target,
+                     const std::vector<std::string> &visible_ids) {
+    if (source == target || !ValidId(source) || !ValidId(target) ||
+        std::find(visible_ids.begin(), visible_ids.end(), source) == visible_ids.end() ||
+        std::find(visible_ids.begin(), visible_ids.end(), target) == visible_ids.end())
+      return false;
+    auto ordered = device_order_;
+    std::set<std::string> known(ordered.begin(), ordered.end());
+    // Include hidden groups before applying a swap in a filtered view.
+    for (const auto &id : Ids())
+      if (known.insert(id).second) ordered.push_back(id);
+    // Active-only devices can be arranged without enrolling them in the wall.
+    for (const auto &id : visible_ids)
+      if (ValidId(id) && known.insert(id).second) ordered.push_back(id);
+    std::iter_swap(std::find(ordered.begin(), ordered.end(), source),
+                   std::find(ordered.begin(), ordered.end(), target));
+    device_order_ = std::move(ordered);
+    return true;
   }
   // History filtering uses group assignments, independently of wall enrollment.
   // nullopt means all devices; an empty name means no named group.
@@ -147,6 +179,7 @@ struct Workspace {
     if (group.empty()) {
       // Removing from the wall leaves history's group assignments intact.
       wall_ids_.erase(id);
+      std::erase(device_order_, id);
     } else if (MatchesGroup(id, group)) {
       // Removing the last named group leaves an ungrouped wall member.
       // Reuse the editor path so enrollment and card order stay unchanged.
@@ -198,9 +231,19 @@ struct Workspace {
           if (ValidId(id) && loaded.HasAssignments(id))
             loaded.wall_ids_.insert(id);
         }
+      if (doc.contains("device_order") && doc["device_order"].is_array()) {
+        std::set<std::string> seen;
+        for (const auto &value : doc["device_order"]) {
+          if (!value.is_string()) continue;
+          const auto id = value.get<std::string>();
+          if (ValidId(id) && seen.insert(id).second)
+            loaded.device_order_.push_back(id);
+        }
+      }
       members = std::move(loaded.members);
       groups = std::move(loaded.groups);
       wall_ids_ = std::move(loaded.wall_ids_);
+      device_order_ = std::move(loaded.device_order_);
       stream_settings = loaded.stream_settings;
       return true;
     } catch (...) {
@@ -212,6 +255,7 @@ struct Workspace {
       nlohmann::json doc{{"version", 2},
                          {"members", nlohmann::json::array()},
                          {"wall_ids", wall_ids_},
+                         {"device_order", device_order_},
                          {"stream_settings", stream_settings.ToJson()}};
       for (const auto &m : members)
         doc["members"].push_back({{"id", m.id}, {"group", m.group}});
@@ -223,6 +267,7 @@ struct Workspace {
 
 private:
   std::set<std::string> wall_ids_;
+  std::vector<std::string> device_order_;
 
   bool HasAssignments(const std::string &id) const {
     return std::any_of(members.begin(), members.end(),

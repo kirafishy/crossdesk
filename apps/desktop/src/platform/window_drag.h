@@ -8,20 +8,20 @@ namespace crossdesk {
 // left-mouse-down event. Returns false when no suitable native event exists.
 bool StartNativeWindowDrag();
 
-// Sets a white native titlebar and hides its zoom button in both main-window
-// modes. DeskHub remains resizable. |slint_view| is its AppKit NSView*.
+// Configures the connection or DeskHub window with a white native titlebar.
+// Only DeskHub is resizable. |slint_view| is its AppKit NSView*.
 // Returns false while the native window or its titlebar controls are not ready.
 bool ConfigureMainWindowChrome(void* slint_view, bool gallery = false);
 // Winit's initial macOS position is a content origin, while subsequent moves
 // use the outer frame. Return the logical titlebar inset for initial placement.
 float MainWindowInitialPositionYOffset();
-bool SetMainWindowFullscreen(bool fullscreen);
-bool IsMainWindowFullscreen();
-bool IsMainWindowActive();
+bool SetGalleryWindowFullscreen(bool fullscreen);
+bool IsGalleryWindowFullscreen();
+bool IsGalleryWindowActive();
 // AppKit's animated zoom spins a nested run loop and cannot be called from a
 // Slint timer. Restore maximization by setting the visible screen frame directly.
-bool MaximizeMainWindowWithoutAnimation();
-bool IsMainWindowMaximized();
+bool MaximizeGalleryWindowWithoutAnimation();
+bool IsGalleryWindowMaximized();
 
 // Configures live resize and replaces the stream window's native Space
 // fullscreen action with an immediate, single-window fullscreen transition.
