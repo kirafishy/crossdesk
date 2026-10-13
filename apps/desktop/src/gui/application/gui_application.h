@@ -61,7 +61,7 @@ private:
   void HandleCredentialRecovery();
   void SyncMainWindow();
   void ShowGalleryWindow();
-  void HideGalleryWindow();
+  void CloseGalleryWindow();
   void SyncWindowGeometry(bool gallery_window);
   void ToggleGalleryFullscreen();
   void RestoreWindowGeometry(bool before_show = false,

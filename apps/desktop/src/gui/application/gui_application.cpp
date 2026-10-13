@@ -1517,10 +1517,9 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     }
   });
   main->window().on_close_requested([this, main] {
-    // Keep the application and all active sessions alive. The tray helper
-    // ensures that supported platforms still provide a way to restore the
-    // main window; Slint hides it regardless of tray availability.
-    if (main->get_gallery_mode()) HideGalleryWindow();
+    // Closing DeskHub disconnects its remote sessions. The connection window
+    // still minimizes to the tray without terminating the application.
+    if (main->get_gallery_mode()) CloseGalleryWindow();
     else MinimizeMainWindowToTray();
     return slint::CloseRequestResponse::HideWindow;
   });
@@ -1539,7 +1538,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     if (!ui_) {
       return;
     }
-    if (main->get_gallery_mode()) HideGalleryWindow();
+    if (main->get_gallery_mode()) CloseGalleryWindow();
     else MinimizeMainWindowToTray();
     main->hide();
   });
@@ -4463,9 +4462,28 @@ void GuiApplication::ShowGalleryWindow() {
   SyncGallery();
 }
 
-void GuiApplication::HideGalleryWindow() {
+void GuiApplication::CloseGalleryWindow() {
   if (!ui_) return;
   ReleaseControl();
+  // Snapshot all receivers, not just the current wall page/group. Include
+  // requests without a live session so no queued work can reconnect on close.
+  std::set<std::string> disconnect_ids;
+  {
+    std::shared_lock lock(remote_sessions_mutex_);
+    for (const auto& [id, _] : remote_sessions_) disconnect_ids.insert(id);
+  }
+  for (const auto& [id, _] : pending_reconnects_) disconnect_ids.insert(id);
+  for (const auto& operation : ui_->batch_operations)
+    disconnect_ids.insert(operation.id);
+  {
+    std::lock_guard lock(pending_presence_probe_mutex_);
+    if (!pending_presence_remote_id_.empty())
+      disconnect_ids.insert(pending_presence_remote_id_);
+  }
+  // Reuse explicit disconnect: cancel retries, release input/media resources,
+  // and queue peer teardown without waiting for the transport on the UI thread.
+  for (const auto& id : disconnect_ids) CloseStreamTab(id);
+  need_to_rejoin_ = false;
   ui_->wall->invoke_reset_gallery_transient();
   ui_->wall->set_alias_open(false);
   ui_->wall->set_delete_open(false);
@@ -4476,11 +4494,9 @@ void GuiApplication::HideGalleryWindow() {
   ui_->wall->set_messages_open(false);
   ResetSettingsUi(true);
   ui_->gallery_requested_auth.clear();
-  if (!ui_->gallery_auth_id.empty()) {
-    ui_->gallery_auth_id.clear();
-    show_connection_status_window_ = false;
-    ui_->wall->set_connection_dialog_open(false);
-  }
+  ui_->gallery_auth_id.clear();
+  show_connection_status_window_ = false;
+  SyncConnectionDialog();
   SyncWindowGeometry(true);
   ui_->gallery_transition.Cancel();
   ui_->wall->set_gallery_transitioning(false);
@@ -4497,6 +4513,7 @@ void GuiApplication::HideGalleryWindow() {
   ui_->wall->hide();
   ui_->gallery_synced = {};
   SyncGallery();
+  SyncStreamWindow();
 }
 
 void GuiApplication::ToggleGalleryFullscreen() {
