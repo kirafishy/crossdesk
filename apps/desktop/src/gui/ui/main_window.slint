@@ -299,10 +299,10 @@ export component MainWindow inherits Window {
     }
     in property <bool> gallery-fullscreen: false;
     in property <bool> gallery-transitioning: false;
-    in property <bool> gallery-content-visible: true;
     changed gallery-transitioning => {
         if root.gallery-transitioning {
-            focus-sink.focus();
+            // Preserve the preview's keyboard focus when only changing size.
+            if !root.gallery-controlling { focus-sink.focus(); }
             root.menu-open = false;
             root.recent-tooltip-visible = false;
         }
@@ -754,12 +754,6 @@ export component MainWindow inherits Window {
         width: root.width;
         height: root.height - self.y;
         clip: true;
-        opacity: root.gallery-content-visible || !root.gallery-mode ? 1 : 0;
-        animate opacity {
-            duration: 60ms;
-            easing: ease-in-out;
-            enabled: root.gallery-mode;
-        }
 
     Rectangle {
         width: parent.width;
@@ -1325,6 +1319,7 @@ export component MainWindow inherits Window {
             tile-width <=> root.gallery-tile-width;
             network-open => { root.gallery-network-open = true; }
             controlling: root.gallery-controlling;
+            input-suspended: root.gallery-transitioning;
             pointer-input(button, kind, x, y) => { root.gallery-pointer(button, kind, x, y); }
             scroll-input(dx, dy, x, y) => { root.gallery-scroll(dx, dy, x, y); }
             key-input(text, pressed, ctrl, alt, shift, meta) => { root.gallery-key(text, pressed, ctrl, alt, shift, meta); }

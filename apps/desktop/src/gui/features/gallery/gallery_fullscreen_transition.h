@@ -12,17 +12,18 @@
 
 namespace crossdesk::gallery {
 
+// Guard input while native geometry settles, without hiding the live content.
 // Driven by the existing UI tick; never pumps events or creates nested timers.
 class FullscreenTransition {
 public:
   using Clock = std::chrono::steady_clock;
-  enum class Action { Idle, Apply, Reveal, Finished };
+  enum class Action { Idle, Apply, Finished };
 
   bool Begin(bool fullscreen, Clock::time_point now) {
     if (Active())
       return false;
     target_ = fullscreen;
-    phase_ = Phase::FadingOut;
+    phase_ = Phase::Pending;
     phase_at_ = now;
     width_ = height_ = 0;
     scale_ = 0;
@@ -33,13 +34,13 @@ public:
   Action Advance(Clock::time_point now, uint32_t width, uint32_t height,
                  float scale, bool fullscreen, bool restoring) {
     using namespace std::chrono_literals;
-    if (phase_ == Phase::FadingOut) {
+    if (phase_ == Phase::Pending) {
       if (restoring && now - phase_at_ >= 1500ms) {
-        Reveal(now);
-        return Action::Reveal;
+        Cancel();
+        return Action::Finished;
       }
-      // Slint fades out for 60ms; allow another frame before native resizing.
-      if (now - phase_at_ < 80ms || restoring)
+      // Apply on the next UI tick as soon as window restoration is complete.
+      if (restoring)
         return Action::Idle;
       phase_ = Phase::Settling;
       phase_at_ = stable_at_ = now;
@@ -65,30 +66,19 @@ public:
            (geometry_changed_ || now - phase_at_ >= 300ms) &&
            now - stable_at_ >= 32ms) ||
           now - phase_at_ >= 1500ms) {
-        Reveal(now);
-        return Action::Reveal;
+        Cancel();
+        return Action::Finished;
       }
-    }
-    if (phase_ == Phase::FadingIn && now - phase_at_ >= 80ms) {
-      Cancel();
-      return Action::Finished;
     }
     return Action::Idle;
   }
 
-  void Reveal(Clock::time_point now) {
-    phase_ = Phase::FadingIn;
-    phase_at_ = now;
-  }
   void Cancel() { phase_ = Phase::Idle; }
   bool Active() const { return phase_ != Phase::Idle; }
   bool Target() const { return target_; }
-  bool ContentVisible() const {
-    return phase_ == Phase::Idle || phase_ == Phase::FadingIn;
-  }
 
 private:
-  enum class Phase { Idle, FadingOut, Settling, FadingIn };
+  enum class Phase { Idle, Pending, Settling };
   Phase phase_ = Phase::Idle;
   bool target_ = false;
   bool geometry_changed_ = false;

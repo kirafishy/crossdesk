@@ -1413,15 +1413,16 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
   main->on_gallery_pointer([this](slint::PointerEventButton button,
                                  slint::PointerEventKind kind, float x,
                                  float y) {
-    if (!ui_->gallery_control_id.empty())
+    if (!ui_->gallery_control_id.empty() && !ui_->gallery_transition.Active())
       SendPointerInput(static_cast<int>(button), static_cast<int>(kind), x, y);
   });
   main->on_gallery_scroll([this](float dx, float dy, float x, float y) {
-    if (!ui_->gallery_control_id.empty()) SendScrollInput(dx, dy, x, y);
+    if (!ui_->gallery_control_id.empty() && !ui_->gallery_transition.Active())
+      SendScrollInput(dx, dy, x, y);
   });
   main->on_gallery_key([this](slint::SharedString text, bool pressed,
                              bool ctrl, bool alt, bool shift, bool meta) {
-    if (!ui_->gallery_control_id.empty())
+    if (!ui_->gallery_control_id.empty() && !ui_->gallery_transition.Active())
       SendKeyInput(std::string(text), pressed, ctrl, alt, shift, meta);
   });
   main->on_open_gallery([this] { ShowGalleryWindow(); });
@@ -4381,9 +4382,7 @@ void GuiApplication::SyncAudioPlayback() {
   }
 }
 
-void GuiApplication::ReleaseControl() {
-  const auto gallery_target = ui_->gallery_control_id;
-  devices_.StopKeyboardCapturer();
+void GuiApplication::ReleasePressedInput() {
   keyboard_.ForceReleasePressedKeys();
   if (auto props = FindRemoteSession(controlled_remote_id_);
       props && props->peer_) {
@@ -4400,11 +4399,17 @@ void GuiApplication::ReleaseControl() {
                             props->mouse_label_.c_str());
     }
   }
+  ui_->pressed_mouse_buttons.clear();
+}
+
+void GuiApplication::ReleaseControl() {
+  const auto gallery_target = ui_->gallery_control_id;
+  devices_.StopKeyboardCapturer();
+  ReleasePressedInput();
   if (!ui_->gallery_control_id.empty()) {
     ui_->gallery_control_id.clear();
     ui_->wall->set_gallery_controlling(false);
   }
-  ui_->pressed_mouse_buttons.clear();
   SyncAudioPlayback();
   std::shared_lock lock(remote_sessions_mutex_);
   for (const auto& [id, props] : remote_sessions_) {
@@ -4476,7 +4481,6 @@ void GuiApplication::HideGalleryWindow() {
   SyncWindowGeometry(true);
   ui_->gallery_transition.Cancel();
   ui_->wall->set_gallery_transitioning(false);
-  ui_->wall->set_gallery_content_visible(true);
   ui_->window_saved = {};
   SaveGalleryWindowState();
 #if defined(__APPLE__)
@@ -4503,9 +4507,10 @@ void GuiApplication::ToggleGalleryFullscreen() {
   const bool target = !(ui_->gallery_window.Restoring()
                             ? ui_->gallery_window.wall_fullscreen : fullscreen);
   ui_->gallery_transition.Begin(target, std::chrono::steady_clock::now());
-  ReleaseControl();
+  // Fullscreen only changes presentation. End held gestures before blocking
+  // input, but retain the controlled session and its keyboard focus.
+  if (!ui_->gallery_control_id.empty()) ReleasePressedInput();
   ui_->wall->set_gallery_transitioning(true);
-  ui_->wall->set_gallery_content_visible(false);
   ui_->gallery_synced = {};
 }
 
@@ -5096,7 +5101,8 @@ void GuiApplication::SyncGallery() {
   if (ui_->observed_gallery_size &&
       (current_size.width != ui_->observed_gallery_size->width ||
        current_size.height != ui_->observed_gallery_size->height)) {
-    if (!ui_->gallery_control_id.empty()) ReleaseControl();
+    if (!ui_->gallery_control_id.empty() && !ui_->gallery_transition.Active())
+      ReleaseControl();
     // Native resize can redraw before the usual 200ms preview refresh.
     ui_->gallery_synced = {};
   }
@@ -5112,7 +5118,8 @@ void GuiApplication::SyncGallery() {
   const bool fullscreen = window.is_fullscreen();
 #endif
   if (wall_mode && !placement.Restoring()) {
-    if (fullscreen != ui_->wall->get_gallery_fullscreen()) ReleaseControl();
+    if (fullscreen != ui_->wall->get_gallery_fullscreen() && !transition.Active())
+      ReleaseControl();
     ui_->wall->set_gallery_fullscreen(fullscreen);
   }
   if (!ui_->gallery_control_id.empty()) {
@@ -5125,13 +5132,13 @@ void GuiApplication::SyncGallery() {
   const auto action = transition.Advance(now, current_size.width, current_size.height,
                                          window.scale_factor(), fullscreen, placement.Restoring());
   if (action == gallery::FullscreenTransition::Action::Apply) {
-    // Update custom chrome before native resizing; keep content hidden until
-    // both the compositor geometry and the gallery model have settled.
+    // Keep previews visible while native resizing and the gallery model catch
+    // up. Only input and geometry persistence wait for the window to settle.
     ui_->wall->set_gallery_fullscreen(transition.Target());
 #if defined(__APPLE__)
     if (!SetGalleryWindowFullscreen(transition.Target())) {
       ui_->wall->set_gallery_fullscreen(fullscreen);
-      transition.Reveal(now);
+      transition.Cancel();
     } else
 #else
     window.set_fullscreen(transition.Target());
@@ -5142,7 +5149,6 @@ void GuiApplication::SyncGallery() {
     ui_->gallery_synced = {};
   }
   ui_->wall->set_gallery_transitioning(transition.Active());
-  ui_->wall->set_gallery_content_visible(transition.ContentVisible());
   if (!transition.Active() && now - ui_->gallery_synced <
       (visible ? 16ms : 200ms))
     return;

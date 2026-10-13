@@ -75,6 +75,7 @@ private:
   void DeviceGroupAction(const std::string& action, const std::string& value,
                          bool gallery_window);
   bool SaveDeviceGroups(const std::string& new_group, bool gallery_window);
+  void ReleasePressedInput();
   void ReleaseControl();
   void SyncAudioPlayback();
   void SaveGalleryWindowState();

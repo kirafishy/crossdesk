@@ -43,6 +43,7 @@ export struct GalleryActionDevice {
 
 export component GalleryView inherits Rectangle {
     in property <bool> controlling: false;
+    in property <bool> input-suspended: false;
     in property <bool> simplified: false;
     in property <bool> fullscreen: false;
     callback toggle-simplified;
@@ -578,7 +579,7 @@ export component GalleryView inherits Rectangle {
                     focus-on-click: true;
                     focus-lost => { if root.controlling { root.action("release", ""); } }
                     key-pressed(event) => {
-                        if root.controlling {
+                        if root.controlling && !root.input-suspended {
                             if event.text == Key.Escape && event.modifiers.shift && (event.modifiers.control || event.modifiers.meta) {
                                 root.action("release", "");
                             } else { root.key-input(event.text, true, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta); }
@@ -586,16 +587,18 @@ export component GalleryView inherits Rectangle {
                         accept
                     }
                     key-released(event) => {
-                        if root.controlling { root.key-input(event.text, false, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta); }
+                        if root.controlling && !root.input-suspended { root.key-input(event.text, false, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta); }
                         accept
                     }
                     TouchArea {
                         pointer-event(event) => {
-                            if event.kind == PointerEventKind.down { video-focus.focus(); }
-                            if root.controlling { root.pointer-input(event.button, event.kind, self.mouse-x, self.mouse-y); }
+                            if !root.input-suspended {
+                                if event.kind == PointerEventKind.down { video-focus.focus(); }
+                                if root.controlling { root.pointer-input(event.button, event.kind, self.mouse-x, self.mouse-y); }
+                            }
                         }
                         scroll-event(event) => {
-                            if root.controlling { root.scroll-input(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y); }
+                            if root.controlling && !root.input-suspended { root.scroll-input(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y); }
                             accept
                         }
                     }
