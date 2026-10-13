@@ -55,6 +55,8 @@ export component GalleryView inherits Rectangle {
     in property <bool> window-active: true;
     in-out property <float> tile-width: 216;
     out property <bool> resizing: false;
+    in-out property <float> focus-rail-height: 70.875;
+    out property <bool> focus-resizing: false;
     private property <float> preview-aspect-ratio: 16 / 9;
     private property <length> card-inset: 6px;
     private property <length> card-chrome-height: root.simplified ? root.card-inset * 2 : 36px;
@@ -64,9 +66,19 @@ export component GalleryView inherits Rectangle {
     private property <length> card-width: clamp(root.tile-width * 1px, 184px, root.max-card-width);
     private property <length> card-preview-height: (root.card-width - root.card-inset * 2) / root.preview-aspect-ratio;
     private property <length> card-height: root.card-preview-height + root.card-chrome-height;
-    private property <length> rail-preview-width: 126px;
-    private property <length> rail-preview-height: root.rail-preview-width / root.preview-aspect-ratio;
-    private property <length> rail-card-height: root.rail-preview-height + (root.simplified ? 10px : 24px);
+    private property <bool> focus-rail-visible: root.focused.id != "" && root.tiles.length > 1;
+    private property <length> rail-chrome-height: root.simplified ? 10px : 24px;
+    private property <length> min-rail-preview-height: 54px;
+    // Leave at least 160px for the main preview and keep each thumbnail inside
+    // the window. Clamp the rendered size without losing the saved preference.
+    private property <length> max-rail-preview-height: max(root.min-rail-preview-height,
+        min((focus-view.width - 10px) / root.preview-aspect-ratio,
+            focus-view.height - 36px - root.rail-chrome-height - 14px - 12px - 160px));
+    private property <length> rail-preview-height: clamp(root.focus-rail-height * 1px,
+        root.min-rail-preview-height, root.max-rail-preview-height);
+    private property <length> rail-preview-width: root.rail-preview-height * root.preview-aspect-ratio;
+    private property <length> rail-card-height: root.rail-preview-height + root.rail-chrome-height;
+    private property <length> rail-slot-width: root.rail-preview-width + 18px;
     private property <string> focused-id: root.focused.id;
     private property <string> device-tooltip-id;
     private property <string> device-tooltip-text;
@@ -89,19 +101,20 @@ export component GalleryView inherits Rectangle {
     private property <length> drag-edge-width: 32px;
     private property <int> drag-page-direction: root.page-direction(root.drag-x, root.drag-y);
     private property <bool> swap-save-failed: false;
-    changed focused-id => { root.device-tooltip-id = ""; root.resizing = false; root.cancel-device-drag(); }
-    changed visible => { root.device-tooltip-id = ""; if !root.visible { root.resizing = false; root.cancel-device-drag(); add-menu.close-menu(); batch-menu.close-menu(); } }
-    changed width => { root.device-tooltip-id = ""; root.resizing = false; root.cancel-device-drag(); }
-    changed height => { root.device-tooltip-id = ""; root.resizing = false; root.cancel-device-drag(); }
-    changed window-active => { if !root.window-active { root.device-tooltip-id = ""; root.resizing = false; root.cancel-device-drag(); } }
+    changed focused-id => { root.device-tooltip-id = ""; root.resizing = false; root.focus-resizing = false; root.cancel-device-drag(); }
+    changed focus-rail-visible => { root.focus-resizing = false; }
+    changed visible => { root.device-tooltip-id = ""; if !root.visible { root.resizing = false; root.focus-resizing = false; root.cancel-device-drag(); add-menu.close-menu(); batch-menu.close-menu(); } }
+    changed width => { root.device-tooltip-id = ""; root.resizing = false; root.focus-resizing = false; root.cancel-device-drag(); }
+    changed height => { root.device-tooltip-id = ""; root.resizing = false; root.focus-resizing = false; root.cancel-device-drag(); }
+    changed window-active => { if !root.window-active { root.device-tooltip-id = ""; root.resizing = false; root.focus-resizing = false; root.cancel-device-drag(); } }
     changed page => { root.device-tooltip-id = ""; if root.page != root.drag-page { root.cancel-device-drag(); } }
     changed group-index => { root.device-tooltip-id = ""; root.cancel-device-drag(); }
     changed card-width => { root.cancel-device-drag(); }
     changed card-height => { root.cancel-device-drag(); }
     changed device-tooltip-id => {
         root.device-tooltip-visible = false;
-        device-tooltip-timer.running = root.device-tooltip-id == "resize-grid";
-        if root.device-tooltip-id == "resize-grid" { device-tooltip-timer.restart(); }
+        device-tooltip-timer.running = root.device-tooltip-id == "resize-grid" || root.device-tooltip-id == "resize-focus";
+        if device-tooltip-timer.running { device-tooltip-timer.restart(); }
     }
     device-tooltip-timer := Timer {
         interval: 450ms; running: false;
@@ -168,6 +181,7 @@ export component GalleryView inherits Rectangle {
     }
     public function reset-transient() {
         root.resizing = false;
+        root.focus-resizing = false;
         root.cancel-device-drag();
         root.batch = false; root.adding = false; root.importing = false; root.confirming = false;
         root.device-tooltip-id = ""; add-menu.close-menu(); batch-menu.close-menu();
@@ -561,7 +575,7 @@ export component GalleryView inherits Rectangle {
             CompactButton { width: 100px; primary: true; enabled: !root.focused.connected || root.controlling || (root.focused.has-frame && !root.focused.stale); text: root.focused.connected ? (root.controlling ? GalleryStrings.tr("释放操控", "Release", "Отпустить") : GalleryStrings.tr("接管操控", "Control", "Управлять")) : GalleryStrings.tr("连接", "Connect", "Подключить"); clicked => { root.action(root.focused.connected ? (root.controlling ? "release" : "control") : "connect", root.focused.id); } }
         }
         Rectangle {
-            x: 0px; y: rail.visible ? rail.y + rail.height + 10px : 36px;
+            x: 0px; y: rail.visible ? focus-divider.y + focus-divider.height : 36px;
             width: parent.width; height: parent.height - self.y;
             background: root.focused.online ? #eff1f4 : DeviceCardStyle.offline-background; border-radius: 6px;
             border-width: root.controlling ? 2px : 1px; border-color: root.controlling ? #76aeea : root.focused.online ? #d5dbe3 : DeviceCardStyle.offline-border;
@@ -607,10 +621,10 @@ export component GalleryView inherits Rectangle {
             }
         }
         rail := ScrollView {
-            visible: root.tiles.length > 1;
+            visible: root.focus-rail-visible;
             x: 0px; y: 36px; width: parent.width; height: root.rail-card-height + 14px;
             // Reserve 14px below the cards for the horizontal scrollbar.
-            viewport-width: max(self.width, max(0, root.tiles.length - 1) * 144px);
+            viewport-width: max(self.width, max(0, root.tiles.length - 1) * root.rail-slot-width);
             viewport-height: self.height;
             horizontal-scrollbar-policy: as-needed;
             vertical-scrollbar-policy: always-off;
@@ -627,13 +641,13 @@ export component GalleryView inherits Rectangle {
                 x: 0px; y: 0px; height: root.rail-card-height; spacing: 0px; padding: 0px;
                 for tile in root.tiles: rail-slot := Rectangle {
                     // Collapse the focused tile and its gap without changing the page model.
-                    width: tile.id == root.focused.id ? 0px : 144px;
+                    width: tile.id == root.focused.id ? 0px : root.rail-slot-width;
                     height: root.rail-card-height; visible: tile.id != root.focused.id;
                     rail-card := Rectangle {
                         private property <string> presence: tile.online ? GalleryStrings.tr("在线", "Online", "В сети")
                             : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
                         private property <string> details: tile.name + "\n" + tile.host-name + "\nID: " + tile.id + "\n" + tile.group-names + "\n" + self.presence;
-                        width: 136px; height: root.rail-card-height; border-radius: 5px;
+                        width: root.rail-preview-width + 10px; height: root.rail-card-height; border-radius: 5px;
                         background: tile.online ? #f5f6f8 : DeviceCardStyle.offline-background; border-width: 1px; border-color: tile.online ? #d5dbe3 : DeviceCardStyle.offline-border;
                         accessible-role: button;
                         accessible-label: self.details;
@@ -649,7 +663,7 @@ export component GalleryView inherits Rectangle {
                         }
                         Text {
                             visible: !root.simplified;
-                            x: 7px; y: root.rail-preview-height + 6px; width: 122px; height: 16px;
+                            x: 7px; y: root.rail-preview-height + 6px; width: parent.width - 14px; height: 16px;
                             text: tile.name; color: tile.online ? #303943 : DeviceCardStyle.offline-text; font-size: 11px;
                             overflow: elide; vertical-alignment: center;
                         }
@@ -667,6 +681,68 @@ export component GalleryView inherits Rectangle {
                             clicked => { root.device-tooltip-id = ""; root.action("focus", tile.id); }
                         }
                     }
+                }
+            }
+        }
+        focus-divider := Rectangle {
+            visible: root.focus-rail-visible;
+            x: 0px; y: rail.y + rail.height; width: parent.width; height: 12px;
+            private property <bool> highlighted: divider-touch.has-hover || root.focus-resizing || divider-focus.has-focus;
+            Rectangle {
+                x: 0px; y: 5px; width: parent.width; height: 1px;
+                background: focus-divider.highlighted ? #a6c9ed : #e6e9ed;
+            }
+            Rectangle {
+                x: (parent.width - self.width) / 2; y: 4px; width: 36px; height: 3px; border-radius: 1.5px;
+                background: focus-divider.highlighted ? #6dabea : #bcc4ce;
+            }
+            divider-focus := FocusScope {
+                width: parent.width; height: parent.height;
+                focus-lost => { root.focus-resizing = false; }
+                key-pressed(event) => {
+                    if event.text == Key.Escape { root.focus-resizing = false; return accept; }
+                    if event.text == Key.UpArrow || event.text == Key.DownArrow {
+                        root.focus-rail-height = clamp(root.rail-preview-height
+                            + (event.text == Key.UpArrow ? -8px : 8px),
+                            root.min-rail-preview-height, root.max-rail-preview-height) / 1px;
+                        return accept;
+                    }
+                    reject
+                }
+                divider-touch := TouchArea {
+                    mouse-cursor: MouseCursor.ns-resize;
+                    private property <length> start-y;
+                    private property <length> start-height;
+                    function show-hint() {
+                        if self.has-hover && !root.focus-resizing {
+                            root.device-tooltip-id = "resize-focus";
+                            root.device-tooltip-text = GalleryStrings.tr("上下拖动，调整缩略图与主画面大小", "Drag up or down to resize the thumbnails and main preview", "Потяните вверх или вниз, чтобы изменить размер миниатюр и основного экрана");
+                            root.device-tooltip-x = focus-view.x + self.mouse-x;
+                            root.device-tooltip-y = focus-view.y + focus-divider.y + self.mouse-y + 16px;
+                        } else if root.device-tooltip-id == "resize-focus" { root.device-tooltip-id = ""; }
+                    }
+                    function resize-preview() {
+                        if !root.focus-resizing { return; }
+                        // Use coordinates in the fixed parent: the divider itself
+                        // moves while it retains the pointer grab.
+                        root.focus-rail-height = clamp(self.start-height
+                            + focus-divider.y + self.mouse-y - self.start-y,
+                            root.min-rail-preview-height, root.max-rail-preview-height) / 1px;
+                    }
+                    changed has-hover => { self.show-hint(); }
+                    pointer-event(event) => {
+                        if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                            divider-focus.focus();
+                            self.start-y = focus-divider.y + self.mouse-y;
+                            self.start-height = root.rail-preview-height;
+                            root.device-tooltip-id = ""; root.focus-resizing = true;
+                        } else if event.kind == PointerEventKind.cancel {
+                            root.focus-resizing = false;
+                        } else if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                            self.resize-preview(); root.focus-resizing = false;
+                        }
+                    }
+                    moved => { self.resize-preview(); self.show-hint(); }
                 }
             }
         }
@@ -766,7 +842,7 @@ export component GalleryView inherits Rectangle {
         }
     }
     // Device details are rendered by MainWindow; resize hints stay local.
-    if root.device-tooltip-visible && root.device-tooltip-id == "resize-grid": Rectangle {
+    if root.device-tooltip-visible && (root.device-tooltip-id == "resize-grid" || root.device-tooltip-id == "resize-focus"): Rectangle {
         x: clamp(root.device-tooltip-x, 8px, parent.width - self.width - 8px);
         y: clamp(root.device-tooltip-y + self.height > footer.y ? root.device-tooltip-y - self.height - 8px : root.device-tooltip-y, 4px, parent.height - self.height - 4px);
         width: min(320px, parent.width - 16px); height: device-tooltip-label.preferred-height + 16px;

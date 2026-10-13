@@ -1278,6 +1278,9 @@ void GuiApplication::InitializeUi() {
       if (std::isfinite(tile_width))
         // The rendered grid constrains the restored width to available space.
         ui_->wall->set_gallery_tile_width(std::max(tile_width, 184.0f));
+      const float focus_rail_height = saved.value("focus_rail_height", 70.875f);
+      if (std::isfinite(focus_rail_height))
+        ui_->wall->set_gallery_focus_rail_height(std::max(focus_rail_height, 54.0f));
       ui_->connection_window.BeginRestore();
     }
   } catch (...) {
@@ -4526,6 +4529,7 @@ void GuiApplication::SaveGalleryWindowState() {
     const float connection_scale = std::max(ui_->main->window().scale_factor(), 1.0f);
     nlohmann::json state{{"version", 2},
                          {"tile_width", ui_->wall->get_gallery_tile_width()},
+                         {"focus_rail_height", ui_->wall->get_gallery_focus_rail_height()},
                          {"fullscreen", ui_->gallery_window.wall_fullscreen},
                          {"maximized", ui_->gallery_window.wall_maximized}};
     if (ui_->gallery_window.wall_size) {

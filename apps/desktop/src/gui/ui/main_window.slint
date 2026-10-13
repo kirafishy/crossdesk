@@ -322,7 +322,8 @@ export component MainWindow inherits Window {
     out property <int> gallery-columns: gallery.columns;
     out property <int> gallery-rows: gallery.rows;
     in-out property <float> gallery-tile-width: 216;
-    out property <bool> gallery-resizing: gallery.resizing;
+    in-out property <float> gallery-focus-rail-height: 70.875;
+    out property <bool> gallery-resizing: gallery.resizing || gallery.focus-resizing;
     in property <int> gallery-page: 0;
     in property <int> gallery-pages: 1;
     in property <int> gallery-count: 0;
@@ -1317,6 +1318,7 @@ export component MainWindow inherits Window {
             toggle-fullscreen => { root.toggle-gallery-fullscreen(); }
             window-active: root.window-active;
             tile-width <=> root.gallery-tile-width;
+            focus-rail-height <=> root.gallery-focus-rail-height;
             network-open => { root.gallery-network-open = true; }
             controlling: root.gallery-controlling;
             input-suspended: root.gallery-transitioning;
