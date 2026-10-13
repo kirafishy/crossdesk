@@ -77,7 +77,7 @@ struct StreamSettings {
                                PreviewResolution stream_view) const {
     if (!wall_managed) return {};
     if (resolution != 0 && Valid()) return kResolutions[resolution];
-    // A square bound limits the longest edge of an unexpanded wall tile.
+    // Keep a bounded fallback until a rendered viewport is available.
     if (!wall_view.width && !stream_view.width) return {320, 320};
     return {std::max(wall_view.width, stream_view.width),
             std::max(wall_view.height, stream_view.height)};

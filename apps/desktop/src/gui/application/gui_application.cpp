@@ -1276,7 +1276,8 @@ void GuiApplication::InitializeUi() {
                 int(saved.at("connection_y").get<float>() * scale)});
       const float tile_width = saved.value("tile_width", 216.0f);
       if (std::isfinite(tile_width))
-        ui_->wall->set_gallery_tile_width(std::clamp(tile_width, 184.0f, 960.0f));
+        // The rendered grid constrains the restored width to available space.
+        ui_->wall->set_gallery_tile_width(std::max(tile_width, 184.0f));
       ui_->connection_window.BeginRestore();
     }
   } catch (...) {
@@ -5369,6 +5370,13 @@ void GuiApplication::SyncGallery() {
   SaveGalleryWindowState();
 
   auto& wall = ui_->gallery;
+  std::unordered_map<std::string, std::string> group_labels;
+  for (const auto& member : wall.members) {
+    if (member.group.empty()) continue;
+    auto& label = group_labels[member.id];
+    if (!label.empty()) label += " · ";
+    label += member.group;
+  }
   std::vector<slint::SharedString> groups{
       UiText(tr("全部设备", "All devices", "Все устройства"))};
   for (const auto& group : wall.groups) groups.push_back(UiText(group));
@@ -5422,14 +5430,29 @@ void GuiApplication::SyncGallery() {
             ui_->wall->get_gallery_video_width(),
             ui_->wall->get_gallery_video_height(), window.scale_factor())
       : gallery::PreviewResolution{};
+  const auto gallery_preview_viewport = visible
+      ? gallery::PreviewResolution::Viewport(
+            ui_->wall->get_gallery_preview_width(),
+            ui_->wall->get_gallery_preview_height(), window.scale_factor())
+      : gallery::PreviewResolution{};
   std::set<std::string> preview_ids;
   std::vector<ui::GalleryTile> tiles;
   const auto make_tile = [&](const std::string& id, bool preview) {
     ui::GalleryTile tile{};
     tile.id = UiText(id);
     tile.name = UiText(name(id));
+    tile.group_names = UiText(group_labels[id]);
     tile.selected = wall.selected.count(id);
     auto props = FindRemoteSession(id);
+    for (const auto& [_, recent] : recent_connections_) {
+      if (recent.remote_id != id) continue;
+      tile.host_name = UiText(recent.remote_host_name);
+      break;
+    }
+    if (props && tile.host_name.empty()) {
+      std::lock_guard lock(props->remote_version_mutex_);
+      tile.host_name = UiText(props->remote_host_name_);
+    }
     tile.connected = props &&
                      props->connection_status_ == ConnectionStatus::Connected &&
                      !props->closing_;
@@ -5455,9 +5478,10 @@ void GuiApplication::SyncGallery() {
           props->connection_status_.load(), localization_language_index_));
     if (preview && visible && tile.connected) {
       preview_ids.insert(id);
-      props->gallery_preview_width_ = ui_->gallery_focus == id
-          ? std::max({320, gallery_viewport.width, gallery_viewport.height})
-          : 320;
+      const auto viewport = ui_->gallery_focus == id
+          ? gallery_viewport : gallery_preview_viewport;
+      props->gallery_preview_width_ =
+          std::max({320, viewport.width, viewport.height});
       std::lock_guard lock(props->gallery_frame_mutex_);
       if (props->gallery_rgba_) {
         auto& cached = ui_->gallery_previews[id];
@@ -5586,10 +5610,13 @@ void GuiApplication::SyncGallery() {
         const bool stream_visible = stream_window_visible &&
             props->tab_opened_ && id == focused_remote_id_;
         if (props->preview_resolution_supported_) {
+          const auto wall_viewport = !preview_ids.count(id)
+              ? gallery::PreviewResolution{}
+              : ui_->gallery_focus == id ? gallery_viewport
+                                        : gallery_preview_viewport;
           const auto resolution = props->preview_resolution_.Update(
               wall.stream_settings.Resolution(
-                  props->wall_managed_, ui_->gallery_focus == id
-                      ? gallery_viewport : gallery::PreviewResolution{},
+                  props->wall_managed_, wall_viewport,
                   stream_visible ? stream_viewport : gallery::PreviewResolution{}),
               now, needs_sync);
           demand.version = 2;
