@@ -165,11 +165,11 @@ void PeerEventHandler::OnReceiveDataBuffer(
       return;
     const auto subscription = PreviewSubscription::Parse(preview_json);
     if (!subscription) return;
+    const auto previous = runtime->preview_subscriptions_.Get(remote_id);
     bool accepted = true;
     // Apply encoder quality to this controller only; other controllers retain
-    // their own demand. Frame gating happens before encoding and transmission.
-    if (runtime->preview_subscriptions_.IsNewer(remote_id,
-                                               subscription->request_id)) {
+    // their own demand. MiniRTC owns per-peer video/audio pause state.
+    if (!previous || subscription->IsNewerThan(*previous)) {
       if (subscription->fps > 0)
         accepted = UpdateVideoSettings(
                      runtime->peer_, remote_id.data(), remote_id.size(),
@@ -177,13 +177,22 @@ void PeerEventHandler::OnReceiveDataBuffer(
                      subscription->frame_rate,
                      static_cast<VideoDegradationPreference>(
                          subscription->EncoderPreference())) == 0;
-      if (accepted)
+      // Audio-only updates must not force a keyframe. The pause API requests
+      // its own keyframes on resume.
+      if (accepted && (!previous || previous->width != subscription->width ||
+                       previous->height != subscription->height))
         accepted = UpdateVideoResolution(
                        runtime->peer_, remote_id.data(), remote_id.size(),
                        subscription->width, subscription->height) == 0;
+      if (accepted)
+        accepted = SetVideoSendPaused(runtime->peer_, remote_id.data(),
+                                      remote_id.size(), subscription->fps == 0) == 0;
+      if (accepted)
+        accepted = SetAudioSendPaused(runtime->peer_, remote_id.data(),
+                                      remote_id.size(), !subscription->audio) == 0;
+      if (accepted && subscription->audio)
+        runtime->devices_.StartSpeakerCapturer();
     }
-    // The resolution API refreshes only this controller's keyframes, including
-    // resume requests with unchanged dimensions. Do not disturb other viewers.
     if (accepted) runtime->preview_subscriptions_.Set(remote_id, *subscription);
     const auto reply = nlohmann::json{
         {"type", "deskhub_preview_status"},
@@ -527,9 +536,16 @@ void PeerEventHandler::OnReceiveDataBuffer(
       runtime->devices_.SendMouseCommand(remote_action,
                                          runtime->selected_display_);
     } else if (remote_action.type == ControlType::audio_capture) {
+      // A negotiated subscription remains authoritative if a legacy capture
+      // command arrives after it (e.g. when unmuting an inactive window).
+      const auto subscription = runtime->preview_subscriptions_.Get(remote_id);
+      const bool paused = subscription ? !subscription->audio : !remote_action.a;
+      const int ret = SetAudioSendPaused(runtime->peer_, remote_id.data(),
+                                         remote_id.size(), paused);
       if (remote_action.a)
         runtime->devices_.StartSpeakerCapturer();
-      else
+      else if (ret != 0)
+        // Legacy/web transports without the per-peer API retain their fallback.
         runtime->devices_.StopSpeakerCapturer();
     } else if (remote_action.type == ControlType::keyboard) {
       runtime->keyboard_.ApplyRemoteEvent(remote_id, remote_action);

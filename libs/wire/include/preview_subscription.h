@@ -36,6 +36,10 @@ struct PreviewSubscription {
     return {0, 60, quality, frame_rate, preference, audio};
   }
 
+  bool IsNewerThan(const PreviewSubscription &other) const {
+    return static_cast<int32_t>(request_id - other.request_id) > 0;
+  }
+
   bool SameSettings(const PreviewSubscription &other) const {
     return fps == other.fps && quality == other.quality &&
            frame_rate == other.frame_rate &&

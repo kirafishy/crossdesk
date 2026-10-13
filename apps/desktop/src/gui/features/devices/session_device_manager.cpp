@@ -51,8 +51,7 @@ SessionDeviceManager::SessionDeviceManager(GuiRuntime &owner)
             frame.captured_timestamp = GetSystemTimeMicros(owner_.peer_);
             std::shared_lock lock(owner_.connection_status_mutex_);
             for (const auto& [id, status] : owner_.connection_status_) {
-              if (status == ConnectionStatus::Connected &&
-                  owner_.preview_subscriptions_.ShouldSendAudio(id))
+              if (status == ConnectionStatus::Connected)
                 SendAudioFrameToPeer(owner_.peer_, &frame,
                                      owner_.audio_label_.c_str(), id.data(),
                                      id.size());

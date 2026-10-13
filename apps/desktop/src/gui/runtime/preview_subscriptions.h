@@ -20,23 +20,21 @@ namespace crossdesk {
 class PreviewSubscriptions {
 public:
   using Clock = std::chrono::steady_clock;
-  bool IsNewer(const std::string &id, uint32_t request_id) {
+  std::optional<PreviewSubscription> Get(const std::string &id) {
     std::lock_guard lock(mutex_);
     const auto found = states_.find(id);
-    return found == states_.end() ||
-           static_cast<int32_t>(request_id -
-                                found->second.request.request_id) > 0;
+    return found == states_.end() ? std::nullopt
+                                 : std::optional(found->second.request);
   }
   bool Set(const std::string &id, const PreviewSubscription &request) {
     std::lock_guard lock(mutex_);
     const auto found = states_.find(id);
     if (found != states_.end() &&
-        static_cast<int32_t>(request.request_id -
-                             found->second.request.request_id) <= 0)
+        !request.IsNewerThan(found->second.request))
       return false;
     auto &state = states_[id];
+    if (state.request.fps != request.fps) state.next.clear();
     state.request = request;
-    state.next.clear();
     return true;
   }
   bool ShouldSend(const std::string &id, Clock::time_point now = Clock::now(),
@@ -46,8 +44,10 @@ public:
     if (found == states_.end())
       return true;
     auto &state = found->second;
+    // MiniRTC owns pause/resume. This gate only limits preview cadence, so
+    // paused input reaches its cheap send gate without dividing by zero here.
     if (!state.request.fps)
-      return false;
+      return true;
     // Interactive streams use the encoder's own 30/60 FPS cadence. A second
     // time gate here can drop valid frames because capture timing varies.
     if (state.request.fps == 60)
@@ -66,11 +66,6 @@ public:
       return false;
     next = now + std::chrono::milliseconds(1000 / state.request.fps);
     return true;
-  }
-  bool ShouldSendAudio(const std::string &id) {
-    std::lock_guard lock(mutex_);
-    const auto found = states_.find(id);
-    return found == states_.end() || found->second.request.audio;
   }
   void Remove(const std::string &id) {
     std::lock_guard lock(mutex_);
