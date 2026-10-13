@@ -158,87 +158,6 @@
       ]
     },
     {
-      "id": "gssdp",
-      "name": "GSSDP",
-      "version": "1.6.4",
-      "license": "LGPL-2.1-or-later",
-      "source": {
-        "kind": "archive",
-        "url": "https://download.gnome.org/sources/gssdp/1.6/gssdp-1.6.4.tar.xz",
-        "sha256": "ff97fdfb7f561d3e6813b4f6a2145259e7c2eff43cc0e63f3fd031d0b6266032"
-      },
-      "documents": [
-        {
-          "path": "COPYING",
-          "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551"
-        },
-        {
-          "path": "AUTHORS",
-          "sha256": "66b5509fcdd21acaab5d7a3856e699bada9e9ebf0485312abbe987711bc7bd27"
-        }
-      ],
-      "recipe_sha256": "52667099a445f7004b9200df4ed771dd74e73745a5c6dc7fe728168e9f8b3e7a",
-      "recipe_path": "deps/submodules/minirtc/thirdparty/gupnp/xmake.lua",
-      "package": "gssdp",
-      "notice_prefixes": [
-        "libgssdp/"
-      ]
-    },
-    {
-      "id": "gupnp",
-      "name": "GUPnP",
-      "version": "1.6.9",
-      "license": "LGPL-2.1-or-later",
-      "source": {
-        "kind": "archive",
-        "url": "https://download.gnome.org/sources/gupnp/1.6/gupnp-1.6.9.tar.xz",
-        "sha256": "2edb6ee3613558e62f538735368aee27151b7e09d4e2e2c51606833da801869b"
-      },
-      "documents": [
-        {
-          "path": "COPYING",
-          "sha256": "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551"
-        },
-        {
-          "path": "AUTHORS",
-          "sha256": "fadd2ab40439bc89d2e9540c02aef1f23edea96983af9cceaef345a9423d3c70"
-        }
-      ],
-      "recipe_sha256": "52667099a445f7004b9200df4ed771dd74e73745a5c6dc7fe728168e9f8b3e7a",
-      "recipe_path": "deps/submodules/minirtc/thirdparty/gupnp/xmake.lua",
-      "package": "gupnp",
-      "notice_prefixes": [
-        "libgupnp/"
-      ]
-    },
-    {
-      "id": "gupnp-igd",
-      "name": "GUPnP IGD",
-      "version": "1.6.0",
-      "license": "LGPL-2.1-or-later",
-      "source": {
-        "kind": "archive",
-        "url": "https://download.gnome.org/sources/gupnp-igd/1.6/gupnp-igd-1.6.0.tar.xz",
-        "sha256": "4099978339ab22126d4968f2a332b6d094fc44c78797860781f1fc2f11771b74"
-      },
-      "documents": [
-        {
-          "path": "COPYING",
-          "sha256": "6095e9ffa777dd22839f7801aa845b31c9ed07f3d6bf8a26dc5d2dec8ccc0ef3"
-        },
-        {
-          "path": "AUTHORS",
-          "sha256": "77a943ea347578cfcffc032616707d43e5f5e03a12f864c0d421c3d632fc1582"
-        }
-      ],
-      "recipe_sha256": "52667099a445f7004b9200df4ed771dd74e73745a5c6dc7fe728168e9f8b3e7a",
-      "recipe_path": "deps/submodules/minirtc/thirdparty/gupnp/xmake.lua",
-      "package": "gupnp-igd",
-      "notice_prefixes": [
-        "libgupnp-igd/"
-      ]
-    },
-    {
       "id": "inih",
       "name": "inih / INIReader",
       "version": "24d9d9deefb95ede2cdb18e77cb01350101f70f8",
@@ -378,7 +297,7 @@
           "sha256": "d72eb6fa9d5e93abb11d13b6c6f04fda2ba183d0705e703887cda243f6f1eead"
         }
       ],
-      "recipe_sha256": "bfb5f125dc57768fcfb7edadb4be69783d66f31e00e0576ea038e30ba593a811",
+      "recipe_sha256": "9c18a7313113ddfd260f345a49ebc0cdc3aeeb6c6d5679c9d3ed50365b51e271",
       "recipe_path": "deps/submodules/minirtc/thirdparty/libnice/xmake.lua",
       "package": "libnice",
       "notice_prefixes": [
@@ -387,61 +306,6 @@
         "random/",
         "socket/",
         "stun/"
-      ]
-    },
-    {
-      "id": "upnp-libpsl",
-      "name": "libpsl",
-      "version": "0.21.5",
-      "license": "MIT / BSD-3-Clause",
-      "source": {
-        "kind": "archive",
-        "url": "https://github.com/rockdaboot/libpsl/releases/download/0.21.5/libpsl-0.21.5.tar.gz",
-        "sha256": "1dcc9ceae8b128f3c0b3f654decd0e1e891afc6ff81098f227ef260449dae208"
-      },
-      "documents": [
-        {
-          "path": "LICENSE",
-          "sha256": "322392e6001b2b3b0fca705dc9f11f26e12441188ecde50eb1d22909980b2925"
-        },
-        {
-          "path": "src/LICENSE.chromium",
-          "sha256": "1d7f52747a9169751cdf2641a8299c0098e9ecdf9429296ffd55bdb14c9ed5b3"
-        }
-      ],
-      "recipe_sha256": "52667099a445f7004b9200df4ed771dd74e73745a5c6dc7fe728168e9f8b3e7a",
-      "recipe_path": "deps/submodules/minirtc/thirdparty/gupnp/xmake.lua",
-      "package": "upnp-libpsl",
-      "notice_prefixes": [
-        "src/",
-        "include/"
-      ]
-    },
-    {
-      "id": "libsoup",
-      "name": "libsoup",
-      "version": "3.6.5",
-      "license": "LGPL-2.0-or-later",
-      "source": {
-        "kind": "archive",
-        "url": "https://download.gnome.org/sources/libsoup/3.6/libsoup-3.6.5.tar.xz",
-        "sha256": "6891765aac3e949017945c3eaebd8cc8216df772456dc9f460976fbdb7ada234"
-      },
-      "documents": [
-        {
-          "path": "COPYING",
-          "sha256": "b7993225104d90ddd8024fd838faf300bea5e83d91203eab98e29512acebd69c"
-        },
-        {
-          "path": "AUTHORS",
-          "sha256": "f8776285b4556368878a1b903a1f0e6d6cee342284961562a7716a2dacc28321"
-        }
-      ],
-      "recipe_sha256": "52667099a445f7004b9200df4ed771dd74e73745a5c6dc7fe728168e9f8b3e7a",
-      "recipe_path": "deps/submodules/minirtc/thirdparty/gupnp/xmake.lua",
-      "package": "libsoup",
-      "notice_prefixes": [
-        "libsoup/"
       ]
     },
     {
@@ -468,30 +332,6 @@
         "crypto/",
         "include/"
       ]
-    },
-    {
-      "id": "upnp-libxml2",
-      "name": "libxml2",
-      "version": "2.14.6",
-      "license": "MIT and embedded notices",
-      "source": {
-        "kind": "archive",
-        "url": "https://download.gnome.org/sources/libxml2/2.14/libxml2-2.14.6.tar.xz",
-        "sha256": "7ce458a0affeb83f0b55f1f4f9e0e55735dbfc1a9de124ee86fb4a66b597203a"
-      },
-      "documents": [
-        {
-          "path": "Copyright",
-          "sha256": "5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626"
-        }
-      ],
-      "recipe_sha256": "52667099a445f7004b9200df4ed771dd74e73745a5c6dc7fe728168e9f8b3e7a",
-      "recipe_path": "deps/submodules/minirtc/thirdparty/gupnp/xmake.lua",
-      "package": "upnp-libxml2",
-      "notice_prefixes": [
-        "include/"
-      ],
-      "notice_root_files": true
     },
     {
       "id": "libyuv",
@@ -539,29 +379,6 @@
           "path": "deps/submodules/minirtc/LICENSE",
           "sha256": "ea8af5e789cb2d4e9b10bce3874982ade163b749b6bfbdb32e2df21c4d106de1"
         }
-      ]
-    },
-    {
-      "id": "nghttp2",
-      "name": "nghttp2",
-      "version": "1.68.0",
-      "license": "MIT",
-      "source": {
-        "kind": "archive",
-        "url": "https://github.com/nghttp2/nghttp2/releases/download/v1.68.0/nghttp2-1.68.0.tar.gz",
-        "sha256": "2c16ffc588ad3f9e2613c3fad72db48ecb5ce15bc362fcc85b342e48daf51013"
-      },
-      "documents": [
-        {
-          "path": "COPYING",
-          "sha256": "6b94f3abc1aabd0c72a7c7d92a77f79dda7c8a0cb3df839a97890b4116a2de2a"
-        }
-      ],
-      "recipe_sha256": "eec10214a906c663f74e3e6bf8952cddec39fec3cac710c10d8b9ea669c9ab79",
-      "recipe_path": "xmake-repo/packages/n/nghttp2/xmake.lua",
-      "package": "nghttp2",
-      "notice_prefixes": [
-        "lib/"
       ]
     },
     {
@@ -750,24 +567,6 @@
       ]
     },
     {
-      "id": "sqlite3",
-      "name": "SQLite",
-      "version": "3.50.0+400",
-      "license": "Public domain",
-      "source": {
-        "kind": "archive",
-        "url": "https://sqlite.org/2025/sqlite-autoconf-3500400.tar.gz",
-        "sha256": "a3db587a1b92ee5ddac2f66b3edb41b26f9c867275782d46c3a088977d6a5b18"
-      },
-      "documents": [],
-      "recipe_sha256": "a752522259dbd722ea79beaa01e5287429ccb37643ccffbecf5fa30ec4df30fd",
-      "recipe_path": "xmake-repo/packages/s/sqlite3/xmake.lua",
-      "package": "sqlite3",
-      "notice_prefixes": [
-        "sqlite3.h"
-      ]
-    },
-    {
       "id": "svt-av1",
       "name": "SVT-AV1",
       "version": "v3.0.2",
@@ -898,7 +697,7 @@
       ]
     }
   ],
-  "bundle_sha256": "f54e5e2168bf6e91d81a413931a052d29f59e0c221df5e1de3f51bd27c662c3a",
+  "bundle_sha256": "a27c89beaaee2397a306417ff133d7f48c74fe6db9041e145fc08f18ec69a080",
   "toolchain": {
     "xmake_min_version": "3.1.1",
     "xmake_repository_revision": "121109352da272cd1a3d4ed52f2dcda34f839955"

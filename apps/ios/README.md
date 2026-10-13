@@ -4,6 +4,10 @@ This target is a native MiniRTC controller. It uses the same WebSocket
 signaling, libnice ICE, SRTP/RTP and data-stream protocol as the desktop app.
 There is no `WKWebView` or browser runtime.
 
+UPnP discovery and router port mapping are disabled in iOS builds, matching
+Android. Local connections, ICE/STUN hole punching, and TURN UDP/TCP relay
+remain available. The native archive excludes GUPnP and its HTTP/XML dependencies.
+
 ## Background connection and Picture in Picture
 
 An established remote desktop session supports native Picture in Picture (PiP).
@@ -265,11 +269,10 @@ in the source-notices document as well.
 `licenses/sources.json` pins the reviewed source archives (SHA-256), notice-review
 Git revisions, selected legal files and source-notice extraction rules.
 `CrossDeskMobile/Resources/ThirdPartyLicenses.json` is the generated resource
-bundled by Xcode. The catalog covers CrossDesk and 33 dependency entries for the default iOS build,
+bundled by Xcode. The catalog covers CrossDesk and 25 dependency entries for the default iOS build,
 including header-only dependencies, GLib's proxy-libintl, spdlog's bundled fmt,
 WebRTC-derived code, inih, and the applicable patent notices. Host build tools,
-OpenH264, desktop-only libraries, and the disabled libpsl built-in suffix list
-are excluded.
+OpenH264, desktop-only libraries, and the disabled UPnP dependency stack are excluded.
 
 Regenerate from the pinned source distributions with Python 3.9 or newer:
 
