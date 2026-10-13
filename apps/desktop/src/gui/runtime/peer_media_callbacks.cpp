@@ -50,6 +50,8 @@ void PeerEventHandler::OnReceiveVideoBuffer(
 
   if (props->connection_established_) {
     const auto timing_now = VideoLatencyFrame::Clock::now();
+    // Pair the clocks before preview conversion so its cost is included.
+    const auto local_now_us = GetSystemTimeMicros(props->peer_);
     const auto* received_native = GetNativeVideoFrame(video_frame);
     props->received_video_stats_.Record(
         received_native ? received_native->width : video_frame->width,
@@ -65,6 +67,8 @@ void PeerEventHandler::OnReceiveVideoBuffer(
                                      std::defer_lock);
     if (preview_width > 0) conversion_lock.lock();
     if (conversion_lock.owns_lock()) {
+      const auto gallery_timing = props->gallery_video_latency_->Frame(
+          video_frame->captured_timestamp, local_now_us, timing_now);
       const auto* native = GetNativeVideoFrame(video_frame);
       const int w = native ? native->width : video_frame->width;
       const int h = native ? native->height : video_frame->height;
@@ -100,6 +104,7 @@ void PeerEventHandler::OnReceiveVideoBuffer(
               props->gallery_width_ = dw;
               props->gallery_height_ = dh;
               props->gallery_frame_at_ = timing_now;
+              props->gallery_frame_timing_ = gallery_timing;
               ++props->gallery_sequence_;
             }
           }
@@ -118,8 +123,7 @@ void PeerEventHandler::OnReceiveVideoBuffer(
       return;
     }
     const auto timing = props->video_latency_->Frame(
-        video_frame->captured_timestamp, GetSystemTimeMicros(props->peer_),
-        timing_now);
+        video_frame->captured_timestamp, local_now_us, timing_now);
     bool background_snapshot_only = false;
     auto* native_renderer = runtime->video_renderer_.get();
     if (native_renderer && native_renderer->IsActive()) {

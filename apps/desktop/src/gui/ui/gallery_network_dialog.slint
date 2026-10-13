@@ -8,7 +8,7 @@ export struct GalleryNetworkDevice {
     mode: string,
     encryption-known: bool,
     encryption-enabled: bool,
-    latency: string,
+    video-latency: string,
     inbound: string,
     outbound: string,
     loss: string,
@@ -122,8 +122,8 @@ component NetworkRow inherits Rectangle {
             Text {
                 y: root.heading ? 0px : 8px; height: root.heading ? parent.height : 20px;
                 width: parent.width;
-                text: root.heading ? GalleryStrings.tr("网络质量", "Network quality", "Качество сети") : "RTT  " + root.device.latency;
-                font-size: 11px; font-weight: root.heading ? 600 : 400;
+                text: root.heading ? GalleryStrings.tr("视频延时", "Video latency", "Задержка видео") : root.device.video-latency;
+                font-size: root.heading ? 11px : 12px; font-weight: root.heading ? 600 : 400;
                 color: root.heading ? #6b7785 : #293746;
                 vertical-alignment: center; overflow: elide;
             }
@@ -191,14 +191,10 @@ export component GalleryNetworkDialog inherits Rectangle {
             x: parent.width - 80px; y: 17px; width: 60px; height: 26px;
             text: GalleryStrings.tr("关闭", "Close", "Закрыть"); clicked => { root.close(); }
         }
-        Rectangle {
-            x: 20px; y: 54px; width: 6px; height: 6px; border-radius: 3px;
-            background: root.devices.length > 0 ? #27a168 : #a7b0ba;
-        }
         Text {
-            x: 32px; y: 48px; width: parent.width - 52px; height: 18px;
-            text: GalleryStrings.tr("已连接设备 · ", "Connected devices · ", "Подключённые устройства · ") + root.devices.length
-                + GalleryStrings.tr(" 台 · 每秒更新", " · Updates every second", " · Обновление раз в секунду");
+            x: 20px; y: 48px; width: parent.width - 40px; height: 18px;
+            text: GalleryStrings.tr("已连接设备 ", "Connected devices ", "Подключённые устройства ") + root.devices.length
+                + GalleryStrings.tr(" 台", "", "");
             font-size: 11px; color: #7a8490; overflow: elide;
         }
         NetworkRow {

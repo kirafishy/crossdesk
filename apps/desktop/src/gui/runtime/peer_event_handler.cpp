@@ -331,6 +331,11 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
         }
         props->net_traffic_stats_.Reset();
         props->received_video_stats_.Reset();
+        {
+          std::lock_guard lock(props->gallery_frame_mutex_);
+          props->gallery_video_latency_->Reset();
+          props->gallery_frame_timing_ = {};
+        }
         props->traversal_mode_ = TraversalMode::UnknownMode;
         props->enable_mouse_control_ = false;
         props->preview_subscription_supported_ = false;

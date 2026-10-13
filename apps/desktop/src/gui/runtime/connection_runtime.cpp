@@ -511,6 +511,11 @@ void GuiRuntime::ResetRemoteSessionResources(
   props->net_traffic_stats_.Reset();
   props->received_video_stats_.Reset();
   {
+    std::lock_guard lock(props->gallery_frame_mutex_);
+    props->gallery_video_latency_->Reset();
+    props->gallery_frame_timing_ = {};
+  }
+  {
     std::lock_guard<std::mutex> lock(props->video_frame_mutex_);
     props->video_latency_->Reset();
     props->video_frame_timing_ = {};

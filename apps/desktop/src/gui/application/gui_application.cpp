@@ -5222,7 +5222,17 @@ void GuiApplication::SyncGallery() {
           : mode == TraversalMode::UnknownMode
               ? tr("等待统计", "Awaiting stats", "Ждём данные")
               : tr("中继", "Relay", "Ретрансляция"));
-      device.latency = device.inbound = device.outbound = device.loss = "—";
+      device.inbound = device.outbound = device.loss = "—";
+      device.video_latency = "—";
+      // Prefer the wall's own frame path. An independently displayed stream
+      // may still supply a measurement for a device outside the current page.
+      auto video_latency = props->gallery_video_latency_->Get(now);
+      if (!video_latency) video_latency = props->video_latency_->Get(now);
+      if (video_latency) {
+        const auto ms = video_latency->average_ms;
+        device.video_latency = UiText(ms < 1 ? "<1 ms"
+            : std::to_string(static_cast<int>(std::lround(ms))) + " ms");
+      }
       const auto video = props->received_video_stats_.Get(now);
       device.resolution = video.width > 0 && video.height > 0
           ? UiText(std::to_string(video.width) + " × " + std::to_string(video.height))
@@ -5237,9 +5247,6 @@ void GuiApplication::SyncGallery() {
       if (mode != TraversalMode::UnknownMode && has_report) {
         device.inbound = UiText(FormatBitrate(stats.total_inbound_stats.bitrate));
         device.outbound = UiText(FormatBitrate(stats.total_outbound_stats.bitrate));
-        if (const auto rtt = props->net_traffic_stats_.SmoothedRttMs(now))
-          device.latency = UiText(*rtt < 1 ? "<1 ms"
-              : std::to_string(static_cast<int>(std::lround(*rtt))) + " ms");
         // MiniRTC's total loss is a sum of media fractions, not an aggregate.
         // Report video loss explicitly, and only after receiving video packets.
         if (stats.video_inbound_stats.rtp_packet_count > 0 &&
@@ -5447,6 +5454,7 @@ void GuiApplication::SyncGallery() {
       : gallery::PreviewResolution{};
   std::set<std::string> preview_ids;
   std::vector<ui::GalleryTile> tiles;
+  std::vector<VideoLatencyFrame> submitted_previews;
   const auto make_tile = [&](const std::string& id, bool preview) {
     ui::GalleryTile tile{};
     tile.id = UiText(id);
@@ -5504,6 +5512,7 @@ void GuiApplication::SyncGallery() {
           cached.image = slint::Image(std::move(pixels));
           cached.sequence = props->gallery_sequence_;
           cached.session = props;
+          submitted_previews.push_back(props->gallery_frame_timing_);
         }
         tile.frame = cached.image;
         tile.has_frame = true;
@@ -5535,6 +5544,9 @@ void GuiApplication::SyncGallery() {
   ui_->wall->set_gallery_focused(ui_->gallery_focus.empty()
                                      ? ui::GalleryTile{}
                                      : make_tile(ui_->gallery_focus, true));
+  // Count each newly submitted image once, including conversion and UI queue
+  // time. Slint image submission does not confirm physical screen presentation.
+  for (const auto& timing : submitted_previews) timing.MarkSubmitted();
   ui_->wall->set_gallery_connected(connected);
   if (!ui_->wall->get_gallery_adding() && !ui_->wall->get_gallery_importing())
     ui_->wall->set_gallery_notice("");

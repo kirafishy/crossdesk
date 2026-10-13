@@ -95,6 +95,10 @@ struct RemoteSession {
   int gallery_width_ = 0, gallery_height_ = 0;
   uint64_t gallery_sequence_ = 0;
   std::chrono::steady_clock::time_point gallery_frame_at_{};
+  VideoLatencyFrame gallery_frame_timing_;
+  // Keep preview submission estimates separate from stream presentation times.
+  std::shared_ptr<VideoLatencyStats> gallery_video_latency_ =
+      std::make_shared<VideoLatencyStats>();
   // Decoder-thread scratch memory, never shared with the UI.
   std::mutex gallery_conversion_mutex_;
   std::vector<unsigned char> gallery_nv12_, gallery_scaled_, gallery_scratch_;
