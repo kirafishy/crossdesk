@@ -3112,8 +3112,10 @@ void GuiApplication::SyncStreamWindow() {
   }
   const ConnectionStatus status = props->connection_status_.load();
   bool remote_update_available = false;
+  HostPlatform remote_platform = HostPlatform::Unknown;
   if (status == ConnectionStatus::Connected) {
     std::lock_guard lock(props->remote_version_mutex_);
+    remote_platform = props->remote_platform_;
     // Wait for host_info: a version still in transit is not a legacy peer.
     if (props->remote_host_info_received_ && !props->remote_update_dismissed_) {
       remote_update_available = props->remote_app_version_.empty() ||
@@ -3176,7 +3178,7 @@ void GuiApplication::SyncStreamWindow() {
         props->remote_cursor_state_received_;
     if (remote_cursor_active) {
       remote_cursor_shape = static_cast<int>(
-          props->cursor_presentation_.Resolve(SDL_GetTicks()));
+          props->cursor_presentation_.Resolve(SDL_GetTicks(), remote_platform));
     }
   }
   (*ui_->stream)->set_remote_cursor_active(remote_cursor_active);
