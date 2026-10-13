@@ -37,6 +37,7 @@
 #include "features/gallery/gallery_fullscreen_transition.h"
 #include "features/gallery/gallery_window_state.h"
 #include "features/gallery/gallery_workspace.h"
+#include "features/gallery/preview_bandwidth.h"
 #include "localization.h"
 #include "platform.h"
 #include "platform/video_renderer.h"
@@ -873,6 +874,14 @@ struct GuiApplication::SlintUi {
     slint::Image image;
   };
   std::unordered_map<std::string, Preview> gallery_previews;
+  struct PendingPreview {
+    std::shared_ptr<RemoteSession> props;
+    PreviewSubscription demand;
+    bool needs_sync = false;
+  };
+  std::vector<PendingPreview> gallery_pending_previews;
+  std::vector<gallery::PreviewBandwidthDemand> gallery_bandwidth_demands;
+  gallery::PreviewBandwidthAllocator gallery_bandwidth_allocator;
   struct BatchOperation {
     std::string id, action, file;
     // Only explicit add-device requests carry credentials; never persisted.
@@ -1321,6 +1330,8 @@ void GuiApplication::ResetSettingsUi() {
   ui_->main->set_gallery_frame_rate_index(ui_->gallery.stream_settings.FrameRateIndex());
   ui_->main->set_gallery_resolution_draft(ui_->gallery.stream_settings.resolution);
   ui_->main->set_gallery_frame_rate_draft(ui_->gallery.stream_settings.FrameRateIndex());
+  ui_->main->set_gallery_bandwidth_index(ui_->gallery.stream_settings.BandwidthIndex());
+  ui_->main->set_gallery_bandwidth_draft(ui_->gallery.stream_settings.BandwidthIndex());
   ui_->main->set_gallery_settings_error("");
 }
 
@@ -3721,10 +3732,12 @@ bool GuiApplication::SaveSettingsFromUi() {
     return false;
   }
   const auto wall_settings = gallery::StreamSettings::FromIndices(
-      main->get_gallery_resolution_draft(), main->get_gallery_frame_rate_draft());
+      main->get_gallery_resolution_draft(), main->get_gallery_frame_rate_draft(),
+      main->get_gallery_bandwidth_draft());
   const bool wall_changed = wall_settings &&
       (wall_settings->resolution != ui_->gallery.stream_settings.resolution ||
-       wall_settings->frame_rate != ui_->gallery.stream_settings.frame_rate);
+       wall_settings->frame_rate != ui_->gallery.stream_settings.frame_rate ||
+       wall_settings->bandwidth_mbps != ui_->gallery.stream_settings.bandwidth_mbps);
   auto updated_wall = ui_->gallery;
   if (wall_settings) updated_wall.stream_settings = *wall_settings;
   // Persist the draft first, but leave live sessions unchanged until the
@@ -5352,9 +5365,25 @@ void GuiApplication::SyncGallery() {
           old.connected != device.connected)
         ui_->gallery_selected_model->set_row_data(i, device);
     }
+  auto& pending_previews = ui_->gallery_pending_previews;
+  auto& bandwidth_demands = ui_->gallery_bandwidth_demands;
+  pending_previews.clear();
+  bandwidth_demands.clear();
+  const bool stream_window_visible = ui_->stream &&
+      (*ui_->stream)->window().is_visible() &&
+      !(*ui_->stream)->window().is_minimized();
+  const auto stream_viewport = stream_window_visible
+      ? gallery::PreviewResolution::Viewport(
+            (*ui_->stream)->get_video_area_width(),
+            (*ui_->stream)->get_video_area_height(),
+            (*ui_->stream)->window().scale_factor())
+      : gallery::PreviewResolution{};
   {
     std::shared_lock lock(remote_sessions_mutex_);
+    pending_previews.reserve(remote_sessions_.size());
+    bandwidth_demands.reserve(remote_sessions_.size());
     for (const auto& [id, props] : remote_sessions_) {
+      if (!props || props->closing_) continue;
       if (!preview_ids.count(id)) {
         props->gallery_preview_width_ = 0;
         std::unique_lock conversion_lock(props->gallery_conversion_mutex_,
@@ -5371,8 +5400,8 @@ void GuiApplication::SyncGallery() {
           props->connection_status_ == ConnectionStatus::Connected) {
         if (wall_mode && !ui_->gallery_hidden_active_ids.count(id))
           props->wall_managed_ = true;
-        // Keep session quality and audio; wall settings override only the
-        // requested resolution/cadence and never overwrite session preferences.
+        // Keep session quality and audio; wall bandwidth, resolution and
+        // cadence requests never overwrite session preferences.
         PreviewSubscription demand;
         {
           std::lock_guard settings_lock(props->video_settings_mutex_);
@@ -5383,42 +5412,66 @@ void GuiApplication::SyncGallery() {
         if (props->wall_managed_)
           wall.stream_settings.ApplyFrameRate(demand, props->preview_fps15_supported_);
         const bool needs_sync = props->preview_needs_sync_.exchange(false);
+        const bool stream_visible = stream_window_visible &&
+            props->tab_opened_ && id == focused_remote_id_;
         if (props->preview_resolution_supported_) {
-          gallery::PreviewResolution stream_viewport;
-          if (props->tab_opened_ && id == focused_remote_id_ && ui_->stream &&
-              (*ui_->stream)->window().is_visible() &&
-              !(*ui_->stream)->window().is_minimized()) {
-            stream_viewport = gallery::PreviewResolution::Viewport(
-                (*ui_->stream)->get_video_area_width(),
-                (*ui_->stream)->get_video_area_height(),
-                (*ui_->stream)->window().scale_factor());
-          }
           const auto resolution = props->preview_resolution_.Update(
               wall.stream_settings.Resolution(
                   props->wall_managed_, ui_->gallery_focus == id
                       ? gallery_viewport : gallery::PreviewResolution{},
-                  stream_viewport), now, needs_sync);
+                  stream_visible ? stream_viewport : gallery::PreviewResolution{}),
+              now, needs_sync);
           demand.version = 2;
           demand.width = resolution.width;
           demand.height = resolution.height;
         }
-        const bool acknowledged =
-            props->preview_ack_.load() == props->preview_request_ &&
-            props->preview_accepted_.load();
-        if (needs_sync || !demand.SameSettings(props->preview_requested_) ||
-            (!acknowledged && now - props->preview_request_at_ > 5s)) {
-          demand.request_id = ++props->preview_request_;
-          if (!demand.request_id) demand.request_id = ++props->preview_request_;
-          const auto message = demand.ToJson().dump();
-          if (SendReliableDataFrame(props->peer_, message.data(),
-                                    message.size(),
-                                    props->control_data_label_.c_str()) == 0)
-            props->preview_requested_ = demand;
-          props->preview_request_at_ = now;
+        if (props->wall_managed_ && !preview_ids.count(id) && !stream_visible)
+          demand.fps = 0;
+        gallery::PreviewBandwidthDemand bandwidth;
+        if (props->preview_bandwidth_supported_) {
+          demand.max_bitrate_bps = 0;
+          if (props->wall_managed_ && demand.fps > 0) {
+            bandwidth = {
+                gallery::PreviewBandwidthDemand::Estimate(
+                    demand.width, demand.height,
+                    demand.fps == 60 ? demand.frame_rate : demand.fps),
+                stream_visible || (visible && ui_->gallery_focus == id)};
+          }
         }
+        bandwidth_demands.push_back(bandwidth);
+        pending_previews.push_back({props, demand, needs_sync});
       }
     }
   }
+  const auto& allocations = ui_->gallery_bandwidth_allocator.Allocate(
+      bandwidth_demands, wall.stream_settings.bandwidth_mbps * 1'000'000);
+  for (size_t i = 0; i < pending_previews.size(); ++i) {
+    if (bandwidth_demands[i].desired_bps == 0) continue;
+    auto& demand = pending_previews[i].demand;
+    // Quantize down to avoid resending subscriptions for sub-kbit rounding.
+    const int bitrate = allocations[i] / 1000 * 1000;
+    demand.max_bitrate_bps = bitrate;
+    if (!bitrate) demand.fps = 0;
+  }
+  for (auto& pending : pending_previews) {
+    auto& props = pending.props;
+    auto& demand = pending.demand;
+    const bool acknowledged =
+        props->preview_ack_.load() == props->preview_request_ &&
+        props->preview_accepted_.load();
+    if (pending.needs_sync || !demand.SameSettings(props->preview_requested_) ||
+        (!acknowledged && now - props->preview_request_at_ > 5s)) {
+      demand.request_id = ++props->preview_request_;
+      if (!demand.request_id) demand.request_id = ++props->preview_request_;
+      const auto message = demand.ToJson().dump();
+      if (SendReliableDataFrame(props->peer_, message.data(), message.size(),
+                                props->control_data_label_.c_str()) == 0)
+        props->preview_requested_ = demand;
+      props->preview_request_at_ = now;
+    }
+  }
+  // Reuse capacity without retaining disconnected sessions between refreshes.
+  pending_previews.clear();
   std::erase_if(ui_->gallery_previews, [&](const auto& item) {
     return !preview_ids.count(item.first);
   });

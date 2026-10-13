@@ -177,8 +177,13 @@ void PeerEventHandler::OnReceiveDataBuffer(
                      subscription->frame_rate,
                      static_cast<VideoDegradationPreference>(
                          subscription->EncoderPreference())) == 0;
-      // Audio-only updates must not force a keyframe. The pause API requests
-      // its own keyframes on resume.
+      if (accepted && (!previous || previous->max_bitrate_bps.value_or(0) !=
+                                       subscription->max_bitrate_bps.value_or(0)))
+        accepted = UpdateVideoBitrateLimit(
+                       runtime->peer_, remote_id.data(), remote_id.size(),
+                       subscription->max_bitrate_bps.value_or(0)) == 0;
+      // Rebalancing bandwidth alone must not force every device to send a
+      // keyframe. The pause API requests its own keyframes on resume.
       if (accepted && (!previous || previous->width != subscription->width ||
                        previous->height != subscription->height))
         accepted = UpdateVideoResolution(
@@ -419,6 +424,7 @@ void PeerEventHandler::OnReceiveDataBuffer(
         props->preview_resolution_supported_ =
             remote_action.i.supports_deskhub_resolution;
         props->preview_fps15_supported_ = remote_action.i.supports_deskhub_fps15;
+        props->preview_bandwidth_supported_ = remote_action.i.supports_deskhub_bandwidth;
         props->video_settings_supported_ =
             remote_action.i.supports_video_settings;
         if (first_advertisement && props->video_settings_supported_) {

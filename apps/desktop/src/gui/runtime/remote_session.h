@@ -78,6 +78,7 @@ struct RemoteSession {
   std::atomic<bool> preview_subscription_supported_{false};
   std::atomic<bool> preview_resolution_supported_{false};
   std::atomic<bool> preview_fps15_supported_{false};
+  std::atomic<bool> preview_bandwidth_supported_{false};
   std::atomic<bool> preview_needs_sync_{true};
   std::atomic<uint32_t> preview_ack_{0};
   std::atomic<bool> preview_accepted_{false};

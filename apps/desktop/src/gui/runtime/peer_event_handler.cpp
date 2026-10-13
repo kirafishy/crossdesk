@@ -291,6 +291,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
           remote_action.i.supports_deskhub_preview = true;
           remote_action.i.supports_deskhub_resolution = true;
           remote_action.i.supports_deskhub_fps15 = true;
+          remote_action.i.supports_deskhub_bandwidth = true;
           for (std::size_t i = 0; i < remote_action.i.display_num; i++) {
             LOG_INFO("Local display [{}:{}]", i + 1,
                      remote_action.i.display_list[i]);
@@ -335,6 +336,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
         props->preview_subscription_supported_ = false;
         props->preview_resolution_supported_ = false;
         props->preview_fps15_supported_ = false;
+        props->preview_bandwidth_supported_ = false;
         props->preview_needs_sync_ = true;
         props->preview_ack_ = 0;
         props->preview_accepted_ = false;
@@ -440,6 +442,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
           remote_action.i.supports_deskhub_preview = true;
           remote_action.i.supports_deskhub_resolution = true;
           remote_action.i.supports_deskhub_fps15 = true;
+          remote_action.i.supports_deskhub_bandwidth = true;
           for (std::size_t i = 0; i < remote_action.i.display_num; i++) {
             LOG_INFO("Local display [{}:{}]", i + 1,
                      remote_action.i.display_list[i]);

@@ -140,6 +140,7 @@ struct HostInfo {
   bool supports_deskhub_preview;
   bool supports_deskhub_resolution;
   bool supports_deskhub_fps15;
+  bool supports_deskhub_bandwidth;
 };
 
 struct ServiceStatus {

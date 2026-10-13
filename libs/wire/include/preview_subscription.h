@@ -25,6 +25,9 @@ struct PreviewSubscription {
   int width = 0;
   int height = 0;
   int version = 1;
+  // Optional negotiated extension: total video budget for this peer, in bps.
+  // 0 restores normal congestion control; absent preserves legacy wire format.
+  std::optional<int> max_bitrate_bps;
 
   static bool ValidResolution(int width, int height) {
     return (width == 0 && height == 0) ||
@@ -45,7 +48,8 @@ struct PreviewSubscription {
            frame_rate == other.frame_rate &&
            EncoderPreference() == other.EncoderPreference() &&
            audio == other.audio && width == other.width &&
-           height == other.height && version == other.version;
+           height == other.height && version == other.version &&
+           max_bitrate_bps == other.max_bitrate_bps;
   }
 
   int EncoderPreference() const {
@@ -63,6 +67,7 @@ struct PreviewSubscription {
       json["width"] = width;
       json["height"] = height;
     }
+    if (max_bitrate_bps) json["max_bitrate_bps"] = *max_bitrate_bps;
     return json;
   }
   static std::optional<PreviewSubscription> Parse(const nlohmann::json &json) {
@@ -107,6 +112,12 @@ struct PreviewSubscription {
         result.width = json.at("width").get<int>();
         result.height = json.at("height").get<int>();
         if (!ValidResolution(result.width, result.height)) return {};
+      }
+      if (json.contains("max_bitrate_bps")) {
+        if (!json.at("max_bitrate_bps").is_number_integer()) return {};
+        const auto bitrate = json.at("max_bitrate_bps").get<int64_t>();
+        if (bitrate < 0 || bitrate > 100'000'000) return {};
+        result.max_bitrate_bps = int(bitrate);
       }
       return result;
     } catch (...) {

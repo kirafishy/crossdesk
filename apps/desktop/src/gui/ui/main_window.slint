@@ -315,8 +315,10 @@ export component MainWindow inherits Window {
     in-out property <bool> gallery-network-open: false;
     in property <int> gallery-resolution-index: 0;
     in property <int> gallery-frame-rate-index: 0;
+    in property <int> gallery-bandwidth-index: 3;
     in-out property <int> gallery-resolution-draft: 0;
     in-out property <int> gallery-frame-rate-draft: 0;
+    in-out property <int> gallery-bandwidth-draft: 3;
     in property <string> gallery-settings-error;
     in property <[GalleryNetworkDevice]> gallery-network-devices;
     changed gallery-network-open => {
@@ -572,6 +574,7 @@ export component MainWindow inherits Window {
             root.gallery-network-open = false;
             root.gallery-resolution-draft = root.gallery-resolution-index;
             root.gallery-frame-rate-draft = root.gallery-frame-rate-index;
+            root.gallery-bandwidth-draft = root.gallery-bandwidth-index;
             root.gallery-action("settings-open", "");
             focus-sink.focus();
         }
@@ -2088,6 +2091,7 @@ export component MainWindow inherits Window {
                 x: 18px; y: 108px; width: parent.width - 36px; height: 272px;
                 resolution-index <=> root.gallery-resolution-draft;
                 frame-rate-index <=> root.gallery-frame-rate-draft;
+                bandwidth-index <=> root.gallery-bandwidth-draft;
                 error: root.gallery-settings-error;
             }
             Rectangle { x: 18px; y: 382px; width: parent.width - 36px; height: 1px; background: #e6ebf2; }
@@ -2096,7 +2100,7 @@ export component MainWindow inherits Window {
                 if root.settings-tab == 1: SettingsButton {
                     width: 110px; quiet: true;
                     text: GalleryStrings.tr("恢复默认", "Reset defaults", "По умолчанию");
-                    clicked => { root.gallery-resolution-draft = 0; root.gallery-frame-rate-draft = 0; }
+                    clicked => { root.gallery-resolution-draft = 0; root.gallery-frame-rate-draft = 0; root.gallery-bandwidth-draft = 3; }
                 }
                 Rectangle { horizontal-stretch: 1; }
                 SettingsButton {
