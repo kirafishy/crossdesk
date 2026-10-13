@@ -24,13 +24,17 @@ public:
     std::lock_guard lock(mutex_);
     const auto found = states_.find(id);
     return found == states_.end() ||
-           request_id > found->second.request.request_id;
+           static_cast<int32_t>(request_id -
+                                found->second.request.request_id) > 0;
   }
   bool Set(const std::string &id, const PreviewSubscription &request) {
     std::lock_guard lock(mutex_);
-    auto &state = states_[id];
-    if (request.request_id <= state.request.request_id)
+    const auto found = states_.find(id);
+    if (found != states_.end() &&
+        static_cast<int32_t>(request.request_id -
+                             found->second.request.request_id) <= 0)
       return false;
+    auto &state = states_[id];
     state.request = request;
     state.next.clear();
     return true;
@@ -49,6 +53,15 @@ public:
     if (state.request.fps == 60)
       return true;
     auto &next = state.next[stream];
+    if (state.request.fps == 15) {
+      // Keep a stable 15 FPS deadline across capture jitter. Rebasing every
+      // frame can turn small timing errors into extra dropped capture frames.
+      const auto interval = std::chrono::nanoseconds(1'000'000'000 / 15);
+      if (now + std::chrono::milliseconds(1) < next) return false;
+      next = next == Clock::time_point{} || now - next > interval
+          ? now + interval : next + interval;
+      return true;
+    }
     if (now < next)
       return false;
     next = now + std::chrono::milliseconds(1000 / state.request.fps);

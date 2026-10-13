@@ -1,0 +1,225 @@
+import { GalleryStrings } from "device_strings.slint";
+import { CompactButton } from "common.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export struct GalleryNetworkDevice {
+    name: string,
+    id: string,
+    mode: string,
+    encryption-known: bool,
+    encryption-enabled: bool,
+    latency: string,
+    inbound: string,
+    outbound: string,
+    loss: string,
+    resolution: string,
+    fps: string,
+}
+
+component NetworkRow inherits Rectangle {
+    in property <GalleryNetworkDevice> device;
+    in property <bool> heading: false;
+    // Keep the same column geometry in the header and every row. Grouping
+    // related values leaves room for device names even in the 640px window.
+    HorizontalLayout {
+        x: 0px; y: 0px; width: parent.width; height: parent.height;
+        padding-left: 12px; padding-right: 12px; spacing: 10px;
+        identity := Rectangle {
+            horizontal-stretch: 1;
+            device-name := Text {
+                y: root.heading ? 0px : 11px; height: root.heading ? parent.height : 20px;
+                width: parent.width; text: root.device.name;
+                font-size: root.heading ? 11px : 12px; font-weight: 600;
+                color: root.heading ? #6b7785 : #293746;
+                vertical-alignment: center; overflow: elide;
+            }
+            name-hover := TouchArea {
+                y: 11px; height: 20px; width: parent.width;
+                enabled: !root.heading;
+            }
+            if !root.heading: HorizontalLayout {
+                x: 0px; y: 34px; width: parent.width; height: 17px; spacing: 4px;
+                id-text := Text {
+                    text: root.device.id; font-size: 10px; color: #7a8490;
+                    vertical-alignment: center; overflow: elide;
+                }
+                Rectangle {
+                    width: max(0px, min(mode-text.preferred-width + 12px,
+                        parent.width - id-text.preferred-width - encryption-badge.width - 12px));
+                    background: #edf2f7; border-radius: 3px;
+                    mode-text := Text {
+                        x: 6px; width: parent.width - 12px; height: parent.height;
+                        text: root.device.mode; font-size: 10px; color: #586f87;
+                        horizontal-alignment: center; vertical-alignment: center; overflow: elide;
+                    }
+                }
+                encryption-badge := Rectangle {
+                    width: encryption-text.preferred-width + 12px;
+                    background: !root.device.encryption-known ? #f0f2f5
+                        : root.device.encryption-enabled ? #e8f5ec : #fff3df;
+                    border-radius: 3px;
+                    encryption-text := Text {
+                        x: 6px; width: parent.width - 12px; height: parent.height;
+                        text: !root.device.encryption-known
+                            ? GalleryStrings.tr("待确认", "Unknown", "Неизвестно")
+                            : root.device.encryption-enabled
+                                ? GalleryStrings.tr("已加密", "Encrypted", "Защищено")
+                                : GalleryStrings.tr("未加密", "Unencrypted", "Без шифр.");
+                        color: !root.device.encryption-known ? #7a8490
+                            : root.device.encryption-enabled ? #18794e : #8a6428;
+                        font-size: 10px; horizontal-alignment: center;
+                        vertical-alignment: center; overflow: elide;
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+            }
+        }
+        Rectangle {
+            width: max(108px, root.width * 0.19);
+            Text {
+                y: root.heading ? 0px : 11px; height: root.heading ? parent.height : 20px;
+                width: parent.width;
+                text: root.heading ? GalleryStrings.tr("画面", "Video", "Видео") : root.device.resolution;
+                font-size: root.heading ? 11px : 12px; font-weight: root.heading ? 600 : 400;
+                color: root.heading ? #6b7785 : #293746;
+                vertical-alignment: center; overflow: elide;
+            }
+            if !root.heading: Text {
+                y: 34px; height: 17px; width: parent.width;
+                text: root.device.fps; font-size: 11px; color: #7a8490;
+                vertical-alignment: center; overflow: elide;
+            }
+        }
+        Rectangle {
+            width: max(100px, root.width * 0.18);
+            if root.heading: Text {
+                x: 0px; width: parent.width;
+                text: GalleryStrings.tr("收发速率", "Transfer rate", "Скорость");
+                font-size: 11px; font-weight: 600; color: #6b7785;
+                vertical-alignment: center; overflow: elide;
+            }
+            if !root.heading: Text {
+                x: 0px; y: 11px; height: 20px; width: 14px;
+                text: "↓"; color: #2676b9; font-size: 12px; vertical-alignment: center;
+            }
+            if !root.heading: Text {
+                x: 17px; y: 11px; height: 20px; width: parent.width - 17px;
+                text: root.device.inbound; color: #293746; font-size: 12px;
+                vertical-alignment: center; overflow: elide;
+            }
+            if !root.heading: Text {
+                x: 0px; y: 34px; height: 17px; width: 14px;
+                text: "↑"; color: #7a8490; font-size: 11px; vertical-alignment: center;
+            }
+            if !root.heading: Text {
+                x: 17px; y: 34px; height: 17px; width: parent.width - 17px;
+                text: root.device.outbound; color: #7a8490; font-size: 11px;
+                vertical-alignment: center; overflow: elide;
+            }
+        }
+        Rectangle {
+            width: max(94px, root.width * 0.16);
+            Text {
+                y: root.heading ? 0px : 11px; height: root.heading ? parent.height : 20px;
+                width: parent.width;
+                text: root.heading ? GalleryStrings.tr("网络质量", "Network quality", "Качество сети") : "RTT  " + root.device.latency;
+                font-size: 11px; font-weight: root.heading ? 600 : 400;
+                color: root.heading ? #6b7785 : #293746;
+                vertical-alignment: center; overflow: elide;
+            }
+            if !root.heading: Text {
+                y: 34px; height: 17px; width: parent.width;
+                text: GalleryStrings.tr("丢包  ", "Loss  ", "Потери  ") + root.device.loss;
+                font-size: 11px; color: #7a8490;
+                vertical-alignment: center; overflow: elide;
+            }
+        }
+    }
+    if !root.heading && name-hover.has-hover && device-name.preferred-width > identity.width: Rectangle {
+        x: 12px; y: 32px; width: min(name-tip.preferred-width + 20px, root.width - 24px);
+        height: 26px; background: #293746; border-radius: 4px; z: 10;
+        name-tip := Text {
+            x: 10px; width: parent.width - 20px; height: parent.height;
+            text: root.device.name; font-size: 11px; color: white;
+            vertical-alignment: center; overflow: elide;
+        }
+    }
+}
+
+component NetworkEmptyState inherits Rectangle {
+    VerticalLayout {
+        alignment: center; spacing: 8px;
+        Text {
+            text: GalleryStrings.tr("暂无已连接设备", "No connected devices", "Нет подключённых устройств");
+            font-size: 13px; color: #596878; horizontal-alignment: center;
+        }
+        Text {
+            text: GalleryStrings.tr("建立连接后，网络和画面信息将在此显示", "Network and video details appear here once connected", "После подключения здесь появятся данные сети и видео");
+            font-size: 11px; color: #8a95a1; horizontal-alignment: center;
+        }
+    }
+}
+
+export component GalleryNetworkDialog inherits Rectangle {
+    in property <[GalleryNetworkDevice]> devices;
+    callback close();
+    background: #00000042;
+    TouchArea { clicked => { root.close(); } }
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(960px, parent.width - 32px);
+        height: min(560px, parent.height - 24px);
+        background: white; border-radius: 8px;
+        border-width: 1px; border-color: #c6cdd5;
+        TouchArea {}
+        FocusScope {
+            init => { self.focus(); }
+            key-pressed(event) => {
+                if event.text == Key.Escape { root.close(); }
+                accept
+            }
+        }
+        Text {
+            x: 20px; y: 17px; width: parent.width - 120px; height: 24px;
+            text: GalleryStrings.tr("设备网络状态", "Device network status", "Сеть устройств");
+            font-size: 17px; font-weight: 600; color: #293746;
+        }
+        CompactButton {
+            x: parent.width - 80px; y: 17px; width: 60px; height: 26px;
+            text: GalleryStrings.tr("关闭", "Close", "Закрыть"); clicked => { root.close(); }
+        }
+        Rectangle {
+            x: 20px; y: 54px; width: 6px; height: 6px; border-radius: 3px;
+            background: root.devices.length > 0 ? #27a168 : #a7b0ba;
+        }
+        Text {
+            x: 32px; y: 48px; width: parent.width - 52px; height: 18px;
+            text: GalleryStrings.tr("已连接设备 · ", "Connected devices · ", "Подключённые устройства · ") + root.devices.length
+                + GalleryStrings.tr(" 台 · 每秒更新", " · Updates every second", " · Обновление раз в секунду");
+            font-size: 11px; color: #7a8490; overflow: elide;
+        }
+        NetworkRow {
+            x: 12px; y: 78px; width: parent.width - 38px; height: 30px;
+            heading: true; background: #f3f5f8; border-radius: 4px;
+            device: {
+                name: GalleryStrings.tr("设备 / ID", "Device / ID", "Устройство / ID"),
+            };
+        }
+        list := ScrollView {
+            x: 12px; y: 108px; width: parent.width - 24px;
+            height: parent.height - self.y - 12px;
+            viewport-width: self.width - 14px;
+            viewport-height: max(self.height, root.devices.length * 62px);
+            horizontal-scrollbar-policy: always-off;
+            for device[index] in root.devices: NetworkRow {
+                y: index * 62px; width: list.viewport-width; height: 62px;
+                device: device; background: mod(index, 2) == 0 ? white : #f8fafc;
+                Rectangle { y: parent.height - 1px; height: 1px; background: #edf0f4; }
+            }
+        }
+        if root.devices.length == 0: NetworkEmptyState {
+            x: list.x; y: list.y; width: list.width; height: list.height;
+        }
+    }
+}

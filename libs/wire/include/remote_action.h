@@ -138,6 +138,8 @@ struct HostInfo {
   bool supports_privacy_screen;
   bool supports_video_settings;
   bool supports_deskhub_preview;
+  bool supports_deskhub_resolution;
+  bool supports_deskhub_fps15;
 };
 
 struct ServiceStatus {

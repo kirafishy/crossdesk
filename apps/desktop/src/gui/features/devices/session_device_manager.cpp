@@ -540,13 +540,13 @@ int SessionDeviceManager::InitializeAudioOutput() {
   desired_out.format = SDL_AUDIO_S16;
   desired_out.channels = 1;
 
-  auto open_stream = [&]() {
-    output_stream_ = SDL_OpenAudioDeviceStream(
-        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired_out, nullptr, nullptr);
-    return output_stream_ != nullptr;
+  auto open_device = [&]() {
+    output_device_ = SDL_OpenAudioDevice(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &desired_out);
+    return output_device_ != 0;
   };
 
-  if (!open_stream()) {
+  if (!open_device()) {
 #if defined(__linux__) && !defined(__APPLE__)
     LOG_WARN("Failed to open output stream with driver [{}]: {}",
              getenv("SDL_AUDIODRIVER") ? getenv("SDL_AUDIODRIVER")
@@ -560,7 +560,7 @@ int SessionDeviceManager::InitializeAudioOutput() {
                 SDL_GetError());
       return -1;
     }
-    if (!open_stream()) {
+    if (!open_device()) {
       LOG_ERROR("Failed to open output stream with dummy driver: {}",
                 SDL_GetError());
       return -1;
@@ -572,31 +572,50 @@ int SessionDeviceManager::InitializeAudioOutput() {
 #endif
   }
 
-  SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(output_stream_));
+  SDL_ResumeAudioDevice(output_device_);
   return 0;
 }
 
 int SessionDeviceManager::DestroyAudioOutput() {
-  if (output_stream_) {
-    SDL_CloseAudioDevice(SDL_GetAudioStreamDevice(output_stream_));
-    SDL_DestroyAudioStream(output_stream_);
-    output_stream_ = nullptr;
+  for (const auto& [_, stream] : output_streams_)
+    SDL_DestroyAudioStream(stream);
+  output_streams_.clear();
+  if (output_device_) {
+    SDL_CloseAudioDevice(output_device_);
+    output_device_ = 0;
   }
   return 0;
 }
 
-void SessionDeviceManager::ClearAudio() {
-  if (output_stream_) SDL_ClearAudioStream(output_stream_);
+void SessionDeviceManager::ClearAudio(const std::string& remote_id) {
+  const auto found = output_streams_.find(remote_id);
+  if (found == output_streams_.end()) return;
+  SDL_DestroyAudioStream(found->second);
+  output_streams_.erase(found);
 }
 
-void SessionDeviceManager::PushAudio(const char *data, size_t size) {
-  if (!output_stream_) {
-    return;
+void SessionDeviceManager::PushAudio(const std::string& remote_id,
+                                     const char *data, size_t size) {
+  if (!output_device_) return;
+  auto found = output_streams_.find(remote_id);
+  if (found == output_streams_.end()) {
+    SDL_AudioSpec spec{};
+    spec.freq = 48000;
+    spec.format = SDL_AUDIO_S16;
+    spec.channels = 1;
+    auto* stream = SDL_CreateAudioStream(&spec, &spec);
+    if (!stream) {
+      LOG_ERROR("Failed to create output stream: {}", SDL_GetError());
+      return;
+    }
+    if (!SDL_BindAudioStream(output_device_, stream)) {
+      LOG_ERROR("Failed to bind output stream: {}", SDL_GetError());
+      SDL_DestroyAudioStream(stream);
+      return;
+    }
+    found = output_streams_.emplace(remote_id, stream).first;
   }
-  const int pushed = SDL_PutAudioStreamData(
-      output_stream_, reinterpret_cast<const Uint8 *>(data),
-      static_cast<int>(size));
-  if (pushed < 0) {
+  if (!SDL_PutAudioStreamData(found->second, data, static_cast<int>(size))) {
     LOG_ERROR("Failed to push audio data: {}", SDL_GetError());
   }
 }

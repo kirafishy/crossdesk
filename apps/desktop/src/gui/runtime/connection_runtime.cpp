@@ -35,6 +35,30 @@ bool GuiRuntime::HasActiveSession() {
                      });
 }
 
+void GuiRuntime::MuteRemoteAudio(const std::shared_ptr<RemoteSession>& props) {
+  if (!props) return;
+  std::lock_guard delivery_lock(audio_delivery_mutex_);
+  props->audio_capture_button_pressed_ = false;
+  props->audio_allowed_ = false;
+  devices_.ClearAudio(props->remote_id_);
+  // Capable peers stop sending to this controller on the next subscription;
+  // old peers remain muted by the local receive gate above.
+  props->preview_needs_sync_ = true;
+}
+
+void GuiRuntime::UnmuteRemoteAudio(const std::shared_ptr<RemoteSession>& props) {
+  if (!props || props->closing_) return;
+  props->audio_capture_button_pressed_ = true;
+  props->preview_needs_sync_ = true;
+  // Also resume capture on old peers, or after a legacy controller stopped it.
+  RemoteAction action{};
+  action.type = ControlType::audio_capture;
+  action.a = true;
+  const auto message = action.to_json();
+  SendReliableDataFrame(props->peer_, message.data(), message.size(),
+                        props->control_data_label_.c_str());
+}
+
 void GuiRuntime::HandleConnectionStatusChange() {
   if (!signal_connected_ || !peer_) {
     return;
@@ -273,6 +297,7 @@ int GuiRuntime::ForceSignalReconnect() {
 
 void GuiRuntime::CloseRemoteSession(std::shared_ptr<RemoteSession> props) {
   if (!props || props->closing_.exchange(true)) return;
+  MuteRemoteAudio(props);
   if (props->peer_events_) props->peer_events_->Deactivate();
   props->connection_established_ = false;
   props->streaming_ = false;
@@ -484,6 +509,7 @@ void GuiRuntime::WaitForSessionCleanup() {
 void GuiRuntime::ResetRemoteSessionResources(
     std::shared_ptr<RemoteSession> props) {
   props->net_traffic_stats_.Reset();
+  props->received_video_stats_.Reset();
   {
     std::lock_guard<std::mutex> lock(props->video_frame_mutex_);
     props->video_latency_->Reset();
@@ -657,6 +683,11 @@ int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
   int ret = -1;
   auto props = FindRemoteSession(remote_id);
   if (!props || props->closing_) return -1;
+  if (background) {
+    // This also covers reusing a foreground connection that is awaiting auth.
+    props->wall_managed_ = true;
+    MuteRemoteAudio(props);
+  }
   if (!props->connection_established_) {
     if (!background) show_connection_status_window_ = true;
 

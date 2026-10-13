@@ -859,6 +859,9 @@ struct GuiApplication::SlintUi {
   std::string gallery_focus, gallery_auth_id, gallery_requested_auth,
       gallery_control_id;
   std::chrono::steady_clock::time_point gallery_synced{};
+  std::chrono::steady_clock::time_point gallery_network_synced{};
+  std::shared_ptr<slint::VectorModel<ui::GalleryNetworkDevice>> gallery_network_model =
+      std::make_shared<slint::VectorModel<ui::GalleryNetworkDevice>>();
   gallery::WindowState gallery_window;
   gallery::FullscreenTransition gallery_transition;
   int main_restore_ticks = 0;
@@ -1162,6 +1165,7 @@ void GuiApplication::InitializeUi() {
     LOG_WARN("Could not load DeskHub workspace; original file retained");
   ui_->main->set_gallery_tiles(ui_->gallery_model);
   ui_->main->set_gallery_selected_devices(ui_->gallery_selected_model);
+  ui_->main->set_gallery_network_devices(ui_->gallery_network_model);
   // Always start on Connection; saved wall geometry is restored only when
   // the user switches to DeskHub, regardless of the previous launch's mode.
   ui_->main->set_gallery_mode(false);
@@ -1313,6 +1317,11 @@ void GuiApplication::ResetSettingsUi() {
   ui_->main->set_server_host(signal_server_ip_self_);
   ui_->main->set_server_port(signal_server_port_self_);
   ui_->main->set_self_host_settings_error("");
+  ui_->main->set_gallery_resolution_index(ui_->gallery.stream_settings.resolution);
+  ui_->main->set_gallery_frame_rate_index(ui_->gallery.stream_settings.FrameRateIndex());
+  ui_->main->set_gallery_resolution_draft(ui_->gallery.stream_settings.resolution);
+  ui_->main->set_gallery_frame_rate_draft(ui_->gallery.stream_settings.FrameRateIndex());
+  ui_->main->set_gallery_settings_error("");
 }
 
 void GuiApplication::BindMainCallbacks() {
@@ -1792,14 +1801,11 @@ void GuiApplication::BindStreamCallbacks() {
     if (!props || !props->connection_established_) {
       return;
     }
-    props->audio_capture_button_pressed_ =
-        !props->audio_capture_button_pressed_;
-    RemoteAction action{};
-    action.type = ControlType::audio_capture;
-    action.a = props->audio_capture_button_pressed_;
-    const std::string message = action.to_json();
-    SendReliableDataFrame(props->peer_, message.c_str(), message.size(),
-                          props->control_data_label_.c_str());
+    if (props->audio_capture_button_pressed_)
+      MuteRemoteAudio(props);
+    else
+      UnmuteRemoteAudio(props);
+    SyncAudioPlayback();
   });
   stream->on_select_file([this] {
     auto props = SelectedSession();
@@ -3710,14 +3716,35 @@ bool GuiApplication::SaveSettingsFromUi() {
       !std::string(main->get_server_host()).empty() ||
       !std::string(main->get_server_port()).empty();
   if (has_endpoint && !ValidateSelfHostedSettingsFromUi()) {
+    main->set_settings_tab(0);
     main->set_self_host_settings_open(true);
+    return false;
+  }
+  const auto wall_settings = gallery::StreamSettings::FromIndices(
+      main->get_gallery_resolution_draft(), main->get_gallery_frame_rate_draft());
+  const bool wall_changed = wall_settings &&
+      (wall_settings->resolution != ui_->gallery.stream_settings.resolution ||
+       wall_settings->frame_rate != ui_->gallery.stream_settings.frame_rate);
+  auto updated_wall = ui_->gallery;
+  if (wall_settings) updated_wall.stream_settings = *wall_settings;
+  // Persist the draft first, but leave live sessions unchanged until the
+  // common save succeeds. Restore the previous wall file if it fails.
+  if (!wall_settings || (wall_changed && !updated_wall.Save(ui_->gallery_path))) {
+    main->set_gallery_settings_error(UiText(
+        localization_language_index_ == 0 ? "保存失败，请重试"
+        : localization_language_index_ == 2 ? "Не удалось сохранить"
+                                            : "Could not save; try again"));
+    main->set_settings_tab(1);
     return false;
   }
   if ((has_endpoint && config_center_->SetServerEndpoint(
           std::string(main->get_server_host()), *ParsePort(main->get_server_port())) != 0) ||
       config_center_->SetSelfHosted(main->get_self_hosted_enabled()) != 0) {
+    if (wall_changed && !ui_->gallery.Save(ui_->gallery_path))
+      LOG_ERROR("Failed to restore DeskHub settings after common save failure");
     main->set_self_host_settings_error(UiText(
         localization::self_hosted_save_failed[localization_language_index_]));
+    main->set_settings_tab(0);
     main->set_self_host_settings_open(true);
     return false;
   }
@@ -3786,6 +3813,14 @@ bool GuiApplication::SaveSettingsFromUi() {
                sizeof(file_transfer_save_path_buf_) - 1);
   config_center_->SetFileTransferSavePath(path);
 
+  if (wall_changed) {
+    ui_->gallery.stream_settings = *wall_settings;
+    std::shared_lock lock(remote_sessions_mutex_);
+    for (const auto& [_, props] : remote_sessions_)
+      if (props && !props->closing_ && props->wall_managed_)
+        props->preview_needs_sync_ = true;
+    ui_->gallery_synced = {};
+  }
   ApplySettingsFromConfig(previous_server !=
                           GetSignalServerSettings(*config_center_));
   return true;
@@ -3912,9 +3947,6 @@ void GuiApplication::SelectStreamTab(int index) {
         props->clipboard_allowed_ = props->tab_selected_ &&
                                     props->control_mouse_ &&
                                     focus_on_stream_window_;
-        props->audio_allowed_ =
-            (props->tab_selected_ && props->audio_capture_button_pressed_ &&
-             focus_on_stream_window_);
       }
     }
     const auto selected = remote_sessions_.find(selected_remote_id);
@@ -3926,6 +3958,7 @@ void GuiApplication::SelectStreamTab(int index) {
                                selected_session->connection_status_.load() ==
                                    ConnectionStatus::Connected;
   }
+  SyncAudioPlayback();
 }
 
 void GuiApplication::ReorderStreamTab(int from, float drop_x, float tab_width) {
@@ -4188,6 +4221,26 @@ bool GuiApplication::OpenUrl(const std::string& url) {
   return SDL_OpenURL(url.c_str());
 }
 
+void GuiApplication::SyncAudioPlayback() {
+  const bool wall_visible = ui_ && ui_->main->get_gallery_mode() &&
+      ui_->main->window().is_visible() && !ui_->main->window().is_minimized();
+  const bool stream_active = ui_ && ui_->stream && focus_on_stream_window_ &&
+      (*ui_->stream)->window().is_visible() &&
+      !(*ui_->stream)->window().is_minimized();
+  std::lock_guard delivery_lock(audio_delivery_mutex_);
+  std::shared_lock lock(remote_sessions_mutex_);
+  for (const auto& [id, props] : remote_sessions_) {
+    const bool allowed = !props->closing_ &&
+        props->connection_status_ == ConnectionStatus::Connected &&
+        props->audio_capture_button_pressed_ &&
+        ((wall_visible && props->wall_managed_) ||
+         (stream_active && props->tab_opened_ && props->tab_selected_));
+    if (props->audio_allowed_.exchange(allowed) != allowed)
+      props->preview_needs_sync_ = true;
+    if (!allowed) devices_.ClearAudio(id);
+  }
+}
+
 void GuiApplication::ReleaseControl() {
   const auto gallery_target = ui_->gallery_control_id;
   devices_.StopKeyboardCapturer();
@@ -4212,17 +4265,14 @@ void GuiApplication::ReleaseControl() {
     ui_->main->set_gallery_controlling(false);
   }
   ui_->pressed_mouse_buttons.clear();
-  std::lock_guard delivery_lock(audio_delivery_mutex_);
-  devices_.ClearAudio();
+  SyncAudioPlayback();
   std::shared_lock lock(remote_sessions_mutex_);
   for (const auto& [id, props] : remote_sessions_) {
     ++props->input_generation_;
     props->clipboard_allowed_ = false;
-    props->audio_allowed_ = false;
     if (id == gallery_target) {
       props->control_mouse_ = false;
       props->enable_mouse_control_ = false;
-      props->audio_capture_button_pressed_ = false;
     }
   }
   controlled_remote_id_.clear();
@@ -4235,6 +4285,17 @@ void GuiApplication::ChangeMainMode(bool wall) {
   ui_->main->set_gallery_transitioning(false);
   ui_->main->set_gallery_content_visible(true);
   ReleaseControl();
+  if (wall) {
+    std::vector<std::shared_ptr<RemoteSession>> sessions;
+    {
+      std::shared_lock lock(remote_sessions_mutex_);
+      for (const auto& [_, props] : remote_sessions_)
+        if (props && !props->closing_) sessions.push_back(props);
+    }
+    // Apply the wall's default to existing connections as well as new ones.
+    // Do this once on entry, so an explicit unmute can still take effect.
+    for (const auto& props : sessions) MuteRemoteAudio(props);
+  }
   auto& window = ui_->main->window();
 #if defined(__APPLE__)
   const bool fullscreen = IsMainWindowFullscreen();
@@ -4361,7 +4422,10 @@ bool GuiApplication::AddGalleryDevice(const std::string& input,
                  "Не удалось сохранить");
   ui_->gallery = std::move(updated);
   ui_->gallery_hidden_active_ids.erase(id);
-  if (auto props = FindRemoteSession(id)) props->wall_managed_ = true;
+  if (auto props = FindRemoteSession(id)) {
+    props->wall_managed_ = true;
+    MuteRemoteAudio(props);
+  }
   for (auto& operation : ui_->batch_operations)
     if (operation.id == id && operation.action == "connect" &&
         operation.state == State::AwaitingPassword)
@@ -4405,7 +4469,10 @@ bool GuiApplication::ImportGalleryRecent(const std::string& input_group) {
   // store and are looked up by the normal connect action when requested.
   for (const auto& id : ids) {
     ui_->gallery_hidden_active_ids.erase(id);
-    if (auto props = FindRemoteSession(id)) props->wall_managed_ = true;
+    if (auto props = FindRemoteSession(id)) {
+      props->wall_managed_ = true;
+      MuteRemoteAudio(props);
+    }
   }
   ui_->gallery_focus.clear();
   ui_->gallery.selected.clear();
@@ -4497,6 +4564,16 @@ void GuiApplication::GalleryAction(const std::string& action,
   using OperationState = SlintUi::BatchOperation::State;
   auto& wall = ui_->gallery;
   ui_->gallery_synced = {};
+  if (action == "settings-open") {
+    ReleaseControl();
+    ui_->main->set_gallery_settings_error("");
+    return;
+  }
+  if (action == "network-open") {
+    ReleaseControl();
+    ui_->gallery_network_synced = {};
+    return;
+  }
   const auto tr = [this](const char* zh, const char* en, const char* ru) {
     return UiText(localization_language_index_ == 0   ? zh
                   : localization_language_index_ == 2 ? ru
@@ -4556,7 +4633,7 @@ void GuiApplication::GalleryAction(const std::string& action,
     wall.page = 0;
     wall.selected.clear();
     ui_->gallery_focus.clear();
-  } else if (action == "selection") {
+  } else if (action == "selection" || action == "view-mode") {
     ReleaseControl();
     wall.selected.clear();
     ui_->gallery_focus.clear();
@@ -4616,7 +4693,8 @@ void GuiApplication::GalleryAction(const std::string& action,
     }
   } else if (action == "release") {
     ReleaseControl();
-  } else if (action == "connect" || action == "disconnect" || action == "file") {
+  } else if (action == "connect" || action == "disconnect" || action == "mute" ||
+             action == "unmute" || action == "file") {
     std::vector<std::string> ids;
     if (!value.empty())
       ids.push_back(value);
@@ -4624,6 +4702,21 @@ void GuiApplication::GalleryAction(const std::string& action,
       for (const auto& id : ui_->gallery_ids)
         if (wall.selected.count(id)) ids.push_back(id);
     if (ids.empty()) return;
+    if (action == "mute" || action == "unmute") {
+      for (const auto& id : ids) {
+        if (auto props = FindRemoteSession(id);
+            props && !props->closing_ &&
+            props->connection_status_ == ConnectionStatus::Connected) {
+          if (action == "mute") {
+            MuteRemoteAudio(props);
+          } else {
+            UnmuteRemoteAudio(props);
+          }
+        }
+      }
+      SyncGallery();
+      return;
+    }
     if (action == "connect" && !value.empty())
       ui_->gallery_requested_auth = value;
     ReleaseControl();
@@ -4776,6 +4869,7 @@ void GuiApplication::RestoreMainWindowGeometry(bool before_show) {
 void GuiApplication::SyncGallery() {
   using OperationState = SlintUi::BatchOperation::State;
   if (!ui_) return;
+  SyncAudioPlayback();
   auto& window = ui_->main->window();
   const auto current_size = window.size();
   if (ui_->observed_main_size &&
@@ -4901,6 +4995,71 @@ void GuiApplication::SyncGallery() {
     }
     return settings_.RecentConnectionDisplayName(device);
   };
+  if (visible && ui_->main->get_gallery_network_open() &&
+      now - ui_->gallery_network_synced >= 1s) {
+    ui_->gallery_network_synced = now;
+    // This list follows live connections, independently of the wall's current
+    // group and page. Never show saved, queued or still-connecting devices.
+    std::vector<std::string> connected_ids;
+    {
+      std::shared_lock lock(remote_sessions_mutex_);
+      for (const auto& [id, props] : remote_sessions_)
+        if (props && !props->closing_ &&
+            props->connection_status_ == ConnectionStatus::Connected)
+          connected_ids.push_back(id);
+    }
+    std::sort(connected_ids.begin(), connected_ids.end());
+    std::vector<ui::GalleryNetworkDevice> devices;
+    for (const auto& id : connected_ids) {
+      const auto props = FindRemoteSession(id);
+      if (!props || props->closing_ ||
+          props->connection_status_ != ConnectionStatus::Connected)
+        continue;
+      ui::GalleryNetworkDevice device{};
+      device.name = UiText(name(id));
+      device.id = UiText(FormatPeerId(id.c_str()));
+      const auto mode = props->traversal_mode_.load();
+      device.mode = UiText(mode == TraversalMode::P2P
+          ? tr("直连", "Direct", "Напрямую")
+          : mode == TraversalMode::UnknownMode
+              ? tr("等待统计", "Awaiting stats", "Ждём данные")
+              : tr("中继", "Relay", "Ретрансляция"));
+      device.latency = device.inbound = device.outbound = device.loss = "—";
+      const auto video = props->received_video_stats_.Get(now);
+      device.resolution = video.width > 0 && video.height > 0
+          ? UiText(std::to_string(video.width) + " × " + std::to_string(video.height))
+          : UiText("—");
+      device.fps = video.fps ? UiText(std::to_string(*video.fps) + " FPS") : UiText("—");
+      const bool has_report = props->net_traffic_stats_.HasRecentReport(now);
+      const auto stats = props->net_traffic_stats_.Load();
+      // Use negotiated transport state, never the local encryption preference.
+      // Missing/stale reports cannot confirm either encrypted or plaintext.
+      device.encryption_known = has_report;
+      device.encryption_enabled = has_report && stats.srtp_active;
+      if (mode != TraversalMode::UnknownMode && has_report) {
+        device.inbound = UiText(FormatBitrate(stats.total_inbound_stats.bitrate));
+        device.outbound = UiText(FormatBitrate(stats.total_outbound_stats.bitrate));
+        if (const auto rtt = props->net_traffic_stats_.SmoothedRttMs(now))
+          device.latency = UiText(*rtt < 1 ? "<1 ms"
+              : std::to_string(static_cast<int>(std::lround(*rtt))) + " ms");
+        // MiniRTC's total loss is a sum of media fractions, not an aggregate.
+        // Report video loss explicitly, and only after receiving video packets.
+        if (stats.video_inbound_stats.rtp_packet_count > 0 &&
+            std::isfinite(stats.video_inbound_stats.loss_rate)) {
+          char loss[24];
+          std::snprintf(loss, sizeof(loss), "%.1f%%",
+              std::clamp(stats.video_inbound_stats.loss_rate, 0.0f, 1.0f) * 100.0f);
+          device.loss = UiText(loss);
+        }
+      }
+      devices.push_back(std::move(device));
+    }
+    if (ui_->gallery_network_model->row_count() != devices.size())
+      ui_->gallery_network_model->set_vector(std::move(devices));
+    else
+      for (size_t i = 0; i < devices.size(); ++i)
+        ui_->gallery_network_model->set_row_data(i, devices[i]);
+  }
   // Limit simultaneous operations without keeping a user-facing operation list
   // or operation history. Targets stay fixed when the selection changes.
   int running = std::count_if(
@@ -4916,6 +5075,11 @@ void GuiApplication::SyncGallery() {
       ++running;
       auto props = FindRemoteSession(operation.id);
       if (operation.action == "connect") {
+        if (props && !props->closing_) {
+          // A wall connect can reuse an already connected/connecting peer.
+          props->wall_managed_ = true;
+          MuteRemoteAudio(props);
+        }
         const auto status = props ? props->connection_status_.load()
                                   : ConnectionStatus::Closed;
         const bool usable = props && props->peer_ && !props->closing_;
@@ -5069,6 +5233,11 @@ void GuiApplication::SyncGallery() {
       std::max(1, (int(ids.size()) + wall.capacity - 1) / wall.capacity));
   ui_->main->set_gallery_count(ids.size());
   int connected = 0, selected_on_page = 0;
+  const auto gallery_viewport = visible && !ui_->gallery_focus.empty()
+      ? gallery::PreviewResolution::Viewport(
+            ui_->main->get_gallery_video_width(),
+            ui_->main->get_gallery_video_height(), window.scale_factor())
+      : gallery::PreviewResolution{};
   std::set<std::string> preview_ids;
   std::vector<ui::GalleryTile> tiles;
   const auto make_tile = [&](const std::string& id, bool preview) {
@@ -5102,7 +5271,9 @@ void GuiApplication::SyncGallery() {
           props->connection_status_.load(), localization_language_index_));
     if (preview && visible && tile.connected) {
       preview_ids.insert(id);
-      props->gallery_preview_width_ = ui_->gallery_focus == id ? 960 : 320;
+      props->gallery_preview_width_ = ui_->gallery_focus == id
+          ? std::max({320, gallery_viewport.width, gallery_viewport.height})
+          : 320;
       std::lock_guard lock(props->gallery_frame_mutex_);
       if (props->gallery_rgba_) {
         auto& cached = ui_->gallery_previews[id];
@@ -5153,6 +5324,7 @@ void GuiApplication::SyncGallery() {
   ui_->main->set_gallery_hidden_selected(wall.selected.size() -
                                          selected_on_page);
   std::vector<ui::GalleryActionDevice> selected_devices;
+  bool selected_audio_available = false, selected_audio_muted = true;
   for (const auto& id : ids)
     if (wall.selected.count(id)) {
       ui::GalleryActionDevice device{};
@@ -5161,8 +5333,15 @@ void GuiApplication::SyncGallery() {
       const auto props = FindRemoteSession(id);
       device.connected = props && !props->closing_ &&
                          props->connection_status_ == ConnectionStatus::Connected;
+      if (device.connected) {
+        selected_audio_available = true;
+        selected_audio_muted &= !props->audio_capture_button_pressed_;
+      }
       selected_devices.push_back(std::move(device));
     }
+  ui_->main->set_gallery_selected_audio_available(selected_audio_available);
+  ui_->main->set_gallery_selected_audio_muted(selected_audio_available &&
+                                             selected_audio_muted);
   if (ui_->gallery_selected_model->row_count() != selected_devices.size())
     ui_->gallery_selected_model->set_vector(std::move(selected_devices));
   else
@@ -5190,8 +5369,10 @@ void GuiApplication::SyncGallery() {
       }
       if (props->preview_subscription_supported_ &&
           props->connection_status_ == ConnectionStatus::Connected) {
-        // Every connected device retains its interactive video settings,
-        // including devices on other pages or behind a hidden wall window.
+        if (wall_mode && !ui_->gallery_hidden_active_ids.count(id))
+          props->wall_managed_ = true;
+        // Keep session quality and audio; wall settings override only the
+        // requested resolution/cadence and never overwrite session preferences.
         PreviewSubscription demand;
         {
           std::lock_guard settings_lock(props->video_settings_mutex_);
@@ -5199,12 +5380,35 @@ void GuiApplication::SyncGallery() {
               props->video_settings_.quality, props->video_settings_.frame_rate,
               props->video_settings_.preference, props->audio_allowed_.load());
         }
+        if (props->wall_managed_)
+          wall.stream_settings.ApplyFrameRate(demand, props->preview_fps15_supported_);
+        const bool needs_sync = props->preview_needs_sync_.exchange(false);
+        if (props->preview_resolution_supported_) {
+          gallery::PreviewResolution stream_viewport;
+          if (props->tab_opened_ && id == focused_remote_id_ && ui_->stream &&
+              (*ui_->stream)->window().is_visible() &&
+              !(*ui_->stream)->window().is_minimized()) {
+            stream_viewport = gallery::PreviewResolution::Viewport(
+                (*ui_->stream)->get_video_area_width(),
+                (*ui_->stream)->get_video_area_height(),
+                (*ui_->stream)->window().scale_factor());
+          }
+          const auto resolution = props->preview_resolution_.Update(
+              wall.stream_settings.Resolution(
+                  props->wall_managed_, ui_->gallery_focus == id
+                      ? gallery_viewport : gallery::PreviewResolution{},
+                  stream_viewport), now, needs_sync);
+          demand.version = 2;
+          demand.width = resolution.width;
+          demand.height = resolution.height;
+        }
         const bool acknowledged =
             props->preview_ack_.load() == props->preview_request_ &&
             props->preview_accepted_.load();
-        if (!demand.SameSettings(props->preview_requested_) ||
+        if (needs_sync || !demand.SameSettings(props->preview_requested_) ||
             (!acknowledged && now - props->preview_request_at_ > 5s)) {
           demand.request_id = ++props->preview_request_;
+          if (!demand.request_id) demand.request_id = ++props->preview_request_;
           const auto message = demand.ToJson().dump();
           if (SendReliableDataFrame(props->peer_, message.data(),
                                     message.size(),

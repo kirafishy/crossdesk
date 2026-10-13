@@ -289,6 +289,8 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
           remote_action.i.supports_deskhub_preview = true;
+          remote_action.i.supports_deskhub_resolution = true;
+          remote_action.i.supports_deskhub_fps15 = true;
           for (std::size_t i = 0; i < remote_action.i.display_num; i++) {
             LOG_INFO("Local display [{}:{}]", i + 1,
                      remote_action.i.display_list[i]);
@@ -327,8 +329,15 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
           props->remote_update_dismissed_ = false;
         }
         props->net_traffic_stats_.Reset();
+        props->received_video_stats_.Reset();
+        props->traversal_mode_ = TraversalMode::UnknownMode;
         props->enable_mouse_control_ = false;
         props->preview_subscription_supported_ = false;
+        props->preview_resolution_supported_ = false;
+        props->preview_fps15_supported_ = false;
+        props->preview_needs_sync_ = true;
+        props->preview_ack_ = 0;
+        props->preview_accepted_ = false;
         props->audio_allowed_ = false;
         props->clipboard_allowed_ = false;
         runtime->ResetRemoteServiceStatus(*props);
@@ -429,6 +438,8 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
           remote_action.i.supports_deskhub_preview = true;
+          remote_action.i.supports_deskhub_resolution = true;
+          remote_action.i.supports_deskhub_fps15 = true;
           for (std::size_t i = 0; i < remote_action.i.display_num; i++) {
             LOG_INFO("Local display [{}:{}]", i + 1,
                      remote_action.i.display_list[i]);
@@ -545,7 +556,7 @@ void PeerEventHandler::OnNetStatusReport(
   if (props->traversal_mode_ != mode) {
     props->net_traffic_stats_.ResetLatency();
     props->traversal_mode_ = mode;
-    LOG_INFO("Net mode: [{}]", int(props->traversal_mode_));
+    LOG_INFO("Net mode: [{}]", int(props->traversal_mode_.load()));
   }
 
   if (!net_traffic_stats) {

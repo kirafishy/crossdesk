@@ -27,6 +27,8 @@ void ResetHostInfo(HostInfo& info) {
   info.supports_privacy_screen = false;
   info.supports_video_settings = false;
   info.supports_deskhub_preview = false;
+  info.supports_deskhub_resolution = false;
+  info.supports_deskhub_fps15 = false;
 }
 
 bool AllocateHostDisplays(HostInfo& info, std::size_t count) {
@@ -221,7 +223,9 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
           {"displays", displays},
           {"supports_privacy_screen", action.i.supports_privacy_screen},
           {"supports_video_settings", action.i.supports_video_settings},
-          {"supports_deskhub_preview", action.i.supports_deskhub_preview}};
+          {"supports_deskhub_preview", action.i.supports_deskhub_preview},
+          {"supports_deskhub_resolution", action.i.supports_deskhub_resolution},
+          {"supports_deskhub_fps15", action.i.supports_deskhub_fps15}};
       break;
     }
     case ControlType::invalid:
@@ -416,6 +420,10 @@ bool RemoteAction::FromJson(const std::string& json_string,
             host_info_object.value("supports_video_settings", false);
         output.i.supports_deskhub_preview =
             host_info_object.value("supports_deskhub_preview", false);
+        output.i.supports_deskhub_resolution =
+            host_info_object.value("supports_deskhub_resolution", false);
+        output.i.supports_deskhub_fps15 =
+            host_info_object.value("supports_deskhub_fps15", false);
         const std::string host_name =
             host_info_object.at("host_name").get<std::string>();
         std::strncpy(output.i.host_name, host_name.c_str(),

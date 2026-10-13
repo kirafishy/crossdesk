@@ -168,20 +168,26 @@ void PeerEventHandler::OnReceiveDataBuffer(
     bool accepted = true;
     // Apply encoder quality to this controller only; other controllers retain
     // their own demand. Frame gating happens before encoding and transmission.
-    if (subscription->fps > 0 && runtime->preview_subscriptions_.IsNewer(
-                                     remote_id, subscription->request_id))
-      accepted = UpdateVideoSettings(
+    if (runtime->preview_subscriptions_.IsNewer(remote_id,
+                                               subscription->request_id)) {
+      if (subscription->fps > 0)
+        accepted = UpdateVideoSettings(
                      runtime->peer_, remote_id.data(), remote_id.size(),
                      static_cast<VideoQuality>(subscription->quality),
                      subscription->frame_rate,
                      static_cast<VideoDegradationPreference>(
                          subscription->EncoderPreference())) == 0;
-    if (accepted && runtime->preview_subscriptions_.Set(remote_id, *subscription) &&
-        subscription->fps > 0)
-      RequestAllVideoKeyFrames(runtime->peer_);
+      if (accepted)
+        accepted = UpdateVideoResolution(
+                       runtime->peer_, remote_id.data(), remote_id.size(),
+                       subscription->width, subscription->height) == 0;
+    }
+    // The resolution API refreshes only this controller's keyframes, including
+    // resume requests with unchanged dimensions. Do not disturb other viewers.
+    if (accepted) runtime->preview_subscriptions_.Set(remote_id, *subscription);
     const auto reply = nlohmann::json{
         {"type", "deskhub_preview_status"},
-        {"version", 1},
+        {"version", subscription->version},
         {"request_id", subscription->request_id},
         {"accepted",
          accepted}}.dump();
@@ -196,8 +202,11 @@ void PeerEventHandler::OnReceiveDataBuffer(
     if (auto props = runtime->FindRemoteSession(remote_id);
         props && source_id == props->control_data_label_) {
       try {
-        if (preview_json.at("version") == 1 &&
+        if ((preview_json.at("version") == 1 ||
+             preview_json.at("version") == 2) &&
             preview_json.at("request_id").is_number_unsigned() &&
+            preview_json.at("request_id").get<uint64_t>() > 0 &&
+            preview_json.at("request_id").get<uint64_t>() <= UINT32_MAX &&
             preview_json.at("accepted").is_boolean()) {
           props->preview_accepted_ = preview_json.at("accepted").get<bool>();
           props->preview_ack_ = preview_json.at("request_id").get<uint32_t>();
@@ -398,6 +407,9 @@ void PeerEventHandler::OnReceiveDataBuffer(
         const bool first_advertisement = !props->video_settings_supported_;
         props->preview_subscription_supported_ =
             remote_action.i.supports_deskhub_preview;
+        props->preview_resolution_supported_ =
+            remote_action.i.supports_deskhub_resolution;
+        props->preview_fps15_supported_ = remote_action.i.supports_deskhub_fps15;
         props->video_settings_supported_ =
             remote_action.i.supports_video_settings;
         if (first_advertisement && props->video_settings_supported_) {

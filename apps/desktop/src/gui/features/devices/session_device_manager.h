@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <remote_action.h>
@@ -67,8 +68,10 @@ public:
 
   int InitializeAudioOutput();
   int DestroyAudioOutput();
-  void ClearAudio();
-  void PushAudio(const char *data, size_t size);
+  // Serialized by GuiRuntime::audio_delivery_mutex_. Each peer has its own
+  // stream so SDL mixes simultaneous playback and muting clears only that peer.
+  void ClearAudio(const std::string& remote_id);
+  void PushAudio(const std::string& remote_id, const char *data, size_t size);
 
   bool SendKeyboardCommand(int key_code, bool is_down, uint32_t scan_code,
                            bool extended);
@@ -94,7 +97,8 @@ private:
                             bool from_secure_desktop);
 
   GuiRuntime &owner_;
-  SDL_AudioStream *output_stream_ = nullptr;
+  uint32_t output_device_ = 0;
+  std::unordered_map<std::string, SDL_AudioStream*> output_streams_;
   ScreenCapturerFactory *screen_capturer_factory_ = nullptr;
   ScreenCapturer *screen_capturer_ = nullptr;
   std::atomic<bool> cursor_capture_dirty_{true};

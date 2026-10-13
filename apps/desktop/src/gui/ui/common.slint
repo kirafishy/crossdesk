@@ -173,6 +173,8 @@ export component CompactComboBox inherits Rectangle {
     in property <[string]> model;
     in-out property <int> current-index: 0;
     in property <bool> enabled: true;
+    in property <bool> subtle: false;
+    in property <bool> show-arrow: true;
     property <bool> popup-animation-enabled: false;
     property <float> popup-progress: 0.0;
     callback selected(int);
@@ -185,29 +187,29 @@ export component CompactComboBox inherits Rectangle {
 
     width: 73px;
     height: 24px;
-    background: root.enabled ? white : #f1f1f1;
+    background: root.enabled ? (root.subtle ? #f8fafc : white) : root.subtle ? #f1f3f6 : #f1f1f1;
     border-width: 1px;
-    border-color: #bfc2c7;
-    border-radius: 3px;
+    border-color: root.subtle ? #dfe6ef : #bfc2c7;
+    border-radius: root.subtle ? 6px : 3px;
 
     Text {
-        x: 5px;
-        width: parent.width - 24px;
+        x: root.subtle ? 10px : 5px;
+        width: parent.width - (root.show-arrow ? (root.subtle ? 36px : 24px) : (root.subtle ? 20px : 10px));
         text: root.model[root.current-index];
         color: root.enabled ? #202124 : #8b8f95;
-        font-size: ImGuiFontStyle.body;
+        font-size: root.subtle ? 12px : ImGuiFontStyle.body;
         overflow: elide;
         vertical-alignment: center;
     }
-    Rectangle {
-        x: parent.width - 21px;
+    if root.show-arrow: Rectangle {
+        x: parent.width - (root.subtle ? 27px : 21px);
         width: 20px;
         height: parent.height - 2px;
         y: 1px;
-        background: root.enabled ? #9bc9f8 : #d7d9dc;
+        background: root.subtle ? transparent : root.enabled ? #9bc9f8 : #d7d9dc;
         Text {
             text: FontAwesomeIcons.angle-down;
-            color: #202124;
+            color: root.subtle ? #79879a : #202124;
             font-family: "Font Awesome 6 Free";
             font-weight: 900;
             font-size: 10px;
@@ -222,7 +224,7 @@ export component CompactComboBox inherits Rectangle {
         }
     }
     TouchArea {
-        enabled: root.enabled;
+        enabled: root.enabled; mouse-cursor: pointer;
         clicked => {
             root.popup-animation-enabled = false;
             root.popup-progress = 0.0;
@@ -261,15 +263,15 @@ export component CompactComboBox inherits Rectangle {
             opacity: root.popup-progress;
             background: white;
             border-width: 1px;
-            border-color: #bfc2c7;
-            border-radius: 3px;
+            border-color: root.subtle ? #dfe6ef : #bfc2c7;
+            border-radius: root.subtle ? 6px : 3px;
             clip: true;
             for choice[index] in root.model: Rectangle {
                 y: index * 23px;
                 width: parent.width;
                 height: 23px;
                 background: option-touch.has-hover ? #dbeafb : index == root.current-index ? #eef5fd : white;
-                Text { x: 5px; width: parent.width - 10px; text: choice; color: #202124; font-size: ImGuiFontStyle.body; overflow: elide; vertical-alignment: center; }
+                Text { x: 5px; width: parent.width - 10px; text: choice; color: #202124; font-size: root.subtle ? 12px : ImGuiFontStyle.body; overflow: elide; vertical-alignment: center; }
                 option-touch := TouchArea {
                     clicked => {
                         popup-open-timer.running = false;
@@ -286,8 +288,8 @@ export component CompactComboBox inherits Rectangle {
                 height: parent.height;
                 background: transparent;
                 border-width: 1px;
-                border-color: #bfc2c7;
-                border-radius: 3px;
+                border-color: root.subtle ? #dfe6ef : #bfc2c7;
+                border-radius: root.subtle ? 6px : 3px;
                 z: 2;
             }
         }

@@ -50,6 +50,11 @@ void PeerEventHandler::OnReceiveVideoBuffer(
 
   if (props->connection_established_) {
     const auto timing_now = VideoLatencyFrame::Clock::now();
+    const auto* received_native = GetNativeVideoFrame(video_frame);
+    props->received_video_stats_.Record(
+        received_native ? received_native->width : video_frame->width,
+        received_native ? received_native->height : video_frame->height,
+        timing_now);
     // Convert only visible thumbnails, off the UI thread. A session retains
     // one latest RGBA image, not an unbounded queue of frames.
     const int preview_width = props->gallery_preview_width_.load();
@@ -274,10 +279,10 @@ void PeerEventHandler::OnReceiveAudioBuffer(
   std::lock_guard delivery_lock(runtime->audio_delivery_mutex_);
   const auto session =
       runtime->FindRemoteSession(std::string(user_id, user_id_size));
-  if (!session || !session->audio_allowed_.load()) return;
+  if (!session || session->closing_ || !session->audio_allowed_.load()) return;
   runtime->audio_buffer_fresh_ = true;
 
-  runtime->devices_.PushAudio(data, size);
+  runtime->devices_.PushAudio(session->remote_id_, data, size);
 }
 
 }  // namespace crossdesk

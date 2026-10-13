@@ -24,6 +24,8 @@ class NetTrafficStatsCache {
                 "Network statistics require lock-free scalar atomics");
 
  public:
+  using Clock = std::chrono::steady_clock;
+
   void Store(const MiniRtcNetTrafficStats& stats) {
     video_inbound_stats_.Store(stats.video_inbound_stats);
     video_outbound_stats_.Store(stats.video_outbound_stats);
@@ -36,6 +38,10 @@ class NetTrafficStatsCache {
     srtp_active_.store(stats.srtp_active, std::memory_order_relaxed);
     rtt_ms_.store(stats.rtt_ms, std::memory_order_relaxed);
     connection_latency_.Update(stats.rtt_ms);
+    last_report_ms_.store(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            Clock::now().time_since_epoch()).count(),
+        std::memory_order_relaxed);
   }
 
   MiniRtcNetTrafficStats Load() const {
@@ -65,9 +71,17 @@ class NetTrafficStatsCache {
 
   void ResetLatency() { connection_latency_.Reset(); }
 
+  bool HasRecentReport(Clock::time_point now = Clock::now()) const {
+    const auto last_report = last_report_ms_.load(std::memory_order_relaxed);
+    const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            now.time_since_epoch()).count();
+    return last_report > 0 && now_ms - last_report < 3000;
+  }
+
   void Reset() {
     Store(MiniRtcNetTrafficStats{});
     ResetLatency();
+    last_report_ms_.store(0, std::memory_order_relaxed);
   }
 
  private:
@@ -114,6 +128,7 @@ class NetTrafficStatsCache {
   OutboundStats total_outbound_stats_;
   std::atomic<bool> srtp_active_{false};
   std::atomic<double> rtt_ms_{-1};
+  std::atomic<int64_t> last_report_ms_{0};
   ConnectionLatencyStats connection_latency_;
 };
 

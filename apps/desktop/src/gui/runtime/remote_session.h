@@ -23,10 +23,12 @@
 #include <preview_subscription.h>
 #include <stream_names.h>
 #include "display_info.h"
+#include "features/gallery/preview_resolution.h"
 #include "cursor_presentation.h"
 #include "minirtc.h"
 #include "rendering/video_latency.h"
 #include "runtime/net_traffic_stats_cache.h"
+#include "runtime/received_video_stats.h"
 #include "runtime/connection_auth_state.h"
 
 namespace crossdesk { class PeerEventHandler; }
@@ -74,10 +76,14 @@ struct RemoteSession {
   // Wall membership, stream-window visibility and input ownership are separate.
   std::atomic<bool> wall_managed_{false};
   std::atomic<bool> preview_subscription_supported_{false};
+  std::atomic<bool> preview_resolution_supported_{false};
+  std::atomic<bool> preview_fps15_supported_{false};
+  std::atomic<bool> preview_needs_sync_{true};
   std::atomic<uint32_t> preview_ack_{0};
   std::atomic<bool> preview_accepted_{false};
   uint32_t preview_request_ = 0;
   PreviewSubscription preview_requested_;
+  gallery::PreviewResolutionDebouncer preview_resolution_;
   std::chrono::steady_clock::time_point preview_request_at_{};
   std::atomic<bool> clipboard_allowed_{false};
   std::atomic<uint64_t> input_generation_{0};
@@ -189,13 +195,14 @@ struct RemoteSession {
   CursorPresentation cursor_presentation_;
   // Shared by minirtc callbacks, Slint rendering and SDL audio callbacks.
   std::atomic<ConnectionStatus> connection_status_ = ConnectionStatus::Closed;
-  TraversalMode traversal_mode_ = TraversalMode::UnknownMode;
+  std::atomic<TraversalMode> traversal_mode_{TraversalMode::UnknownMode};
   int fps_ = 0;
   int frame_count_ = 0;
   std::chrono::steady_clock::time_point last_time_;
   // UI-thread snapshot refreshed with FPS once per second.
   std::optional<VideoLatencyStats::Snapshot> video_latency_snapshot_;
   NetTrafficStatsCache net_traffic_stats_;
+  ReceivedVideoStats received_video_stats_;
 
   using QueuedFile = FileTransferState::QueuedFile;
   using FileTransferStatus = FileTransferState::FileTransferStatus;

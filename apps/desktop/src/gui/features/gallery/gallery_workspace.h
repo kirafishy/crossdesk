@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "gallery_storage.h"
+#include "gallery_stream_settings.h"
 
 namespace crossdesk::gallery {
 struct Member {
@@ -33,6 +34,7 @@ struct Workspace {
   std::set<std::string> selected;
   int page = 0;
   int capacity = 6;
+  StreamSettings stream_settings;
 
   static std::string NormalizeId(const std::string &input) {
     std::string result;
@@ -181,6 +183,8 @@ struct Workspace {
       if (version == 2 && !doc.at("wall_ids").is_array())
         return false;
       Workspace loaded;
+      if (doc.contains("stream_settings"))
+        loaded.stream_settings = StreamSettings::FromJson(doc["stream_settings"]);
       for (const auto &member : doc.at("members")) {
         const auto id = member.at("id").get<std::string>();
         loaded.AddAssignment(id, member.value("group", ""));
@@ -197,6 +201,7 @@ struct Workspace {
       members = std::move(loaded.members);
       groups = std::move(loaded.groups);
       wall_ids_ = std::move(loaded.wall_ids_);
+      stream_settings = loaded.stream_settings;
       return true;
     } catch (...) {
       return false;
@@ -206,7 +211,8 @@ struct Workspace {
     try {
       nlohmann::json doc{{"version", 2},
                          {"members", nlohmann::json::array()},
-                         {"wall_ids", wall_ids_}};
+                         {"wall_ids", wall_ids_},
+                         {"stream_settings", stream_settings.ToJson()}};
       for (const auto &m : members)
         doc["members"].push_back({{"id", m.id}, {"group", m.group}});
       return WriteAtomically(path, doc.dump(2));

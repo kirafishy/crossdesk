@@ -71,6 +71,7 @@ private:
   void DeviceGroupAction(const std::string& action, const std::string& value);
   bool SaveDeviceGroups(const std::string& new_group);
   void ReleaseControl();
+  void SyncAudioPlayback();
   void SaveGalleryWindowState();
   void SyncAnnouncements();
   void SyncConnectionDialog();
