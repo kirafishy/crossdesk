@@ -5229,7 +5229,7 @@ void GuiApplication::SyncGallery() {
       std::max(1, int((ui_->main->get_gallery_height() - 114) / 144));
   wall.ResizePage(columns * rows, ids.size());
   // Resizing/fullscreen changes page capacity. Keep the focused device in
-  // the page model so the rail can still display and reveal its current card.
+  // the page model so the rail shows the other devices on the same page.
   if (!ui_->gallery_focus.empty()) {
     const auto focused = std::find(ids.begin(), ids.end(), ui_->gallery_focus);
     if (focused != ids.end())

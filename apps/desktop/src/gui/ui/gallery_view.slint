@@ -31,27 +31,29 @@ export component GalleryView inherits Rectangle {
     in property <bool> controlling: false;
     in property <bool> simplified: false;
     private property <length> grid-gap: root.simplified ? 6px : 12px;
+    private property <length> rail-card-height: root.simplified ? 92px : 76px;
+    private property <string> focused-id: root.focused.id;
+    private property <string> rail-tooltip-id;
+    private property <string> rail-tooltip-text;
+    private property <length> rail-tooltip-x;
+    private property <bool> rail-tooltip-visible: false;
+    changed focused-id => { root.rail-tooltip-id = ""; }
+    changed visible => { root.rail-tooltip-id = ""; }
+    changed rail-tooltip-id => {
+        root.rail-tooltip-visible = false;
+        rail-tooltip-timer.running = root.rail-tooltip-id != "";
+        if root.rail-tooltip-id != "" { rail-tooltip-timer.restart(); }
+    }
+    rail-tooltip-timer := Timer {
+        interval: 450ms; running: false;
+        triggered => {
+            self.running = false;
+            root.rail-tooltip-visible = root.rail-tooltip-id != "";
+        }
+    }
     // Pointer mapping must use the exact image viewport, including its inset.
     out property <float> video-width: video.width / 1px;
     out property <float> video-height: video.height / 1px;
-    private property <bool> vertical-rail: focus-view.width > 840px;
-    private property <int> rail-current-index: 0;
-    changed rail-current-index => { root.reveal-current(); }
-    changed width => { root.reveal-current(); }
-    changed height => { root.reveal-current(); }
-    function reveal-current() {
-        if root.vertical-rail {
-            rail.viewport-x = 0px;
-            let top = root.rail-current-index * 100px;
-            rail.viewport-y = clamp(rail.viewport-y, -top, rail.height - top - 92px);
-            rail.viewport-y = clamp(rail.viewport-y, min(0px, rail.height - rail.viewport-height), 0px);
-        } else {
-            rail.viewport-y = 0px;
-            let left = root.rail-current-index * 144px;
-            rail.viewport-x = clamp(rail.viewport-x, -left, rail.width - left - 136px);
-            rail.viewport-x = clamp(rail.viewport-x, min(0px, rail.width - rail.viewport-width), 0px);
-        }
-    }
     callback pointer-input(PointerEventButton, PointerEventKind, length, length);
     callback scroll-input(length, length, length, length);
     callback key-input(string, bool, bool, bool, bool, bool);
@@ -203,8 +205,8 @@ export component GalleryView inherits Rectangle {
             CompactButton { width: 100px; primary: true; enabled: !root.focused.connected || root.controlling || (root.focused.has-frame && !root.focused.stale); text: root.focused.connected ? (root.controlling ? GalleryStrings.tr("释放操控", "Release", "Отпустить") : GalleryStrings.tr("接管操控", "Control", "Управлять")) : GalleryStrings.tr("连接", "Connect", "Подключить"); clicked => { root.action(root.focused.connected ? (root.controlling ? "release" : "control") : "connect", root.focused.id); } }
         }
         Rectangle {
-            x: 0px; y: 36px; width: root.vertical-rail ? parent.width - 158px : parent.width;
-            height: root.vertical-rail ? parent.height - 36px : parent.height - 152px;
+            x: 0px; y: rail.visible ? rail.y + rail.height + 10px : 36px;
+            width: parent.width; height: parent.height - self.y;
             background: #eff1f4; border-radius: 6px;
             border-width: root.controlling ? 2px : 1px; border-color: root.controlling ? #76aeea : #d5dbe3;
             video := Rectangle {
@@ -247,45 +249,84 @@ export component GalleryView inherits Rectangle {
             }
         }
         rail := ScrollView {
-            x: root.vertical-rail ? parent.width - 148px : 0px;
-            y: root.vertical-rail ? 36px : parent.height - 106px;
-            width: root.vertical-rail ? 148px : parent.width;
-            height: root.vertical-rail ? parent.height - 36px : 106px;
-            // Reserve 14px below or 12px beside cards for the scrollbar.
-            viewport-width: root.vertical-rail ? self.width : max(self.width, root.tiles.length * 144px - 8px);
-            viewport-height: root.vertical-rail ? max(self.height, root.tiles.length * 100px - 8px) : self.height;
-            horizontal-scrollbar-policy: root.vertical-rail ? always-off : as-needed;
-            vertical-scrollbar-policy: root.vertical-rail ? as-needed : always-off;
-            for tile[index] in root.tiles: Rectangle {
-                private property <bool> current: tile.id == root.focused.id;
-                init => { if self.current { root.rail-current-index = index; root.reveal-current(); } }
-                changed current => { if self.current { root.rail-current-index = index; root.reveal-current(); } }
-                x: root.vertical-rail ? 0px : index * 144px;
-                y: root.vertical-rail ? index * 100px : 0px;
-                width: 136px; height: 92px; border-radius: 5px;
-                background: tile.id == root.focused.id ? #edf5ff : #f5f6f8;
-                border-width: tile.id == root.focused.id ? 2px : 1px;
-                border-color: tile.id == root.focused.id ? #76aeea : #d5dbe3;
-                Rectangle {
-                    x: 5px; y: 5px; width: 126px; height: root.simplified ? 82px : 52px; background: #24272d;
-                    if tile.has-frame: Image { width: parent.width; height: parent.height; source: tile.frame; image-fit: contain; opacity: tile.stale || !tile.connected ? 0.4 : 1; }
-                    if !root.simplified && (!tile.has-frame || tile.stale || !tile.connected): Text {
-                        text: tile.status; color: #e2e6ed; font-size: 10px; overflow: elide;
-                        horizontal-alignment: center; vertical-alignment: center;
+            visible: root.tiles.length > 1;
+            x: 0px; y: 36px; width: parent.width; height: root.rail-card-height + 14px;
+            // Reserve 14px below the cards for the horizontal scrollbar.
+            viewport-width: max(self.width, max(0, root.tiles.length - 1) * 144px);
+            viewport-height: self.height;
+            horizontal-scrollbar-policy: as-needed;
+            vertical-scrollbar-policy: always-off;
+            changed width => {
+                root.rail-tooltip-id = "";
+                self.viewport-x = clamp(self.viewport-x, min(0px, self.width - self.viewport-width), 0px);
+            }
+            changed viewport-width => {
+                root.rail-tooltip-id = "";
+                self.viewport-x = clamp(self.viewport-x, min(0px, self.width - self.viewport-width), 0px);
+            }
+            changed viewport-x => { root.rail-tooltip-id = ""; }
+            HorizontalLayout {
+                x: 0px; y: 0px; height: root.rail-card-height; spacing: 0px; padding: 0px;
+                for tile in root.tiles: rail-slot := Rectangle {
+                    // Collapse the focused tile and its gap without changing the page model.
+                    width: tile.id == root.focused.id ? 0px : 144px;
+                    height: root.rail-card-height; visible: tile.id != root.focused.id;
+                    Rectangle {
+                        private property <string> presence: tile.online ? GalleryStrings.tr("在线", "Online", "В сети")
+                            : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
+                        private property <string> details: tile.name + "\nID: " + tile.id + "\n" + self.presence;
+                        width: 136px; height: root.rail-card-height; border-radius: 5px;
+                        background: #f5f6f8; border-width: 1px; border-color: #d5dbe3;
+                        accessible-role: button;
+                        accessible-label: self.details;
+                        accessible-action-default => { root.action("focus", tile.id); }
+                        changed details => { if rail-touch.has-hover { rail-touch.show-details(); } }
+                        Rectangle {
+                            x: 5px; y: 5px; width: 126px; height: root.simplified ? 82px : 52px; background: #24272d;
+                            if tile.has-frame: Image { width: parent.width; height: parent.height; source: tile.frame; image-fit: contain; opacity: tile.stale || !tile.connected ? 0.4 : 1; }
+                            if !root.simplified && (!tile.has-frame || tile.stale || !tile.connected): Text {
+                                text: tile.status; color: #e2e6ed; font-size: 10px; overflow: elide;
+                                horizontal-alignment: center; vertical-alignment: center;
+                            }
+                        }
+                        Rectangle {
+                            visible: !root.simplified;
+                            x: 7px; y: 63px; width: 6px; height: 6px; border-radius: 3px;
+                            background: tile.online ? #17854c : tile.presence-known ? #8a939e : transparent;
+                            border-width: 1px; border-color: tile.online ? #17854c : #8a939e;
+                        }
+                        Text {
+                            visible: !root.simplified;
+                            x: 18px; y: 58px; width: 111px; height: 16px;
+                            text: tile.name; color: #303943; font-size: 11px;
+                            overflow: elide; vertical-alignment: center;
+                        }
+                        rail-touch := TouchArea {
+                            function show-details() {
+                                root.rail-tooltip-id = tile.id;
+                                root.rail-tooltip-text = parent.details;
+                                root.rail-tooltip-x = rail.x + rail.viewport-x + rail-slot.x;
+                            }
+                            changed has-hover => {
+                                if self.has-hover { self.show-details(); }
+                                else if root.rail-tooltip-id == tile.id { root.rail-tooltip-id = ""; }
+                            }
+                            moved => { if self.has-hover { self.show-details(); } }
+                            clicked => { root.rail-tooltip-id = ""; root.action("focus", tile.id); }
+                        }
                     }
                 }
-                Text { visible: !root.simplified; x: 7px; y: 61px; width: 122px; height: 16px; text: tile.name; color: #303943; font-size: 11px; overflow: elide; }
-                Text {
-                    visible: !root.simplified;
-                    x: 7px; y: 78px; width: 86px; height: 12px; font-size: 9px;
-                    text: tile.online ? GalleryStrings.tr("在线", "Online", "В сети") : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
-                    color: tile.online ? #17854c : #7a828d; overflow: elide;
-                }
-                if !root.simplified && tile.id == root.focused.id: Text {
-                    x: 99px; y: 78px; width: 30px; height: 12px;
-                    text: GalleryStrings.tr("当前", "Current", "Выбрано"); color: #4d83bd; font-size: 9px; horizontal-alignment: right; overflow: elide;
-                }
-                TouchArea { clicked => { root.action("focus", tile.id); } }
+            }
+        }
+        // Keep full device details outside the clipped thumbnail rail.
+        if root.rail-tooltip-visible && rail.visible && root.rail-tooltip-id != "" && root.rail-tooltip-id != root.focused.id: Rectangle {
+            x: clamp(root.rail-tooltip-x, 0px, parent.width - self.width);
+            y: rail.y + rail.height + 4px;
+            width: min(320px, parent.width); height: rail-tooltip-label.preferred-height + 16px;
+            background: #22252bf2; border-width: 1px; border-color: #ffffff38; border-radius: 5px;
+            rail-tooltip-label := Text {
+                x: 8px; y: 8px; width: parent.width - 16px;
+                text: root.rail-tooltip-text; color: white; font-size: 11px; wrap: word-wrap;
             }
         }
     }
