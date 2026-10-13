@@ -265,7 +265,7 @@ component PasswordInput inherits Rectangle {
 }
 
 export component MainWindow inherits Window {
-    title: root.gallery-mode ? "CrossDesk · " + GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub") : "CrossDesk";
+    title: root.gallery-mode ? "CrossDesk " + GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub") : "CrossDesk";
     icon: @image-url("../../../resources/linux/crossdesk_256x256.png");
     preferred-width: 640px;
     preferred-height: root.minimum-window-height;
@@ -371,9 +371,8 @@ export component MainWindow inherits Window {
     in property <bool> window-active: true;
     private property <length> titlebar-height:
         root.custom-titlebar && !root.gallery-fullscreen ? (root.wayland-titlebar ? 32px : 31px) : 0px;
-    private property <length> content-header-height: root.gallery-mode ? 38px : 0px;
     out property <length> minimum-window-height:
-        448px + root.content-header-height + root.titlebar-height;
+        448px + root.titlebar-height;
     private property <length> wayland-corner-radius: 12px;
     in property <string> local-id: "";
     in property <string> local-password: "";
@@ -804,7 +803,6 @@ export component MainWindow inherits Window {
         }
 
         // The connection page shares its section heading row with the menu.
-        // Only DeskHub needs a separate toolbar above its content.
         menu-button := IconButton {
             visible: !root.gallery-mode;
             x: parent.width - 29px - self.width;
@@ -894,29 +892,8 @@ export component MainWindow inherits Window {
             }
         }
 
-        if root.gallery-mode: Text {
-            x: 29px; y: root.content-header-height - self.height; width: 164px; height: 24px;
-            text: GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub");
-            color: #24272d; font-weight: 600; font-size: 12px;
-            vertical-alignment: center;
-        }
-        if root.gallery-mode: CompactButton {
-            x: parent.width - 29px - 24px - 8px - self.width;
-            y: root.content-header-height - self.height; width: 94px; height: 24px;
-            primary: root.gallery-simplified;
-            text: root.gallery-simplified ? GalleryStrings.tr("退出精简", "Exit compact", "Обычный вид")
-                : GalleryStrings.tr("精简模式", "Compact", "Компактно");
-            clicked => { root.gallery-simplified = !root.gallery-simplified; }
-        }
-        if root.gallery-mode: IconButton {
-            x: parent.width - 29px - self.width;
-            y: root.content-header-height - self.height; width: 24px; height: 24px;
-            icon: root.gallery-fullscreen ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
-            tooltip: root.gallery-fullscreen ? GalleryStrings.tr("退出全屏", "Exit fullscreen", "Выйти из полноэкранного режима") : GalleryStrings.tr("全屏", "Fullscreen", "На весь экран");
-            clicked => { root.toggle-gallery-fullscreen(); }
-        }
         Rectangle {
-            y: root.content-header-height; height: parent.height - self.y - 24px; visible: !root.gallery-mode;
+            y: 0px; height: parent.height - self.y - 24px; visible: !root.gallery-mode;
         // Local and remote desktop panels.
         Rectangle {
             y: 0px;
@@ -1337,10 +1314,13 @@ export component MainWindow inherits Window {
 
         }
         gallery := GalleryView {
-            y: root.content-header-height; width: parent.width;
+            y: 0px; width: parent.width;
             height: parent.height - self.y;
             visible: root.gallery-mode;
             simplified: root.gallery-simplified;
+            fullscreen: root.gallery-fullscreen;
+            toggle-simplified => { root.gallery-simplified = !root.gallery-simplified; }
+            toggle-fullscreen => { root.toggle-gallery-fullscreen(); }
             window-active: root.window-active;
             tile-width <=> root.gallery-tile-width;
             network-open => { root.gallery-network-open = true; }

@@ -3,7 +3,17 @@ import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
 import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { GroupFilter } from "group_filter.slint";
 import { ScrollView, LineEdit } from "std-widgets.slint";
-import { CompactButton, SecondaryButton, FontAwesomeIcons, ImGuiCheckBox } from "common.slint";
+import { CompactButton, SecondaryButton, IconButton, FontAwesomeIcons, ImGuiCheckBox } from "common.slint";
+
+component GalleryToolbarButton inherits CompactButton {
+    in property <string> alternate-text;
+    in property <length> horizontal-padding: 12px;
+    // Reserve both labels so toggling a mode never shifts adjacent controls.
+    width: max(48px, ceil(max(label-width-probe.preferred-width,
+        alternate-width-probe.preferred-width) / 1px) * 1px + root.horizontal-padding * 2);
+    label-width-probe := Text { visible: false; text: root.text; font-size: root.text-size; }
+    alternate-width-probe := Text { visible: false; text: root.alternate-text; font-size: root.text-size; }
+}
 
 export struct GalleryTile {
     id: string,
@@ -34,6 +44,13 @@ export struct GalleryActionDevice {
 export component GalleryView inherits Rectangle {
     in property <bool> controlling: false;
     in property <bool> simplified: false;
+    in property <bool> fullscreen: false;
+    callback toggle-simplified;
+    callback toggle-fullscreen;
+    // Keep long localized actions and the selection summary visible at 640px.
+    private property <length> toolbar-button-padding: root.width < 720px ? 8px : 12px;
+    private property <length> view-controls-width: compact-toggle.width + 30px;
+    private property <length> view-controls-space: root.view-controls-width + 6px;
     in property <bool> window-active: true;
     in-out property <float> tile-width: 216;
     out property <bool> resizing: false;
@@ -154,7 +171,7 @@ export component GalleryView inherits Rectangle {
         root.batch = false; root.adding = false; root.importing = false; root.confirming = false;
         root.device-tooltip-id = ""; add-menu.close-menu(); batch-menu.close-menu();
     }
-    changed batch => { root.device-tooltip-id = ""; root.cancel-device-drag(); batch-menu.close-menu(); }
+    changed batch => { root.device-tooltip-id = ""; root.cancel-device-drag(); add-menu.close-menu(); batch-menu.close-menu(); }
     function cancel-device-drag() {
         root.dragging = false; root.drag-source = ""; root.drag-page = -1;
     }
@@ -235,40 +252,92 @@ export component GalleryView inherits Rectangle {
     function confirm-action(code: string, name: string) {
         root.action-code = code; root.action-name = name; root.confirming = true;
     }
-    toolbar := HorizontalLayout {
-        x: 29px; y: 12px; width: parent.width - 58px; height: 24px;
+    // Swap toolbar contents in place so selection never moves the grid or pager.
+    toolbar := Rectangle {
+        x: 29px; y: 12px; width: parent.width - 58px - root.view-controls-space; height: 24px;
         visible: root.focused.id == "" && !root.simplified;
-        spacing: 8px;
-        GroupFilter { width: 155px; height: 24px; system-count: 1; model: root.groups; current-index <=> root.group-index;
-            selected(index) => { root.action("group", index); }
+        HorizontalLayout {
+            x: 0px; y: 0px; width: parent.width - selection-toggle.width - 6px; height: parent.height;
+            visible: !root.batch; spacing: 6px;
+            GroupFilter { width: 155px; height: 24px; system-count: 1; model: root.groups; current-index <=> root.group-index;
+                selected(index) => { root.action("group", index); }
+            }
+            Text {
+                text: root.count + GalleryStrings.tr(" 台设备", " devices", " устройств");
+                min-width: 0px; overflow: elide; font-size: 11px; color: #858c96; vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; min-width: 0px; }
+            add-menu := GalleryMenuButton {
+                horizontal-padding: root.toolbar-button-padding;
+                width: self.preferred-button-width;
+                text: GalleryStrings.tr("添加", "Add", "Добавить"); menu-width: 232px;
+                items: [
+                    {label: GalleryStrings.tr("通过设备 ID 添加", "Add by device ID", "Добавить по ID устройства"), enabled: true},
+                    {label: GalleryStrings.tr("从近期连接添加", "Add from recent", "Добавить из недавних"), enabled: true},
+                ];
+                opened => { root.device-tooltip-id = ""; root.action("release", ""); }
+                selected(index) => {
+                    if index == 0 { root.action("add-open", ""); root.adding = true; }
+                    else { root.action("recent-open", ""); root.importing = true; }
+                }
+            }
         }
-        Text {
-            text: root.count + GalleryStrings.tr(" 台设备", " devices", " устройств");
-            font-size: 11px; color: #858c96; vertical-alignment: center;
+        selection-actions := HorizontalLayout {
+            x: 0px; y: 0px; height: parent.height;
+            visible: root.batch; width: parent.width - selection-toggle.width - 6px; spacing: 6px;
+            Rectangle {
+                horizontal-stretch: 1; min-width: 0px;
+                Text {
+                    x: 0px; y: 0px; width: parent.width; height: root.hidden-selected > 0 ? 13px : parent.height;
+                    text: GalleryStrings.tr("已选 ", "Selected ", "Выбрано ") + root.selected-count + GalleryStrings.tr(" 台", "", "");
+                    color: #62666d; vertical-alignment: center; font-size: 11px; overflow: elide;
+                }
+                if root.hidden-selected > 0: Text {
+                    y: 14px; width: parent.width; height: 10px;
+                    text: GalleryStrings.tr("跨页 ", "Other pages ", "Вне страницы ") + root.hidden-selected;
+                    color: #80858d; font-size: 10px; overflow: elide;
+                }
+            }
+            GalleryToolbarButton {
+                horizontal-padding: root.toolbar-button-padding;
+                enabled: root.count > 0;
+                text: root.count > 0 && root.selected-count == root.count
+                    ? GalleryStrings.tr("取消全选", "Deselect all", "Снять выбор")
+                    : GalleryStrings.tr("全选", "Select all", "Выбрать все");
+                alternate-text: root.count > 0 && root.selected-count == root.count
+                    ? GalleryStrings.tr("全选", "Select all", "Выбрать все")
+                    : GalleryStrings.tr("取消全选", "Deselect all", "Снять выбор");
+                clicked => { root.action("all-select", ""); }
+            }
+            GalleryToolbarButton { horizontal-padding: root.toolbar-button-padding; primary: true; enabled: root.selected-count > 0; text: GalleryStrings.tr("连接", "Connect", "Связь"); clicked => { root.action("connect", ""); } }
+            GalleryToolbarButton { horizontal-padding: root.toolbar-button-padding; enabled: root.selected-count > 0; text: GalleryStrings.tr("断开", "Close", "Отключить"); clicked => { root.confirm-action("disconnect", self.text); } }
+            batch-menu := GalleryMenuButton {
+                horizontal-padding: root.toolbar-button-padding;
+                width: self.preferred-button-width; enabled: root.selected-count > 0;
+                text: GalleryStrings.tr("更多", "More", "Ещё");
+                items: [
+                    {label: root.selected-audio-muted ? GalleryStrings.tr("取消静音", "Unmute", "Со звуком") : GalleryStrings.tr("静音", "Mute", "Без звука"), enabled: root.selected-audio-available},
+                    {label: GalleryStrings.tr("分发文件", "Send file", "Отправить файл"), enabled: root.selected-count > 0},
+                ];
+                opened => { root.device-tooltip-id = ""; root.action("release", ""); }
+                selected(index) => {
+                    if index == 0 { root.action(root.selected-audio-muted ? "unmute" : "mute", ""); }
+                    else { root.confirm-action("file", GalleryStrings.tr("分发文件", "Send file", "Отправить файл")); }
+                }
+            }
         }
-        Rectangle { horizontal-stretch: 1; }
-        CompactButton {
-            width: 72px; quiet: true; primary: root.batch;
+        selection-toggle := GalleryToolbarButton {
+            x: parent.width - self.width; y: 0px;
+            horizontal-padding: root.toolbar-button-padding;
+            primary: root.batch;
+            alternate-text: GalleryStrings.tr("选择", "Select", "Выбрать");
             text: root.batch ? GalleryStrings.tr("完成", "Done", "Готово") : GalleryStrings.tr("选择", "Select", "Выбрать");
             clicked => { root.batch = !root.batch; root.action("selection", ""); }
-        }
-        add-menu := GalleryMenuButton {
-            width: 90px; primary: true;
-            text: GalleryStrings.tr("添加", "Add", "Добавить"); menu-width: 232px;
-            items: [
-                {label: GalleryStrings.tr("通过设备 ID 添加", "Add by device ID", "Добавить по ID устройства"), enabled: true},
-                {label: GalleryStrings.tr("从近期连接添加", "Add from recent", "Добавить из недавних"), enabled: true},
-            ];
-            opened => { root.device-tooltip-id = ""; root.action("release", ""); }
-            selected(index) => {
-                if index == 0 { root.action("add-open", ""); root.adding = true; }
-                else { root.action("recent-open", ""); root.importing = true; }
-            }
         }
     }
     grid := TouchArea {
         x: root.simplified ? 12px : toolbar.x;
-        y: root.simplified ? 12px : toolbar.y + toolbar.height + 12px;
+        y: toolbar.y + toolbar.height + 12px;
         width: parent.width - self.x * 2;
         height: footer.y - 12px - self.y;
         visible: root.focused.id == "";
@@ -467,10 +536,10 @@ export component GalleryView inherits Rectangle {
     }
     focus-view := Rectangle {
         visible: root.focused.id != "";
-        x: 29px; y: 7px; width: parent.width - 58px;
+        x: 29px; y: toolbar.y; width: parent.width - 58px;
         height: footer.y - 12px - self.y;
         HorizontalLayout {
-            x: 0px; y: 0px; width: parent.width; height: 28px; spacing: 8px;
+            x: 0px; y: 0px; width: parent.width - root.view-controls-space; height: 24px; spacing: 8px;
             CompactButton { width: 52px; text: GalleryStrings.tr("返回", "Back", "Назад"); clicked => { root.action("focus", ""); } }
             Rectangle {
                 horizontal-stretch: 1; min-width: 0px;
@@ -603,13 +672,12 @@ export component GalleryView inherits Rectangle {
         y: parent.height - 44px; height: 44px; background: #fafbfc;
         Rectangle { y: 0px; width: parent.width; height: 1px; background: #e1e4e8; }
     }
-    // Fixed selection widths keep the cards, actions and pager stationary.
+    // Connection status and pagination remain available in every selection state.
     footer := Rectangle {
         x: root.simplified ? 12px : toolbar.x; y: parent.height - 34px;
         width: parent.width - self.x * 2; height: 24px;
         status-area := Rectangle {
             x: 0px; y: 0px; width: parent.width - 124px; height: parent.height;
-            visible: !root.batch || root.simplified;
             connection-count := Text {
                 x: 0px; width: min(self.preferred-width, parent.width - network-button.width - 12px); height: parent.height;
                 text: root.connected-summary;
@@ -626,50 +694,30 @@ export component GalleryView inherits Rectangle {
                 clicked => { root.device-tooltip-id = ""; root.network-open(); }
             }
         }
-        selection-actions := HorizontalLayout {
-            x: 0px; y: 0px; height: parent.height;
-            visible: root.batch && !root.simplified; width: 408px; spacing: 6px;
-            Rectangle {
-                width: 100px;
-                Text {
-                    x: 0px; y: 0px; width: parent.width; height: root.hidden-selected > 0 ? 13px : parent.height;
-                    text: GalleryStrings.tr("已选 ", "Selected ", "Выбрано ") + root.selected-count + GalleryStrings.tr(" 台", "", "");
-                    color: #62666d; vertical-alignment: center; font-size: 11px; overflow: elide;
-                }
-                if root.hidden-selected > 0: Text {
-                    y: 14px; width: parent.width; height: 10px;
-                    text: GalleryStrings.tr("跨页 ", "Other pages ", "Вне страницы ") + root.hidden-selected;
-                    color: #80858d; font-size: 10px; overflow: elide;
-                }
-            }
-            CompactButton {
-                width: 90px; quiet: true; enabled: root.count > 0;
-                text: root.count > 0 && root.selected-count == root.count
-                    ? GalleryStrings.tr("取消全选", "Deselect all", "Снять выбор")
-                    : GalleryStrings.tr("全选", "Select all", "Выбрать все");
-                clicked => { root.action("all-select", ""); }
-            }
-            CompactButton { width: 60px; primary: true; enabled: root.selected-count > 0; text: GalleryStrings.tr("连接", "Connect", "Связь"); clicked => { root.action("connect", ""); } }
-            CompactButton { width: 64px; enabled: root.selected-count > 0; text: GalleryStrings.tr("断开", "Close", "Отключить"); clicked => { root.confirm-action("disconnect", self.text); } }
-            batch-menu := GalleryMenuButton {
-                width: 70px; enabled: root.selected-count > 0; opens-up: true;
-                text: GalleryStrings.tr("更多", "More", "Ещё");
-                items: [
-                    {label: root.selected-audio-muted ? GalleryStrings.tr("取消静音", "Unmute", "Со звуком") : GalleryStrings.tr("静音", "Mute", "Без звука"), enabled: root.selected-audio-available},
-                    {label: GalleryStrings.tr("分发文件", "Send file", "Отправить файл"), enabled: root.selected-count > 0},
-                ];
-                opened => { root.device-tooltip-id = ""; root.action("release", ""); }
-                selected(index) => {
-                    if index == 0 { root.action(root.selected-audio-muted ? "unmute" : "mute", ""); }
-                    else { root.confirm-action("file", GalleryStrings.tr("分发文件", "Send file", "Отправить файл")); }
-                }
-            }
-        }
         pager := HorizontalLayout {
             x: parent.width - self.width; y: 0px; width: 112px; height: 24px; spacing: 6px;
             previous-page := CompactButton { primary: root.drag-page-direction < 0; width: 24px; text: "‹"; text-size: 16px; enabled: root.page > 0; clicked => { root.action("page", "previous"); } }
             Text { text: (root.page + 1) + " / " + root.pages; min-width: 0px; overflow: elide; horizontal-alignment: center; vertical-alignment: center; }
             next-page := CompactButton { primary: root.drag-page-direction > 0; width: 24px; text: "›"; text-size: 16px; enabled: root.page + 1 < root.pages; clicked => { root.action("page", "next"); } }
+        }
+    }
+    // Paint the fullscreen tooltip above the grid/rail, below modal overlays.
+    view-controls := HorizontalLayout {
+        x: parent.width - (root.simplified ? 12px : 29px) - self.width;
+        y: toolbar.y; width: root.view-controls-width; height: toolbar.height; spacing: 6px;
+        compact-toggle := GalleryToolbarButton {
+            horizontal-padding: root.toolbar-button-padding;
+            primary: root.simplified;
+            alternate-text: GalleryStrings.tr("退出精简", "Exit compact", "Обычный вид");
+            text: root.simplified ? GalleryStrings.tr("退出精简", "Exit compact", "Обычный вид")
+                : GalleryStrings.tr("精简模式", "Compact", "Компактно");
+            clicked => { root.toggle-simplified(); }
+        }
+        IconButton {
+            width: 24px; height: 24px;
+            icon: root.fullscreen ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
+            tooltip: root.fullscreen ? GalleryStrings.tr("退出全屏", "Exit fullscreen", "Выйти из полноэкранного режима") : GalleryStrings.tr("全屏", "Fullscreen", "На весь экран");
+            clicked => { root.toggle-fullscreen(); }
         }
     }
     for edge in 2: Rectangle {

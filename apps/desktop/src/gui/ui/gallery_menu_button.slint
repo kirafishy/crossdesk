@@ -8,6 +8,8 @@ export component GalleryMenuButton inherits Rectangle {
     in property <bool> enabled: true;
     in property <bool> opens-up: false;
     in property <length> menu-width: 200px;
+    in property <length> horizontal-padding: 12px;
+    out property <length> preferred-button-width: ceil(button-label.preferred-width / 1px) * 1px + root.horizontal-padding * 2 + 18px;
     in property <[GalleryMenuItem]> items;
     private property <int> current-index: 0;
     callback opened;
@@ -62,13 +64,13 @@ export component GalleryMenuButton inherits Rectangle {
             enabled: root.enabled; primary: root.primary;
             clicked => { trigger-focus.focus(); root.open-menu(); }
         }
-        Text {
-            x: 6px; width: parent.width - 24px; height: parent.height;
+        button-label := Text {
+            x: root.horizontal-padding; width: parent.width - root.horizontal-padding * 2 - 18px; height: parent.height;
             text: root.text; color: root.enabled ? #24272d : #8e9298;
             font-size: 11px; overflow: elide; horizontal-alignment: center; vertical-alignment: center;
         }
         Text {
-            x: parent.width - 19px; width: 12px; height: parent.height;
+            x: parent.width - root.horizontal-padding - 12px; width: 12px; height: parent.height;
             text: root.opens-up ? FontAwesomeIcons.angle-up : FontAwesomeIcons.angle-down;
             font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 9px;
             color: root.enabled ? #62666d : #8e9298;

@@ -268,7 +268,7 @@ void X11ActivateGalleryWindow(Display* display) {
                          0, 256, False, XInternAtom(display, "UTF8_STRING", False),
                          &name_type, &name_format, &length, &remaining, &name);
       const bool matches = name && name_format == 8 &&
-          std::string_view(reinterpret_cast<char*>(name), length).starts_with("CrossDesk · ");
+          std::string_view(reinterpret_cast<char*>(name), length).starts_with("CrossDesk ");
       if (name) XFree(name);
       if (!matches) continue;
       XEvent event{};
