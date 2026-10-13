@@ -161,34 +161,6 @@ component DialogPromptText inherits Rectangle {
     }
 }
 
-// Explicit device labels make state readable without interpreting a dot.
-// Opaque surfaces keep the badge legible over both dark and light previews.
-component ConnectionStatusBadge inherits Rectangle {
-    in property <string> label;
-    in property <bool> online: false;
-
-    preferred-width: badge-label.preferred-width + 16px;
-    width: self.preferred-width;
-    height: 20px;
-    border-radius: self.height / 2;
-    background: root.online ? #eaf8f0 : #f2f4f7;
-    border-width: 1px;
-    border-color: root.online ? #bce3cd : #d5dbe3;
-
-    badge-label := Text {
-        x: 8px;
-        width: max(0px, parent.width - 16px);
-        height: parent.height;
-        text: root.label;
-        color: root.online ? #16a34a : #596575;
-        font-size: ImGuiFontStyle.small;
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        overflow: elide;
-    }
-}
-
 // Keep the green center and fade the surrounding glow into the status bar.
 component OnlineStatusIndicator inherits Rectangle {
     in property <length> dot-diameter: 8px;
@@ -921,29 +893,22 @@ export component MainWindow inherits Window {
 
         mode-switch := Rectangle {
             x: 29px; y: root.content-header-height - self.height; width: 164px; height: 24px;
-            background: #eef1f5;
-            border-width: 0.5px; border-color: #d5dbe3; border-radius: 6px;
+            background: #e2e4e7;
+            border-width: 1px; border-color: #c8cbd0; border-radius: 3px;
             Rectangle {
                 x: root.gallery-mode ? 82px : 2px;
                 y: 2px; width: 80px; height: parent.height - 4px;
-                background: @linear-gradient(180deg, #c4e0fd, #abd0f8);
-                border-width: 0.5px; border-color: #97bde5; border-radius: 4px;
-                drop-shadow-color: #315b8b20;
-                drop-shadow-blur: 2px; drop-shadow-offset-y: 1px;
-                Rectangle {
-                    x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
-                    border-width: 0.5px; border-color: #ffffff70; border-radius: 3px;
-                }
+                background: #a8d0fa;
+                border-width: 1px; border-color: #9bc3ed; border-radius: 3px;
                 animate x { duration: 160ms; easing: ease-out; }
             }
             for label[index] in [GalleryStrings.tr("连接", "Connect", "Связь"), GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub")]: Rectangle {
                 x: 2px + index * 80px; y: 2px; width: 80px; height: parent.height - 4px;
                 Text {
                     text: label;
-                    color: (index == 1) == root.gallery-mode ? #234b75 : #697483;
+                    color: #24272d;
                     font-weight: (index == 1) == root.gallery-mode ? 600 : 400;
                     horizontal-alignment: center; vertical-alignment: center; font-size: 12px;
-                    animate color { duration: 120ms; easing: ease-out; }
                 }
                 TouchArea {
                     clicked => { root.change-mode(index == 1); }
@@ -951,25 +916,18 @@ export component MainWindow inherits Window {
             }
         }
         if root.gallery-mode: CompactButton {
-            x: menu-button.x - 87px - 16px - 94px - 8px - self.width;
+            x: menu-button.x - 24px - 16px - self.width;
             y: mode-switch.y; width: 94px; height: mode-switch.height;
             primary: root.gallery-simplified;
             text: root.gallery-simplified ? GalleryStrings.tr("退出精简", "Exit compact", "Обычный вид")
                 : GalleryStrings.tr("精简模式", "Compact", "Компактно");
             clicked => { root.gallery-simplified = !root.gallery-simplified; }
         }
-        if root.gallery-mode: CompactButton {
-            x: menu-button.x - 87px - 16px - self.width;
-            y: mode-switch.y; width: 94px; height: mode-switch.height;
-            text: GalleryStrings.tr("网络状态", "Network", "Сеть");
-            clicked => { root.gallery-network-open = true; }
-        }
-        if root.gallery-mode: CompactButton {
+        if root.gallery-mode: IconButton {
             x: menu-button.x - self.width - 8px;
-            y: mode-switch.y;
-            width: 87px;
-            height: mode-switch.height;
-            text: root.gallery-fullscreen ? GalleryStrings.tr("退出全屏", "Exit full", "Выйти") : GalleryStrings.tr("全屏", "Fullscreen", "На весь экран");
+            y: mode-switch.y; width: 24px; height: mode-switch.height;
+            icon: root.gallery-fullscreen ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
+            tooltip: root.gallery-fullscreen ? GalleryStrings.tr("退出全屏", "Exit fullscreen", "Выйти из полноэкранного режима") : GalleryStrings.tr("全屏", "Fullscreen", "На весь экран");
             clicked => { root.toggle-gallery-fullscreen(); }
         }
         Rectangle {
@@ -1157,7 +1115,7 @@ export component MainWindow inherits Window {
             }
         }
 
-        // Recent connections: horizontal cards with thumbnail, state and actions.
+        // Recent connections: horizontal cards with thumbnail and hover actions.
         recent-panel := Rectangle {
             y: 234px;
             height: parent.height - self.y;
@@ -1209,6 +1167,7 @@ export component MainWindow inherits Window {
                         width: 178px;
                         height: 117px;
                         background: transparent;
+                        private property <bool> available: connection.online || connection.connected;
                         private property <length> content-width: self.width - 30px;
                         private property <length> toolbar-width: DeviceCardStyle.toolbar-width;
                         private property <length> toolbar-right-padding: 3px;
@@ -1226,7 +1185,8 @@ export component MainWindow inherits Window {
                                 y: 0px;
                                 width: parent.width;
                                 height: 84px;
-                                background: connection.platform == "windows" ? @linear-gradient(135deg, #1f61b3, #337ac4) :
+                                background: !connection-card.available ? DeviceCardStyle.offline-preview :
+                                    connection.platform == "windows" ? @linear-gradient(135deg, #1f61b3, #337ac4) :
                                     connection.platform == "macos" ? @linear-gradient(135deg, #6e4aad, #8c63c4) :
                                     connection.platform == "linux" ? @linear-gradient(135deg, #a14f14, #ba631f) :
                                     connection.platform == "ios" ? @linear-gradient(135deg, #146e66, #1f8278) :
@@ -1236,6 +1196,8 @@ export component MainWindow inherits Window {
                                     height: parent.height;
                                     source: connection.thumbnail;
                                     image-fit: cover;
+                                    // Keep the saved preview recognizable under the offline gray.
+                                    opacity: connection-card.available ? 1 : 0.16;
                                 }
                                 if !connection.has-thumbnail: Text {
                                     x: 8px;
@@ -1245,7 +1207,7 @@ export component MainWindow inherits Window {
                                         connection.platform == "macos" ? "macOS" :
                                         connection.platform == "linux" ? "Linux" :
                                         connection.platform == "ios" ? "iOS" : UiStrings.unknown-platform;
-                                    color: white;
+                                    color: connection-card.available ? white : DeviceCardStyle.offline-placeholder;
                                     font-size: 20px;
                                     font-weight: 600;
                                     horizontal-alignment: center;
@@ -1258,7 +1220,7 @@ export component MainWindow inherits Window {
                                 y: 84px;
                                 width: parent.width;
                                 height: 25px;
-                                background: #00000018;
+                                background: connection-card.available ? #00000018 : DeviceCardStyle.offline-background;
                                 Text {
                                     x: 4px;
                                     y: 1px;
@@ -1268,7 +1230,7 @@ export component MainWindow inherits Window {
                                                   ? connection-card.toolbar-width + connection-card.toolbar-right-padding
                                                   : 0px));
                                     text: connection.display-name;
-                                    color: #30343b;
+                                    color: connection-card.available ? #30343b : DeviceCardStyle.offline-text;
                                     // The ImGui card footer uses its own 0.52 font
                                     // scale and renders slightly larger than the
                                     // compact body text used in dialogs.
@@ -1276,13 +1238,6 @@ export component MainWindow inherits Window {
                                     overflow: elide;
                                     vertical-alignment: center;
                                 }
-                            }
-                            ConnectionStatusBadge {
-                                x: 6px;
-                                y: 6px;
-                                width: min(self.preferred-width, parent.width - 12px);
-                                label: connection.online ? UiStrings.online : UiStrings.offline;
-                                online: connection.online;
                             }
                             // The software renderer only clips rectangular bounds.
                             // This outer border masks the four corners there too.
@@ -1306,6 +1261,12 @@ export component MainWindow inherits Window {
                                 width: parent.width;
                                 height: 84px;
                                 private property <string> group-names: connection.group-names;
+                                private property <bool> available: connection-card.available;
+                                changed available => {
+                                    if self.has-hover && root.recent-tooltip-id == connection.remote-id {
+                                        root.recent-tooltip-online = self.available;
+                                    }
+                                }
                                 changed group-names => {
                                     if self.has-hover && root.recent-tooltip-id == connection.remote-id {
                                         root.recent-tooltip-groups = self.group-names;
@@ -1318,7 +1279,7 @@ export component MainWindow inherits Window {
                                         root.recent-tooltip-host = connection.host-name;
                                         root.recent-tooltip-id = connection.remote-id;
                                         root.recent-tooltip-groups = self.group-names;
-                                        root.recent-tooltip-online = connection.online;
+                                        root.recent-tooltip-online = self.available;
                                         root.recent-tooltip-pointer-x = recent-panel.x + recent-list.x
                                             + recent-scroll.x + recent-scroll.viewport-x
                                             + connection-card.x + card-touch.x + self.mouse-x;
@@ -1377,9 +1338,10 @@ export component MainWindow inherits Window {
         }
         gallery := GalleryView {
             y: root.content-header-height; width: parent.width;
-            height: parent.height - self.y - (root.gallery-simplified ? 0px : 24px);
+            height: parent.height - self.y - 24px;
             visible: root.gallery-mode;
             simplified: root.gallery-simplified;
+            network-open => { root.gallery-network-open = true; }
             controlling: root.gallery-controlling;
             pointer-input(button, kind, x, y) => { root.gallery-pointer(button, kind, x, y); }
             scroll-input(dx, dy, x, y) => { root.gallery-scroll(dx, dy, x, y); }
@@ -1407,9 +1369,8 @@ export component MainWindow inherits Window {
                 root.delete-remote-id = id; root.delete-from-gallery = true; root.delete-open = true;
             }
         }
-        // Status bar.
+        // Shared server status bar stays visible in every connection and DeskHub view.
         Rectangle {
-            visible: !root.gallery-mode || !root.gallery-simplified;
             y: parent.height - 24px;
             height: 24px;
             background: #fafbfc;

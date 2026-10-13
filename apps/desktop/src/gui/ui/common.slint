@@ -349,17 +349,18 @@ export component CompactButton inherits Rectangle {
     in property <string> text;
     in property <length> text-size: ImGuiFontStyle.body;
     in property <bool> primary: false;
+    in property <bool> quiet: false;
     in property <bool> enabled: true;
     callback clicked;
 
     width: 34px;
     height: 24px;
-    background: !root.enabled ? #eceef0
+    background: !root.enabled ? (root.quiet ? transparent : #eceef0)
               : button-touch.pressed ? (root.primary ? #82b8f2 : #d8dadd)
               : button-touch.has-hover ? (root.primary ? #b8d9fb : #f0f1f2)
-              : root.primary ? #a8d0fa : #e2e4e7;
+              : root.primary ? #a8d0fa : root.quiet ? transparent : #e2e4e7;
     border-width: 1px;
-    border-color: root.primary ? #9bc3ed : #c8cbd0;
+    border-color: root.primary ? #9bc3ed : root.quiet ? transparent : #c8cbd0;
     border-radius: 3px;
     Text {
         text: root.text;
