@@ -1,0 +1,34 @@
+export global RemoteCursor {
+    // Numeric values mirror crossdesk::RemoteCursorShape on the wire.
+    public pure function shape(value: int) -> MouseCursor {
+        return value == 1 ? MouseCursor.none
+            : value == 2 ? MouseCursor.help
+            : value == 3 ? MouseCursor.pointer
+            : value == 4 ? MouseCursor.progress
+            : value == 5 ? MouseCursor.wait
+            : value == 6 ? MouseCursor.crosshair
+            : value == 7 ? MouseCursor.text
+            : value == 8 ? MouseCursor.alias
+            : value == 9 ? MouseCursor.copy
+            : value == 10 ? MouseCursor.move
+            : value == 11 ? MouseCursor.no-drop
+            : value == 12 ? MouseCursor.not-allowed
+            : value == 13 ? MouseCursor.grab
+            : value == 14 ? MouseCursor.grabbing
+            : value == 15 ? MouseCursor.col-resize
+            : value == 16 ? MouseCursor.row-resize
+            : value == 17 ? MouseCursor.n-resize
+            : value == 18 ? MouseCursor.e-resize
+            : value == 19 ? MouseCursor.s-resize
+            : value == 20 ? MouseCursor.w-resize
+            : value == 21 ? MouseCursor.ne-resize
+            : value == 22 ? MouseCursor.nw-resize
+            : value == 23 ? MouseCursor.se-resize
+            : value == 24 ? MouseCursor.sw-resize
+            : value == 25 ? MouseCursor.ew-resize
+            : value == 26 ? MouseCursor.ns-resize
+            : value == 27 ? MouseCursor.nesw-resize
+            : value == 28 ? MouseCursor.nwse-resize
+            : MouseCursor.default;
+    }
+}

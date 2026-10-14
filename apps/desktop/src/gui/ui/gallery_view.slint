@@ -1,4 +1,5 @@
 import { GalleryStrings } from "device_strings.slint";
+import { RemoteCursor } from "remote_cursor.slint";
 import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
 import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { GroupFilter } from "group_filter.slint";
@@ -44,6 +45,7 @@ export struct GalleryActionDevice {
 
 export component GalleryView inherits Rectangle {
     in property <bool> controlling: false;
+    in property <int> remote-cursor-shape: 0;
     in property <bool> group-controlling: false;
     in property <bool> input-suspended: false;
     in property <bool> simplified: false;
@@ -620,6 +622,8 @@ export component GalleryView inherits Rectangle {
                         accept
                     }
                     TouchArea {
+                        mouse-cursor: root.controlling && !root.input-suspended
+                            ? RemoteCursor.shape(root.remote-cursor-shape) : MouseCursor.default;
                         pointer-event(event) => {
                             if !root.input-suspended {
                                 if event.kind == PointerEventKind.down { video-focus.focus(); }

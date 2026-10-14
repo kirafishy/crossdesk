@@ -4395,6 +4395,8 @@ void GuiApplication::ReleaseControl() {
   ReleasePressedInput();
   gallery_group_control_id_.clear();
   ui_->wall->set_gallery_group_controlling(false);
+  ui_->wall->set_gallery_remote_cursor_shape(
+      static_cast<int>(RemoteCursorShape::default_cursor));
   if (!ui_->gallery_control_id.empty()) {
     ui_->gallery_control_id.clear();
     ui_->wall->set_gallery_controlling(false);
@@ -5148,12 +5150,27 @@ void GuiApplication::SyncGallery() {
       ReleaseControl();
     ui_->wall->set_gallery_fullscreen(fullscreen);
   }
+  auto cursor_shape = RemoteCursorShape::default_cursor;
   if (!ui_->gallery_control_id.empty()) {
+    // Only the selected control source owns the wall cursor, including group
+    // control. Followers can report different shapes without replacing it.
     auto controlled = FindRemoteSession(ui_->gallery_control_id);
     if (!visible || !controlled || controlled->closing_ ||
-        controlled->connection_status_ != ConnectionStatus::Connected)
+        controlled->connection_status_ != ConnectionStatus::Connected) {
       ReleaseControl();
+    } else {
+      HostPlatform platform;
+      {
+        std::lock_guard lock(controlled->remote_version_mutex_);
+        platform = controlled->remote_platform_;
+      }
+      std::lock_guard lock(controlled->remote_cursor_state_mutex_);
+      if (controlled->remote_cursor_state_received_)
+        cursor_shape = controlled->cursor_presentation_.Resolve(
+            SDL_GetTicks(), platform);
+    }
   }
+  ui_->wall->set_gallery_remote_cursor_shape(static_cast<int>(cursor_shape));
   const auto now = std::chrono::steady_clock::now();
   const auto action = transition.Advance(now, current_size.width, current_size.height,
                                          window.scale_factor(), fullscreen, placement.Restoring());
