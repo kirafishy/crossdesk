@@ -62,6 +62,9 @@ struct Workspace {
            std::all_of(id.begin(), id.end(),
                        [](unsigned char c) { return c >= '0' && c <= '9'; });
   }
+  bool Contains(const std::string &id) const {
+    return wall_ids_.count(id) != 0;
+  }
   bool Add(const std::string &id, const std::string &group = {}) {
     if (!ValidId(id))
       return false;

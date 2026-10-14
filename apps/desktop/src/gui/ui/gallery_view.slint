@@ -33,6 +33,7 @@ export struct GalleryRecentDevice {
     id: string,
     name: string,
     selected: bool,
+    added: bool,
     online: bool,
 }
 export struct GalleryActionDevice {
@@ -159,6 +160,7 @@ export component GalleryView inherits Rectangle {
     in-out property <bool> importing: false;
     in property <[GalleryRecentDevice]> recent-devices;
     in property <int> recent-selected: 0;
+    in property <int> recent-available: 0;
     in property <string> import-group;
     private property <bool> confirming: false;
     private property <string> action-name;
@@ -922,10 +924,10 @@ export component GalleryView inherits Rectangle {
             background: white; border-radius: 8px; border-width: 1px; border-color: #b2b2b2;
             Text { x: 18px; y: 16px; height: 24px; text: GalleryStrings.tr("从最近连接添加", "Add from recent connections", "Добавить из недавних"); font-size: 16px; }
             Text { x: 18px; y: 44px; width: 404px; height: 18px; text: GalleryStrings.tr("加入桌面墙后，可通过批量选择连接", "Add devices, then use Select to connect them.", "После добавления подключайтесь через выбор."); color: #62666d; font-size: 11px; }
-            ImGuiCheckBox { x: 18px; y: 74px; enabled: root.recent-devices.length > 0; checked: root.recent-devices.length > 0 && root.recent-selected == root.recent-devices.length; }
-            Text { x: 45px; y: 74px; height: 21px; text: GalleryStrings.tr("全选", "Select all", "Выбрать все"); font-size: 12px; vertical-alignment: center; }
-            TouchArea { x: 18px; y: 74px; width: 144px; height: 21px; enabled: root.recent-devices.length > 0; clicked => { root.action("recent-all", ""); } }
-            Text { x: 224px; y: 74px; width: 198px; height: 21px; text: GalleryStrings.tr("已选 ", "Selected ", "Выбрано ") + root.recent-selected + " / " + root.recent-devices.length; horizontal-alignment: right; vertical-alignment: center; font-size: 12px; color: #62666d; }
+            ImGuiCheckBox { x: 18px; y: 74px; enabled: root.recent-available > 0; checked: root.recent-devices.length > 0 && root.recent-selected == root.recent-available; }
+            Text { x: 45px; y: 74px; height: 21px; text: GalleryStrings.tr("全选", "Select all", "Выбрать все"); color: root.recent-available > 0 ? #24272d : #92969e; font-size: 12px; vertical-alignment: center; }
+            TouchArea { x: 18px; y: 74px; width: 144px; height: 21px; enabled: root.recent-available > 0; clicked => { root.action("recent-all", ""); } }
+            Text { x: 224px; y: 74px; width: 198px; height: 21px; text: GalleryStrings.tr("待添加 ", "To add ", "К добавлению ") + root.recent-selected + " / " + root.recent-available; horizontal-alignment: right; vertical-alignment: center; font-size: 12px; color: #62666d; }
             Rectangle {
                 x: 18px; y: 102px; width: 404px; height: 160px;
                 border-width: 1px; border-color: #d8dadd; border-radius: 4px; clip: true;
@@ -935,17 +937,17 @@ export component GalleryView inherits Rectangle {
                     viewport-height: max(self.height, root.recent-devices.length * 44px);
                     for device[index] in root.recent-devices: Rectangle {
                         y: index * 44px; width: recent-list.viewport-width; height: 44px;
-                        background: device.selected ? #edf5fe : row-touch.has-hover ? #f4f5f6 : white;
-                        ImGuiCheckBox { x: 8px; y: 11px; checked: device.selected; }
-                        Text { x: 36px; y: 3px; width: parent.width - 126px; height: 20px; text: device.name; font-size: 12px; overflow: elide; vertical-alignment: center; }
-                        Text { x: 36px; y: 23px; width: parent.width - 126px; height: 16px; text: device.id; font-size: 11px; color: #808080; }
-                        Rectangle { x: parent.width - 74px; y: 19px; width: 6px; height: 6px; border-radius: 3px; background: device.online ? #21b567 : #92969e; }
+                        background: device.added ? #f1f2f4 : device.selected ? #edf5fe : row-touch.has-hover ? #f4f5f6 : white;
+                        ImGuiCheckBox { x: 8px; y: 11px; enabled: !device.added; checked: device.added || device.selected; }
+                        Text { x: 36px; y: 3px; width: parent.width - 126px; height: 20px; text: device.name; color: device.added ? #92969e : #24272d; font-size: 12px; overflow: elide; vertical-alignment: center; }
+                        Text { x: 36px; y: 23px; width: parent.width - 126px; height: 16px; text: device.id; font-size: 11px; color: device.added ? #92969e : #808080; }
+                        Rectangle { x: parent.width - 74px; y: 19px; width: 6px; height: 6px; border-radius: 3px; background: !device.added && device.online ? #21b567 : #92969e; }
                         Text {
                             x: parent.width - 61px; y: 12px; width: 57px; height: 20px;
-                            text: device.online ? GalleryStrings.tr("在线", "Online", "В сети") : GalleryStrings.tr("离线", "Offline", "Не в сети");
-                            color: device.online ? #17854c : #808080; font-size: 11px; vertical-alignment: center;
+                            text: device.added ? GalleryStrings.tr("已添加", "Added", "Добавлено") : device.online ? GalleryStrings.tr("在线", "Online", "В сети") : GalleryStrings.tr("离线", "Offline", "Не в сети");
+                            color: device.added ? #92969e : device.online ? #17854c : #808080; font-size: 11px; vertical-alignment: center;
                         }
-                        row-touch := TouchArea { clicked => { root.action("recent-select", device.id); } }
+                        row-touch := TouchArea { enabled: !device.added; clicked => { root.action("recent-select", device.id); } }
                     }
                 }
                 if root.recent-devices.length == 0: Text { text: GalleryStrings.tr("暂无最近连接", "No recent connections", "Нет недавних подключений"); color: #808080; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }

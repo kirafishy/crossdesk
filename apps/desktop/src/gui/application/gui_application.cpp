@@ -4628,7 +4628,9 @@ bool GuiApplication::ImportGalleryRecent(const std::string& input_group) {
   std::vector<std::string> ids;
   for (size_t i = 0; i < ui_->gallery_recent_model->row_count(); ++i) {
     const auto device = ui_->gallery_recent_model->row_data(i);
-    if (device && device->selected) ids.emplace_back(device->id);
+    if (device && device->selected && !device->added &&
+        !ui_->gallery.Contains(std::string(device->id)))
+      ids.emplace_back(device->id);
   }
   if (ids.empty()) return false;
   const auto group = Trim(input_group);
@@ -4773,6 +4775,7 @@ void GuiApplication::GalleryAction(const std::string& action,
             ? wall.groups[group_index - 1] : ""));
     std::vector<ui::GalleryRecentDevice> devices;
     std::set<std::string> seen;
+    int available = 0;
     for (const auto& [_, recent] : recent_connections_) {
       if (!gallery::Workspace::ValidId(recent.remote_id) ||
           !seen.insert(recent.remote_id).second)
@@ -4781,25 +4784,31 @@ void GuiApplication::GalleryAction(const std::string& action,
       device.id = UiText(recent.remote_id);
       device.name = UiText(settings_.RecentConnectionDisplayName(recent));
       device.online = device_presence_cache_.IsOnline(recent.remote_id);
+      device.added = wall.Contains(recent.remote_id);
+      device.selected = device.added;
+      if (!device.added) ++available;
       devices.push_back(std::move(device));
     }
     ui_->gallery_recent_model->set_vector(std::move(devices));
     ui_->wall->set_gallery_recent_devices(ui_->gallery_recent_model);
     ui_->wall->set_gallery_recent_selected(0);
+    ui_->wall->set_gallery_recent_available(available);
     return;
   }
   if (action == "recent-close") {
     ui_->gallery_recent_model->set_vector({});
     ui_->wall->set_gallery_recent_selected(0);
+    ui_->wall->set_gallery_recent_available(0);
     ui_->wall->set_gallery_notice("");
     return;
   }
   if (action == "recent-select" || action == "recent-all") {
     const bool select_all = ui_->wall->get_gallery_recent_selected() <
-                           int(ui_->gallery_recent_model->row_count());
+                           ui_->wall->get_gallery_recent_available();
     int count = 0;
     for (size_t i = 0; i < ui_->gallery_recent_model->row_count(); ++i) {
       auto device = *ui_->gallery_recent_model->row_data(i);
+      if (device.added) continue;
       if (action == "recent-all" || std::string(device.id) == value) {
         device.selected = action == "recent-all" ? select_all : !device.selected;
         ui_->gallery_recent_model->set_row_data(i, device);
@@ -5179,14 +5188,24 @@ void GuiApplication::SyncGallery() {
   }
   if (ui_->wall->get_gallery_importing()) {
     // Keep the picker selection and ordering stable when presence changes.
+    int available = 0, selected = 0;
     for (size_t i = 0; i < ui_->gallery_recent_model->row_count(); ++i) {
       auto device = *ui_->gallery_recent_model->row_data(i);
       const bool online = device_presence_cache_.IsOnline(std::string(device.id));
-      if (device.online != online) {
+      const bool added = ui_->gallery.Contains(std::string(device.id));
+      if (device.online != online || device.added != added) {
         device.online = online;
+        if (device.added != added) device.selected = added;
+        device.added = added;
         ui_->gallery_recent_model->set_row_data(i, device);
       }
+      if (!device.added) {
+        ++available;
+        if (device.selected) ++selected;
+      }
     }
+    ui_->wall->set_gallery_recent_available(available);
+    ui_->wall->set_gallery_recent_selected(selected);
   }
   const auto tr = [this](const char* zh, const char* en,
                          const char* ru) -> std::string {

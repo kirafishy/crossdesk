@@ -341,6 +341,7 @@ export component MainWindow inherits Window {
     in-out property <bool> gallery-importing: false;
     in property <[GalleryRecentDevice]> gallery-recent-devices;
     in property <int> gallery-recent-selected: 0;
+    in property <int> gallery-recent-available: 0;
     in property <string> gallery-import-group;
     callback open-gallery();
     callback toggle-gallery-fullscreen();
@@ -1337,7 +1338,8 @@ export component MainWindow inherits Window {
             selected-devices: root.gallery-selected-devices;
             focused: root.gallery-focused; batch <=> root.gallery-batch; adding <=> root.gallery-adding;
             importing <=> root.gallery-importing; recent-devices: root.gallery-recent-devices;
-            recent-selected: root.gallery-recent-selected; import-group: root.gallery-import-group;
+            recent-selected: root.gallery-recent-selected;
+            recent-available: root.gallery-recent-available; import-group: root.gallery-import-group;
             action(code, value) => { root.gallery-action(code, value); }
             swap-devices(source, target) => { root.gallery-swap(source, target) }
             add-device(id, password, group, remember) => { root.gallery-add-device(id, password, group, remember) }
