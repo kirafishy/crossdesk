@@ -1,3 +1,4 @@
+import { UiRadius } from "ui_radius.slint";
 import { GalleryStrings } from "device_strings.slint";
 import { SettingsGroup, SettingsRow, SettingsSelect } from "settings_controls.slint";
 
@@ -13,6 +14,7 @@ export component GallerySettings inherits Rectangle {
             label: GalleryStrings.tr("分辨率上限", "Resolution limit", "Разрешение");
             label-reserve: self.width - 112px;
             SettingsSelect {
+                border-radius: UiRadius.control;
                 x: 136px; y: 4px; width: parent.width - 150px;
                 current-index <=> root.resolution-index;
                 model: [GalleryStrings.tr("自动", "Auto", "Авто"),
@@ -24,6 +26,7 @@ export component GallerySettings inherits Rectangle {
             label: GalleryStrings.tr("帧率", "Frame rate", "Частота кадров");
             label-reserve: self.width - 112px;
             SettingsSelect {
+                border-radius: UiRadius.control;
                 x: 136px; y: 4px; width: parent.width - 150px;
                 current-index <=> root.frame-rate-index;
                 model: [GalleryStrings.tr("跟随设备设置", "Follow device settings", "Настройки устройства"), "15 FPS", "30 FPS", "60 FPS"];
@@ -33,22 +36,15 @@ export component GallerySettings inherits Rectangle {
             label: GalleryStrings.tr("视频总带宽", "Video budget", "Бюджет видео");
             label-reserve: self.width - 112px; divider: false;
             SettingsSelect {
+                border-radius: UiRadius.control;
                 x: 136px; y: 4px; width: parent.width - 150px;
                 current-index <=> root.bandwidth-index;
                 model: ["2 Mbps", "5 Mbps", "10 Mbps", "20 Mbps", "50 Mbps", "100 Mbps"];
             }
         }
     }
-    Text {
-        x: 2px; y: 144px; width: parent.width - 4px; height: 70px;
-        text: GalleryStrings.tr(
-            "可见设备共享视频预算，优先保障展开画面；不可见设备暂停视频。音频与文件传输不计入，旧版设备不支持限额。瞬时速率可能超过预算。",
-            "Visible devices share the video budget, with priority for expanded views. Hidden video pauses. Audio, files and older devices are excluded; brief bursts may exceed the budget.",
-            "Бюджет видео делится между видимыми устройствами с приоритетом крупного вида. Скрытое видео приостановлено. Звук, файлы и старые устройства не учитываются; возможны краткие превышения.");
-        color: #718096; font-size: 11px; wrap: word-wrap;
-    }
     if root.error != "": Text {
-        x: 2px; y: 224px; width: parent.width - 4px; height: 32px;
+        x: 2px; y: 144px; width: parent.width - 4px; height: 32px;
         text: root.error; color: #c53e3e; font-size: 11px; wrap: word-wrap;
     }
 }

@@ -1,3 +1,4 @@
+import { UiRadius } from "ui_radius.slint";
 import { ScrollView } from "std-widgets.slint";
 import { FontAwesomeIcons } from "common.slint";
 
@@ -6,6 +7,9 @@ export component GroupFilter inherits Rectangle {
     in property <[string]> model;
     in property <int> system-count: 2;
     in property <bool> enabled: true;
+    in property <color> normal-border-color: #c9cdd2;
+    in property <color> hover-border-color: root.normal-border-color;
+    in property <color> focus-border-color: #8db5df;
     in-out property <int> current-index: 0;
     callback selected(int);
     private property <bool> has-divider: root.system-count > 0 && root.model.length > root.system-count;
@@ -23,8 +27,9 @@ export component GroupFilter inherits Rectangle {
     width: 155px; height: 28px;
     background: !root.enabled ? #f3f4f5 : trigger-touch.has-hover ? #f8f9fb : white;
     border-width: 1px;
-    border-color: popup.is-open || trigger-focus.has-focus ? #8db5df : #c9cdd2;
-    border-radius: 4px;
+    border-color: popup.is-open || trigger-focus.has-focus ? root.focus-border-color
+        : trigger-touch.has-hover ? root.hover-border-color : root.normal-border-color;
+    border-radius: UiRadius.control;
     animate background, border-color { duration: 100ms; easing: ease-out; }
     forward-focus: trigger-focus;
     accessible-role: combobox;
@@ -117,7 +122,7 @@ export component GroupFilter inherits Rectangle {
                 width: parent.width; height: parent.height;
                 opacity: root.popup-progress;
                 background: white; border-width: 1px;
-                border-color: #c9cdd2; border-radius: 5px;
+                border-color: root.normal-border-color; border-radius: UiRadius.menu;
                 ScrollView {
                     x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
                     viewport-width: self.width;
@@ -131,7 +136,7 @@ export component GroupFilter inherits Rectangle {
                         }
                         for choice[index] in root.model: Rectangle {
                             y: index * 26px + (root.has-divider && index >= root.system-count ? 6px : 0px);
-                            width: parent.width; height: 26px; border-radius: 3px;
+                            width: parent.width; height: 26px; border-radius: UiRadius.control;
                             background: index == root.current-index ? #edf4fc : option-touch.has-hover ? #f1f3f5 : transparent;
                             animate background { duration: 100ms; easing: ease-out; }
                             accessible-role: list-item;

@@ -1,3 +1,4 @@
+import { UiRadius } from "ui_radius.slint";
 import { GalleryStrings } from "device_strings.slint";
 import { CompactButton } from "common.slint";
 import { ScrollView } from "std-widgets.slint";
@@ -137,7 +138,7 @@ component NetworkRow inherits Rectangle {
     }
     if !root.heading && name-hover.has-hover && device-name.preferred-width > identity.width: Rectangle {
         x: 12px; y: 32px; width: min(name-tip.preferred-width + 20px, root.width - 24px);
-        height: 26px; background: #293746; border-radius: 4px; z: 10;
+        height: 26px; background: #293746; border-radius: UiRadius.control; z: 10;
         name-tip := Text {
             x: 10px; width: parent.width - 20px; height: parent.height;
             text: root.device.name; font-size: 11px; color: white;
@@ -172,7 +173,7 @@ export component GalleryNetworkDialog inherits Rectangle {
         y: (parent.height - self.height) / 2;
         width: min(760px, parent.width - 32px);
         height: min(120px + root.list-height, parent.height - 32px);
-        background: white; border-radius: 8px;
+        background: white; border-radius: UiRadius.surface;
         border-width: 1px; border-color: #c6cdd5;
         TouchArea {}
         FocusScope {
@@ -188,6 +189,7 @@ export component GalleryNetworkDialog inherits Rectangle {
             font-size: 17px; font-weight: 600; color: #293746;
         }
         CompactButton {
+            border-radius: UiRadius.control;
             x: parent.width - 80px; y: 17px; width: 60px; height: 26px;
             text: GalleryStrings.tr("关闭", "Close", "Закрыть"); clicked => { root.close(); }
         }
@@ -199,7 +201,7 @@ export component GalleryNetworkDialog inherits Rectangle {
         }
         NetworkRow {
             x: 12px; y: 78px; width: parent.width - 38px; height: 30px;
-            heading: true; background: #f3f5f8; border-radius: 4px;
+            heading: true; background: #f3f5f8; border-radius: UiRadius.control;
             device: {
                 name: GalleryStrings.tr("设备 / ID", "Device / ID", "Устройство / ID"),
             };

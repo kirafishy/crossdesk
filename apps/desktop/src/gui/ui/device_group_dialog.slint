@@ -1,4 +1,6 @@
-import { ScrollView, LineEdit } from "std-widgets.slint";
+import { UiRadius } from "ui_radius.slint";
+import { ScrollView } from "std-widgets.slint";
+import { RoundedLineEdit } from "rounded_line_edit.slint";
 import { CompactButton, ImGuiCheckBox } from "common.slint";
 import { GalleryStrings } from "device_strings.slint";
 
@@ -23,7 +25,7 @@ export component DeviceGroupDialog inherits Rectangle {
         y: (parent.height - self.height) / 2;
         width: min(360px, parent.width - 40px);
         height: 208px + group-list.height + (root.error == "" ? 0px : 32px);
-        background: white; border-radius: 8px;
+        background: white; border-radius: UiRadius.surface;
         border-width: 1px; border-color: #b2b2b2;
         TouchArea {}
         Text {
@@ -42,7 +44,8 @@ export component DeviceGroupDialog inherits Rectangle {
         group-list := Rectangle {
             x: 18px; y: 95px; width: parent.width - 36px;
             height: min(5, max(1, root.options.length)) * 32px + 2px;
-            background: #fbfcfd; border-width: 1px; border-color: #e1e5eb; border-radius: 5px;
+            background: #fbfcfd; border-width: 1px; border-color: #e1e5eb; border-radius: UiRadius.surface;
+            clip: true;
             ScrollView {
                 x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
                 viewport-width: self.width;
@@ -64,8 +67,21 @@ export component DeviceGroupDialog inherits Rectangle {
                     }
                 }
             }
+            // Keep row hover backgrounds inside the rounded list on every renderer.
+            Rectangle {
+                x: -UiRadius.surface; y: -UiRadius.surface;
+                width: parent.width + 2 * UiRadius.surface;
+                height: parent.height + 2 * UiRadius.surface;
+                border-width: UiRadius.surface; border-radius: 2 * UiRadius.surface;
+                border-color: white;
+            }
+            Rectangle {
+                width: parent.width; height: parent.height;
+                border-width: 1px; border-radius: UiRadius.surface;
+                border-color: #e1e5eb;
+            }
         }
-        LineEdit {
+        RoundedLineEdit {
             x: 18px; y: group-list.y + group-list.height + 12px;
             width: parent.width - 36px; height: 30px;
             text <=> root.new-group;

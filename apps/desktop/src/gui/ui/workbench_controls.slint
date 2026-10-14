@@ -1,0 +1,124 @@
+import { UiRadius } from "ui_radius.slint";
+// Colors and spacing for the connection workbench; shapes are shared app-wide.
+export global WorkbenchStyle {
+    out property <color> canvas: #f2f5f9;
+    out property <color> surface: #ffffff;
+    out property <color> border: #c6cfdd;
+    out property <color> control-border: #b2bfd1;
+    out property <color> hover-border: #7f97b8;
+    out property <color> field-surface: #f5f7fb;
+    out property <color> hover-surface: #eef3fb;
+    out property <color> pressed-surface: #e4ebf6;
+    out property <color> separator: #e1e7ef;
+    out property <color> text: #1c2940;
+    out property <color> muted: #69788e;
+    out property <color> accent: #3564e3;
+    out property <color> success: #18835a;
+}
+
+export component WorkbenchButton inherits Rectangle {
+    in property <string> text;
+    in property <string> icon;
+    in property <string> tooltip;
+    in property <bool> primary: false;
+    in property <bool> quiet: false;
+    in property <bool> enabled: true;
+    private property <bool> keyboard-focus: false;
+    private property <bool> show-focus: button-focus.has-focus && root.keyboard-focus;
+    callback clicked;
+    width: 112px;
+    height: 36px;
+    border-radius: UiRadius.control;
+    border-width: root.show-focus ? 2px : 1px;
+    border-color: root.show-focus ? (root.primary ? #193da0 : WorkbenchStyle.accent)
+        : root.primary ? WorkbenchStyle.accent
+        : touch.has-hover ? WorkbenchStyle.hover-border
+        : root.quiet ? transparent : WorkbenchStyle.control-border;
+    background: root.primary
+        ? (touch.pressed ? #254cc0 : touch.has-hover ? #4574f0 : WorkbenchStyle.accent)
+        : (touch.pressed ? WorkbenchStyle.pressed-surface : touch.has-hover ? WorkbenchStyle.hover-surface : root.quiet ? transparent : white);
+    opacity: root.enabled ? 1 : 0.45;
+    animate background, border-color { duration: 120ms; }
+    forward-focus: button-focus;
+    accessible-role: button;
+    accessible-label: root.tooltip != "" ? root.tooltip : root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+        alignment: center;
+        if root.icon != "": Text {
+            text: root.icon;
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            font-size: 14px;
+            color: root.primary ? white : WorkbenchStyle.muted;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        if root.text != "": Text {
+            text: root.text;
+            font-size: 13px;
+            font-weight: root.primary ? 600 : 500;
+            color: root.primary ? white : WorkbenchStyle.text;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+    button-focus := FocusScope {
+        enabled: root.enabled;
+        focus-gained(reason) => {
+            if reason == FocusReason.tab-navigation {
+                root.keyboard-focus = true;
+            } else if reason == FocusReason.pointer-click {
+                root.keyboard-focus = false;
+            }
+        }
+        key-pressed(event) => {
+            root.keyboard-focus = true;
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+        touch := TouchArea {
+            enabled: root.enabled;
+            mouse-cursor: pointer;
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    root.keyboard-focus = false;
+                }
+            }
+            // Keep focus for subsequent keyboard activation without leaving a
+            // keyboard focus ring behind after a pointer click.
+            clicked => { root.keyboard-focus = false; button-focus.focus(); root.clicked(); }
+        }
+    }
+    if touch.has-hover && root.tooltip != "": Rectangle {
+        x: min(0px, root.width - self.width);
+        y: root.height + 6px;
+        width: tip.preferred-width + 16px;
+        height: 28px;
+        background: #24324a;
+        border-radius: UiRadius.control;
+        z: 20;
+        tip := Text {
+            text: root.tooltip;
+            font-size: 11px;
+            color: white;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component WorkbenchCard inherits Rectangle {
+    background: WorkbenchStyle.surface;
+    border-width: 1px;
+    border-color: WorkbenchStyle.border;
+    border-radius: UiRadius.surface;
+}

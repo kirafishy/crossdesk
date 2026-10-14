@@ -1,4 +1,6 @@
+import { UiRadius } from "ui_radius.slint";
 import { CompactComboBox, ToggleSwitch } from "common.slint";
+import { WorkbenchStyle } from "workbench_controls.slint";
 
 // Shared visual treatment for the global settings pages.
 export component SettingsButton inherits Rectangle {
@@ -8,12 +10,13 @@ export component SettingsButton inherits Rectangle {
     in property <bool> align-left: false;
     in property <bool> enabled: true;
     callback clicked();
-    width: 88px; height: 32px; border-radius: 7px;
+    width: 88px; height: 32px; border-radius: UiRadius.control;
     background: !root.enabled ? #f0f3f7
         : root.primary ? (touch.pressed ? #1e4fa3 : touch.has-hover ? #2866c9 : #3275dc)
         : touch.pressed ? #e9eef5 : touch.has-hover ? #f0f4fa : root.quiet ? transparent : white;
     border-width: root.quiet || root.primary ? 0px : 1px;
-    border-color: #dce3ec;
+    border-color: !root.enabled ? WorkbenchStyle.border
+        : touch.has-hover ? WorkbenchStyle.hover-border : WorkbenchStyle.control-border;
     accessible-role: button; accessible-label: root.text;
     accessible-action-default => { if root.enabled { root.clicked(); } }
     Text {
@@ -28,6 +31,8 @@ export component SettingsButton inherits Rectangle {
 export component SettingsSelect inherits CompactComboBox {
     subtle: true;
     show-arrow: false;
+    normal-border-color: WorkbenchStyle.control-border;
+    hover-border-color: WorkbenchStyle.hover-border;
     height: 28px;
 }
 
@@ -41,7 +46,7 @@ export component SettingsGroup inherits Rectangle {
     }
     Rectangle {
         y: 24px; width: parent.width; height: parent.height - self.y;
-        background: white; border-radius: 9px; border-color: #e5eaf1; border-width: 1px;
+        background: white; border-radius: UiRadius.surface; border-color: WorkbenchStyle.border; border-width: 1px;
         VerticalLayout { padding: 0px; spacing: 0px; @children }
     }
 }
@@ -58,7 +63,7 @@ export component SettingsRow inherits Rectangle {
         font-size: 12px; overflow: elide; vertical-alignment: center;
     }
     if root.divider: Rectangle {
-        x: 12px; y: parent.height - 1px; width: parent.width - 24px; height: 1px; background: #eff2f6;
+        x: 12px; y: parent.height - 1px; width: parent.width - 24px; height: 1px; background: #d9e1ec;
     }
     @children
 }

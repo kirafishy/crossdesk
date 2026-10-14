@@ -24,14 +24,16 @@ struct WindowState {
 
   void Observe(bool wall, slint::PhysicalPosition position,
                slint::PhysicalSize size, float scale, bool fullscreen,
-               bool maximized, float compact_height = 486) {
+               bool maximized, float compact_height = 486,
+               float compact_width = 640) {
     if (Restoring())
       return;
     if (!wall) {
       connection_position = position;
       return;
     }
-    if (!fullscreen && !maximized && IsUndersized(size, scale, compact_height))
+    if (!fullscreen && !maximized &&
+        IsUndersized(size, scale, compact_height, compact_width))
       return;
     scale = std::max(scale, 1.0f);
     wall_fullscreen = fullscreen;
@@ -46,12 +48,13 @@ struct WindowState {
   bool RecoverUndersized(bool wall, slint::PhysicalPosition position,
                          slint::PhysicalSize size, float scale, bool visible,
                          bool minimized, bool fullscreen, bool maximized,
-                         float compact_height = 486) {
+                         float compact_height = 486,
+                         float compact_width = 640) {
     // Hidden/minimized/uninitialized windows can report temporary tiny bounds.
     // Leave those alone, and let an in-flight restoration retain its target.
     if (Restoring() || !visible || minimized || fullscreen || maximized ||
         size.width == 0 || size.height == 0 ||
-        !IsUndersized(size, scale, compact_height))
+        !IsUndersized(size, scale, compact_height, compact_width))
       return false;
     if (wall) {
       wall_position = position;
@@ -66,9 +69,11 @@ struct WindowState {
   }
 
   slint::PhysicalSize RestoreSize(bool wall, float scale,
-                                  float compact_height = 486) const {
+                                  float compact_height = 486,
+                                  float compact_width = 640) const {
     const float width =
-        wall && wall_size ? std::max(640.0f, wall_size->width) : 640;
+        wall && wall_size ? std::max(compact_width, wall_size->width)
+                          : compact_width;
     const float height = wall && wall_size
                              ? std::max(compact_height, wall_size->height)
                              : compact_height;
@@ -157,9 +162,9 @@ private:
   std::optional<slint::PhysicalSize> target_, last_size_;
   int matches_ = 0;
   static bool IsUndersized(slint::PhysicalSize size, float scale,
-                           float compact_height) {
+                           float compact_height, float compact_width) {
     scale = std::max(scale, 1.0f);
-    return double(size.width) + 1 < 640 * scale ||
+    return double(size.width) + 1 < compact_width * scale ||
            double(size.height) + 1 < compact_height * scale;
   }
   static bool SameSize(slint::PhysicalSize a, slint::PhysicalSize b) {

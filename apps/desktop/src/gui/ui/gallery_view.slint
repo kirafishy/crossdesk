@@ -1,12 +1,18 @@
+import { UiRadius } from "ui_radius.slint";
 import { GalleryStrings } from "device_strings.slint";
 import { RemoteCursor } from "remote_cursor.slint";
 import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
 import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { GroupFilter } from "group_filter.slint";
-import { ScrollView, LineEdit } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
+import { RoundedLineEdit } from "rounded_line_edit.slint";
 import { CompactButton, SecondaryButton, IconButton, FontAwesomeIcons, ImGuiCheckBox } from "common.slint";
 
-component GalleryToolbarButton inherits CompactButton {
+component GalleryButton inherits CompactButton {
+    border-radius: UiRadius.control;
+}
+
+component GalleryToolbarButton inherits GalleryButton {
     in property <string> alternate-text;
     in property <length> horizontal-padding: 12px;
     // Reserve both labels so toggling a mode never shifts adjacent controls.
@@ -487,7 +493,7 @@ export component GalleryView inherits Rectangle {
             }
             if root.batch && !root.simplified: Rectangle {
                 x: parent.width - 27px; y: parent.height - 27px;
-                width: 18px; height: 18px; border-radius: 5px; border-width: 1px;
+                width: 18px; height: 18px; border-radius: 4px; border-width: 1px;
                 background: tile.selected ? (tile-touch.pressed ? #5c9fdf : tile-touch.has-hover ? #659fe0 : #6dabea) : tile-touch.has-hover ? #f3f8fe : white;
                 border-color: tile.selected ? #6dabea : tile-touch.has-hover ? #76aeea : #b7bec8;
                 animate background, border-color { duration: 120ms; }
@@ -560,14 +566,14 @@ export component GalleryView inherits Rectangle {
         height: footer.y - 12px - self.y;
         HorizontalLayout {
             x: 0px; y: 0px; width: parent.width - root.view-controls-space; height: 24px; spacing: 8px;
-            CompactButton { width: 52px; text: GalleryStrings.tr("返回", "Back", "Назад"); clicked => { root.action("focus", ""); } }
+            GalleryButton { width: 52px; text: GalleryStrings.tr("返回", "Back", "Назад"); clicked => { root.action("focus", ""); } }
             Rectangle {
                 horizontal-stretch: 1; min-width: 0px;
                 Text { x: 0px; width: parent.width; height: parent.height; text: root.focused.name; color: root.focused.online ? #303943 : DeviceCardStyle.offline-text; font-size: 12px; font-weight: 600; overflow: elide; horizontal-alignment: left; vertical-alignment: center; }
             }
             Rectangle {
                 width: min(focus-state.preferred-width + 16px, 110px); height: 22px;
-                border-radius: 5px;
+                border-radius: UiRadius.control;
                 background: root.controlling ? #e7f1fd : #f0f2f5;
                 focus-state := Text {
                     x: 8px; width: parent.width - 16px; height: parent.height;
@@ -589,12 +595,12 @@ export component GalleryView inherits Rectangle {
                 accessible-action-default => { self.clicked(); }
                 clicked => { root.action(root.group-controlling ? "group-release" : "group-control", root.focused.id); }
             }
-            CompactButton { width: 100px; primary: true; enabled: !root.focused.connected || root.controlling || (root.focused.has-frame && !root.focused.stale); text: root.focused.connected ? (root.controlling ? GalleryStrings.tr("释放操控", "Release", "Отпустить") : GalleryStrings.tr("接管操控", "Control", "Управлять")) : GalleryStrings.tr("连接", "Connect", "Подключить"); clicked => { root.action(root.focused.connected ? (root.controlling ? "release" : "control") : "connect", root.focused.id); } }
+            GalleryButton { width: 100px; primary: true; enabled: !root.focused.connected || root.controlling || (root.focused.has-frame && !root.focused.stale); text: root.focused.connected ? (root.controlling ? GalleryStrings.tr("释放操控", "Release", "Отпустить") : GalleryStrings.tr("接管操控", "Control", "Управлять")) : GalleryStrings.tr("连接", "Connect", "Подключить"); clicked => { root.action(root.focused.connected ? (root.controlling ? "release" : "control") : "connect", root.focused.id); } }
         }
         Rectangle {
             x: 0px; y: rail.visible ? focus-divider.y + focus-divider.height : 36px;
             width: parent.width; height: parent.height - self.y;
-            background: root.focused.online ? #eff1f4 : DeviceCardStyle.offline-background; border-radius: 6px;
+            background: root.focused.online ? #eff1f4 : DeviceCardStyle.offline-background; border-radius: UiRadius.surface;
             border-width: root.controlling ? 2px : 1px; border-color: root.controlling ? #76aeea : root.focused.online ? #d5dbe3 : DeviceCardStyle.offline-border;
             video := Rectangle {
                 x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
@@ -666,7 +672,7 @@ export component GalleryView inherits Rectangle {
                         private property <string> presence: tile.online ? GalleryStrings.tr("在线", "Online", "В сети")
                             : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
                         private property <string> details: tile.name + "\n" + tile.host-name + "\nID: " + tile.id + "\n" + tile.group-names + "\n" + self.presence;
-                        width: root.rail-preview-width + 10px; height: root.rail-card-height; border-radius: 5px;
+                        width: root.rail-preview-width + 10px; height: root.rail-card-height; border-radius: UiRadius.surface;
                         background: tile.online ? #f5f6f8 : DeviceCardStyle.offline-background; border-width: 1px; border-color: tile.online ? #d5dbe3 : DeviceCardStyle.offline-border;
                         accessible-role: button;
                         accessible-label: self.details;
@@ -696,7 +702,8 @@ export component GalleryView inherits Rectangle {
                                 if self.has-hover { self.show-details(); }
                                 else if root.device-tooltip-id == tile.id { root.device-tooltip-id = ""; }
                             }
-                            moved => { if self.has-hover { self.show-details(); } }
+                            changed mouse-x => { if self.has-hover { self.show-details(); } }
+                            changed mouse-y => { if self.has-hover { self.show-details(); } }
                             clicked => { root.device-tooltip-id = ""; root.action("focus", tile.id); }
                         }
                     }
@@ -786,7 +793,7 @@ export component GalleryView inherits Rectangle {
             network-button := SecondaryButton {
                 x: connection-count.x + connection-count.width + 12px;
                 min-width: 64px; width: 64px; height: parent.height;
-                border-color: #c8cbd0; border-radius: 3px;
+                border-color: #c8cbd0; border-radius: UiRadius.control;
                 text: GalleryStrings.tr("网络状态", "Network", "Сеть");
                 accessible-role: button;
                 accessible-label: self.text;
@@ -796,9 +803,9 @@ export component GalleryView inherits Rectangle {
         }
         pager := HorizontalLayout {
             x: parent.width - self.width; y: 0px; width: 112px; height: 24px; spacing: 6px;
-            previous-page := CompactButton { primary: root.drag-page-direction < 0; width: 24px; text: "‹"; text-size: 16px; enabled: root.page > 0; clicked => { root.action("page", "previous"); } }
+            previous-page := GalleryButton { primary: root.drag-page-direction < 0; width: 24px; text: "‹"; text-size: 16px; enabled: root.page > 0; clicked => { root.action("page", "previous"); } }
             Text { text: (root.page + 1) + " / " + root.pages; min-width: 0px; overflow: elide; horizontal-alignment: center; vertical-alignment: center; }
-            next-page := CompactButton { primary: root.drag-page-direction > 0; width: 24px; text: "›"; text-size: 16px; enabled: root.page + 1 < root.pages; clicked => { root.action("page", "next"); } }
+            next-page := GalleryButton { primary: root.drag-page-direction > 0; width: 24px; text: "›"; text-size: 16px; enabled: root.page + 1 < root.pages; clicked => { root.action("page", "next"); } }
         }
     }
     // Paint the fullscreen tooltip above the grid/rail, below modal overlays.
@@ -815,6 +822,7 @@ export component GalleryView inherits Rectangle {
         }
         IconButton {
             width: 24px; height: 24px;
+            border-radius: UiRadius.control;
             icon: root.fullscreen ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
             tooltip: root.fullscreen ? GalleryStrings.tr("退出全屏", "Exit fullscreen", "Выйти из полноэкранного режима") : GalleryStrings.tr("全屏", "Fullscreen", "На весь экран");
             clicked => { root.toggle-fullscreen(); }
@@ -836,7 +844,7 @@ export component GalleryView inherits Rectangle {
         x: clamp(grid.x + root.drag-x + 14px, 8px, parent.width - self.width - 8px);
         y: clamp(grid.y + root.drag-y + 14px, 8px, footer.y - self.height - 12px);
         width: 224px; height: 54px; z: 10;
-        background: #fffffff2; border-width: 1px; border-color: #76aeea; border-radius: 4px;
+        background: #fffffff2; border-width: 1px; border-color: #76aeea; border-radius: UiRadius.surface;
         Rectangle {
             x: 8px; y: 9px; width: 64px; height: 36px;
             background: root.dragged-tile.online ? #24272d : DeviceCardStyle.offline-preview;
@@ -857,7 +865,7 @@ export component GalleryView inherits Rectangle {
     if root.swap-save-failed: Rectangle {
         x: (parent.width - self.width) / 2; y: footer.y - self.height - 14px;
         width: min(420px, parent.width - 32px); height: 36px; z: 10;
-        background: #fff2f0; border-width: 1px; border-color: #e9b7b0; border-radius: 4px;
+        background: #fff2f0; border-width: 1px; border-color: #e9b7b0; border-radius: UiRadius.surface;
         Text { x: 12px; y: 0px; width: parent.width - 24px; height: parent.height; font-size: 12px; color: #9d4339; vertical-alignment: center;
             text: GalleryStrings.tr("换位未保存，请重试", "Couldn't save positions. Please try again.", "Не удалось сохранить порядок. Повторите попытку."); overflow: elide;
         }
@@ -867,7 +875,7 @@ export component GalleryView inherits Rectangle {
         x: clamp(root.device-tooltip-x, 8px, parent.width - self.width - 8px);
         y: clamp(root.device-tooltip-y + self.height > footer.y ? root.device-tooltip-y - self.height - 8px : root.device-tooltip-y, 4px, parent.height - self.height - 4px);
         width: min(320px, parent.width - 16px); height: device-tooltip-label.preferred-height + 16px;
-        background: #22252bf2; border-width: 1px; border-color: #ffffff38; border-radius: 5px;
+        background: #22252bf2; border-width: 1px; border-color: #ffffff38; border-radius: UiRadius.control;
         device-tooltip-label := Text {
             x: 8px; y: 8px; width: parent.width - 16px;
             text: root.device-tooltip-text; color: white; font-size: 11px; wrap: word-wrap;
@@ -878,7 +886,7 @@ export component GalleryView inherits Rectangle {
         TouchArea {}
         add-dialog := Rectangle {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 400px; height: 306px;
-            background: white; border-radius: 8px; border-width: 1px; border-color: #b2b2b2;
+            background: white; border-radius: UiRadius.surface; border-width: 1px; border-color: #b2b2b2;
             function submit() {
                 if root.add-device(device-id.text, password.text, group.text, remember.checked) {
                     password.text = "";
@@ -887,21 +895,21 @@ export component GalleryView inherits Rectangle {
             }
             Text { x: 18px; y: 16px; height: 24px; text: GalleryStrings.tr("添加设备", "Add device", "Добавить устройство"); font-size: 16px; }
             Text { x: 18px; y: 56px; width: 72px; height: 30px; text: GalleryStrings.tr("设备 ID", "Device ID", "ID"); vertical-alignment: center; font-size: 12px; }
-            device-id := LineEdit {
+            device-id := RoundedLineEdit {
                 x: 96px; y: 56px; width: 286px; height: 30px;
                 placeholder-text: GalleryStrings.tr("9 位设备 ID", "9-digit device ID", "ID из 9 цифр");
                 input-type: InputType.number;
                 accepted => { password.focus(); }
             }
             Text { x: 18px; y: 100px; width: 72px; height: 30px; text: GalleryStrings.tr("密码", "Password", "Пароль"); vertical-alignment: center; font-size: 12px; }
-            password := LineEdit {
+            password := RoundedLineEdit {
                 x: 96px; y: 100px; width: 286px; height: 30px;
                 placeholder-text: GalleryStrings.tr("设备连接密码", "Device password", "Пароль устройства");
                 input-type: InputType.password;
                 accepted => { group.focus(); }
             }
             Text { x: 18px; y: 144px; width: 72px; height: 30px; text: GalleryStrings.tr("分组", "Group", "Группа"); vertical-alignment: center; font-size: 12px; }
-            group := LineEdit {
+            group := RoundedLineEdit {
                 x: 96px; y: 144px; width: 286px; height: 30px;
                 placeholder-text: GalleryStrings.tr("分组名称（可选）", "Group name (optional)", "Группа (необязательно)");
                 accepted => { add-dialog.submit(); }
@@ -911,8 +919,8 @@ export component GalleryView inherits Rectangle {
                 TouchArea { clicked => { remember.checked = !remember.checked; } }
             }
             Text { x: 18px; y: 216px; width: 364px; height: 28px; text: root.notice; color: #8e4740; font-size: 11px; wrap: word-wrap; overflow: elide; }
-            CompactButton { x: 172px; y: 260px; width: 72px; height: 28px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { password.text = ""; root.adding = false; } }
-            CompactButton {
+            GalleryButton { x: 172px; y: 260px; width: 72px; height: 28px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { password.text = ""; root.adding = false; } }
+            GalleryButton {
                 x: 254px; y: 260px; width: 128px; height: 28px; primary: true;
                 text: GalleryStrings.tr("添加并连接", "Add and connect", "Подключить");
                 enabled: device-id.text != "" && password.text != "";
@@ -925,7 +933,7 @@ export component GalleryView inherits Rectangle {
         TouchArea {}
         Rectangle {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 440px; height: 378px;
-            background: white; border-radius: 8px; border-width: 1px; border-color: #b2b2b2;
+            background: white; border-radius: UiRadius.surface; border-width: 1px; border-color: #b2b2b2;
             Text { x: 18px; y: 16px; height: 24px; text: GalleryStrings.tr("从最近连接添加", "Add from recent connections", "Добавить из недавних"); font-size: 16px; }
             Text { x: 18px; y: 44px; width: 404px; height: 18px; text: GalleryStrings.tr("加入桌面墙后，可通过批量选择连接", "Add devices, then use Select to connect them.", "После добавления подключайтесь через выбор."); color: #62666d; font-size: 11px; }
             ImGuiCheckBox { x: 18px; y: 74px; enabled: root.recent-available > 0; checked: root.recent-devices.length > 0 && root.recent-selected == root.recent-available; }
@@ -934,7 +942,7 @@ export component GalleryView inherits Rectangle {
             Text { x: 224px; y: 74px; width: 198px; height: 21px; text: GalleryStrings.tr("待添加 ", "To add ", "К добавлению ") + root.recent-selected + " / " + root.recent-available; horizontal-alignment: right; vertical-alignment: center; font-size: 12px; color: #62666d; }
             Rectangle {
                 x: 18px; y: 102px; width: 404px; height: 160px;
-                border-width: 1px; border-color: #d8dadd; border-radius: 4px; clip: true;
+                border-width: 1px; border-color: #d8dadd; border-radius: UiRadius.surface; clip: true;
                 recent-list := ScrollView {
                     x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
                     viewport-width: self.width - 12px;
@@ -955,12 +963,24 @@ export component GalleryView inherits Rectangle {
                     }
                 }
                 if root.recent-devices.length == 0: Text { text: GalleryStrings.tr("暂无最近连接", "No recent connections", "Нет недавних подключений"); color: #808080; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+                Rectangle {
+                    x: -UiRadius.surface; y: -UiRadius.surface;
+                    width: parent.width + 2 * UiRadius.surface;
+                    height: parent.height + 2 * UiRadius.surface;
+                    border-width: UiRadius.surface; border-radius: 2 * UiRadius.surface;
+                    border-color: white;
+                }
+                Rectangle {
+                    width: parent.width; height: parent.height;
+                    border-width: 1px; border-radius: UiRadius.surface;
+                    border-color: #d8dadd;
+                }
             }
             Text { x: 18px; y: 274px; width: 60px; height: 30px; text: GalleryStrings.tr("分组", "Group", "Группа"); font-size: 12px; vertical-alignment: center; }
-            import-group := LineEdit { x: 84px; y: 274px; width: 338px; height: 30px; text: root.import-group; placeholder-text: GalleryStrings.tr("分组名称（可选）", "Group name (optional)", "Группа (необязательно)"); }
+            import-group := RoundedLineEdit { x: 84px; y: 274px; width: 338px; height: 30px; text: root.import-group; placeholder-text: GalleryStrings.tr("分组名称（可选）", "Group name (optional)", "Группа (необязательно)"); }
             Text { x: 18px; y: 309px; width: 404px; height: 20px; text: root.notice; font-size: 11px; color: #8e4740; overflow: elide; }
-            CompactButton { x: 192px; y: 336px; width: 72px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { root.importing = false; } }
-            CompactButton { x: 274px; y: 336px; width: 148px; primary: true; text: GalleryStrings.tr("加入桌面墙", "Add selected", "Добавить"); enabled: root.recent-selected > 0; clicked => { if root.import-recent(import-group.text) { root.importing = false; } } }
+            GalleryButton { x: 192px; y: 336px; width: 72px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { root.importing = false; } }
+            GalleryButton { x: 274px; y: 336px; width: 148px; primary: true; text: GalleryStrings.tr("加入桌面墙", "Add selected", "Добавить"); enabled: root.recent-selected > 0; clicked => { if root.import-recent(import-group.text) { root.importing = false; } } }
         }
     }
     if root.confirming: Rectangle {
@@ -968,7 +988,7 @@ export component GalleryView inherits Rectangle {
         Rectangle {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             width: 360px; height: confirmation-list.height + 118px;
-            background: white; border-radius: 8px; border-width: 1px; border-color: #b2b2b2;
+            background: white; border-radius: UiRadius.surface; border-width: 1px; border-color: #b2b2b2;
             Text {
                 x: 20px; y: 18px; width: parent.width - 132px; height: 24px;
                 text: root.action-code == "disconnect" ? GalleryStrings.tr("断开连接", "Disconnect devices", "Отключение") : root.action-name;
@@ -976,13 +996,13 @@ export component GalleryView inherits Rectangle {
             }
             Rectangle {
                 x: parent.width - 108px; y: 20px; width: 88px; height: 22px;
-                background: #eff3f8; border-radius: 11px;
+                background: #eff3f8; border-radius: UiRadius.surface;
                 Text { text: root.selected-count + GalleryStrings.tr(" 台设备", " devices", " устр."); color: #626e7d; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
             }
             confirmation-list := Rectangle {
                 x: 20px; y: 58px; width: parent.width - 40px;
                 height: clamp(root.selected-devices.length * 52px + 2px, 54px, 210px);
-                background: #fcfdfe; border-width: 1px; border-color: #e2e6eb; border-radius: 6px; clip: true;
+                background: #fcfdfe; border-width: 1px; border-color: #e2e6eb; border-radius: UiRadius.surface; clip: true;
                 confirmation-scroll := ScrollView {
                     x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
                     viewport-width: self.width - 12px;
@@ -1002,8 +1022,8 @@ export component GalleryView inherits Rectangle {
                     }
                 }
             }
-            CompactButton { x: parent.width - 208px; y: parent.height - 46px; width: 72px; height: 28px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { root.confirming = false; } }
-            CompactButton {
+            GalleryButton { x: parent.width - 208px; y: parent.height - 46px; width: 72px; height: 28px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { root.confirming = false; } }
+            GalleryButton {
                 x: parent.width - 126px; y: parent.height - 46px; width: 108px; height: 28px; primary: true;
                 text: root.action-code == "disconnect" ? GalleryStrings.tr("确认断开", "Disconnect", "Отключить") : GalleryStrings.tr("确认执行", "Continue", "Продолжить");
                 clicked => { root.confirming = false; root.action(root.action-code, ""); }

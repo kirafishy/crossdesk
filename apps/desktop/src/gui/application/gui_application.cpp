@@ -4973,6 +4973,7 @@ void GuiApplication::RestoreWindowGeometry(bool before_show,
   auto& window = component->window();
   const auto current_size = window.size();
   const bool wall_mode = gallery_window;
+  const float compact_width = component->get_minimum_window_width();
   const float compact_height = component->get_minimum_window_height();
   if (!before_show && ui_->loaded_window_scale[gallery_window] > 0) {
     const float ratio = window.scale_factor() / ui_->loaded_window_scale[gallery_window];
@@ -4986,7 +4987,8 @@ void GuiApplication::RestoreWindowGeometry(bool before_show,
     }
     ui_->loaded_window_scale[gallery_window] = 0;
   }
-  auto target_size = placement.RestoreSize(wall_mode, window.scale_factor(), compact_height);
+  auto target_size = placement.RestoreSize(wall_mode, window.scale_factor(),
+                                         compact_height, compact_width);
   const auto& position = gallery_window
                              ? placement.wall_position
                              : placement.connection_position;
@@ -5024,7 +5026,8 @@ void GuiApplication::RestoreWindowGeometry(bool before_show,
     // placement. Only recover coordinates when its display is unavailable.
     if (!found && available.w > 0 && available.h > 0) {
       const auto margin = uint32_t(32 * window.scale_factor());
-      const auto minimum = placement.RestoreSize(false, window.scale_factor(), compact_height);
+      const auto minimum = placement.RestoreSize(false, window.scale_factor(),
+                                               compact_height, compact_width);
       safe_size.width = std::max(minimum.width,
           std::min(safe_size.width, uint32_t(available.w)));
       safe_size.height = std::max(minimum.height, std::min(
@@ -5080,6 +5083,7 @@ void GuiApplication::SyncWindowGeometry(bool gallery_window) {
   auto& placement = gallery_window ? ui_->gallery_window : ui_->connection_window;
   const bool wall_mode = gallery_window;
   const bool transitioning = gallery_window && ui_->gallery_transition.Active();
+  const float compact_width = component->get_minimum_window_width();
   const float compact_height = component->get_minimum_window_height();
 #if defined(__APPLE__)
   const bool fullscreen = gallery_window && IsGalleryWindowFullscreen();
@@ -5091,16 +5095,17 @@ void GuiApplication::SyncWindowGeometry(bool gallery_window) {
   if (!transitioning && placement.RecoverUndersized(wall_mode, window.position(), current_size,
                                  window.scale_factor(), window.is_visible(),
                                  window.is_minimized(), fullscreen, maximized,
-                                 compact_height)) {
+                                 compact_height, compact_width)) {
     ui_->restore_ticks[gallery_window] = 0;
     const auto target = placement.RestoreSize(wall_mode, window.scale_factor(),
-                                               compact_height);
+                                               compact_height, compact_width);
     LOG_WARN("DeskHub undersized window: wall={} client={}x{} scale={}; restoring={}x{}",
              wall_mode, current_size.width, current_size.height,
              window.scale_factor(), target.width, target.height);
   }
   if (placement.Restoring() && ++ui_->restore_ticks[gallery_window] == 120) {
-    const auto target = placement.RestoreSize(wall_mode, window.scale_factor(), compact_height);
+    const auto target = placement.RestoreSize(wall_mode, window.scale_factor(),
+                                            compact_height, compact_width);
     LOG_WARN("DeskHub window restore delayed: wall={} client={}x{} target={}x{} scale={} fullscreen={} maximized={}",
              wall_mode, current_size.width, current_size.height, target.width,
              target.height, window.scale_factor(), fullscreen, maximized);
@@ -5114,7 +5119,7 @@ void GuiApplication::SyncWindowGeometry(bool gallery_window) {
                current_size.height, window.scale_factor(), fullscreen, maximized);
   } else if (window.is_visible() && !window.is_minimized() && !transitioning) {
     placement.Observe(wall_mode, window.position(), current_size, window.scale_factor(),
-                      fullscreen, maximized, compact_height);
+                      fullscreen, maximized, compact_height, compact_width);
   }
 }
 

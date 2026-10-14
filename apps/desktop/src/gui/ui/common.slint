@@ -1,3 +1,4 @@
+import { UiRadius } from "ui_radius.slint";
 // The legacy client uses ImGui::StyleColorsLight(). Keep the structural line
 // colors in one place so the Slint renderer produces the same visual weight.
 export global ImGuiLineStyle {
@@ -8,7 +9,7 @@ export global ImGuiLineStyle {
 }
 
 export global FloatingBarStyle {
-    out property <length> corner-radius: 6px;
+    out property <length> corner-radius: UiRadius.menu;
 }
 
 // ImGui loads a 32px font atlas and applies per-window font scales. These
@@ -76,7 +77,7 @@ export component IconButton inherits Rectangle {
     background: touch.pressed ? (danger ? #d92d20 : root.pressed-background)
                               : touch.has-hover ? (danger ? #f04438 : root.hover-background)
                                                 : root.normal-background;
-    border-radius: 4px;
+    border-radius: UiRadius.control;
     opacity: root.enabled ? 1 : 0.4;
 
     Text {
@@ -109,7 +110,7 @@ export component IconButton inherits Rectangle {
         width: tip.preferred-width + 12px;
         height: 24px;
         background: #22252be8;
-        border-radius: 4px;
+        border-radius: UiRadius.control;
         z: 20;
         tip := Text {
             text: root.tooltip;
@@ -136,7 +137,7 @@ export component ImageButton inherits Rectangle {
     background: touch.pressed ? (danger ? #d92d20 : #d9dde5)
                               : touch.has-hover ? (danger ? #f04438 : #edf0f5)
                                                 : transparent;
-    border-radius: 4px;
+    border-radius: UiRadius.control;
 
     Image {
         x: (parent.width - self.width) / 2;
@@ -157,7 +158,7 @@ export component ImageButton inherits Rectangle {
         width: tip.preferred-width + 12px;
         height: 24px;
         background: #22252be8;
-        border-radius: 4px;
+        border-radius: UiRadius.control;
         z: 20;
         tip := Text {
             text: root.tooltip;
@@ -175,6 +176,8 @@ export component CompactComboBox inherits Rectangle {
     in property <bool> enabled: true;
     in property <bool> subtle: false;
     in property <bool> show-arrow: true;
+    in property <color> normal-border-color: root.subtle ? #dfe6ef : #bfc2c7;
+    in property <color> hover-border-color: root.normal-border-color;
     property <bool> popup-animation-enabled: false;
     property <float> popup-progress: 0.0;
     callback selected(int);
@@ -189,8 +192,8 @@ export component CompactComboBox inherits Rectangle {
     height: 24px;
     background: root.enabled ? (root.subtle ? #f8fafc : white) : root.subtle ? #f1f3f6 : #f1f1f1;
     border-width: 1px;
-    border-color: root.subtle ? #dfe6ef : #bfc2c7;
-    border-radius: root.subtle ? 6px : 3px;
+    border-color: root.enabled && combo-touch.has-hover ? root.hover-border-color : root.normal-border-color;
+    border-radius: UiRadius.control;
 
     Text {
         x: root.subtle ? 10px : 5px;
@@ -207,6 +210,8 @@ export component CompactComboBox inherits Rectangle {
         height: parent.height - 2px;
         y: 1px;
         background: root.subtle ? transparent : root.enabled ? #9bc9f8 : #d7d9dc;
+        border-top-right-radius: UiRadius.control - 1px;
+        border-bottom-right-radius: UiRadius.control - 1px;
         Text {
             text: FontAwesomeIcons.angle-down;
             color: root.subtle ? #79879a : #202124;
@@ -223,7 +228,7 @@ export component CompactComboBox inherits Rectangle {
             }
         }
     }
-    TouchArea {
+    combo-touch := TouchArea {
         enabled: root.enabled; mouse-cursor: pointer;
         clicked => {
             root.popup-animation-enabled = false;
@@ -263,8 +268,8 @@ export component CompactComboBox inherits Rectangle {
             opacity: root.popup-progress;
             background: white;
             border-width: 1px;
-            border-color: root.subtle ? #dfe6ef : #bfc2c7;
-            border-radius: root.subtle ? 6px : 3px;
+            border-color: root.normal-border-color;
+            border-radius: UiRadius.menu;
             clip: true;
             for choice[index] in root.model: Rectangle {
                 y: index * 23px;
@@ -288,8 +293,8 @@ export component CompactComboBox inherits Rectangle {
                 height: parent.height;
                 background: transparent;
                 border-width: 1px;
-                border-color: root.subtle ? #dfe6ef : #bfc2c7;
-                border-radius: root.subtle ? 6px : 3px;
+                border-color: root.normal-border-color;
+                border-radius: UiRadius.menu;
                 z: 2;
             }
         }
@@ -361,7 +366,7 @@ export component CompactButton inherits Rectangle {
               : root.primary ? #a8d0fa : root.quiet ? transparent : #e2e4e7;
     border-width: 1px;
     border-color: root.primary ? #9bc3ed : root.quiet ? transparent : #c8cbd0;
-    border-radius: 3px;
+    border-radius: UiRadius.control;
     Text {
         text: root.text;
         color: root.enabled ? #24272d : #8e9298;
@@ -385,7 +390,7 @@ export component PrimaryButton inherits Rectangle {
               : touch.pressed ? #1849a9
               : touch.has-hover ? #2970d6
               : #2463c7;
-    border-radius: 5px;
+    border-radius: UiRadius.control;
 
     Text {
         text: root.text;
@@ -414,7 +419,7 @@ export component SecondaryButton inherits Rectangle {
               : touch.has-hover ? #f3f4f6 : white;
     border-width: 1px;
     border-color: #c9ced7;
-    border-radius: 5px;
+    border-radius: UiRadius.control;
     clip: true;
 
     Text {
@@ -471,5 +476,5 @@ export component DialogSurface inherits Rectangle {
     background: white;
     border-width: 1px;
     border-color: ImGuiLineStyle.border;
-    border-radius: 8px;
+    border-radius: UiRadius.surface;
 }

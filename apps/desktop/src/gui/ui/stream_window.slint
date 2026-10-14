@@ -1,3 +1,4 @@
+import { UiRadius } from "ui_radius.slint";
 import { ComboBox, ScrollView } from "std-widgets.slint";
 import { RemoteCursor } from "remote_cursor.slint";
 import { FontAwesomeIcons, IconButton, PrimaryButton, DialogSurface, ImGuiLineStyle, ImGuiFontStyle, FloatingBarStyle } from "common.slint";
@@ -98,7 +99,7 @@ component ControlBarButton inherits Rectangle {
     background: root.muted ? #eef0f3 : touch.pressed && root.action-enabled ? #0f87fa
                               : touch.has-hover ? #4296fa
                                                 : root.selected ? #4296fa : #4296fa66;
-    border-radius: 3px;
+    border-radius: UiRadius.control;
 
     Text {
         text: root.icon;
@@ -159,7 +160,7 @@ component VideoSettingRow inherits VerticalLayout {
             height: 27px;
             background: !root.enabled ? #f1f1f1 : root.selected == index ? #d7eaff
                 : option-touch.has-hover ? #eaf3ff : #f5f6f8;
-            border-radius: 4px;
+            border-radius: UiRadius.control;
             border-width: 1px;
             border-color: root.enabled && root.selected == index ? #4296fa : #dce0e6;
             Text { text: option; color: root.enabled ? #30343b : #8b8f95;
@@ -967,7 +968,7 @@ export component StreamWindow inherits Window {
                         width: parent.width;
                         height: root.stats-header-height;
                         background: #f3f5f8;
-                        border-radius: 4px;
+                        border-radius: UiRadius.control;
                         Text {
                             x: stats-table.label-column-width + 4px;
                             width: stats-table.value-column-width - 8px;
@@ -1004,7 +1005,7 @@ export component StreamWindow inherits Window {
                         width: parent.width;
                         height: stats-table.row-height;
                         background: index == root.stats-rows.length - 1 ? #edf3fc : transparent;
-                        border-radius: 4px;
+                        border-radius: UiRadius.control;
                         Text {
                             x: 4px;
                             width: stats-table.label-column-width - 8px;
@@ -1133,7 +1134,7 @@ export component StreamWindow inherits Window {
                 x: root.video-menu-x; y: root.video-menu-y;
                 width: root.video-menu-width; height: root.video-menu-height;
                 background: white; border-width: 1px; border-color: ImGuiLineStyle.border;
-                border-radius: 5px; z: 11;
+                border-radius: UiRadius.menu; z: 11;
                 TouchArea {
                     pointer-event(event) => { if event.kind == PointerEventKind.down { root.suppress-next-remote-pointer-release = true; } }
                     scroll-event(event) => { accept }
@@ -1183,7 +1184,7 @@ export component StreamWindow inherits Window {
                 background: white;
                 border-width: 1px;
                 border-color: ImGuiLineStyle.border;
-                border-radius: 5px;
+                border-radius: UiRadius.menu;
                 clip: true;
                 z: 11;
 
@@ -1195,7 +1196,7 @@ export component StreamWindow inherits Window {
                                   : index == display-menu.hovered-index ? #d8e6f8
                                   : index == root.selected-display ? #e8eef9
                                                                    : transparent;
-                        border-radius: 3px;
+                        border-radius: UiRadius.control;
                         Text {
                             x: 8px;
                             width: parent.width - 34px;
@@ -1246,7 +1247,7 @@ export component StreamWindow inherits Window {
 
             if root.shortcut-menu-open: Rectangle {
                 x: control.x + shortcut-button.x; y: control.y + 40px; width: 180px; height: 68px;
-                background: white; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: 5px; z: 11;
+                background: white; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.menu; z: 11;
                 VerticalLayout {
                     padding: 4px; spacing: 1px;
                     for shortcut in ["Ctrl+Alt+Del", "Win+L"]: Rectangle {
@@ -1280,7 +1281,7 @@ export component StreamWindow inherits Window {
                 // Anchor to the button row so expanded stats stay beneath the tooltip.
                 y: control.y + root.control-toolbar-height + self.height + 8px <= video.height
                     ? control.y + root.control-toolbar-height + 4px : max(4px, control.y - self.height - 4px);
-                background: #30343bf5; border-radius: 5px; z: 12;
+                background: #30343bf5; border-radius: UiRadius.control; z: 12;
                 control-tip := Text {
                     x: 8px; y: 6px; width: parent.width - 16px;
                     text: root.hovered-control.text;
@@ -1304,7 +1305,7 @@ export component StreamWindow inherits Window {
                 width: min(520px, parent.width - 48px);
                 height: max(208px, remote-update-message.y + remote-update-message.height + 92px);
                 border-color: #e5e9f0;
-                border-radius: 14px;
+                border-radius: UiRadius.surface;
                 drop-shadow-color: #07142b30;
                 drop-shadow-blur: 32px;
                 drop-shadow-offset-y: 12px;
@@ -1320,7 +1321,7 @@ export component StreamWindow inherits Window {
                 }
                 Rectangle {
                     x: 32px; y: 32px; width: 48px; height: 48px;
-                    background: #edf4ff; border-radius: 12px;
+                    background: #edf4ff; border-radius: UiRadius.surface;
                     Path {
                         x: 12px; y: 12px; width: 24px; height: 24px;
                         viewbox-width: 24; viewbox-height: 24;
@@ -1355,7 +1356,7 @@ export component StreamWindow inherits Window {
                 PrimaryButton {
                     x: parent.width - 136px; y: parent.height - 68px;
                     width: 104px; height: 36px;
-                    border-radius: 7px;
+                    border-radius: UiRadius.control;
                     text: StreamStrings.remote-update-dismiss;
                     text-size: 14px;
                     clicked => { root.dismiss-remote-update(); }
@@ -1365,7 +1366,7 @@ export component StreamWindow inherits Window {
             // Transfer progress overlay at bottom-left.
             if root.file-transfer-visible: Rectangle {
                 x: 18px; y: parent.height - min(210px, parent.height * 0.35); width: min(430px, parent.width * 0.6); height: min(190px, parent.height * 0.32);
-                background: #fffffff0; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: 6px; z: 7;
+                background: #fffffff0; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.surface; z: 7;
                 Text { x: 12px; y: 8px; text: StreamStrings.file-transfer; color: #2d3138; font-weight: 600; }
                 IconButton { x: parent.width - 32px; y: 1px; icon: FontAwesomeIcons.xmark; icon-size: 13px; clicked => { root.close-file-transfer(); } }
                 ScrollView {

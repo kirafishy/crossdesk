@@ -1,3 +1,5 @@
+import { UiRadius } from "ui_radius.slint";
+import { WorkbenchStyle, WorkbenchButton, WorkbenchCard } from "workbench_controls.slint";
 import { GalleryStrings } from "device_strings.slint";
 import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
 import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint";
@@ -6,7 +8,8 @@ import { GalleryNetworkDialog, GalleryNetworkDevice } from "gallery_network_dial
 import { SettingsButton, SettingsSelect, SettingsGroup, SettingsRow, SettingsToggleRow } from "settings_controls.slint";
 import { GallerySettings } from "gallery_settings.slint";
 import { GroupFilter } from "group_filter.slint";
-import { LineEdit, ScrollView } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
+import { RoundedLineEdit } from "rounded_line_edit.slint";
 import { AnnouncementItem, MessagePanel, MessageStrings } from "message_panel.slint";
 import { FontAwesomeIcons, IconButton, CompactComboBox, ImGuiCheckBox, MiniToggleSwitch, CompactButton, PrimaryButton, SecondaryButton, ToggleSwitch, SectionTitle, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
 
@@ -117,21 +120,6 @@ export global UiStrings {
     in-out property <string> release-date-label: "Release Date: ";
 }
 
-// Fluent LineEdit draws a blue 2px focus underline. The ImGui-style field
-// already has its own border, so cover that underline and restore its bottom
-// edge without changing the editor's focus, selection, or clear-button logic.
-component LineEditFocusUnderlineMask inherits Rectangle {
-    height: 3px;
-    background: white;
-    z: 2;
-
-    Rectangle {
-        y: parent.height - 1px;
-        height: 1px;
-        background: ImGuiLineStyle.border;
-    }
-}
-
 // Prompt copy in modal dialogs sits slightly low in the legacy ImGui layout.
 // Offset only the rendered text so input fields and action buttons keep their
 // established geometry.
@@ -161,62 +149,11 @@ component DialogPromptText inherits Rectangle {
     }
 }
 
-// Keep the green center and fade the surrounding glow into the status bar.
-component OnlineStatusIndicator inherits Rectangle {
-    in property <length> dot-diameter: 8px;
-
-    width: root.dot-diameter * 2.2;
-    height: self.width;
-    border-radius: self.width / 2;
-    // Slint's default radial radius is half the bounding-box diagonal.
-    // Fade out at the circle's edge (1 / sqrt(2)), before rounded clipping.
-    background: @radial-gradient(
-        circle,
-        #00ff0040 0%,
-        #00ff0038 32%,
-        #00ff0018 50%,
-        #00ff0007 62%,
-        #00ff0000 70.7%
-    );
-
-    Rectangle {
-        x: (parent.width - root.dot-diameter) / 2;
-        y: (parent.height - root.dot-diameter) / 2;
-        width: root.dot-diameter;
-        height: root.dot-diameter;
-        border-radius: root.dot-diameter / 2;
-        background: #00ff00;
-    }
-}
-
-// ImGui::Button under StyleColorsLight(), used by both actions in the legacy
-// connection-password dialog. The old dialog does not distinguish primary and
-// secondary actions visually.
-component ConnectionDialogButton inherits Rectangle {
-    in property <string> text;
-    callback clicked;
-
-    width: max(40px, button-label.preferred-width + 8px);
-    height: 24px;
-    background: button-touch.pressed ? #0f87fa
-              : button-touch.has-hover ? #4296fa
-              : #4296fa66;
-    border-radius: 3px;
-
-    button-label := Text {
-        text: root.text;
-        color: #000000de;
-        font-size: ImGuiFontStyle.base;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-    button-touch := TouchArea { clicked => { root.clicked(); } }
-}
-
 // Use the same compact, plain-text field for connection and password changes.
 component PasswordInput inherits Rectangle {
     in-out property <string> text;
     in property <int> max-length: 0;
+    in property <length> text-size: ImGuiFontStyle.base;
     private property <string> previous-text;
     callback accepted;
 
@@ -225,7 +162,7 @@ component PasswordInput inherits Rectangle {
     background: white;
     border-width: 1px;
     border-color: ImGuiLineStyle.border;
-    border-radius: 3px;
+    border-radius: UiRadius.control;
     forward-focus: editor;
 
     init => { root.previous-text = root.text; }
@@ -236,7 +173,7 @@ component PasswordInput inherits Rectangle {
         input-type: InputType.text;
         single-line: true;
         color: #202124;
-        font-size: ImGuiFontStyle.base;
+        font-size: root.text-size;
         vertical-alignment: center;
         selection-foreground-color: white;
         selection-background-color: #2463c7;
@@ -267,10 +204,10 @@ component PasswordInput inherits Rectangle {
 export component MainWindow inherits Window {
     title: root.gallery-mode ? "CrossDesk " + GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub") : "CrossDesk";
     icon: @image-url("../../../resources/linux/crossdesk_256x256.png");
-    preferred-width: 640px;
+    preferred-width: root.minimum-window-width;
     preferred-height: root.minimum-window-height;
-    min-width: 640px;
-    max-width: root.gallery-mode ? 16384px : 640px;
+    min-width: root.minimum-window-width;
+    max-width: root.gallery-mode ? 16384px : root.minimum-window-width;
     min-height: root.minimum-window-height;
     max-height: root.gallery-mode ? 16384px : root.minimum-window-height;
     no-frame: root.custom-titlebar;
@@ -375,8 +312,9 @@ export component MainWindow inherits Window {
     in property <bool> window-active: true;
     private property <length> titlebar-height:
         root.custom-titlebar && !root.gallery-fullscreen ? (root.wayland-titlebar ? 32px : 31px) : 0px;
+    out property <length> minimum-window-width: 640px;
     out property <length> minimum-window-height:
-        448px + root.titlebar-height;
+        (root.gallery-mode ? 448px : 472px) + root.titlebar-height;
     private property <length> wayland-corner-radius: 12px;
     in property <string> local-id: "";
     in property <string> local-password: "";
@@ -762,7 +700,7 @@ export component MainWindow inherits Window {
     Rectangle {
         width: parent.width;
         height: parent.height;
-        background: white;
+        background: root.gallery-mode ? white : WorkbenchStyle.canvas;
         border-width: 0px;
         border-radius: 0px;
 
@@ -800,23 +738,22 @@ export component MainWindow inherits Window {
             z: 7;
         }
 
-        // The connection page shares its section heading row with the menu.
-        menu-button := IconButton {
+        // A compact application toolbar keeps global actions outside device cards.
+        // Center the 28px buttons above the cards with 6px of space on each side.
+        open-gallery-button := WorkbenchButton {
             visible: !root.gallery-mode;
-            x: parent.width - 29px - self.width;
-            y: 10.5px;
-            width: 28px;
-            height: self.width;
+            x: 20px; y: 6px;
+            width: 80px; height: 28px;
+            text: GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub");
+            z: 8;
+            clicked => { root.open-gallery(); }
+        }
+        menu-button := WorkbenchButton {
+            visible: !root.gallery-mode;
+            x: parent.width - 56px; y: open-gallery-button.y;
+            width: 36px; height: 28px;
             icon: FontAwesomeIcons.bars;
-            icon-size: 14px;
-            border-width: 1px;
-            border-color: #c9cdd2;
-            border-radius: 4px;
-            hover-background: #e1e5eb;
-            pressed-background: #cbd1d9;
-            tooltip: root.announcement-unread > 0
-                ? MessageStrings.unread + " " + root.announcement-unread + (root.update-available ? " · " + UiStrings.update-available : "")
-                : root.update-available ? UiStrings.update-available : "";
+            tooltip: GalleryStrings.tr("更多", "More", "Ещё");
             z: 8;
             clicked => { root.gallery-action("release", ""); root.menu-open = !root.menu-open; }
         }
@@ -829,7 +766,7 @@ export component MainWindow inherits Window {
             border-radius: 8px;
             border-width: 1px;
             border-color: white;
-            background: #2563eb;
+            background: WorkbenchStyle.accent;
             opacity: root.menu-open || mod(animation-tick(), 2s) < 1s ? 1 : 0;
             z: 9;
             accessible-role: button;
@@ -891,275 +828,189 @@ export component MainWindow inherits Window {
         }
 
         Rectangle {
-            y: 0px; height: parent.height - self.y - 24px; visible: !root.gallery-mode;
-        // Local and remote desktop panels.
+            y: 0px; height: parent.height - 28px; visible: !root.gallery-mode;
+        // Two balanced cards keep identity and connection actions distinct.
         Rectangle {
-            y: 0px;
-            height: 234px;
-            background: white;
-
-            SectionTitle { x: 29px; y: 9px; width: 256px; height: 31px; text: UiStrings.local-desktop; }
-            Rectangle {
-                   x: 29px;
-                    y: 42px;
-                    width: 256px;
-                    height: 183px;
-                    background: #eff0f2;
-                    border-radius: 9px;
-                    border-width: 1px;
-                    border-color: ImGuiLineStyle.border;
-
-                    Text { x: 8px; y: 10px; width: 160px; height: 26px; text: UiStrings.local-id; color: #111111; font-size: ImGuiFontStyle.panel-label; }
-                    Rectangle {
-                                x: 8px;
-                                y: 42px;
-                                width: 160px;
-                                height: 38px;
-                                background: white;
-                                border-width: 1px;
-                                border-color: ImGuiLineStyle.border;
-                                border-radius: 4px;
-                                // Measure the ID using the preferred field size.
-                                // The visible text can then scale only on systems
-                                // whose font metrics would otherwise clip it.
-                                local-id-width-probe := Text {
-                                    visible: false;
-                                    text: root.local-id;
-                                    font-size: ImGuiFontStyle.field-value;
-                                    letter-spacing: 1px;
-                                }
-                                Text {
-                                    x: 8px;
-                                    // Compensate for the font's ascender-heavy
-                                    // metrics so digits sit at the optical center.
-                                    y: 4px;
-                                    width: parent.width - 16px;
-                                    height: parent.height - 4px;
-                                    text: root.local-id;
-                                    color: #20242a;
-                                    font-size: max(18px,
-                                        ImGuiFontStyle.field-value *
-                                        (self.width / max(self.width, local-id-width-probe.preferred-width)));
-                                    letter-spacing: 1px;
-                                    horizontal-alignment: left;
-                                    vertical-alignment: center;
-                                }
+            x: 20px; y: 40px; width: parent.width - 40px; height: 208px;
+            // Button tooltips extend below these cards into the recent section.
+            z: 1;
+            local-card := WorkbenchCard {
+                x: 0px; y: 0px;
+                width: (parent.width - 16px) / 2; height: parent.height;
+                Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.local-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
+                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: GalleryStrings.tr("将 ID 和密码分享给连接方", "Share your ID and password to get connected", "Передайте ID и пароль для подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                Text { x: 16px; y: 68px; height: 18px; text: UiStrings.local-id; font-size: 12px; color: WorkbenchStyle.muted; }
+                Rectangle {
+                    x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
+                    // Raise the whole field: a child's z cannot escape its
+                    // parent's stacking order above the following password row.
+                    z: 1;
+                    background: WorkbenchStyle.field-surface; border-radius: UiRadius.control;
+                    border-width: 1px; border-color: WorkbenchStyle.border;
+                    Text { x: 12px; width: parent.width - 64px; height: parent.height; text: root.local-id; font-size: 24px; font-weight: 600; letter-spacing: 1px; color: WorkbenchStyle.text; vertical-alignment: center; }
+                    Rectangle { x: parent.width - 48px; y: 10px; width: 1px; height: parent.height - 20px; background: WorkbenchStyle.border; }
+                    WorkbenchButton {
+                        x: parent.width - 42px; y: 2px; width: 36px; quiet: true;
+                        icon: root.copy-toast ? FontAwesomeIcons.check : FontAwesomeIcons.copy;
+                        tooltip: root.copy-toast ? UiStrings.copied : GalleryStrings.tr("复制本机 ID", "Copy local ID", "Копировать ID");
+                        clicked => { if root.copy-local-id() { root.copy-toast = true; copy-timer.restart(); } }
                     }
-                    IconButton {
-                                x: 174px;
-                                y: 46px;
-                                width: 29px;
-                                height: 30px;
-                                icon: root.copy-toast ? FontAwesomeIcons.check : FontAwesomeIcons.copy;
-                                icon-size: 16px;
-                                tooltip: UiStrings.copied;
-                                clicked => {
-                                    if root.copy-local-id() {
-                                        root.copy-toast = true;
-                                        copy-timer.restart();
-                                    }
-                                }
+                }
+                Text { x: 16px; y: 138px; height: 18px; text: UiStrings.password; font-size: 12px; color: WorkbenchStyle.muted; }
+                Rectangle {
+                    x: 16px; y: 158px; width: parent.width - 32px; height: 36px;
+                    background: WorkbenchStyle.field-surface; border-radius: UiRadius.control;
+                    border-width: 1px; border-color: WorkbenchStyle.border;
+                    Text { x: 12px; width: parent.width - 132px; height: parent.height; text: root.password-visible ? root.local-password : "••••••"; font-size: 20px; font-weight: 500; letter-spacing: 2px; color: WorkbenchStyle.text; vertical-alignment: center; }
+                    Rectangle { x: parent.width - 118px; y: 8px; width: 1px; height: parent.height - 16px; background: WorkbenchStyle.border; }
+                    WorkbenchButton {
+                        x: parent.width - 112px; y: 0px; width: 36px; quiet: true;
+                        icon: root.password-visible ? FontAwesomeIcons.eye : FontAwesomeIcons.eye-slash;
+                        tooltip: root.password-visible ? GalleryStrings.tr("隐藏密码", "Hide password", "Скрыть пароль") : GalleryStrings.tr("显示密码", "Show password", "Показать пароль");
+                        clicked => { root.toggle-password-visibility(); }
                     }
-                    Rectangle { x: 8px; y: 88px; width: 240px; height: 1px; background: ImGuiLineStyle.separator; }
-                    Text { x: 8px; y: 101px; width: 160px; height: 26px; text: UiStrings.password; color: #111111; font-size: ImGuiFontStyle.panel-label; }
-                    Rectangle {
-                                x: 8px;
-                                y: 129px;
-                                width: 160px;
-                                height: 39px;
-                                background: white;
-                                border-width: 1px;
-                                border-color: ImGuiLineStyle.border;
-                                border-radius: 4px;
-                                Text {
-                                    x: 8px;
-                                    y: 4px;
-                                    width: parent.width - 16px;
-                                    height: parent.height - 4px;
-                                    text: root.password-visible ? root.local-password : "••••••";
-                                    color: #20242a;
-                                    font-size: ImGuiFontStyle.field-value;
-                                    letter-spacing: 2px;
-                                    horizontal-alignment: left;
-                                    vertical-alignment: center;
-                                }
+                    WorkbenchButton {
+                        x: parent.width - 74px; y: 0px; width: 36px; quiet: true;
+                        icon: FontAwesomeIcons.rotate; tooltip: UiStrings.refresh-password;
+                        enabled: !root.password-change-pending;
+                        clicked => { root.refresh-password(); }
                     }
-                    IconButton {
-                                x: 174px;
-                                y: 133px;
-                                width: 24px;
-                                height: 30px;
-                                icon: root.password-visible ? FontAwesomeIcons.eye : FontAwesomeIcons.eye-slash;
-                                icon-size: 17px;
-                                clicked => { root.toggle-password-visibility(); }
+                    WorkbenchButton {
+                        x: parent.width - 36px; y: 0px; width: 36px; quiet: true;
+                        icon: FontAwesomeIcons.pen;
+                        tooltip: GalleryStrings.tr("修改密码", "Change password", "Изменить пароль");
+                        enabled: !root.password-change-pending;
+                        clicked => { root.reset-password-open = true; }
                     }
-                    IconButton {
-                                x: 198px;
-                                y: 133px;
-                                width: 24px;
-                                height: 30px;
-                                icon: FontAwesomeIcons.rotate;
-                                icon-size: 15px;
-                                tooltip: UiStrings.refresh-password;
-                                enabled: !root.password-change-pending;
-                                clicked => { root.refresh-password(); }
-                    }
-                    IconButton {
-                                x: 222px;
-                                y: 133px;
-                                width: 24px;
-                                height: 30px;
-                                icon: FontAwesomeIcons.pen;
-                                icon-size: 15px;
-                                enabled: !root.password-change-pending;
-                                clicked => { root.reset-password-open = true; }
-                    }
+                }
             }
-
-            Rectangle { x: parent.width / 2; y: 18px; width: 1px; height: 206px; background: ImGuiLineStyle.border; }
-
-            SectionTitle { x: 356px; y: 9px; width: menu-button.x - self.x - 8px; height: 31px; text: UiStrings.remote-desktop; }
-            Rectangle {
-                    x: 356px;
-                    y: 42px;
-                    width: 256px;
-                    height: 183px;
-                    background: #eff0f2;
-                    border-radius: 9px;
-                    border-width: 1px;
-                    border-color: ImGuiLineStyle.border;
-
-                    Text { x: 8px; y: 10px; width: 160px; height: 26px; text: UiStrings.remote-id; color: #111111; font-size: ImGuiFontStyle.panel-label; }
-                    Rectangle {
-                                x: 8px;
-                                y: 42px;
-                                width: 160px;
-                                height: 38px;
-                                background: white;
-                                border-width: 1px;
-                                border-color: ImGuiLineStyle.border;
-                                border-radius: 4px;
-                                remote-id-editor := TextInput {
-                                    x: 10px;
-                                    y: 1.5px;
-                                    width: parent.width - 20px;
-                                    height: parent.height - 3px;
-                                    text <=> root.remote-id-input;
-                                    font-size: ImGuiFontStyle.field-value;
-                                    input-type: InputType.number;
-                                    color: #202124;
-                                    vertical-alignment: center;
-                                    selection-foreground-color: white;
-                                    selection-background-color: #2463c7;
-                                    // Run formatting after the input event has
-                                    // finished so the caret state isn't reset by
-                                    // a synchronous two-way binding rewrite.
-                                    edited => { root.connection-input-error = ""; remote-id-format-timer.restart(); }
-                                    accepted => { root.connect-requested(root.remote-id-input); }
-                                }
+            WorkbenchCard {
+                x: local-card.width + 16px; y: 0px; width: local-card.width; height: parent.height;
+                Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.remote-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
+                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: GalleryStrings.tr("输入设备 ID，连接远程桌面", "Enter a device ID to start a remote session", "Введите ID для удалённого подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                Text { x: 16px; y: 68px; height: 18px; text: UiStrings.remote-id; font-size: 12px; color: WorkbenchStyle.muted; }
+                Rectangle {
+                    x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
+                    background: white; border-radius: UiRadius.control; border-width: 1px;
+                    border-color: root.connection-input-error != "" ? #d65252 : remote-id-editor.has-focus ? WorkbenchStyle.accent : WorkbenchStyle.control-border;
+                    animate border-color { duration: 120ms; }
+                    if root.remote-id-input == "": Text {
+                        x: 12px; width: parent.width - 24px; height: parent.height;
+                        text: GalleryStrings.tr("请输入 9 位设备 ID", "Enter a 9-digit device ID", "Введите ID из 9 цифр");
+                        font-size: 13px; color: #8290a4; vertical-alignment: center;
                     }
-                    Text { x: 8px; y: 92px; width: 240px; height: 52px; text: root.connection-input-error; font-size: 12px; color: #a33832; wrap: word-wrap; }
-                    IconButton {
-                                x: 175px;
-                                y: 42px;
-                                width: 64px;
-                                height: 38px;
-                                normal-background: #a7cefc;
-                                hover-background: #b8d8fc;
-                                pressed-background: #76aeea;
-                                border-radius: 4px;
-                                icon: FontAwesomeIcons.arrow-right-long;
-                                icon-size: 25px;
-                                clicked => { root.connect-requested(root.remote-id-input); }
+                    remote-id-editor := TextInput {
+                        x: 12px; width: parent.width - 24px; height: parent.height;
+                        text <=> root.remote-id-input; font-size: 24px; font-weight: 600; letter-spacing: 1px;
+                        input-type: InputType.number; color: WorkbenchStyle.text;
+                        accessible-label: UiStrings.remote-id;
+                        vertical-alignment: center;
+                        selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
+                        edited => { root.connection-input-error = ""; remote-id-format-timer.restart(); }
+                        accepted => { if !root.connection-pending { root.connect-requested(root.remote-id-input); } }
                     }
+                }
+                Text {
+                    x: 16px; y: 133px; width: parent.width - 32px; height: 24px;
+                    text: root.connection-input-error;
+                    font-size: 11px; color: #be3d42; wrap: word-wrap;
+                }
+                WorkbenchButton {
+                    x: 16px; y: 158px; width: parent.width - 32px; height: 36px;
+                    primary: true; icon: FontAwesomeIcons.arrow-right-long;
+                    text: root.connection-pending ? GalleryStrings.tr("正在连接…", "Connecting…", "Подключение…") : UiStrings.connect;
+                    enabled: !root.connection-pending;
+                    clicked => { root.connect-requested(root.remote-id-input); }
+                }
             }
         }
 
         // Recent connections: horizontal cards with thumbnail and hover actions.
         recent-panel := Rectangle {
-            y: 234px;
+            y: 260px;
             height: parent.height - self.y;
-            background: white;
-            border-width: 0px;
-            border-color: ImGuiLineStyle.border;
 
-            Rectangle { y: 0px; height: 1px; background: ImGuiLineStyle.border; }
-
-            SectionTitle { x: 29px; y: 7px; width: open-gallery-button.x - self.x - 12px; height: 28px; text: UiStrings.recent-connections; }
-            open-gallery-button := SecondaryButton {
-                x: recent-group-filter.x - self.width - 8px;
-                y: recent-group-filter.y;
-                min-width: 60px;
-                width: root.compact-language ? 60px : 72px;
-                height: recent-group-filter.height;
-                text-size: ImGuiFontStyle.base;
-                border-color: #c9cdd2;
-                border-radius: 4px;
-                text: GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub");
-                accessible-role: button;
-                accessible-label: self.text;
-                accessible-action-default => { root.open-gallery(); }
-                clicked => { root.open-gallery(); }
-            }
+            Text { x: 20px; y: 0px; width: recent-group-filter.x - self.x - 12px; height: 32px; text: UiStrings.recent-connections; font-size: 15px; font-weight: 600; color: WorkbenchStyle.text; vertical-alignment: center; }
             recent-group-filter := GroupFilter {
-                x: parent.width - self.width - 29px; y: 8px;
-                width: 155px; height: 28px;
+                x: parent.width - self.width - 20px; y: 0px;
+                width: 155px; height: 32px;
+                normal-border-color: WorkbenchStyle.control-border;
+                hover-border-color: WorkbenchStyle.hover-border;
+                focus-border-color: WorkbenchStyle.accent;
                 model: root.recent-groups;
                 current-index <=> root.recent-group-index;
                 selected(index) => { root.recent-group-selected(index); }
             }
 
             recent-list := Rectangle {
-                x: 29px;
-                y: 42px;
-                width: parent.width - 58px;
-                height: 139px;
-                background: #eff0f2;
-                border-width: 1px;
-                border-color: ImGuiLineStyle.border;
-                border-radius: 10px;
+                x: 20px;
+                y: 36px;
+                width: parent.width - 40px;
+                height: 142px;
+                // A continuous inset surface groups the cards into one
+                // horizontal scrolling lane, including its scrollbar.
+                background: root.recent-connections.length > 0 ? #e6edf6 : transparent;
+                border-width: root.recent-connections.length > 0 ? 1px : 0px;
+                border-color: #c9d4e3;
+                border-radius: UiRadius.surface;
                 clip: true;
 
-                if root.recent-connections.length == 0: Text {
-                    text: root.recent-group-index == 0
-                        ? GalleryStrings.tr("暂无近期连接", "No recent connections", "Нет недавних подключений")
-                        : GalleryStrings.tr("该分组暂无近期连接", "No recent connections in this group", "В этой группе нет недавних подключений");
-                    color: #808080; font-size: ImGuiFontStyle.base;
-                    horizontal-alignment: center; vertical-alignment: center;
+                if root.recent-connections.length == 0: WorkbenchCard {
+                    x: 0px; y: 6px; width: parent.width; height: 124px;
+                    Rectangle {
+                        x: 20px; y: 38px; width: 48px; height: 48px;
+                        background: #f0f4fb; border-radius: UiRadius.surface;
+                        Text { text: FontAwesomeIcons.display; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 20px; color: #8297b9; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Text {
+                        x: 84px; y: 36px; width: parent.width - 104px; height: 24px;
+                        text: root.recent-group-index == 0
+                            ? GalleryStrings.tr("暂无近期连接", "No recent connections", "Нет недавних подключений")
+                            : GalleryStrings.tr("该分组暂无近期连接", "No recent connections in this group", "В этой группе нет недавних подключений");
+                        color: WorkbenchStyle.text; font-size: 14px; font-weight: 600;
+                    }
+                    Text {
+                        x: 84px; y: 68px; width: parent.width - 104px; height: 20px;
+                        text: root.recent-group-index == 0
+                            ? GalleryStrings.tr("连接过的设备会显示在这里，方便下次快速访问。", "Devices you connect to will appear here for quick access.", "Устройства появятся здесь после первого подключения.")
+                            : GalleryStrings.tr("切换设备分组，查看其他连接记录。", "Choose another group to see your other connections.", "Выберите другую группу для просмотра подключений.");
+                        color: WorkbenchStyle.muted; font-size: 12px;
+                    }
                 }
                 recent-scroll := ScrollView {
-                    width: parent.width;
-                    height: parent.height;
+                    visible: root.recent-connections.length > 0;
+                    x: 6px; y: 5px;
+                    width: parent.width - 12px;
+                    height: parent.height - 6px;
                     horizontal-stretch: 1;
+                    changed viewport-x => { root.recent-tooltip-visible = false; }
 
                 HorizontalLayout {
-                    padding-left: 8px;
-                    padding-top: 8px;
-                    padding-bottom: 14px;
-                    spacing: 24px;
+                    padding: 0px;
+                    padding-bottom: 10px;
+                    spacing: 12px;
                     alignment: start;
                     for connection[index] in root.recent-connections: connection-card := Rectangle {
-                        width: 178px;
-                        height: 117px;
+                        width: (recent-scroll.width - 24px) / 3;
+                        height: 126px;
                         background: transparent;
                         private property <bool> available: connection.online || connection.connected;
-                        private property <length> content-width: self.width - 30px;
+                        private property <length> content-width: self.width;
                         private property <length> toolbar-width: DeviceCardStyle.toolbar-width;
                         private property <length> toolbar-right-padding: 3px;
 
                         Rectangle {
-                            x: 7px;
-                            y: 7px;
                             width: connection-card.content-width;
-                            height: 109px;
-                            border-radius: 4px;
+                            height: 124px;
+                            border-radius: UiRadius.surface;
+                            background: white;
                             clip: true;
 
                             Rectangle {
                                 x: 0px;
                                 y: 0px;
                                 width: parent.width;
-                                height: 84px;
+                                height: 80px;
                                 background: !connection-card.available ? DeviceCardStyle.offline-preview :
                                     connection.platform == "windows" ? @linear-gradient(135deg, #1f61b3, #337ac4) :
                                     connection.platform == "macos" ? @linear-gradient(135deg, #6e4aad, #8c63c4) :
@@ -1192,26 +1043,28 @@ export component MainWindow inherits Window {
                             }
                             Rectangle {
                                 x: 0px;
-                                y: 84px;
+                                y: 80px;
                                 width: parent.width;
-                                height: 25px;
-                                background: connection-card.available ? #00000018 : DeviceCardStyle.offline-background;
+                                height: 44px;
+                                background: white;
+                                Rectangle { x: 0px; y: 0px; width: parent.width; height: 1px; background: WorkbenchStyle.border; }
                                 Text {
-                                    x: 4px;
-                                    y: 1px;
-                                    height: parent.height - self.y;
-                                    width: max(0px, parent.width - self.x - 4px
-                                               - (card-touch.has-hover
-                                                  ? connection-card.toolbar-width + connection-card.toolbar-right-padding
-                                                  : 0px));
+                                    x: 12px; y: 4px; height: 19px;
+                                    width: parent.width - 24px;
                                     text: connection.display-name;
-                                    color: connection-card.available ? #30343b : DeviceCardStyle.offline-text;
-                                    // The ImGui card footer uses its own 0.52 font
-                                    // scale and renders slightly larger than the
-                                    // compact body text used in dialogs.
-                                    font-size: ImGuiFontStyle.base;
+                                    color: WorkbenchStyle.text;
+                                    font-size: 13px; font-weight: 600;
+                                    overflow: elide; vertical-alignment: center;
+                                }
+                                Text {
+                                    x: 12px; y: 24px; height: 16px; width: parent.width - 92px;
+                                    text: connection.remote-id; font-size: 11px; color: WorkbenchStyle.muted;
                                     overflow: elide;
-                                    vertical-alignment: center;
+                                }
+                                presence-label := Text {
+                                    x: parent.width - self.preferred-width - 12px; y: 24px; height: 16px;
+                                    text: connection-card.available ? UiStrings.online : UiStrings.offline;
+                                    font-size: 10px; color: connection-card.available ? WorkbenchStyle.success : WorkbenchStyle.muted;
                                 }
                             }
                             // The software renderer only clips rectangular bounds.
@@ -1227,14 +1080,14 @@ export component MainWindow inherits Window {
                             }
                         }
                         card-touch := TouchArea {
-                            x: 7px;
-                            y: 7px;
                             width: connection-card.content-width;
-                            height: 109px;
+                            height: 124px;
+                            mouse-cursor: pointer;
                             clicked => { root.recent-connect(connection.remote-id); }
                             image-touch := TouchArea {
+                                x: 0px; y: 0px;
                                 width: parent.width;
-                                height: 84px;
+                                height: 80px;
                                 private property <string> group-names: connection.group-names;
                                 private property <bool> available: connection-card.available;
                                 changed available => {
@@ -1248,38 +1101,36 @@ export component MainWindow inherits Window {
                                     }
                                 }
                                 clicked => { root.recent-connect(connection.remote-id); }
+                                function show-details() {
+                                    if !self.has-hover { return; }
+                                    root.recent-tooltip-name = connection.display-name;
+                                    root.recent-tooltip-host = connection.host-name;
+                                    root.recent-tooltip-id = connection.remote-id;
+                                    root.recent-tooltip-groups = self.group-names;
+                                    root.recent-tooltip-online = self.available;
+                                    root.recent-tooltip-pointer-x = recent-panel.x + recent-list.x
+                                        + recent-scroll.x + recent-scroll.viewport-x
+                                        + connection-card.x + card-touch.x + self.x + self.mouse-x;
+                                    root.recent-tooltip-pointer-y = recent-panel.y + recent-list.y
+                                        + recent-scroll.y + recent-scroll.viewport-y
+                                        + connection-card.y + card-touch.y + self.y + self.mouse-y;
+                                    root.recent-tooltip-visible = true;
+                                }
                                 changed has-hover => {
                                     if self.has-hover {
-                                        root.recent-tooltip-name = connection.display-name;
-                                        root.recent-tooltip-host = connection.host-name;
-                                        root.recent-tooltip-id = connection.remote-id;
-                                        root.recent-tooltip-groups = self.group-names;
-                                        root.recent-tooltip-online = self.available;
-                                        root.recent-tooltip-pointer-x = recent-panel.x + recent-list.x
-                                            + recent-scroll.x + recent-scroll.viewport-x
-                                            + connection-card.x + card-touch.x + self.mouse-x;
-                                        root.recent-tooltip-pointer-y = recent-panel.y + recent-list.y
-                                            + recent-scroll.y + recent-scroll.viewport-y
-                                            + connection-card.y + card-touch.y + self.mouse-y;
-                                        root.recent-tooltip-visible = true;
+                                        self.show-details();
                                     } else if root.recent-tooltip-id == connection.remote-id {
                                         root.recent-tooltip-visible = false;
                                     }
                                 }
-                                moved => {
-                                    if self.has-hover {
-                                        root.recent-tooltip-pointer-x = recent-panel.x + recent-list.x
-                                            + recent-scroll.x + recent-scroll.viewport-x
-                                            + connection-card.x + card-touch.x + self.mouse-x;
-                                        root.recent-tooltip-pointer-y = recent-panel.y + recent-list.y
-                                            + recent-scroll.y + recent-scroll.viewport-y
-                                            + connection-card.y + card-touch.y + self.mouse-y;
-                                    }
-                                }
+                                // moved only reports pressed pointer movement;
+                                // track both coordinates during ordinary hover.
+                                changed mouse-x => { self.show-details(); }
+                                changed mouse-y => { self.show-details(); }
                             }
                             if card-touch.has-hover: DeviceCardActions {
                                 x: parent.width - self.width - connection-card.toolbar-right-padding;
-                                y: 85px;
+                                y: 52px;
                                 remove-label: GalleryStrings.tr("删除记录", "Delete record", "Удалить запись");
                                 connected: connection.connected;
                                 edit-alias => {
@@ -1297,12 +1148,11 @@ export component MainWindow inherits Window {
                                 disconnect-device => { root.recent-disconnect(connection.remote-id); }
                             }
                         }
-                        if index < root.recent-connections.length - 1: Rectangle {
-                            x: 183px;
-                            y: 7px;
-                            width: 1px;
-                            height: 109px;
-                            background: #0000007a;
+                        Rectangle {
+                            width: parent.width; height: 124px;
+                            border-width: 1px; border-radius: UiRadius.surface;
+                            border-color: card-touch.has-hover ? WorkbenchStyle.hover-border : WorkbenchStyle.border;
+                            animate border-color { duration: 120ms; }
                         }
                     }
                 }
@@ -1356,48 +1206,44 @@ export component MainWindow inherits Window {
         }
         // Server status and reconnect actions belong to the connection window.
         if !root.gallery-mode: Rectangle {
-            y: parent.height - 24px;
-            height: 24px;
-            background: #fafbfc;
+            y: parent.height - 28px;
+            height: 28px;
+            background: white;
             Rectangle {
                 y: 0px;
                 height: 1px;
-                background: ImGuiLineStyle.border;
+                background: WorkbenchStyle.border;
             }
-            if root.signal-connected && !root.signal-tls-error: OnlineStatusIndicator {
-                    x: 15px - self.width / 2;
-                    y: 12px - self.height / 2;
-                    dot-diameter: 8px;
-            }
-            if !root.signal-connected || root.signal-tls-error: Rectangle {
-                    x: 11px;
-                    y: 8px;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 4px;
-                    background: root.signal-tls-error || root.signal-reconnecting ? #f59e0b : #ef4444;
+            Rectangle {
+                x: 20px; y: 11px; width: 6px; height: 6px; border-radius: 3px;
+                background: root.signal-tls-error || root.signal-reconnecting ? #d6932b : root.signal-connected ? WorkbenchStyle.success : #d65252;
             }
             Text {
-                    x: 28px;
-                    y: 3px;
-                    height: 18px;
+                    x: 34px;
+                    y: 0px;
+                    height: parent.height;
                     text: root.signal-tls-error ? UiStrings.tls-error
                           : root.signal-connected ? UiStrings.signal-connected
                           : root.signal-reconnecting ? UiStrings.signal-reconnecting
                           : UiStrings.signal-disconnected;
-                    color: #343941;
-                    font-size: ImGuiFontStyle.base;
+                    color: WorkbenchStyle.muted;
+                    font-size: 11px;
                     vertical-alignment: center;
             }
+            if root.signal-connected && !root.signal-tls-error: Text {
+                x: parent.width - self.preferred-width - 20px; height: parent.height;
+                text: root.current-version;
+                font-size: 11px; color: WorkbenchStyle.muted; vertical-alignment: center;
+            }
             if !root.signal-connected && !root.signal-tls-error: Rectangle {
-                    x: parent.width - self.width - 12px;
-                    y: 3px;
-                    height: 18px;
+                    x: parent.width - self.width - 20px;
+                    y: 0px;
+                    height: parent.height;
                     width: reconnect-label.preferred-width;
                     reconnect-label := Text {
                             text: UiStrings.signal-reconnect;
-                            color: #2563eb;
-                            font-size: ImGuiFontStyle.base;
+                            color: WorkbenchStyle.accent;
+                            font-size: 11px;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                     }
@@ -1423,18 +1269,20 @@ export component MainWindow inherits Window {
         private property <bool> presence-known: !root.gallery-mode || gallery.hovered-device.presence-known;
         private property <length> pointer-x: root.gallery-mode ? gallery.x + gallery.device-tooltip-x : root.recent-tooltip-pointer-x;
         private property <length> pointer-y: root.gallery-mode ? gallery.y + gallery.device-tooltip-y : root.recent-tooltip-pointer-y;
-        x: min(root.width - self.width - 8px,
-               max(8px, self.pointer-x > root.width * 0.7
-                   ? self.pointer-x - self.width - 12px : self.pointer-x + 12px));
-        y: min(root.height - root.titlebar-height - self.height - 8px,
-               max(8px, self.pointer-y - self.height - 8px));
-        width: 260px;
+        // Follow the pointer with a gap; change sides only when space runs out.
+        x: clamp(self.pointer-x + self.width + 12px <= parent.width - 8px
+                 ? self.pointer-x + 12px : self.pointer-x - self.width - 12px,
+                 8px, max(8px, parent.width - self.width - 8px));
+        y: clamp(self.pointer-y - self.height - 12px >= 8px
+                 ? self.pointer-y - self.height - 12px : self.pointer-y + 16px,
+                 8px, max(8px, parent.height - self.height - 8px));
+        width: min(260px, parent.width - 16px);
         height: (self.host-name != "" && self.host-name != self.device-name
                  ? 80px : 64px) + tooltip-groups.preferred-height + 2px;
         background: #22252bf2;
         border-width: 1px;
         border-color: #ffffff38;
-        border-radius: 5px;
+        border-radius: UiRadius.control;
         z: 20;
 
         VerticalLayout {
@@ -1475,7 +1323,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    // Dismiss the title menu when clicking anywhere outside of it.
+    // Dismiss the application menu when clicking anywhere outside of it.
     if !root.gallery-mode && root.menu-open: TouchArea {
         x: 0px;
         y: 0px;
@@ -1488,38 +1336,39 @@ export component MainWindow inherits Window {
         }
     }
 
-    // Title menu.
+    // Expand downward from the application toolbar.
     if !root.gallery-mode && root.menu-open: Rectangle {
         x: menu-button.x + menu-button.width - self.width;
-        y: menu-button.y + menu-button.height + 2px;
-        width: max(80px, max(menu-settings-label.preferred-width,
+        y: menu-button.y + menu-button.height + 6px;
+        width: max(128px, max(menu-settings-label.preferred-width,
                    max(menu-messages-label.preferred-width + (root.announcement-unread > 0 ? menu-message-badge.width + 8px : 0px),
-                       menu-about-label.preferred-width + (root.update-available ? menu-update-badge.width + 8px : 0px))) + 24px);
-        height: 93px;
-        background: white;
+                       menu-about-label.preferred-width + (root.update-available ? menu-update-badge.width + 8px : 0px))) + 28px);
+        height: application-menu-content.preferred-height;
+        background: WorkbenchStyle.surface;
         border-width: 1px;
-        border-color: ImGuiLineStyle.border;
-        border-radius: 5px;
+        border-color: WorkbenchStyle.control-border;
+        border-radius: UiRadius.menu;
         z: 10;
         TouchArea { }
-        VerticalLayout {
-            padding: 4px;
-            spacing: 2px;
+        application-menu-content := VerticalLayout {
+            padding: 6px;
+            spacing: 0px;
             menu-settings := Rectangle {
-                height: 27px;
-                background: settings-touch.pressed ? #d8dadd
-                          : settings-touch.has-hover ? #f0f1f2
-                                                     : white;
+                height: 30px;
+                background: settings-touch.pressed ? WorkbenchStyle.pressed-surface
+                          : settings-touch.has-hover ? WorkbenchStyle.hover-surface
+                                                     : transparent;
                 border-width: 0px;
-                border-radius: 3px;
+                border-radius: UiRadius.control;
+                animate background { duration: 120ms; }
                 accessible-role: button;
                 accessible-label: UiStrings.settings;
                 accessible-action-default => { settings-touch.clicked(); }
                 menu-settings-label := Text {
-                    x: 7px;
+                    x: 8px;
                     height: parent.height;
                     text: UiStrings.settings;
-                    color: #2d3138;
+                    color: WorkbenchStyle.text; font-size: 12px;
                     vertical-alignment: center;
                     accessible-role: none;
                 }
@@ -1528,19 +1377,27 @@ export component MainWindow inherits Window {
                     clicked => { root.menu-open = false; root.settings-open = true; }
                 }
             }
+            Rectangle {
+                height: 7px;
+                Rectangle {
+                    x: 8px; y: 3px; width: parent.width - 16px; height: 1px;
+                    background: WorkbenchStyle.border;
+                }
+            }
             menu-messages := Rectangle {
-                height: 27px;
-                background: messages-touch.pressed ? #d8dadd
-                          : messages-touch.has-hover ? #f0f1f2 : white;
-                border-radius: 3px;
+                height: 30px;
+                background: messages-touch.pressed ? WorkbenchStyle.pressed-surface
+                          : messages-touch.has-hover ? WorkbenchStyle.hover-surface : transparent;
+                border-radius: UiRadius.control;
+                animate background { duration: 120ms; }
                 accessible-role: button;
                 accessible-label: MessageStrings.messages + (root.announcement-unread > 0 ? " · " + MessageStrings.unread + " " + root.announcement-unread : "");
                 accessible-action-default => { messages-touch.clicked(); }
                 menu-messages-label := Text {
-                    x: 7px;
+                    x: 8px;
                     height: parent.height;
                     text: MessageStrings.messages;
-                    color: #2d3138;
+                    color: WorkbenchStyle.text; font-size: 12px;
                     vertical-alignment: center;
                     accessible-role: none;
                 }
@@ -1569,21 +1426,29 @@ export component MainWindow inherits Window {
                     }
                 }
             }
+            Rectangle {
+                height: 7px;
+                Rectangle {
+                    x: 8px; y: 3px; width: parent.width - 16px; height: 1px;
+                    background: WorkbenchStyle.border;
+                }
+            }
             menu-about := Rectangle {
-                height: 27px;
-                background: about-touch.pressed ? #d8dadd
-                          : about-touch.has-hover ? #f0f1f2
-                                                  : white;
+                height: 30px;
+                background: about-touch.pressed ? WorkbenchStyle.pressed-surface
+                          : about-touch.has-hover ? WorkbenchStyle.hover-surface
+                                                  : transparent;
                 border-width: 0px;
-                border-radius: 3px;
+                border-radius: UiRadius.control;
+                animate background { duration: 120ms; }
                 accessible-role: button;
                 accessible-label: UiStrings.about + (root.update-available ? " · " + UiStrings.update-available : "");
                 accessible-action-default => { about-touch.clicked(); }
                 menu-about-label := Text {
-                    x: 7px;
+                    x: 8px;
                     height: parent.height;
                     text: UiStrings.about;
-                    color: #2d3138;
+                    color: WorkbenchStyle.text; font-size: 12px;
                     vertical-alignment: center;
                     accessible-role: none;
                 }
@@ -1608,22 +1473,6 @@ export component MainWindow inherits Window {
                     clicked => { root.menu-open = false; root.about-open = true; }
                 }
             }
-        }
-        Rectangle {
-            x: 4px;
-            y: 31.5px;
-            width: parent.width - 8px;
-            height: 1px;
-            background: ImGuiLineStyle.separator;
-            z: 1;
-        }
-        Rectangle {
-            x: 4px;
-            y: 60.5px;
-            width: parent.width - 8px;
-            height: 1px;
-            background: ImGuiLineStyle.separator;
-            z: 1;
         }
     }
 
@@ -1669,9 +1518,9 @@ export component MainWindow inherits Window {
         }
     }
     if root.copy-toast: Rectangle {
-        x: 180px; y: 170px; width: 280px; height: 68px;
+        x: (parent.width - self.width) / 2; y: parent.height - 92px; width: 280px; height: 40px;
         background: #fffffff2;
-        border-radius: 8px;
+        border-radius: UiRadius.surface;
         border-width: 1px;
         border-color: ImGuiLineStyle.border;
         z: 30;
@@ -1684,8 +1533,8 @@ export component MainWindow inherits Window {
         z: 40;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: root.compact-language ? 205px : 160px;
-            y: 140px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             width: root.compact-language ? 230px : 320px;
             height: 170px;
             VerticalLayout {
@@ -1742,35 +1591,20 @@ export component MainWindow inherits Window {
         z: 40;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: root.gallery-mode ? (parent.width - self.width) / 2 : root.compact-language ? 205px : 160px;
-            y: root.gallery-mode ? (parent.height - self.height) / 2 : 145px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             width: root.compact-language ? 230px : 320px;
             height: 160px;
             VerticalLayout {
                 padding: 20px; spacing: 14px;
                 DialogPromptText { prompt: UiStrings.edit-alias; }
-                Rectangle {
+                RoundedLineEdit {
                     height: 28px;
-                    background: white;
-                    border-width: 1px;
-                    border-color: ImGuiLineStyle.border;
-                    border-radius: 4px;
-
-                    LineEdit {
-                        x: 1px;
-                        y: 1.5px;
-                        width: parent.width - 2px;
-                        height: parent.height - 2px;
-                        text <=> root.alias-input;
-                        accepted => {
-                            root.recent-edit-alias(root.alias-remote-id, root.alias-input);
-                            root.alias-open = false;
-                        }
-                    }
-                    LineEditFocusUnderlineMask {
-                        x: 5px;
-                        y: parent.height - 3px;
-                        width: parent.width - 10px;
+                    normal-border-color: ImGuiLineStyle.border;
+                    text <=> root.alias-input;
+                    accepted => {
+                        root.recent-edit-alias(root.alias-remote-id, root.alias-input);
+                        root.alias-open = false;
                     }
                 }
                 HorizontalLayout {
@@ -1788,8 +1622,8 @@ export component MainWindow inherits Window {
         z: 40;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: root.gallery-mode ? (parent.width - self.width) / 2 : root.compact-language ? 205px : 160px;
-            y: root.gallery-mode ? (parent.height - self.height) / 2 : 155px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             width: root.compact-language ? 230px : 320px;
             height: 140px;
             VerticalLayout {
@@ -1810,7 +1644,7 @@ export component MainWindow inherits Window {
         z: 39;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: 185px; y: 150px; width: 270px; height: 150px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 270px; height: 150px;
             VerticalLayout {
                 padding: 20px; spacing: 18px;
                 DialogPromptText { prompt: root.offline-warning; }
@@ -1819,80 +1653,57 @@ export component MainWindow inherits Window {
         }
     }
 
-    // Connection progress and password retry modal from the ImGui client.
+    // Connection feedback follows the workbench spacing and action hierarchy.
     if root.connection-dialog-open: Rectangle {
-        background: #00000042;
+        background: #15223850;
         z: 48;
         TouchArea { clicked => { focus-sink.focus(); } }
-        DialogSurface {
-            x: root.connection-password-required ? 211px : 190px;
-            y: root.connection-password-required ? 143px : 130px;
-            width: root.connection-password-required ? 211px : 260px;
-            height: root.connection-password-required ? 158px : 145px;
-
-            if root.connection-password-required: Rectangle {
-                Text {
-                    y: 38px;
-                    height: 22px;
-                    text: root.connection-status-text;
-                    color: #30343b;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+        WorkbenchCard {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 340px;
+            height: root.connection-password-required && !root.connection-validating ? 236px : 168px;
+            Text {
+                x: 24px; y: 24px; width: parent.width - 48px; height: 46px;
+                text: root.connection-status-text;
+                color: WorkbenchStyle.text; font-size: 14px;
+                wrap: word-wrap; horizontal-alignment: center; vertical-alignment: center;
+            }
+            if root.connection-password-required && !root.connection-validating: PasswordInput {
+                x: (parent.width - self.width) / 2; y: 86px;
+                width: 164px; height: 36px; text-size: 16px;
+                border-radius: UiRadius.control; border-color: WorkbenchStyle.control-border;
+                text <=> root.connection-password;
+                accepted => { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
+            }
+            if root.connection-password-required && !root.connection-validating: Rectangle {
+                x: (parent.width - self.width) / 2; y: 134px;
+                width: remember-label.preferred-width + 29px; height: 21px;
+                ImGuiCheckBox { x: 0px; y: 0px; checked <=> root.connection-remember-password; }
+                remember-label := Text {
+                    x: 29px; height: parent.height;
+                    text: UiStrings.remember-password;
+                    color: WorkbenchStyle.muted; font-size: 12px; vertical-alignment: center;
                 }
-
-                if !root.connection-validating: PasswordInput {
-                    x: 71px; y: 63px;
-                    text <=> root.connection-password;
-                    accepted => { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
+                TouchArea {
+                    x: 29px; width: parent.width - 29px; height: parent.height;
+                    clicked => { root.connection-remember-password = !root.connection-remember-password; }
                 }
-
-                if !root.connection-validating: Rectangle {
-                    x: 72px; y: 89px; width: 120px; height: 21px;
-                    ImGuiCheckBox {
-                        x: 0px; y: 0px;
-                        checked <=> root.connection-remember-password;
-                    }
-                    Text {
-                        x: 27px; y: 0px;
-                        width: parent.width - 27px; height: parent.height;
-                        text: UiStrings.remember-password;
-                        color: #30343b;
-                        font-size: ImGuiFontStyle.body;
-                        vertical-alignment: center;
-                    }
-                    TouchArea {
-                        x: 27px; y: 0px;
-                        width: parent.width - 27px; height: parent.height;
-                        clicked => { root.connection-remember-password = !root.connection-remember-password; }
-                    }
-                }
-
-                if !root.connection-validating: ConnectionDialogButton {
-                    x: 69px; y: 118px;
-                    text: UiStrings.ok;
-                    clicked => { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
-                }
-                ConnectionDialogButton {
-                    x: root.connection-validating ? (parent.width - self.width) / 2 : 117px;
-                    y: 118px;
+            }
+            HorizontalLayout {
+                x: 24px; y: parent.height - 60px; width: parent.width - 48px; height: 36px;
+                spacing: 12px; alignment: center;
+                if root.connection-password-required || root.connection-pending: WorkbenchButton {
                     text: UiStrings.cancel;
                     clicked => { root.connection-cancel(); }
                 }
-            }
-
-            if !root.connection-password-required: VerticalLayout {
-                padding: 20px; spacing: 13px;
-                DialogPromptText { prompt: root.connection-status-text; }
-                HorizontalLayout {
-                    alignment: center; spacing: 8px;
-                    if root.connection-pending: SecondaryButton {
-                        text: UiStrings.cancel;
-                        clicked => { root.connection-cancel(); }
-                    }
-                    if !root.connection-pending: PrimaryButton {
-                        text: UiStrings.ok;
-                        clicked => { root.connection-acknowledge(); }
-                    }
+                if root.connection-password-required && !root.connection-validating: WorkbenchButton {
+                    primary: true; text: UiStrings.ok;
+                    clicked => { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
+                }
+                if !root.connection-password-required && !root.connection-pending: WorkbenchButton {
+                    primary: true; text: UiStrings.ok;
+                    clicked => { root.connection-acknowledge(); }
                 }
             }
         }
@@ -1904,20 +1715,20 @@ export component MainWindow inherits Window {
         z: 50;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: root.compact-language ? 255px : 190px;
-            y: 162px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             width: root.compact-language ? 130px : 260px;
             height: 125px;
-            border-radius: 7px;
+            border-radius: UiRadius.surface;
             Rectangle {
                 x: 0px;
                 y: 0px;
                 width: parent.width;
                 height: 21px;
                 background: #d3d3d3;
-                border-radius: 7px;
+                border-top-left-radius: UiRadius.surface;
+                border-top-right-radius: UiRadius.surface;
                 z: 5;
-                Rectangle { y: parent.height - 7px; height: 7px; background: #d3d3d3; }
                 Text { x: 6px; text: UiStrings.request-permissions; font-size: ImGuiFontStyle.base; font-weight: 600; color: #202124; vertical-alignment: center; }
             }
             Text { x: 10px; y: 32px; width: root.compact-language ? 110px : 240px; height: 24px; text: UiStrings.permission-required; color: #202124; font-size: 8px; wrap: word-wrap; }
@@ -1945,37 +1756,47 @@ export component MainWindow inherits Window {
         background: #15223850;
         z: 45;
         TouchArea { clicked => { focus-sink.focus(); } }
-        DialogSurface {
+        settings-dialog := DialogSurface {
+            // Center every content section; the scrollbar sits in the right margin.
+            private property <length> content-inset: 26px;
+            private property <length> scrollbar-gutter: 22px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: min(400px, parent.width - 40px); height: min(446px, parent.height - 16px);
-            background: #f8fafc; border-radius: 14px; border-color: #e1e7ef;
+            width: min(400px, parent.width - 40px);
+            height: min(446px, parent.height - 16px);
+            background: #f8fafc; border-radius: UiRadius.surface; border-color: #e1e7ef;
             drop-shadow-color: #14294424; drop-shadow-blur: 24px; drop-shadow-offset-y: 8px;
             TouchArea { clicked => { focus-sink.focus(); } }
             Text {
-                x: 18px; y: 18px; width: parent.width - 36px; height: 27px;
+                x: settings-dialog.content-inset; y: 18px;
+                width: parent.width - 2 * settings-dialog.content-inset; height: 27px;
                 text: UiStrings.settings; font-size: 20px; font-weight: 600; color: #22324a;
             }
             Rectangle {
-                x: 18px; y: 56px; width: parent.width - 36px; height: 40px;
-                background: #eaf0f6; border-radius: 9px;
+                x: settings-dialog.content-inset; y: 56px;
+                width: parent.width - 2 * settings-dialog.content-inset; height: 40px;
+                background: WorkbenchStyle.canvas; border-radius: UiRadius.menu;
+                border-width: 1px; border-color: WorkbenchStyle.border;
                 Rectangle {
-                    x: 4px + root.settings-tab * (parent.width - 8px) / 2;
-                    y: 4px; width: (parent.width - 8px) / 2; height: parent.height - 8px;
-                    background: white; border-radius: 6px;
-                    drop-shadow-color: #1e3e6520; drop-shadow-blur: 3px; drop-shadow-offset-y: 1px;
+                    x: 4px + root.settings-tab * (parent.width - 4px) / 2;
+                    y: 4px; width: (parent.width - 12px) / 2; height: parent.height - 8px;
+                    background: WorkbenchStyle.surface; border-radius: UiRadius.control;
+                    border-width: 1px; border-color: WorkbenchStyle.control-border;
                     animate x { duration: 140ms; easing: ease-out; }
                 }
                 for label[index] in [GalleryStrings.tr("常规", "General", "Общие"), GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub")]: Rectangle {
-                    x: 4px + index * (parent.width - 8px) / 2;
-                    y: 4px; width: (parent.width - 8px) / 2; height: parent.height - 8px;
-                    border-radius: 6px;
-                    background: tab-touch.has-hover && root.settings-tab != index ? #e1e8f1 : transparent;
+                    x: 4px + index * (parent.width - 4px) / 2;
+                    y: 4px; width: (parent.width - 12px) / 2; height: parent.height - 8px;
+                    border-radius: UiRadius.control;
+                    background: root.settings-tab == index ? transparent
+                        : tab-touch.pressed ? WorkbenchStyle.pressed-surface
+                        : tab-touch.has-hover ? WorkbenchStyle.hover-surface : transparent;
+                    animate background { duration: 100ms; }
                     accessible-role: button; accessible-label: label;
                     accessible-action-default => { tab-touch.clicked(); }
                     Text {
-                        text: label; font-size: 12px; font-weight: root.settings-tab == index ? 600 : 400;
-                        color: root.settings-tab == index ? #2e70cf : #718096;
+                        text: label; font-size: 12px; font-weight: root.settings-tab == index ? 600 : 500;
+                        color: root.settings-tab == index ? WorkbenchStyle.accent : WorkbenchStyle.muted;
                         horizontal-alignment: center; vertical-alignment: center;
                     }
                     tab-touch := TouchArea {
@@ -1985,74 +1806,87 @@ export component MainWindow inherits Window {
                 }
             }
             if root.settings-tab == 0: settings-scroll := ScrollView {
-                x: 18px; y: 108px; width: parent.width - 28px; height: parent.height - 174px;
+                x: settings-dialog.content-inset; y: 108px;
+                width: parent.width - 2 * settings-dialog.content-inset + settings-dialog.scrollbar-gutter;
+                height: parent.height - 174px;
+                viewport-width: self.visible-width;
+                viewport-height: settings-content.preferred-height;
                 viewport-y <=> root.settings-scroll-y;
-                VerticalLayout {
-                    width: settings-scroll.width - 12px;
-                    spacing: 14px; padding-bottom: 4px;
-                    SettingsGroup {
-                        title: GalleryStrings.tr("界面", "Interface", "Интерфейс"); rows: 1;
-                        SettingsRow {
-                            label: UiStrings.language; divider: false;
-                            SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; model: ["中文", "English", "Русский"]; current-index <=> root.language-index; }
+                horizontal-scrollbar-policy: always-off;
+                vertical-scrollbar-policy: as-needed;
+                // Fluent's scrollbar expands over the viewport on hover.
+                // Keep its full 14px track plus an 8px gap outside the groups.
+                Rectangle {
+                    x: 0px; y: 0px;
+                    width: settings-scroll.viewport-width;
+                    height: settings-scroll.viewport-height;
+                    settings-content := VerticalLayout {
+                        padding: 0px; padding-right: settings-dialog.scrollbar-gutter; padding-bottom: 4px;
+                        spacing: 14px;
+                        SettingsGroup {
+                            title: GalleryStrings.tr("界面", "Interface", "Интерфейс"); rows: 1;
+                            SettingsRow {
+                                label: UiStrings.language; divider: false;
+                                SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; model: ["中文", "English", "Русский"]; current-index <=> root.language-index; }
+                            }
                         }
-                    }
-                    SettingsGroup {
-                        title: GalleryStrings.tr("视频", "Video", "Видео");
-                        rows: root.capture-method-visible ? 3 : 2;
-                        if root.capture-method-visible: SettingsRow {
-                            label: UiStrings.capture-method; enabled: !root.settings-session-active;
-                            SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; enabled: !root.settings-session-active; model: [UiStrings.capture-method-auto, "DXGI", "WGC", "GDI"]; current-index <=> root.capture-method-index; }
+                        SettingsGroup {
+                            title: GalleryStrings.tr("视频", "Video", "Видео");
+                            rows: root.capture-method-visible ? 3 : 2;
+                            if root.capture-method-visible: SettingsRow {
+                                label: UiStrings.capture-method; enabled: !root.settings-session-active;
+                                SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; enabled: !root.settings-session-active; model: [UiStrings.capture-method-auto, "DXGI", "WGC", "GDI"]; current-index <=> root.capture-method-index; }
+                            }
+                            SettingsRow {
+                                label: UiStrings.codec; enabled: !root.settings-session-active;
+                                SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; enabled: !root.settings-session-active; model: [UiStrings.codec-h264, UiStrings.codec-av1]; current-index <=> root.codec-index; }
+                            }
+                            SettingsToggleRow { label: UiStrings.hardware-codec; checked <=> root.hardware-codec-enabled; enabled: root.hardware-codec-available && !root.settings-session-active; divider: false; }
                         }
-                        SettingsRow {
-                            label: UiStrings.codec; enabled: !root.settings-session-active;
-                            SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; enabled: !root.settings-session-active; model: [UiStrings.codec-h264, UiStrings.codec-av1]; current-index <=> root.codec-index; }
+                        SettingsGroup {
+                            title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 3;
+                            SettingsToggleRow { label: UiStrings.turn-relay; checked <=> root.turn-enabled; enabled: !root.settings-session-active; }
+                            SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: root.turn-enabled && !root.settings-session-active; }
+                            SettingsToggleRow {
+                                checked <=> root.self-hosted-enabled; enabled: !root.settings-session-active; divider: false;
+                                SettingsButton { x: 0px; y: 2px; width: parent.width - 60px; height: 32px; quiet: true; align-left: true; text: UiStrings.self-hosted; enabled: !root.settings-session-active; clicked => { root.self-host-settings-open = true; } }
+                            }
                         }
-                        SettingsToggleRow { label: UiStrings.hardware-codec; checked <=> root.hardware-codec-enabled; enabled: root.hardware-codec-available && !root.settings-session-active; divider: false; }
-                    }
-                    SettingsGroup {
-                        title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 3;
-                        SettingsToggleRow { label: UiStrings.turn-relay; checked <=> root.turn-enabled; enabled: !root.settings-session-active; }
-                        SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: root.turn-enabled && !root.settings-session-active; }
-                        SettingsToggleRow {
-                            checked <=> root.self-hosted-enabled; enabled: !root.settings-session-active; divider: false;
-                            SettingsButton { x: 0px; y: 2px; width: parent.width - 60px; height: 32px; quiet: true; align-left: true; text: UiStrings.self-hosted; enabled: !root.settings-session-active; clicked => { root.self-host-settings-open = true; } }
+                        SettingsGroup {
+                            title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 1;
+                            SettingsToggleRow { label: UiStrings.privacy-on-connect; checked <=> root.privacy-on-connect-enabled; enabled: root.privacy-setting-available; divider: false; }
                         }
-                    }
-                    SettingsGroup {
-                        title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 1;
-                        SettingsToggleRow { label: UiStrings.privacy-on-connect; checked <=> root.privacy-on-connect-enabled; enabled: root.privacy-setting-available; divider: false; }
-                    }
-                    SettingsGroup {
-                        title: GalleryStrings.tr("本地存储", "Local storage", "Локальное хранение"); rows: 2;
-                        SettingsToggleRow { label: UiStrings.save-remote-previews; checked <=> root.save-remote-previews; }
-                        SettingsRow {
-                            label: UiStrings.file-save-path; enabled: !root.settings-session-active; divider: false;
-                            SettingsButton { x: parent.width - 116px; y: 4px; width: 104px; height: 28px; text: root.file-save-path == "" ? UiStrings.default-desktop : root.file-save-path; enabled: !root.settings-session-active; clicked => { root.browse-save-path(); } }
+                        SettingsGroup {
+                            title: GalleryStrings.tr("本地存储", "Local storage", "Локальное хранение"); rows: 2;
+                            SettingsToggleRow { label: UiStrings.save-remote-previews; checked <=> root.save-remote-previews; }
+                            SettingsRow {
+                                label: UiStrings.file-save-path; enabled: !root.settings-session-active; divider: false;
+                                SettingsButton { x: parent.width - 116px; y: 4px; width: 104px; height: 28px; text: root.file-save-path == "" ? UiStrings.default-desktop : root.file-save-path; enabled: !root.settings-session-active; clicked => { root.browse-save-path(); } }
+                            }
                         }
-                    }
-                    SettingsGroup {
-                        title: GalleryStrings.tr("启动与后台", "Startup & background", "Запуск и фоновая работа"); rows: 2;
-                        SettingsToggleRow { label: UiStrings.autostart; checked <=> root.autostart-enabled; enabled: !root.settings-session-active; }
-                        SettingsToggleRow { label: UiStrings.daemon; checked <=> root.daemon-enabled; enabled: !root.settings-session-active; divider: false; }
+                        SettingsGroup {
+                            title: GalleryStrings.tr("启动与后台", "Startup & background", "Запуск и фоновая работа"); rows: 2;
+                            SettingsToggleRow { label: UiStrings.autostart; checked <=> root.autostart-enabled; enabled: !root.settings-session-active; }
+                            SettingsToggleRow { label: UiStrings.daemon; checked <=> root.daemon-enabled; enabled: !root.settings-session-active; divider: false; }
+                        }
                     }
                 }
             }
             if root.settings-tab == 1: GallerySettings {
-                x: 18px; y: 108px; width: parent.width - 36px; height: parent.height - 174px;
+                x: settings-dialog.content-inset; y: 108px;
+                width: parent.width - 2 * settings-dialog.content-inset; height: parent.height - 174px;
                 resolution-index <=> root.gallery-resolution-draft;
                 frame-rate-index <=> root.gallery-frame-rate-draft;
                 bandwidth-index <=> root.gallery-bandwidth-draft;
                 error: root.gallery-settings-error;
             }
-            Rectangle { x: 18px; y: parent.height - 64px; width: parent.width - 36px; height: 1px; background: #e6ebf2; }
+            Rectangle {
+                x: settings-dialog.content-inset; y: parent.height - 64px;
+                width: parent.width - 2 * settings-dialog.content-inset; height: 1px; background: #e6ebf2;
+            }
             HorizontalLayout {
-                x: 18px; y: parent.height - 50px; width: parent.width - 36px; height: 32px; spacing: 10px;
-                if root.settings-tab == 1: SettingsButton {
-                    width: 110px; quiet: true;
-                    text: GalleryStrings.tr("恢复默认", "Reset defaults", "По умолчанию");
-                    clicked => { root.gallery-resolution-draft = 0; root.gallery-frame-rate-draft = 0; root.gallery-bandwidth-draft = 3; }
-                }
+                x: settings-dialog.content-inset; y: parent.height - 50px;
+                width: parent.width - 2 * settings-dialog.content-inset; height: 32px; spacing: 10px;
                 Rectangle { horizontal-stretch: 1; }
                 SettingsButton {
                     width: 80px; text: UiStrings.cancel;
@@ -2075,7 +1909,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: 360px; height: root.self-host-settings-error == "" ? 266px : 322px;
-            border-radius: 12px; border-color: #e1e7ef; background: #f8fafc;
+            border-radius: UiRadius.surface; border-color: #e1e7ef; background: #f8fafc;
             drop-shadow-color: #14294424; drop-shadow-blur: 18px; drop-shadow-offset-y: 6px;
             TouchArea { clicked => { focus-sink.focus(); } }
             Text {
@@ -2083,18 +1917,18 @@ export component MainWindow inherits Window {
                 text: UiStrings.self-hosted-settings; font-size: 16px; font-weight: 600; color: #22324a;
             }
             Text { x: 18px; y: 56px; width: parent.width - 36px; height: 20px; text: UiStrings.server-host; color: #34445a; font-size: 12px; overflow: elide; vertical-alignment: center; }
-            Rectangle {
+            RoundedLineEdit {
                 x: 18px; y: 80px; width: parent.width - 36px; height: 30px;
-                background: white; border-width: 1px; border-color: #dfe6ef; border-radius: 6px;
-                LineEdit { x: 1px; y: 2px; width: parent.width - 2px; height: parent.height - 4px; text <=> root.server-host; input-type: InputType.text; font-size: 12px; }
-                LineEditFocusUnderlineMask { x: 5px; y: parent.height - 3px; width: parent.width - 10px; }
+                surrounding-background: #f8fafc;
+                normal-border-color: WorkbenchStyle.control-border;
+                text <=> root.server-host;
             }
             Text { x: 18px; y: 120px; width: parent.width - 36px; height: 20px; text: UiStrings.server-port; color: #34445a; font-size: 12px; overflow: elide; vertical-alignment: center; }
-            Rectangle {
+            RoundedLineEdit {
                 x: 18px; y: 144px; width: parent.width - 36px; height: 30px;
-                background: white; border-width: 1px; border-color: #dfe6ef; border-radius: 6px;
-                LineEdit { x: 1px; y: 2px; width: parent.width - 2px; height: parent.height - 4px; text <=> root.server-port; input-type: InputType.number; font-size: 12px; }
-                LineEditFocusUnderlineMask { x: 5px; y: parent.height - 3px; width: parent.width - 10px; }
+                surrounding-background: #f8fafc;
+                normal-border-color: WorkbenchStyle.control-border;
+                text <=> root.server-port; input-type: InputType.number;
             }
             if root.self-host-settings-error != "": Text {
                 x: 18px; y: 186px; width: parent.width - 36px; height: 48px;
@@ -2111,11 +1945,11 @@ export component MainWindow inherits Window {
         z: 46;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: (root.width - self.width) / 2;
-            y: (root.height - self.height) / 2;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             width: 320px;
             height: max(216px, about-content.preferred-height);
-            border-radius: 7px;
+            border-radius: UiRadius.surface;
 
             Rectangle {
                 x: 0px;
@@ -2123,9 +1957,9 @@ export component MainWindow inherits Window {
                 width: parent.width;
                 height: 21px;
                 background: #d3d3d3;
-                border-radius: 7px;
+                border-top-left-radius: UiRadius.surface;
+                border-top-right-radius: UiRadius.surface;
                 z: 5;
-                Rectangle { y: parent.height - 7px; height: 7px; background: #d3d3d3; }
                 Text { x: 6px; text: UiStrings.about; font-size: ImGuiFontStyle.base; font-weight: 600; color: #202124; vertical-alignment: center; }
             }
             // Grow for update actions and wrapped translations while keeping
@@ -2221,76 +2055,132 @@ export component MainWindow inherits Window {
 
     // Update notification modal.
     if root.update-open && root.update-available: Rectangle {
-        background: transparent;
+        background: #14233b45;
         z: 47;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: 120px;
-            y: 52px;
-            width: 400px;
-            height: 346px;
-            border-radius: 7px;
-            Text { x: 30px; y: 22px; width: 320px; height: 24px; text: UiStrings.update-available + ": " + root.latest-version; color: #202124; font-size: ImGuiFontStyle.prominent; vertical-alignment: center; }
-            Rectangle {
-                x: 30px;
-                y: 47px;
-                width: 320px;
-                height: 22px;
-                Text {
-                    x: 0px;
-                    width: parent.width;
-                    height: parent.height;
-                    text: UiStrings.access-website + "https://crossdesk.cn";
-                    color: website-touch.has-hover ? #174ea6 : #334fd1;
-                    font-size: ImGuiFontStyle.body;
-                    horizontal-alignment: left;
-                    vertical-alignment: center;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 464px;
+            height: 400px;
+            border-radius: UiRadius.surface;
+            border-color: WorkbenchStyle.border;
+            drop-shadow-color: #07142b24;
+            drop-shadow-blur: 24px;
+            drop-shadow-offset-y: 8px;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 16px;
+                VerticalLayout {
+                    vertical-stretch: 0;
+                    spacing: 6px;
+                    Text {
+                        height: 24px;
+                        text: UiStrings.update-available;
+                        color: WorkbenchStyle.text;
+                        font-size: 18px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                    HorizontalLayout {
+                        height: 20px;
+                        spacing: 12px;
+                        Text {
+                            text: root.latest-version;
+                            color: WorkbenchStyle.muted;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Rectangle {
+                            width: update-website-label.preferred-width;
+                            accessible-role: button;
+                            accessible-label: update-website-label.text;
+                            accessible-action-default => { root.open-download(); }
+                            update-website-label := Text {
+                                text: UiStrings.access-website + "https://crossdesk.cn";
+                                color: website-touch.has-hover ? #254cc0 : WorkbenchStyle.accent;
+                                font-size: 11px;
+                                vertical-alignment: center;
+                            }
+                            website-touch := TouchArea { mouse-cursor: pointer; clicked => { root.open-download(); } }
+                        }
+                    }
                 }
-                website-touch := TouchArea { mouse-cursor: pointer; clicked => { root.open-download(); } }
-            }
-            Text {
-                x: 30px;
-                y: 75px;
-                width: 320px;
-                height: 20px;
-                text: UiStrings.release-notes;
-                color: #202124;
-                font-size: 12px;
-                vertical-alignment: center;
-            }
-            Rectangle {
-                x: 30px;
-                y: 105px;
-                width: 360px;
-                height: 190px;
-                background: white;
-                border-width: 1px;
-                border-color: #b9bdc3;
-                ScrollView {
-                    x: 1px;
-                    y: 1px;
-                    width: parent.width - 2px;
-                    height: parent.height - 2px;
-                    VerticalLayout {
-                        width: 340px;
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        padding-top: 8px;
-                        padding-bottom: 8px;
-                        spacing: 7px;
-                        VerticalLayout {
-                            width: 312px;
-                            spacing: 10px;
-                            for block in root.release-note-blocks: VerticalLayout {
-                                padding-top: block.section-gap ? 10px : 0px;
-                                StyledText { width: 312px; text: block.content; default-color: #202124; default-font-size: ImGuiFontStyle.body; }
+
+                VerticalLayout {
+                    spacing: 8px;
+                    Text {
+                        height: 18px;
+                        text: UiStrings.release-notes;
+                        color: WorkbenchStyle.text;
+                        font-size: 12px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                    Rectangle {
+                        background: WorkbenchStyle.field-surface;
+                        border-width: 1px;
+                        border-color: WorkbenchStyle.separator;
+                        border-radius: UiRadius.control;
+                        // Inset the viewport so text and the scrollbar stay clear
+                        // of the rounded frame, including at either scroll limit.
+                        update-notes-scroll := ScrollView {
+                            x: 12px;
+                            y: 12px;
+                            width: parent.width - 24px;
+                            height: parent.height - 24px;
+                            viewport-width: self.width - 12px;
+                            viewport-height: update-notes-content.preferred-height;
+                            horizontal-scrollbar-policy: always-off;
+                            vertical-scrollbar-policy: as-needed;
+                            update-notes-content := VerticalLayout {
+                                width: update-notes-scroll.viewport-width;
+                                alignment: start;
+                                spacing: 8px;
+                                padding-bottom: 6px;
+                                for block in root.release-note-blocks: Rectangle {
+                                    height: update-note.preferred-height + (block.section-gap ? 6px : 0px);
+                                    update-note := StyledText {
+                                        y: block.section-gap ? 6px : 0px;
+                                        // Measure wrapped paragraphs at the viewport
+                                        // width before stacking the following block.
+                                        width: update-notes-scroll.viewport-width;
+                                        height: self.preferred-height;
+                                        text: block.content;
+                                        default-color: WorkbenchStyle.text;
+                                        default-font-size: 13px;
+                                    }
+                                }
                             }
                         }
                     }
                 }
+
+                VerticalLayout {
+                    vertical-stretch: 0;
+                    spacing: 16px;
+                    Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                    HorizontalLayout {
+                        alignment: end;
+                        spacing: 8px;
+                        WorkbenchButton {
+                            width: 88px;
+                            height: 34px;
+                            text: UiStrings.later;
+                            clicked => { root.update-open = false; }
+                        }
+                        WorkbenchButton {
+                            width: 88px;
+                            height: 34px;
+                            primary: true;
+                            text: UiStrings.download;
+                            clicked => { root.open-download(); root.update-open = false; }
+                        }
+                    }
+                }
             }
-            CompactButton { x: root.compact-language ? 163px : 130px; y: 309px; width: root.compact-language ? 34px : 70px; primary: true; text: UiStrings.download; clicked => { root.open-download(); root.update-open = false; } }
-            CompactButton { x: root.compact-language ? 204px : 207px; y: 309px; width: root.compact-language ? 34px : 56px; text: UiStrings.later; clicked => { root.update-open = false; } }
         }
     }
 
@@ -2304,7 +2194,7 @@ export component MainWindow inherits Window {
             y: (parent.height - self.height) / 2;
             width: 512px;
             height: wayland-notice-content.preferred-height;
-            border-radius: 14px;
+            border-radius: UiRadius.surface;
             border-color: #dce3ee;
             drop-shadow-color: #07142b30;
             drop-shadow-blur: 28px;
@@ -2333,7 +2223,7 @@ export component MainWindow inherits Window {
                     background: #fff8eb;
                     border-color: #f0dfba;
                     border-width: 1px;
-                    border-radius: 9px;
+                    border-radius: UiRadius.surface;
                     VerticalLayout {
                         padding: 14px; spacing: 8px;
                         Text {
@@ -2356,7 +2246,7 @@ export component MainWindow inherits Window {
                     background: #f3f7fd;
                     border-color: #dfe8f5;
                     border-width: 1px;
-                    border-radius: 9px;
+                    border-radius: UiRadius.surface;
                     VerticalLayout {
                         padding: 14px; spacing: 8px;
                         Text {
@@ -2380,7 +2270,7 @@ export component MainWindow inherits Window {
                     height: 34px; alignment: end;
                     PrimaryButton {
                         width: 104px; height: 34px;
-                        border-radius: 7px;
+                        border-radius: UiRadius.control;
                         text-size: ImGuiFontStyle.base;
                         text: UiStrings.wayland-notice-acknowledge;
                         accessible-role: button;
@@ -2399,7 +2289,7 @@ export component MainWindow inherits Window {
         z: 50;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: 80px; y: 75px; width: 480px; height: 300px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 480px; height: 300px;
             VerticalLayout {
                 padding: 24px; spacing: 14px;
                 DialogPromptText {
@@ -2409,7 +2299,7 @@ export component MainWindow inherits Window {
                     text-weight: 600;
                 }
                 Rectangle {
-                    background: #f7f8fa; border-color: #d9dde4; border-width: 1px; border-radius: 6px;
+                    background: #f7f8fa; border-color: #d9dde4; border-width: 1px; border-radius: UiRadius.surface;
                     Text { x: 14px; y: 22px; width: parent.width - 28px; height: parent.height - 24px; text: UiStrings.service-setup-message; color: #3d434d; wrap: word-wrap; vertical-alignment: center; }
                 }
                 if root.portable-service-status != "": Text {
@@ -2446,7 +2336,7 @@ export component MainWindow inherits Window {
         z: 51;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
-            x: 100px; y: 130px; width: 440px; height: 190px;
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 440px; height: 190px;
             VerticalLayout {
                 padding: 24px; spacing: 16px;
                 DialogPromptText {

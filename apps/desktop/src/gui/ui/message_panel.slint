@@ -1,3 +1,4 @@
+import { UiRadius } from "ui_radius.slint";
 import { ScrollView } from "std-widgets.slint";
 import { CompactButton, DialogSurface, IconButton, FontAwesomeIcons, ImGuiFontStyle } from "common.slint";
 
@@ -68,12 +69,11 @@ export component MessagePanel inherits DialogSurface {
         }
     }
     background: white;
-    border-radius: 7px;
+    border-radius: UiRadius.surface;
     TouchArea { }
     title-bar := Rectangle {
         x: 0px; y: 0px; width: parent.width; height: 21px;
-        background: #d3d3d3; border-radius: 7px;
-        Rectangle { y: parent.height - 7px; height: 7px; background: #d3d3d3; }
+        background: #d3d3d3; border-top-left-radius: UiRadius.surface; border-top-right-radius: UiRadius.surface;
         message-heading := Text {
             x: 6px; width: parent.width - 100px; height: parent.height;
             text: MessageStrings.messages;
@@ -101,7 +101,7 @@ export component MessagePanel inherits DialogSurface {
         }
         IconButton {
             x: parent.width - 25px; y: 2px; width: 19px; height: parent.height - 4px;
-            border-radius: 3px;
+            border-radius: UiRadius.control;
             icon: FontAwesomeIcons.xmark; icon-size: ImGuiFontStyle.base;
             icon-color: #202124;
             hover-background: #bfc2c7; pressed-background: #b2b2b2;
@@ -113,7 +113,7 @@ export component MessagePanel inherits DialogSurface {
     }
     if root.notice-text != "": Rectangle {
         x: 16px; y: title-bar.height + 10px; width: parent.width - 32px; height: 28px;
-        border-radius: 4px;
+        border-radius: UiRadius.surface;
         background: #fef2f2;
         Text {
             x: 8px; width: parent.width - 16px; height: parent.height;
@@ -133,7 +133,7 @@ export component MessagePanel inherits DialogSurface {
                 for item[index] in root.items: Rectangle {
                     height: 54px;
                     background: root.selected-id == item.id ? #eaf2ff : entry-touch.has-hover ? #f0f1f2 : transparent;
-                    border-radius: 4px;
+                    border-radius: UiRadius.control;
                     Text { x: 8px; y: 6px; width: parent.width - 32px; height: 18px; text: item.title; overflow: elide; font-size: ImGuiFontStyle.base; font-weight: item.read ? 400 : 600; color: #202124; vertical-alignment: center; }
                     if !item.read: Rectangle {
                         x: parent.width - 17px; y: 13px; width: 5px; height: 5px;

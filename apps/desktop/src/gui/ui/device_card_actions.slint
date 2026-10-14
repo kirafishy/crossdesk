@@ -1,3 +1,4 @@
+import { UiRadius } from "ui_radius.slint";
 import { IconButton, FontAwesomeIcons } from "common.slint";
 import { GalleryStrings } from "device_strings.slint";
 
@@ -12,6 +13,7 @@ export global DeviceCardStyle {
 
 component CardAction inherits IconButton {
     width: 26px; height: 23px;
+    border-radius: UiRadius.control;
     icon-size: 12px; icon-color: white;
     hover-background: #ffffff2e;
     pressed-background: #598cf273;
@@ -28,7 +30,7 @@ export component DeviceCardActions inherits Rectangle {
     callback connect-device();
     callback disconnect-device();
     width: DeviceCardStyle.toolbar-width; height: 23px;
-    background: #4a4e55dc; border-radius: 5px;
+    background: #4a4e55dc; border-radius: UiRadius.control;
     HorizontalLayout {
         spacing: 0px;
         CardAction {

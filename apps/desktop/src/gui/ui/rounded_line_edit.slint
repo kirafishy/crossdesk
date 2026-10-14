@@ -1,0 +1,50 @@
+import { LineEdit } from "std-widgets.slint";
+import { UiRadius } from "ui_radius.slint";
+
+// Retain the standard editor's selection, clipboard, clear button and input
+// method support. Only its outer frame is replaced by the shared shape.
+export component RoundedLineEdit inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder-text;
+    in property <InputType> input-type: InputType.text;
+    in property <bool> enabled: true;
+    in property <length> font-size: 12px;
+    in property <color> normal-border-color: #dfe6ef;
+    in property <brush> surrounding-background: white;
+    callback accepted();
+    callback edited();
+    height: 30px;
+    border-radius: UiRadius.control;
+    background: white;
+    clip: true;
+    forward-focus: editor;
+
+    editor := LineEdit {
+        x: -1px; y: -1px;
+        width: parent.width + 2px; height: parent.height + 2px;
+        text <=> root.text;
+        placeholder-text: root.placeholder-text;
+        input-type: root.input-type;
+        enabled: root.enabled;
+        font-size: root.font-size;
+        accepted => { root.accepted(); }
+        edited => { root.edited(); }
+    }
+    // The software renderer clips children to rectangular bounds. Mask the
+    // standard editor's corners before drawing our rounded border on top.
+    Rectangle {
+        x: -root.border-radius; y: -root.border-radius;
+        width: parent.width + 2 * root.border-radius;
+        height: parent.height + 2 * root.border-radius;
+        border-width: root.border-radius;
+        border-radius: 2 * root.border-radius;
+        border-color: root.surrounding-background;
+    }
+    Rectangle {
+        width: parent.width; height: parent.height;
+        border-radius: root.border-radius;
+        border-width: editor.has-focus ? 2px : 1px;
+        border-color: editor.has-focus ? #3564e3 : root.normal-border-color;
+        background: transparent;
+    }
+}
