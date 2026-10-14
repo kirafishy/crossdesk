@@ -20,11 +20,19 @@ export component WorkbenchButton inherits Rectangle {
     in property <string> text;
     in property <string> icon;
     in property <string> tooltip;
+    in property <bool> tooltip-suppressed: false;
+    in property <color> icon-color: root.primary ? white : WorkbenchStyle.muted;
     in property <bool> primary: false;
     in property <bool> quiet: false;
     in property <bool> enabled: true;
+    out property <bool> has-focus: button-focus.has-focus;
     private property <bool> keyboard-focus: false;
     private property <bool> show-focus: button-focus.has-focus && root.keyboard-focus;
+    private property <bool> tooltip-active: root.enabled && root.tooltip != ""
+        && !root.tooltip-suppressed && !touch.pressed
+        && (touch.has-hover || root.show-focus);
+    private property <bool> tooltip-visible: false;
+    changed tooltip-active => { root.tooltip-visible = false; }
     callback clicked;
     width: 112px;
     height: 36px;
@@ -55,7 +63,7 @@ export component WorkbenchButton inherits Rectangle {
             font-family: "Font Awesome 6 Free";
             font-weight: 900;
             font-size: 14px;
-            color: root.primary ? white : WorkbenchStyle.muted;
+            color: root.icon-color;
             vertical-alignment: center;
             accessible-role: none;
         }
@@ -98,21 +106,73 @@ export component WorkbenchButton inherits Rectangle {
             clicked => { root.keyboard-focus = false; button-focus.focus(); root.clicked(); }
         }
     }
-    if touch.has-hover && root.tooltip != "": Rectangle {
+    tooltip-timer := Timer {
+        interval: 450ms;
+        running: root.tooltip-active && !root.tooltip-visible;
+        triggered => { root.tooltip-visible = true; }
+    }
+    if root.tooltip-active && root.tooltip-visible: Rectangle {
         x: min(0px, root.width - self.width);
         y: root.height + 6px;
-        width: tip.preferred-width + 16px;
-        height: 28px;
+        width: min(260px, tip.preferred-width + 20px);
+        height: max(28px, tip.preferred-height + 12px);
         background: #24324a;
         border-radius: UiRadius.control;
         z: 20;
         tip := Text {
+            x: 10px; y: 6px;
+            width: parent.width - 20px;
+            height: parent.height - 12px;
             text: root.tooltip;
-            font-size: 11px;
+            font-size: 12px;
             color: white;
+            wrap: word-wrap;
             horizontal-alignment: center;
             vertical-alignment: center;
         }
+    }
+}
+
+// A raised surface keeps transient action feedback distinct from the workbench.
+export component WorkbenchNotice inherits Rectangle {
+    in property <string> text;
+    in property <string> icon;
+    in property <bool> error: false;
+    in property <length> width-limit: 360px;
+    private property <color> foreground: root.error ? #b42318 : #146c49;
+    width: min(root.width-limit, max(280px, message.preferred-width + 64px));
+    height: 64px;
+    background: root.error ? #fff1f0 : #e9f6ef;
+    border-width: 1px;
+    border-color: root.error ? #f0c4bf : #b9dfc9;
+    border-radius: UiRadius.surface;
+    drop-shadow-color: #14294424;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 6px;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+    Text {
+        x: message.x - 28px; width: 18px; height: parent.height;
+        text: root.icon;
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        font-size: 16px;
+        color: root.foreground;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+    message := Text {
+        x: (parent.width - self.width + 28px) / 2;
+        width: min(self.preferred-width, parent.width - 64px);
+        height: parent.height;
+        text: root.text;
+        font-size: 14px;
+        font-weight: 600;
+        color: root.foreground;
+        overflow: elide;
+        vertical-alignment: center;
+        accessible-role: none;
     }
 }
 

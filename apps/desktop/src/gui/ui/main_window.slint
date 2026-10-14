@@ -1,5 +1,5 @@
 import { UiRadius } from "ui_radius.slint";
-import { WorkbenchStyle, WorkbenchButton, WorkbenchCard } from "workbench_controls.slint";
+import { WorkbenchStyle, WorkbenchButton, WorkbenchCard, WorkbenchNotice } from "workbench_controls.slint";
 import { GalleryStrings } from "device_strings.slint";
 import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
 import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint";
@@ -32,6 +32,7 @@ export struct ReleaseNoteBlock {
 }
 
 export enum UpdateCheckStatus { idle, checking, up-to-date, available, failed }
+enum CopyFeedback { idle, success, failed }
 
 export global UiStrings {
     in-out property <string> local-desktop: "Local Desktop";
@@ -467,7 +468,7 @@ export component MainWindow inherits Window {
     in-out property <bool> delete-open: false;
     private property <string> delete-remote-id: "";
     private property <bool> delete-from-gallery: false;
-    private property <bool> copy-toast: false;
+    private property <CopyFeedback> copy-feedback: idle;
     private property <bool> compact-language: root.language-index == 0;
     private property <bool> recent-tooltip-visible: false;
     private property <string> recent-tooltip-name: "";
@@ -478,7 +479,9 @@ export component MainWindow inherits Window {
     private property <length> recent-tooltip-pointer-x: 0px;
     private property <length> recent-tooltip-pointer-y: 0px;
 
-    changed menu-open => { if root.menu-open { root.gallery-action("release", ""); } }
+    changed menu-open => {
+        if root.menu-open { root.copy-feedback = CopyFeedback.idle; root.gallery-action("release", ""); }
+    }
     changed connection-dialog-open => { if root.connection-dialog-open { root.gallery-action("release", ""); } }
     changed permission-dialog-open => { if root.permission-dialog-open { root.gallery-action("release", ""); } }
     changed settings-open => {
@@ -544,6 +547,7 @@ export component MainWindow inherits Window {
                 width: parent.width - 80px;
                 property <int> phase: self.pressed ? 1 : 0;
                 changed phase => {
+                    if self.pressed { root.copy-feedback = CopyFeedback.idle; }
                     root.main-title-drag(phase, self.mouse-x, self.mouse-y);
                 }
                 moved => {
@@ -643,7 +647,10 @@ export component MainWindow inherits Window {
             x: 0px;
             width: parent.width - 92px;
             property <int> phase: self.pressed ? 1 : 0;
-            changed phase => { root.main-title-drag(phase, self.mouse-x, self.mouse-y); }
+            changed phase => {
+                if self.pressed { root.copy-feedback = CopyFeedback.idle; }
+                root.main-title-drag(phase, self.mouse-x, self.mouse-y);
+            }
             moved => { if (self.pressed) { root.main-title-drag(2, self.mouse-x, self.mouse-y); } }
         }
         minimize-button := Rectangle {
@@ -735,7 +742,12 @@ export component MainWindow inherits Window {
                 return reject;
             }
         }
-        TouchArea { clicked => { focus-sink.focus(); } }
+        TouchArea {
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down { root.copy-feedback = CopyFeedback.idle; }
+            }
+            clicked => { focus-sink.focus(); }
+        }
 
         // Slint owns the client area below the native macOS title bar. Draw
         // the boundary here because AppKit's titlebar separator is not shown
@@ -860,11 +872,21 @@ export component MainWindow inherits Window {
                     border-width: 1px; border-color: WorkbenchStyle.border;
                     Text { x: 12px; width: parent.width - 64px; height: parent.height; text: root.local-id; font-size: 24px; font-weight: 600; letter-spacing: 1px; color: WorkbenchStyle.text; vertical-alignment: center; }
                     Rectangle { x: parent.width - 48px; y: 10px; width: 1px; height: parent.height - 20px; background: WorkbenchStyle.border; }
-                    WorkbenchButton {
+                    copy-button := WorkbenchButton {
                         x: parent.width - 42px; y: 2px; width: 36px; quiet: true;
-                        icon: root.copy-toast ? FontAwesomeIcons.check : FontAwesomeIcons.copy;
-                        tooltip: root.copy-toast ? UiStrings.copied : GalleryStrings.tr("复制本机 ID", "Copy local ID", "Копировать ID");
-                        clicked => { if root.copy-local-id() { root.copy-toast = true; copy-timer.restart(); } }
+                        icon: root.copy-feedback == CopyFeedback.success ? FontAwesomeIcons.check : FontAwesomeIcons.copy;
+                        icon-color: root.copy-feedback == CopyFeedback.success ? WorkbenchStyle.success : WorkbenchStyle.muted;
+                        tooltip: GalleryStrings.tr("复制本机 ID", "Copy local ID", "Копировать ID");
+                        tooltip-suppressed: root.copy-feedback != CopyFeedback.idle;
+                        // Let other controls receive the original click; moving
+                        // focus away from Copy dismisses its transient feedback.
+                        changed has-focus => {
+                            if !self.has-focus { root.copy-feedback = CopyFeedback.idle; }
+                        }
+                        clicked => {
+                            root.copy-feedback = root.copy-local-id() ? CopyFeedback.success : CopyFeedback.failed;
+                            copy-timer.restart();
+                        }
                     }
                 }
                 Text { x: 16px; y: 138px; height: 18px; text: UiStrings.password; font-size: 12px; color: WorkbenchStyle.muted; }
@@ -994,7 +1016,10 @@ export component MainWindow inherits Window {
                     width: parent.width - 12px;
                     height: parent.height - 6px;
                     horizontal-stretch: 1;
-                    changed viewport-x => { root.recent-tooltip-visible = false; }
+                    changed viewport-x => {
+                        root.recent-tooltip-visible = false;
+                        root.copy-feedback = CopyFeedback.idle;
+                    }
 
                 HorizontalLayout {
                     padding: 0px;
@@ -1094,7 +1119,7 @@ export component MainWindow inherits Window {
                             width: connection-card.content-width;
                             height: 124px;
                             mouse-cursor: pointer;
-                            clicked => { root.recent-connect(connection.remote-id); }
+                            clicked => { root.copy-feedback = CopyFeedback.idle; root.recent-connect(connection.remote-id); }
                             image-touch := TouchArea {
                                 x: 0px; y: 0px;
                                 width: parent.width;
@@ -1111,7 +1136,7 @@ export component MainWindow inherits Window {
                                         root.recent-tooltip-groups = self.group-names;
                                     }
                                 }
-                                clicked => { root.recent-connect(connection.remote-id); }
+                                clicked => { root.copy-feedback = CopyFeedback.idle; root.recent-connect(connection.remote-id); }
                                 function show-details() {
                                     if !self.has-hover { return; }
                                     root.recent-tooltip-name = connection.display-name;
@@ -1145,18 +1170,20 @@ export component MainWindow inherits Window {
                                 remove-label: GalleryStrings.tr("删除记录", "Delete record", "Удалить запись");
                                 connected: connection.connected;
                                 edit-alias => {
+                                    root.copy-feedback = CopyFeedback.idle;
                                     root.alias-remote-id = connection.remote-id;
                                     root.alias-input = connection.display-name;
                                     root.alias-open = true;
                                 }
-                                edit-groups => { root.open-device-groups(connection.remote-id, connection.display-name); }
+                                edit-groups => { root.copy-feedback = CopyFeedback.idle; root.open-device-groups(connection.remote-id, connection.display-name); }
                                 remove-device => {
+                                    root.copy-feedback = CopyFeedback.idle;
                                     root.delete-remote-id = connection.remote-id;
                                     root.delete-from-gallery = false;
                                     root.delete-open = true;
                                 }
-                                connect-device => { root.recent-connect(connection.remote-id); }
-                                disconnect-device => { root.recent-disconnect(connection.remote-id); }
+                                connect-device => { root.copy-feedback = CopyFeedback.idle; root.recent-connect(connection.remote-id); }
+                                disconnect-device => { root.copy-feedback = CopyFeedback.idle; root.recent-disconnect(connection.remote-id); }
                             }
                         }
                         Rectangle {
@@ -1261,6 +1288,7 @@ export component MainWindow inherits Window {
                     TouchArea {
                             mouse-cursor: pointer;
                             clicked => {
+                                root.copy-feedback = CopyFeedback.idle;
                                 root.signal-reconnect-requested();
                             }
                     }
@@ -1516,8 +1544,9 @@ export component MainWindow inherits Window {
     }
 
     copy-timer := Timer {
-        interval: 1000ms;
-        triggered => { root.copy-toast = false; }
+        interval: root.copy-feedback == CopyFeedback.failed ? 4s : 2500ms;
+        running: root.copy-feedback != CopyFeedback.idle;
+        triggered => { root.copy-feedback = CopyFeedback.idle; }
     }
     remote-id-format-timer := Timer {
         interval: 1ms;
@@ -1530,14 +1559,17 @@ export component MainWindow inherits Window {
                 formatted.character-count, formatted.character-count);
         }
     }
-    if root.copy-toast: Rectangle {
-        x: (parent.width - self.width) / 2; y: parent.height - 92px; width: 280px; height: 40px;
-        background: #fffffff2;
-        border-radius: UiRadius.surface;
-        border-width: 1px;
-        border-color: ImGuiLineStyle.border;
+    // Float above the workbench while keeping modal dialogs in front.
+    if !root.gallery-mode && root.copy-feedback != CopyFeedback.idle: WorkbenchNotice {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2 - 24px;
+        width-limit: min(440px, parent.width - 40px);
+        error: root.copy-feedback == CopyFeedback.failed;
+        icon: self.error ? FontAwesomeIcons.xmark : FontAwesomeIcons.check;
+        text: self.error
+            ? GalleryStrings.tr("复制失败，请重试", "Couldn’t copy. Try again", "Не удалось скопировать. Повторите попытку")
+            : UiStrings.copied;
         z: 30;
-        Text { text: UiStrings.copied; color: #333840; horizontal-alignment: center; vertical-alignment: center; }
     }
 
     // Reset password modal.
