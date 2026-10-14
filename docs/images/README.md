@@ -4,49 +4,51 @@
 
 ## 来源 / Sources
 
-- 桌面与 Web 首页截图生成日期：2026-09-25；`fixtures/source.png` 和 `fixtures/website.png` 保留 2026-09-07 的公开页面截图。
-- 桌面 UI 源代码：`f73a57ba` 加本次工具栏关闭状态斜杠渲染修复，Slint 1.17.1，macOS arm64；本次扩展截图工具以捕获会话画面设置，并等待窗口完成尺寸与缩放初始化后导出。
-- 桌面图片来自 [`slint_ui_smoke_test`](../../apps/desktop/tests/slint_ui_smoke_test.cpp) 的 UI 捕获模式，直接渲染仓库中的 Slint 组件；不是旧版本截图或重新绘制的界面。
-- 主窗口展示“已连接服务器”和三台在线设备的完整示例状态。ID `123 456 789`、密码 `123456`、连接状态及设备记录均为演示数据，不是真实设备凭据或真实远程会话。示例设置不代表应用运行时默认值。
-- 本次主窗口截图包含随机密码刷新按钮；设置截图包含强制中继与自动隐私屏选项；自托管弹窗仅显示服务器地址和信令端口。画质、帧率和画面偏好在会话工具栏的“画面设置”菜单中展示。
-- 会话截图使用 `fixtures/website.png` 作为示例远端画面，展示真实工具栏和打开的画面设置菜单，不建立远程连接。“关于”截图中的 `v1.5.2` 和“已是最新版本”均为演示数据，不代表对线上最新版本的检查结果。
-- 会话工具栏的隐私屏按钮展示“已关闭”状态。关闭标记使用直接绘制的斜线路径，避免软件渲染器将旋转矩形显示为竖线。
-- 设备缩略图使用可公开的页面截图：`fixtures/source.png` 来自 [CrossDesk 的 Xmake 源码页](https://github.com/kunkundi/crossdesk/blob/ios-support/xmake.lua)，`fixtures/website.png` 来自 [CrossDesk 官网](https://www.crossdesk.cn/)，第三张复用 `web-client.png`。它们用于展示缩略图效果，不代表这些页面正在对应的远程电脑上运行。
-- `web-client.png`：2026-09-25 在 [web.crossdesk.cn](https://web.crossdesk.cn/) 重新截取的连接首页，页面显示版本 `2026.09.24.2`，视口为 1280 × 720。ID 与密码输入框为空，没有发起远程连接；使用该图片作为设备缩略图的桌面截图也已重新生成。
+- 桌面截图更新于 **2026-10-14**，UI 源代码为 `e76d2bf9`，使用 Slint 1.17.1、macOS arm64 和软件渲染器。图片直接渲染仓库中的 Slint 组件。
+- 主窗口、常规设置、桌面墙设置、自托管、关于与会话截图来自现有 [`slint_ui_smoke_test`](../../apps/desktop/tests/slint_ui_smoke_test.cpp) 的捕获模式。主窗口展示左上角桌面墙入口、双卡片连接区和近期连接分组筛选；设置展示“常规 / 桌面墙”选项卡与新的分组布局。
+- 桌面墙网格与放大图复用同一捕获代码，在**工程外的临时目录**中复制源文件，仅调整演示设备数量、单元格宽度和网格窗口高度。Slint 组件没有改动，工程内没有新增或修改测试文件。网格展示六台演示设备；放大图展示只读预览、群控和接管入口，没有建立真实连接。
+- 本机 ID `123 456 789`、密码 `123456`、设备名称、在线 / 连接状态及记录均为演示数据。主窗口展示三台设备，桌面墙展示六台；它们不是真实设备凭据或真实远程会话。示例配置不代表所有运行时默认值。
+- “关于”中的 `v1.5.2` 和“已是最新版本”是捕获工具的示例值，不代表当前发布版本或实际在线检查结果。会话图使用公开页面作为远端画面，展示真实工具栏与画面设置菜单；隐私屏按钮处于关闭状态。
+- 缩略图沿用既有公开页面截图：`fixtures/source.png` 来自 [CrossDesk Xmake 源码页](https://github.com/kunkundi/crossdesk/blob/ios-support/xmake.lua)，`fixtures/website.png` 来自 [CrossDesk 官网](https://www.crossdesk.cn/)，两者采集于 2026-09-07。它们只用于展示预览效果，不代表这些页面正在对应设备上运行，页面中的版本信息也不代表最新发布。
+- `web-client.png` 保留 **2026-09-25** 从 [Web 客户端](https://web.crossdesk.cn/) 采集的 1280 × 720 连接首页，页面版本为 `2026.09.24.2`，ID 与密码为空。本次未重新采集 Web 页面；桌面设备预览继续复用这张图片。
 
-Desktop images were refreshed on 2026-09-25 from UI source `f73a57ba`, using Slint 1.17.1 on macOS arm64. They render actual components with demonstration data, including the refreshed password controls, client settings, live video menu, and manual update check. The source-code and website fixtures remain public page captures from 2026-09-07. The Web connection page was recaptured on 2026-09-25 at 1280 × 720, showing version `2026.09.24.2` with empty credential fields; no remote connection was initiated. Desktop images using its thumbnail were regenerated as well. Desktop IDs, device names, settings, version numbers, and update results are illustrative. Native iOS screenshots are not included because this update did not capture a signed app running on a physical device.
-
-The session images also include this change's toolbar slash-rendering fix. The privacy button shows the off state using diagonal paths that render correctly without rectangle rotation.
+Desktop images were refreshed on **2026-10-14** from UI source `e76d2bf9`, using Slint 1.17.1 on macOS arm64. They render the actual components with demonstration data. DeskHub images use an external temporary copy of the existing capture program with six sample devices, 300 logical-pixel cells, and a shorter grid window; no UI components or repository tests were changed. IDs, credentials, connection states, versions, and update results are illustrative. No remote sessions were opened. Public-page fixtures remain from 2026-09-07, and the Web screenshot remains from 2026-09-25. This refresh does not include native mobile screenshots.
 
 ## 文件 / Files
 
-| 文件 | 页面 | 语言 |
+| 文件（`zh` / `en`） | 页面 | PNG 尺寸 |
 | --- | --- | --- |
-| `desktop-main-zh.png` / `desktop-main-en.png` | Main window / 主窗口 | 中文 / English |
-| `desktop-settings-zh.png` / `desktop-settings-en.png` | Settings / 设置 | 中文 / English |
-| `desktop-self-hosted-zh.png` / `desktop-self-hosted-en.png` | Self-hosting / 自托管设置 | 中文 / English |
-| `desktop-stream-video-settings-zh.png` / `desktop-stream-video-settings-en.png` | Session toolbar and video settings / 会话工具栏与画面设置 | 中文 / English |
-| `desktop-about-zh.png` / `desktop-about-en.png` | About and manual update check / 关于与检查更新 | 中文 / English |
-| `web-client.png` | Web connection page / Web 连接首页 | 中文 |
+| `desktop-main-*.png` | 主窗口 / Main window | 1280 × 944 |
+| `desktop-deskhub-*.png`（不含 `focus`） | 六设备桌面墙 / Six-device DeskHub grid | 1920 × 1000 |
+| `desktop-deskhub-focus-*.png` | 桌面墙放大视图 / Enlarged DeskHub view | 1920 × 1396 |
+| `desktop-settings-*.png`（不含 `deskhub`） | 常规设置 / General settings | 1280 × 944 |
+| `desktop-settings-deskhub-*.png` | 桌面墙传输设置 / DeskHub video settings | 1280 × 944 |
+| `desktop-self-hosted-*.png` | 自托管设置 / Self-hosting | 1280 × 944 |
+| `desktop-stream-video-settings-*.png` | 会话工具栏与画面设置 / Session video settings | 1920 × 1200 |
+| `desktop-about-*.png` | 关于与检查更新 / About and update check | 1280 × 944 |
+| `web-client.png`（中文） | Web 连接首页 / Web connection page | 1280 × 720 |
 
-主窗口及其弹窗图片为 1280 × 900 PNG，会话图片为 1920 × 1200 PNG，均使用 2× 原生渲染缩放保持文字清晰，未放大旧图。Markdown 只设置展示宽度，保持原始比例。设置列表可滚动，截图仅展示首屏。演示配置显示硬件编解码器可用；实际可用性由平台、设备与构建决定。Windows 专属的采集方式与便携版服务入口不会出现在这些 macOS 截图中。
+桌面图片使用 2× 原生渲染缩放，捕获窗口内容区，不包含 macOS 原生标题栏。未放大旧 UI 截图，也未重绘控件；演示远端画面由实际组件按比例显示。Markdown 只设置展示宽度。常规设置可滚动，截图仅展示首屏；Windows 专属采集方式与便携版服务入口不会出现在这些 macOS 图片中。
 
 ## 重新生成 / Regenerate
 
-更新 Web 图片时，在浏览器中打开 [web.crossdesk.cn](https://web.crossdesk.cn/)，等待连接表单和底部版本号加载完成，保持 ID 与密码为空，截取页面视口。当前图片使用 1280 × 720 视口；浏览器导出的 JPEG 仅转换为 PNG，未修改页面布局或内容。替换 `web-client.png` 后，重新生成下方桌面截图以同步设备卡片缩略图，并更新本页的日期与页面版本号。
+以下命令在仓库根目录、已配置依赖的 macOS 开发环境执行。所有临时源码、PPM 和额外捕获程序均写入系统临时目录，最终 PNG 才写入 `docs/images`。`sips` 仅做 PPM 到 PNG 的无损格式转换，其他平台可使用支持 PPM 的转换工具。
 
-以下命令在仓库根目录、已完成依赖配置的 macOS 开发环境运行。`sips` 仅将 Slint 导出的 PPM 无损转换为 PNG，不修改 UI。其他平台可以使用支持 PPM 的图片格式转换工具。
+先检查 `/tmp/crossdesk-ui-capture-page` 和 `/tmp/crossdesk-ui-capture-language`：旧覆盖文件存在且非空时会优先于环境变量，应确认并移开后再捕获。`CROSSDESK_UI_CAPTURE_DEMO_ASSETS` 必须包含上述公开页面图片，缺失图片会导致捕获失败。工具等待窗口尺寸与缩放初始化后再截图。
+
+### 主窗口、设置与会话
 
 ```bash
 set -e
 xmake b -y slint_ui_smoke_test
-mkdir -p build/readme-capture docs/images
+capture_dir=$(mktemp -d "${TMPDIR:-/tmp}/crossdesk-readme-capture.XXXXXX")
+export capture_dir
 
 for locale in zh en; do
   language=0
   if [ "$locale" = en ]; then language=1; fi
-  for page in main settings self-hosted about stream-video-settings; do
-    snapshot="$PWD/build/readme-capture/desktop-$page-$locale.ppm"
+  for page in main settings settings-deskhub self-hosted about stream-video-settings; do
+    snapshot="$capture_dir/desktop-$page-$locale.ppm"
     SLINT_BACKEND=winit-software SLINT_SCALE_FACTOR=2 \
       CROSSDESK_UI_CAPTURE=1 \
       CROSSDESK_UI_CAPTURE_DEMO_ASSETS="$PWD/docs/images" \
@@ -60,6 +62,67 @@ for locale in zh en; do
 done
 ```
 
-`CROSSDESK_UI_CAPTURE_DEMO_ASSETS` 必须指向包含上述图片的目录。缺失图片会让捕获命令失败，避免再次导出空白缩略图；不设置该变量时，仍保留原有测试状态。捕获工具会先运行窗口事件循环，等待尺寸与缩放初始化；直接在 `show()` 后截图可能得到 1× 图片。
+### 六设备桌面墙
 
-捕获模式兼容 `/tmp/crossdesk-ui-capture-page` 和 `/tmp/crossdesk-ui-capture-language` 两个旧覆盖文件；如存在，它们会优先于环境变量，运行前请检查。更新后逐张检查文字、布局、敏感信息和文档引用，并同步修改本页日期与源码版本。
+现有捕获模式的 `gallery` / `gallery-focus` 默认使用三台设备。要复现本页的六设备图，在上一步同一 shell 中创建临时副本，只修改演示场景：
+
+```bash
+python3 - <<'PY'
+import os
+from pathlib import Path
+
+source = Path('apps/desktop/tests/slint_ui_smoke_test.cpp').read_text()
+changes = [
+    ('options.page != "main-recent-scrolled") {',
+     'options.page != "main-recent-scrolled" &&\n'
+     '        !options.page.starts_with("gallery")) {'),
+    ('window->set_gallery_mode(true);\n    std::vector',
+     'window->set_gallery_mode(true);\n'
+     '    window->set_gallery_tile_width(300);\n    std::vector'),
+    ('698.0f;\n#else\n        720.0f;',
+     'options.page == "gallery" ? 500.0f : 698.0f;\n#else\n'
+     '        options.page == "gallery" ? 500.0f : 720.0f;'),
+]
+for old, new in changes:
+    assert source.count(old) == 1, 'Capture source changed; review the fixture adjustment.'
+    source = source.replace(old, new, 1)
+Path(os.environ['capture_dir'], 'readme_capture.cpp').write_text(source)
+PY
+```
+
+以下编译路径对应本次的 `macosx / arm64 / debug` 配置。其他配置先用 `xmake show -t slint_ui_smoke_test` 查看当前生成头文件和库目录，再替换路径；不要在工程内添加临时构建入口。
+
+```bash
+slint_prefix=$(xmake lua -c 'import("core.project.config"); config.load(); import("core.project.project"); print(project.target("slint_ui_smoke_test"):pkg("slint"):installdir())')
+xcrun clang++ -std=c++20 \
+  -Iapps/desktop/src/gui \
+  -Iapps/desktop/src/gui/assets/fonts \
+  -Iapps/desktop/src/gui/assets/localization \
+  -Ibuild/.gens/crossdesk_ui/macosx/arm64/debug/rules/slint \
+  -isystem "$slint_prefix/include/slint" \
+  "$capture_dir/readme_capture.cpp" \
+  build/macosx/arm64/debug/libcrossdesk_ui.a \
+  -L"$slint_prefix/lib" -lslint_cpp -Wl,-rpath,"$slint_prefix/lib" \
+  -o "$capture_dir/readme_capture"
+
+for locale in zh en; do
+  language=0
+  if [ "$locale" = en ]; then language=1; fi
+  for page in gallery gallery-focus; do
+    name=deskhub
+    if [ "$page" = gallery-focus ]; then name=deskhub-focus; fi
+    snapshot="$capture_dir/desktop-$name-$locale.ppm"
+    SLINT_BACKEND=winit-software SLINT_SCALE_FACTOR=2 \
+      CROSSDESK_UI_CAPTURE=1 \
+      CROSSDESK_UI_CAPTURE_DEMO_ASSETS="$PWD/docs/images" \
+      CROSSDESK_UI_CAPTURE_PAGE="$page" \
+      CROSSDESK_UI_CAPTURE_LANGUAGE="$language" \
+      CROSSDESK_UI_CAPTURE_SNAPSHOT="$snapshot" \
+      "$capture_dir/readme_capture"
+    sips -s format png "$snapshot" \
+      --out "docs/images/desktop-$name-$locale.png"
+  done
+done
+```
+
+更新后逐张检查文字、布局、演示数据和文档引用，并同步日期、源码版本与图片尺寸。若更新 Web 图片，应打开 Web 客户端，等待表单与底部版本号加载完成，保持 ID 与密码为空，再截取页面视口；替换后也需重新生成桌面图以同步缩略图。

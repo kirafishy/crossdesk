@@ -1,7 +1,7 @@
 <div align="center">
   <img src="apps/desktop/resources/linux/crossdesk_128x128.png" width="80" alt="CrossDesk logo" />
   <h1>CrossDesk</h1>
-  <p>A lightweight, cross-platform remote desktop for computers, browsers, and iPhone / iPad.</p>
+  <p>A lightweight, cross-platform remote desktop for computers, browsers, and mobile devices, with DeskHub for viewing and controlling multiple desktops.</p>
   <p><a href="https://www.crossdesk.cn/">Website</a> · <a href="https://github.com/kunkundi/crossdesk/releases">Download</a> · <a href="https://web.crossdesk.cn/">Open Web Client</a> · <a href="README.md">中文</a></p>
 </div>
 
@@ -15,11 +15,11 @@
 
 </div>
 
-CrossDesk connects Windows, macOS, and Linux desktops, with browser and native iOS / Android clients for controlling computers. Built on [MiniRTC](https://github.com/kunkundi/minirtc), it supports real-time video and audio, keyboard and mouse control, file transfer, and self-hosting. The project is under active development.
+CrossDesk connects Windows, macOS, and Linux desktops, with browser and native iOS / Android clients for controlling computers. The desktop client now includes **DeskHub**, a separate window for viewing multiple remote desktops, organizing devices into groups, and performing batch actions or synchronized control. Built on [MiniRTC](https://github.com/kunkundi/minirtc), it supports real-time video and audio, keyboard and mouse control, file transfer, and self-hosting. The project is under active development.
 
 > This guide follows the current repository source. Desktop screenshots render the current Slint UI with sample IDs, passwords, online statuses, and recent devices; thumbnails show public pages. Check each release's notes for the features and requirements of its binaries. Native iOS build and signing instructions are below.
 
-[Preview](#preview) · [Download](#download) · [Quick start](#quick-start) · [Session controls](#session) · [Settings](#settings) · [iOS](#ios) · [Self-hosting](#self-hosting) · [Build](docs/BUILD_EN.md) · [FAQ](docs/FAQ.md#english)
+[Preview](#preview) · [Download](#download) · [Quick start](#quick-start) · [DeskHub](#deskhub) · [Session controls](#session) · [Settings](#settings) · [iOS](#ios) · [Self-hosting](#self-hosting) · [Build](docs/BUILD_EN.md) · [FAQ](docs/FAQ.md#english)
 
 <a id="preview"></a>
 
@@ -27,10 +27,18 @@ CrossDesk connects Windows, macOS, and Linux desktops, with browser and native i
 
 ### Desktop client
 
-The main window brings together your device ID, connection password, remote connection entry, and recent devices.
+The main window presents your credentials and connection controls in Local Desktop and Remote Desktop cards, with recent devices and a group filter below. Open DeskHub at the top left, or use the top-right menu for settings, messages, and About.
 
 <p align="center">
-  <img src="docs/images/desktop-main-en.png" width="800" alt="Current desktop UI example showing a connected server and three online devices with page thumbnails" />
+  <img src="docs/images/desktop-main-en.png" width="800" alt="Updated main window with DeskHub access, local credentials, remote connection controls, and recent-device group filtering; data is illustrative" />
+</p>
+
+### DeskHub
+
+View multiple devices in a separate window with groups, a resizable grid, compact and fullscreen views, and batch actions. Click a preview to enlarge it, then take control when needed.
+
+<p align="center">
+  <img src="docs/images/desktop-deskhub-en.png" width="960" alt="DeskHub grid with six demonstration devices, group filtering, Add, Select, Compact, and Network controls" />
 </p>
 
 ### Web client
@@ -38,7 +46,7 @@ The main window brings together your device ID, connection password, remote conn
 Enter a remote device ID and password in your browser without installing the desktop app on the controlling device.
 
 <p align="center">
-  <img src="docs/images/web-client.png" width="800" alt="Current CrossDesk Web Client connection page in Chinese" />
+  <img src="docs/images/web-client.png" width="800" alt="CrossDesk Web Client connection page in Chinese, captured on 2026-09-25" />
 </p>
 
 See the [screenshot notes](docs/images/README.md) for image sources and refresh instructions.
@@ -49,7 +57,8 @@ See the [screenshot notes](docs/images/README.md) for image sources and refresh 
 | --- | --- |
 | Cross-platform control | Windows / macOS / Linux desktop control; browser and native iOS / Android controllers |
 | Live video and audio | H.264 / AV1, hardware codecs, and remote audio; adjust quality, 30 / 60 fps, and video preference during a session |
-| Devices and displays | Recent connections, device aliases, session tabs, and remote display switching |
+| Devices and displays | Recent connections, device aliases and group filtering, session tabs, and remote display switching |
+| DeskHub | Live multi-desktop previews, groups and drag reordering, enlarged views with control, synchronized input, and batch connection / disconnection / audio / file actions; configurable resolution, frame rate, and shared video budget |
 | Input and sharing | Keyboard/mouse input, remote cursor synchronization, shortcuts, text clipboard synchronization, and file transfer |
 | Networking and deployment | Direct P2P connections, TURN relay and forced relay, SRTP media encryption, and self-hosted signaling/relay services |
 | Privacy screen | Enable automatically when connected to, or toggle from the session toolbar; availability depends on the host OS and capture method |
@@ -103,9 +112,9 @@ Both contain the same complete application, replace each other and preserve user
 ### Connect from another computer
 
 1. **Prepare the host.** Install and run CrossDesk on the computer to control. Wait for the bottom status bar to show that the server is connected. Share the **Local ID** and **Password** shown under **Local Desktop** with the controller.
-2. **Enter the remote ID.** On the controlling computer, enter the host's ID in **Remote Desktop → Remote ID**, then click **→**.
+2. **Enter the remote ID.** On the controlling computer, enter the host's **9-digit ID** in **Remote Desktop → Remote ID**, then click **Connect**.
 3. **Verify the password.** Enter the host's current connection password when prompted and confirm. Select **Remember password** if you want to save it.
-4. **Reconnect later.** Previously connected devices appear under **Recent Connections**. Reconnect from a card, edit its alias, or remove its record.
+4. **Reconnect later.** Previously connected devices appear under **Recent Connections**. Reconnect from a card, or hover to rename it, edit its groups, remove its record, or connect / disconnect. Use the group filter beside the heading to narrow the list.
 
 The eye button shows or hides the local password, the refresh button generates a new random password, and the pencil button lets you edit it. Passwords use **6 ASCII letters or digits**. Stay connected to the server when editing or refreshing a password. Wait for the change to succeed and the client to reconnect, then copy the current password. Controllers that saved the old password must enter it again.
 
@@ -116,6 +125,27 @@ The eye button shows or hides the local password, the refresh button generates a
 3. Use the page's display, mouse-mode, and keyboard controls during the session. Phone and tablet browsers can also connect.
 
 For self-hosting, connect both sides to the same service. Browser deployment is documented in [CrossDesk Web Client](https://github.com/kunkundi/crossdesk-web-client).
+
+<a id="deskhub"></a>
+
+## DeskHub: view and control multiple devices
+
+Click **DeskHub** at the top left of the main window to open a separate window. The connection window remains available for ordinary remote sessions and global settings. DeskHub saves its device membership, groups, order, and window layout; connections must be started manually after relaunching.
+
+1. **Add devices.** Choose **Add → Add by device ID**, enter an ID, password, and optional group, then click **Add and connect**. Credentials are saved only when you select **Remember password**. Alternatively, choose **Add from recent** and import multiple records; use **Select → Connect** to connect after importing.
+2. **Arrange the view.** Switch from **All devices** to a group, drag grid dividers to resize all previews, or drag a device onto another to swap positions. **Compact** hides device names and management controls; fullscreen provides more viewing space. Changing pages keeps connections open.
+3. **Enlarge and control.** Click a preview to open a read-only enlarged view. Switch devices with the thumbnails above it, and drag the divider to resize the two areas. Click **Control** to send keyboard and mouse input. Click **Release** or press **Ctrl / ⌘ + Shift + Esc** to release; switching devices or losing window focus also releases control.
+4. **Apply batch actions.** Click **Select**, choose devices or **Select all**, and connect, disconnect with **Close**, or use **More** to mute / unmute or send a file. **Select all** includes every page in the current group; switching groups clears the selection.
+
+<p align="center">
+  <img src="docs/images/desktop-deskhub-focus-en.png" width="960" alt="DeskHub enlarged view with thumbnails above the main preview and View only status, Group control, and Control buttons; screens are illustrative" />
+</p>
+
+**Group control:** click **Group control** in the enlarged view to mirror input from the current device to **all connected devices**, including other groups, pages, and connections not displayed in the wall. The scope is independent of the batch selection. Devices receive the same coordinates and keys without additional scaling for different screen sizes. Releasing control also ends group control.
+
+DeskHub connections are muted by default. Enable sound with **Select → More → Unmute**. The bottom **Network** button shows direct / relay mode, encryption, receive/send rates, video latency, packet loss, resolution, and frame rate for all connected devices. For the full single-session toolbar, including display switching and privacy screens, click a connected device under **Recent Connections** in the main window to open its separate session window.
+
+**Closing DeskHub disconnects all remote devices and closes session windows sharing those connections; minimizing it keeps connections open.** The disconnect scope includes all groups and pages, regardless of selection. See the [DeskHub guide](docs/deskhub.md) (Chinese) for further controls, preview behavior, and compatibility details.
 
 <a id="session"></a>
 
@@ -136,7 +166,7 @@ Switch devices using session tabs. Expand the control bar if it is collapsed, an
 | Fullscreen | Enter / exit fullscreen |
 | Disconnect | End the current remote session |
 
-Desktop clients synchronize text clipboard contents. Configure the receiving directory under **Settings → File Save Path**. Closing the main window hides it and keeps the app running; use the system tray or menu-bar exit command to quit completely.
+Desktop clients synchronize text clipboard contents. Configure the receiving directory under **Settings → General → File Save Path**. Closing the main window hides it and keeps the app running; use the system tray or menu-bar exit command to quit completely.
 
 ### Adjust video during a session
 
@@ -150,10 +180,10 @@ After connecting, open **Video settings** (the sliders icon) in the toolbar. Cho
 
 ## Client settings and updates
 
-Open **☰ → Settings** in the top-right corner and click **OK** to save. Configure codecs and connections before connecting; some settings are disabled during an active session. Scroll down for self-hosting, startup behavior, and the file save path. Adjust quality, frame rate, and video preference from the remote session toolbar.
+Open **☰ → Settings** in the top-right corner, choose **General / DeskHub**, and click **Save** to apply changes. Switching tabs preserves pending changes; **Cancel** discards them. General settings are grouped into interface, video, networking, and further sections available by scrolling. Configure codecs and connections before connecting; some settings are disabled during an active session. Adjust ordinary session quality, frame rate, and video preference from its toolbar.
 
 <p align="center">
-  <img src="docs/images/desktop-settings-en.png" width="720" alt="Current client settings with codec, hardware codecs, TURN, forced relay, and automatic privacy screen options" />
+  <img src="docs/images/desktop-settings-en.png" width="720" alt="Updated General settings with General and DeskHub tabs, language, video codec, hardware codecs, and networking options" />
 </p>
 
 | Setting | Purpose |
@@ -168,6 +198,22 @@ Open **☰ → Settings** in the top-right corner and click **OK** to save. Conf
 | Self-Hosted Config | Set the server address and signaling port, then enable the checkbox |
 | Auto Start / Enable Daemon | Configure startup and process supervision; restart as indicated by the UI |
 | File Save Path | Choose where received files are saved |
+
+### DeskHub video transmission
+
+Use **Settings → DeskHub** to configure wall sessions together. Saving applies changes immediately to current DeskHub sessions and future connections; ordinary connections are unaffected.
+
+| Setting | Purpose |
+| --- | --- |
+| Resolution limit | Auto, 320 × 180, 640 × 360, 1280 × 720, 1920 × 1080, 2560 × 1440, 3840 × 2160, or Original resolution; Auto adapts to grid / enlarged views, while fixed limits preserve aspect ratio without upscaling the source |
+| Frame rate | Follow device settings, or choose 15 / 30 / 60 FPS |
+| Video budget | Defaults to 20 Mbps; choose 2 / 5 / 10 / 20 / 50 / 100 Mbps, shared by compatible DeskHub sessions with priority for enlarged views. Audio, file transfers, and ordinary connections are excluded; this is not a hard limit on instantaneous traffic |
+
+<p align="center">
+  <img src="docs/images/desktop-settings-deskhub-en.png" width="720" alt="DeskHub video settings with Auto resolution, Follow device settings frame rate, and a 20 Mbps video budget" />
+</p>
+
+Devices supporting preview subscriptions can pause video while their views are hidden and resume when visible. Older hosts fall back according to their capabilities, so not every resolution, frame-rate, or bandwidth setting will apply.
 
 ### Check for updates
 
@@ -248,7 +294,7 @@ If **Remote Windows service unavailable** appears, check installation and servic
 
 ## Self-hosting
 
-Host your own signaling and TURN services, then enter their connection details under **☰ → Settings → Self-Hosted Config**. Enable the same server configuration on both the controller and host.
+Host your own signaling and TURN services, then enter their connection details under **☰ → Settings → General → Self-Hosted Config**. Enable the same server configuration on both the controller and host.
 
 - [Self-hosting guide](docs/SELF_HOSTING_EN.md): current Compose deployment, client settings, certificate trust, and troubleshooting.
 - [CrossDesk Server](https://github.com/kunkundi/crossdesk-server): server source and release configuration.
