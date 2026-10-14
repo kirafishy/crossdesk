@@ -4167,6 +4167,8 @@ void GuiApplication::CloseStreamTab(const std::string& remote_id) {
   }
   if (controlled_remote_id_ == remote_id)
     ReleaseControl();
+  else if (!gallery_group_control_id_.empty())
+    ReleasePressedInput();
   keyboard_.ReleaseRemotePressedKeys(remote_id, "stream_tab_closed");
   CloseRemoteSession(props);
   ResetRemoteSessionResources(props);
@@ -4179,7 +4181,7 @@ void GuiApplication::CloseStreamTab(const std::string& remote_id) {
   }
   if (focused_remote_id_ == remote_id) {
     focused_remote_id_.clear();
-    controlled_remote_id_.clear();
+    if (controlled_remote_id_ == remote_id) controlled_remote_id_.clear();
     if (ui_->video_presenter && ui_->video_presenter->SelectStream({})) {
       video_frame_dirty_.store(true, std::memory_order_release);
     }
@@ -4267,13 +4269,7 @@ void GuiApplication::SendPointerInput(int button, int kind, float x, float y) {
   ui_->pointer_x = point->x;
   ui_->pointer_y = point->y;
   controlled_remote_id_ = props->remote_id_;
-  const std::string message = action.to_json();
-  {
-    std::lock_guard lock(props->remote_cursor_state_mutex_);
-    props->cursor_presentation_.NoteInput(SDL_GetTicks());
-  }
-  SendReliableDataFrame(props->peer_, message.c_str(), message.size(),
-                        props->mouse_label_.c_str());
+  SendRemoteInput(action);
 }
 
 void GuiApplication::SendScrollInput(float delta_x, float delta_y, float x,
@@ -4312,14 +4308,8 @@ void GuiApplication::SendScrollInput(float delta_x, float delta_y, float x,
   if (action.m.s == 0) {
     return;
   }
-  {
-    std::lock_guard lock(props->remote_cursor_state_mutex_);
-    props->cursor_presentation_.NoteInput(SDL_GetTicks());
-  }
   controlled_remote_id_ = props->remote_id_;
-  const std::string message = action.to_json();
-  SendReliableDataFrame(props->peer_, message.c_str(), message.size(),
-                        props->mouse_label_.c_str());
+  SendRemoteInput(action);
 }
 
 void GuiApplication::SendKeyInput(const std::string& text, bool pressed,
@@ -4386,20 +4376,15 @@ void GuiApplication::SyncAudioPlayback() {
 
 void GuiApplication::ReleasePressedInput() {
   keyboard_.ForceReleasePressedKeys();
-  if (auto props = FindRemoteSession(controlled_remote_id_);
-      props && props->peer_) {
-    for (int button : ui_->pressed_mouse_buttons) {
-      RemoteAction action{};
-      action.type = ControlType::mouse;
-      action.m.x = ui_->pointer_x;
-      action.m.y = ui_->pointer_y;
-      action.m.flag = button == 1   ? MouseFlag::left_up
-                      : button == 2 ? MouseFlag::right_up
-                                    : MouseFlag::middle_up;
-      const auto message = action.to_json();
-      SendReliableDataFrame(props->peer_, message.data(), message.size(),
-                            props->mouse_label_.c_str());
-    }
+  for (int button : ui_->pressed_mouse_buttons) {
+    RemoteAction action{};
+    action.type = ControlType::mouse;
+    action.m.x = ui_->pointer_x;
+    action.m.y = ui_->pointer_y;
+    action.m.flag = button == 1   ? MouseFlag::left_up
+                    : button == 2 ? MouseFlag::right_up
+                                  : MouseFlag::middle_up;
+    SendRemoteInput(action);
   }
   ui_->pressed_mouse_buttons.clear();
 }
@@ -4408,6 +4393,8 @@ void GuiApplication::ReleaseControl() {
   const auto gallery_target = ui_->gallery_control_id;
   devices_.StopKeyboardCapturer();
   ReleasePressedInput();
+  gallery_group_control_id_.clear();
+  ui_->wall->set_gallery_group_controlling(false);
   if (!ui_->gallery_control_id.empty()) {
     ui_->gallery_control_id.clear();
     ui_->wall->set_gallery_controlling(false);
@@ -4845,10 +4832,17 @@ void GuiApplication::GalleryAction(const std::string& action,
   } else if (action == "focus") {
     ReleaseControl();
     ui_->gallery_focus = value;
-  } else if (action == "control") {
+  } else if (action == "group-release") {
+    // Flush releases to the old group before returning to single-device input.
+    ReleasePressedInput();
+    gallery_group_control_id_.clear();
+    ui_->wall->set_gallery_group_controlling(false);
+  } else if (action == "control" || action == "group-control") {
     ReleaseControl();
     auto props = FindRemoteSession(value);
-    if (!props || props->connection_status_ != ConnectionStatus::Connected)
+    if (value != ui_->gallery_focus || !props || !props->peer_ ||
+        props->closing_ ||
+        props->connection_status_ != ConnectionStatus::Connected)
       return;
     {
       std::lock_guard lock(props->gallery_frame_mutex_);
@@ -4858,6 +4852,8 @@ void GuiApplication::GalleryAction(const std::string& action,
     }
     ui_->gallery_control_id = value;
     controlled_remote_id_ = value;
+    if (action == "group-control") gallery_group_control_id_ = value;
+    ui_->wall->set_gallery_group_controlling(!gallery_group_control_id_.empty());
     props->control_mouse_ = true;
     props->enable_mouse_control_ = true;
     props->clipboard_allowed_ = true;
@@ -5735,7 +5731,7 @@ void GuiApplication::Cleanup() {
 #endif
   privacy_.Disable();
   clipboard_.Shutdown();
-  keyboard_.ForceReleasePressedKeys();
+  ReleaseControl();
   keyboard_.ReleaseAllRemotePressedKeys("application_exit");
   devices_.DestroyDevices();
   privacy_.Shutdown();

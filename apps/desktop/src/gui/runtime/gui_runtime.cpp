@@ -28,6 +28,49 @@ GuiRuntime::GuiRuntime()
 
 GuiRuntime::~GuiRuntime() { WaitForSessionCleanup(); }
 
+void GuiRuntime::SendRemoteInput(const RemoteAction& action) {
+  const bool mouse = action.type == ControlType::mouse;
+  if (!mouse && action.type != ControlType::keyboard &&
+      action.type != ControlType::keyboard_state)
+    return;
+  const std::string& target_id = controlled_remote_id_.empty()
+      ? focused_remote_id_ : controlled_remote_id_;
+  if (target_id.empty()) return;
+  const bool group = gallery_group_control_id_ == target_id;
+  const bool releasing = mouse
+      ? action.m.flag == MouseFlag::left_up ||
+        action.m.flag == MouseFlag::right_up ||
+        action.m.flag == MouseFlag::middle_up
+      : action.type == ControlType::keyboard
+          ? action.k.flag == KeyFlag::key_up : action.ks.pressed_count == 0;
+  const auto available = [](const auto& props) {
+    return props && props->peer_ && !props->closing_ &&
+           props->connection_status_ == ConnectionStatus::Connected;
+  };
+  std::shared_lock lock(remote_sessions_mutex_);
+  const auto source = remote_sessions_.find(target_id);
+  // A lost leader must stop new input, but its followers still need key/button
+  // releases before group control is cleared by the UI.
+  if (!releasing &&
+      (source == remote_sessions_.end() || !available(source->second)))
+    return;
+  const auto message = action.to_json();
+  for (const auto& [id, props] : remote_sessions_) {
+    if ((!group && id != target_id) || !available(props)) continue;
+    if (mouse) {
+      std::lock_guard cursor_lock(props->remote_cursor_state_mutex_);
+      props->cursor_presentation_.NoteInput(SDL_GetTicks());
+    }
+    // Reuse exactly the leader's mapped coordinates and key metadata. Neither
+    // gallery filters nor the follower's preview dimensions affect input.
+    const int result = SendReliableDataFrame(
+        props->peer_, message.data(), message.size(),
+        mouse ? props->mouse_label_.c_str() : props->keyboard_label_.c_str());
+    if (result != 0)
+      LOG_WARN("Send remote input failed, remote_id={}, ret={}", id, result);
+  }
+}
+
 int GuiRuntime::CreateConnectionPeer() {
   // Tick retries after the old peer's leave notification and socket shutdown.
   if (connection_peer_cleanup_.valid()) return 0;

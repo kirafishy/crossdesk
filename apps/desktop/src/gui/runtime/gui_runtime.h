@@ -87,6 +87,10 @@ class GuiRuntime : protected gui_detail::GuiState {
   void WaitForSessionCleanup();
   std::shared_ptr<RemoteSession> FindRemoteSession(
       const std::string& remote_id);
+  // UI thread: send mapped mouse/keyboard input to the current control target,
+  // or every connected session while that target leads DeskHub group control.
+  void SendRemoteInput(const RemoteAction& action);
+  std::string gallery_group_control_id_;
 
   void ResetRemoteServiceStatus(RemoteSession& props);
   void ApplyRemoteServiceStatus(RemoteSession& props,

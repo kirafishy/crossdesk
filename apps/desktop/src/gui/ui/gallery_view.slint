@@ -43,6 +43,7 @@ export struct GalleryActionDevice {
 
 export component GalleryView inherits Rectangle {
     in property <bool> controlling: false;
+    in property <bool> group-controlling: false;
     in property <bool> input-suspended: false;
     in property <bool> simplified: false;
     in property <bool> fullscreen: false;
@@ -566,11 +567,23 @@ export component GalleryView inherits Rectangle {
                 background: root.controlling ? #e7f1fd : #f0f2f5;
                 focus-state := Text {
                     x: 8px; width: parent.width - 16px; height: parent.height;
-                    text: root.controlling ? GalleryStrings.tr("正在操控", "Controlling", "Управление")
+                    text: root.group-controlling ? GalleryStrings.tr("群控中", "Group control", "Групповое")
+                        : root.controlling ? GalleryStrings.tr("正在操控", "Controlling", "Управление")
                         : root.focused.connected && root.focused.has-frame && !root.focused.stale
                             ? GalleryStrings.tr("只读预览", "View only", "Просмотр") : root.focused.status;
                     font-size: 10px; color: root.controlling ? #3e77b3 : #6b7480; vertical-alignment: center; overflow: elide;
                 }
+            }
+            GalleryToolbarButton {
+                horizontal-padding: root.toolbar-button-padding;
+                primary: root.group-controlling;
+                enabled: root.group-controlling || (root.focused.connected && root.focused.has-frame && !root.focused.stale);
+                text: root.group-controlling ? GalleryStrings.tr("关闭群控", "Stop group", "Откл. группу") : GalleryStrings.tr("开启群控", "Group control", "Групп. ввод");
+                alternate-text: root.group-controlling ? GalleryStrings.tr("开启群控", "Group control", "Групп. ввод") : GalleryStrings.tr("关闭群控", "Stop group", "Откл. группу");
+                accessible-role: button;
+                accessible-label: self.text + GalleryStrings.tr("：同步键鼠到所有已连接设备", ": mirror input to all connected devices", ": ввод на всех подключённых устройствах");
+                accessible-action-default => { self.clicked(); }
+                clicked => { root.action(root.group-controlling ? "group-release" : "group-control", root.focused.id); }
             }
             CompactButton { width: 100px; primary: true; enabled: !root.focused.connected || root.controlling || (root.focused.has-frame && !root.focused.stale); text: root.focused.connected ? (root.controlling ? GalleryStrings.tr("释放操控", "Release", "Отпустить") : GalleryStrings.tr("接管操控", "Control", "Управлять")) : GalleryStrings.tr("连接", "Connect", "Подключить"); clicked => { root.action(root.focused.connected ? (root.controlling ? "release" : "control") : "connect", root.focused.id); } }
         }
@@ -759,7 +772,9 @@ export component GalleryView inherits Rectangle {
             x: 0px; y: 0px; width: parent.width - 124px; height: parent.height;
             connection-count := Text {
                 x: 0px; width: min(self.preferred-width, parent.width - network-button.width - 12px); height: parent.height;
-                text: root.connected-summary;
+                text: root.group-controlling
+                    ? GalleryStrings.tr("群控中 · 所有已连接设备", "Group control · All connected devices", "Групповое управление · Все подключения")
+                    : root.connected-summary;
                 color: #62666d; vertical-alignment: center; font-size: 11px; overflow: elide;
             }
             network-button := SecondaryButton {

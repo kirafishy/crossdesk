@@ -309,6 +309,7 @@ export component MainWindow inherits Window {
     }
     in-out property <string> connection-input-error;
     in property <bool> gallery-controlling: false;
+    in property <bool> gallery-group-controlling: false;
     out property <float> gallery-video-width: gallery.video-width;
     out property <float> gallery-video-height: gallery.video-height;
     out property <float> gallery-preview-width: gallery.preview-width;
@@ -1321,6 +1322,7 @@ export component MainWindow inherits Window {
             focus-rail-height <=> root.gallery-focus-rail-height;
             network-open => { root.gallery-network-open = true; }
             controlling: root.gallery-controlling;
+            group-controlling: root.gallery-group-controlling;
             input-suspended: root.gallery-transitioning;
             pointer-input(button, kind, x, y) => { root.gallery-pointer(button, kind, x, y); }
             scroll-input(dx, dy, x, y) => { root.gallery-scroll(dx, dy, x, y); }

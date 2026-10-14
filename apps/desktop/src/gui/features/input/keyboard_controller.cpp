@@ -160,27 +160,7 @@ void KeyboardController::SendHeartbeat(bool force) {
     action.ks.pressed_count = index;
   }
 
-  const std::string target_id = owner_.controlled_remote_id_.empty()
-                                    ? owner_.focused_remote_id_
-                                    : owner_.controlled_remote_id_;
-  std::shared_lock sessions_lock(owner_.remote_sessions_mutex_);
-  const auto props_it = owner_.remote_sessions_.find(target_id);
-  if (target_id.empty() || props_it == owner_.remote_sessions_.end() ||
-      props_it->second->connection_status_.load() !=
-          ConnectionStatus::Connected ||
-      !props_it->second->peer_) {
-    last_heartbeat_tick_ = now;
-    return;
-  }
-
-  const std::string message = action.to_json();
-  const int result = SendReliableDataFrame(
-      props_it->second->peer_, message.c_str(), message.size(),
-      props_it->second->keyboard_label_.c_str());
-  if (result != 0) {
-    LOG_WARN("Send keyboard heartbeat failed, remote_id={}, ret={}", target_id,
-             result);
-  }
+  owner_.SendRemoteInput(action);
   last_heartbeat_tick_ = now;
 }
 
@@ -200,24 +180,7 @@ int KeyboardController::SendKeyCommand(int key_code, bool is_down,
   action.k.scan_code = scan_code;
   action.k.extended = extended;
 
-  const std::string target_id = owner_.controlled_remote_id_.empty()
-                                    ? owner_.focused_remote_id_
-                                    : owner_.controlled_remote_id_;
-  std::shared_lock sessions_lock(owner_.remote_sessions_mutex_);
-  const auto props_it = owner_.remote_sessions_.find(target_id);
-  if (!target_id.empty() && props_it != owner_.remote_sessions_.end() &&
-      props_it->second->connection_status_.load() ==
-          ConnectionStatus::Connected &&
-      props_it->second->peer_) {
-    const std::string message = action.to_json();
-    const int result = SendReliableDataFrame(
-        props_it->second->peer_, message.c_str(), message.size(),
-        props_it->second->keyboard_label_.c_str());
-    if (result != 0) {
-      LOG_WARN("Send keyboard command failed, remote_id={}, ret={}", target_id,
-               result);
-    }
-  }
+  owner_.SendRemoteInput(action);
 
   TrackPressedKey(key_code, is_down, scan_code, extended);
   return 0;
