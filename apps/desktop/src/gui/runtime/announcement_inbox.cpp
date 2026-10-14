@@ -154,6 +154,29 @@ bool AnnouncementInbox::Read(int64_t id, int64_t revision) {
   }
   return false;
 }
+bool AnnouncementInbox::ReadAll() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (catalog_revision_ < 0) return false;
+  auto updated = reads_;
+  // Use the complete catalog, including announcements whose bodies have not
+  // been paged in. Persist once before changing any visible reading state.
+  for (const auto& [id, revision] : catalog_) {
+    if (!IsDismissed(id, revision)) updated[id] = revision;
+  }
+  if (updated == reads_) return true;
+  if (!SaveLocalState(updated, dismissed_)) {
+    state_.read_save_failed = true;
+    ++state_.version;
+    return false;
+  }
+  reads_ = std::move(updated);
+  state_.read_save_failed = false;
+  state_.delete_failed = false;
+  UpdateReadingState();
+  ++state_.version;
+  return true;
+}
+
 bool AnnouncementInbox::IsDismissed(int64_t id, int64_t revision) const {
   const auto found = dismissed_.find(id);
   return found != dismissed_.end() && found->second == revision;

@@ -1493,6 +1493,10 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     SyncAnnouncements();
   });
   main->on_refresh_announcements([this] { announcements_.Refresh(); });
+  main->on_read_all_announcements([this] {
+    announcements_.ReadAll();
+    SyncAnnouncements();
+  });
   main->on_open_announcement_link([this](slint::SharedString link) {
     const std::string url(link);
     if (announcement_text::IsWebUrl(url)) OpenUrl(url);
@@ -2637,6 +2641,7 @@ void GuiApplication::SyncAnnouncements() {
           revision == ui_->announcement_selected_revision) {
         selected_found = true;
         main->set_announcement_selected_id(row.id);
+        main->set_announcement_selected_revision(row.revision);
         main->set_announcement_selected_title(row.title);
         main->set_announcement_selected_body(
             announcement_text::Format(item["body"].get<std::string>()));
@@ -2648,6 +2653,7 @@ void GuiApplication::SyncAnnouncements() {
     if (!selected_found) {
       ui_->announcement_selected_id.clear();
       main->set_announcement_selected_id("");
+      main->set_announcement_selected_revision("");
       main->set_announcement_selected_body(slint::StyledText{});
     }
     main->set_announcements(

@@ -23,10 +23,11 @@ struct TranslationRow {
   X(messages, u8"消息", "Messages", u8"Сообщения") \
   X(message_unread, u8"未读", "Unread", u8"Не прочитано") \
   X(message_read, u8"已读", "Read", u8"Прочитано") \
+  X(message_read_all, u8"全部已读", "Mark all as read", u8"Отметить всё прочитанным") \
   X(message_empty, u8"暂无公告", "No announcements", u8"Нет объявлений") \
   X(message_select, u8"选择公告查看详情", "Select an announcement to read", u8"Выберите объявление") \
   X(message_loading, u8"正在加载…", "Loading…", u8"Загрузка…") \
-  X(message_read_save_error, u8"无法保存本地阅读状态，请重新打开公告重试。", "Unable to save reading status locally. Open the announcement again to retry.", u8"Не удалось сохранить статус чтения. Откройте объявление снова.") \
+  X(message_read_save_error, u8"无法保存本地阅读状态，请重试。", "Unable to save reading status locally. Please try again.", u8"Не удалось сохранить статус чтения. Повторите попытку.") \
   X(message_close, u8"关闭", "Close", u8"Закрыть") \
   X(message_delete, u8"删除", "Delete", u8"Удалить") \
   X(message_delete_title, u8"删除公告", "Delete announcement", u8"Удалить объявление") \

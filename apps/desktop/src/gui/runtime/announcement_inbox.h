@@ -38,6 +38,7 @@ class AnnouncementInbox {
   void Refresh();
   void LoadMore();
   bool Read(int64_t id, int64_t revision);
+  bool ReadAll();
   bool Dismiss(int64_t id, int64_t revision);
   nlohmann::json TakePendingRequest(std::chrono::steady_clock::time_point now =
                                         std::chrono::steady_clock::now());

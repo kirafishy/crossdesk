@@ -5,13 +5,14 @@ import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
 import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint";
 import { GalleryView, GalleryTile, GalleryRecentDevice, GalleryActionDevice } from "gallery_view.slint";
 import { GalleryNetworkDialog, GalleryNetworkDevice } from "gallery_network_dialog.slint";
-import { SettingsButton, SettingsSelect, SettingsGroup, SettingsRow, SettingsToggleRow } from "settings_controls.slint";
+import { SettingsDialog, SettingsButton, SettingsSelect, SettingsGroup, SettingsRow, SettingsToggleRow } from "settings_controls.slint";
 import { GallerySettings } from "gallery_settings.slint";
 import { GroupFilter } from "group_filter.slint";
 import { ScrollView } from "std-widgets.slint";
 import { RoundedLineEdit } from "rounded_line_edit.slint";
 import { AnnouncementItem, MessagePanel, MessageStrings } from "message_panel.slint";
 import { FontAwesomeIcons, IconButton, CompactComboBox, ImGuiCheckBox, MiniToggleSwitch, CompactButton, PrimaryButton, SecondaryButton, ToggleSwitch, SectionTitle, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
+import "../assets/fonts/message_spacing.ttf";
 
 export struct RecentConnection {
     remote-id: string,
@@ -344,6 +345,7 @@ export component MainWindow inherits Window {
     in property <bool> announcement-loaded;
     in-out property <bool> messages-open: false;
     in property <string> announcement-selected-id;
+    in property <string> announcement-selected-revision;
     in property <string> announcement-selected-title;
     in property <styled-text> announcement-selected-body;
     in property <string> announcement-selected-date;
@@ -352,6 +354,7 @@ export component MainWindow inherits Window {
     callback open-announcement-link(string);
     callback delete-announcement(string, string);
     callback refresh-announcements;
+    callback read-all-announcements;
     callback load-more-announcements;
     in property <bool> update-available: false;
     in property <UpdateCheckStatus> update-check-status: idle;
@@ -498,6 +501,10 @@ export component MainWindow inherits Window {
 
     changed messages-open => {
         if root.messages-open { focus-sink.focus(); }
+    }
+
+    changed about-open => {
+        if root.about-open { focus-sink.focus(); }
     }
 
     reset-remote-id => {
@@ -711,6 +718,10 @@ export component MainWindow inherits Window {
                     if event.text == Key.Return || event.text == Key.Escape {
                         root.wayland-notice-open = false;
                     }
+                    return accept;
+                }
+                if root.about-open && !root.update-open {
+                    if event.text == Key.Escape { root.about-open = false; }
                     return accept;
                 }
                 if root.messages-open {
@@ -1477,14 +1488,14 @@ export component MainWindow inherits Window {
     }
 
     if root.messages-open: Rectangle {
-        background: #00000042;
+        background: #15223850;
         z: 40;
         TouchArea { clicked => { focus-sink.focus(); } }
         MessagePanel {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: 520px;
-            height: 330px;
+            width: min(592px, parent.width - 32px);
+            height: min(400px, parent.height - 24px);
             items: root.announcements;
             unread-count: root.announcement-unread; total: root.announcement-total;
             loading: root.announcement-loading; failed: root.announcement-failed; loaded: root.announcement-loaded;
@@ -1492,12 +1503,14 @@ export component MainWindow inherits Window {
             delete-failed: root.announcement-delete-failed;
             connected: root.signal-connected;
             selected-id: root.announcement-selected-id; selected-title: root.announcement-selected-title;
+            selected-revision: root.announcement-selected-revision;
             selected-body: root.announcement-selected-body; selected-date: root.announcement-selected-date;
             selected-read: root.announcement-selected-read;
             open-message(id, revision) => { root.open-announcement(id, revision); }
             open-link(url) => { root.open-announcement-link(url); }
             delete-message(id, revision) => { root.delete-announcement(id, revision); }
             load-more => { root.load-more-announcements(); }
+            read-all => { root.read-all-announcements(); }
             close => { root.messages-open = false; }
         }
     }
@@ -1941,113 +1954,107 @@ export component MainWindow inherits Window {
     }
 
     if root.about-open: Rectangle {
-        background: transparent;
+        background: #15223850;
         z: 46;
         TouchArea { clicked => { focus-sink.focus(); } }
-        DialogSurface {
+        SettingsDialog {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: 320px;
-            height: max(216px, about-content.preferred-height);
-            border-radius: UiRadius.surface;
+            width: min(400px, parent.width - 40px);
+            height: self.content-top + about-content.preferred-height + 24px;
+            title: UiStrings.about;
+            close-label: MessageStrings.close;
+            close => { root.about-open = false; }
 
-            Rectangle {
-                x: 0px;
-                y: 0px;
-                width: parent.width;
-                height: 21px;
-                background: #d3d3d3;
-                border-top-left-radius: UiRadius.surface;
-                border-top-right-radius: UiRadius.surface;
-                z: 5;
-                Text { x: 6px; text: UiStrings.about; font-size: ImGuiFontStyle.base; font-weight: 600; color: #202124; vertical-alignment: center; }
-            }
-            // Grow for update actions and wrapped translations while keeping
-            // the footer below the version and check result.
+            // Content-driven height keeps translated update states and actions
+            // above the footer without reserving an empty update section.
             about-content := VerticalLayout {
-                padding: 16px;
-                padding-top: 35px;
-                spacing: 12px;
-                alignment: space-between;
-
-                VerticalLayout {
-                    vertical-stretch: 0;
-                    spacing: 4px;
-                    Text {
-                        text: "CrossDesk " + root.current-version;
-                        color: #202124;
-                        font-size: ImGuiFontStyle.base;
-                        font-weight: 600;
-                        min-height: 18px;
-                        overflow: elide;
+                x: 24px; y: parent.content-top; width: parent.width - 48px;
+                height: self.preferred-height;
+                padding: 0px; spacing: 20px;
+                Rectangle {
+                    height: max(96px, product-info.preferred-height + 32px);
+                    background: WorkbenchStyle.surface;
+                    border-radius: UiRadius.surface;
+                    border-width: 1px; border-color: WorkbenchStyle.border;
+                    Image {
+                        x: 16px; y: (parent.height - self.height) / 2;
+                        width: 56px; height: 56px;
+                        source: @image-url("../../../resources/linux/crossdesk_128x128.png");
+                        image-fit: contain;
                     }
-                    if root.update-available: Rectangle {
-                        height: max(18px, version-link.preferred-height);
-                        accessible-role: button;
-                        accessible-label: UiStrings.release-notes + " " + root.latest-version;
-                        accessible-action-default => { version-touch.clicked(); }
-                        version-link := Text {
-                            x: 0px;
-                            y: 0px;
-                            width: parent.width;
-                            height: parent.height;
-                            text: UiStrings.update-available + ": " + root.latest-version;
-                            color: version-touch.has-hover ? #174ea6 : #334fd1;
-                            font-size: ImGuiFontStyle.body;
-                            vertical-alignment: center;
-                            horizontal-alignment: left;
-                            wrap: word-wrap;
-                        }
-                        version-touch := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => { root.about-open = false; root.update-open = true; }
+                    product-info := VerticalLayout {
+                        x: 88px; y: 16px; width: parent.width - 104px; height: parent.height - 32px;
+                        alignment: center; spacing: 5px;
+                        Text { text: "CrossDesk"; font-size: 22px; font-weight: 600; color: WorkbenchStyle.text; }
+                        Text {
+                            text: UiStrings.version + " " + root.current-version;
+                            color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
                         }
                     }
-                    if root.update-available: HorizontalLayout {
-                        alignment: start;
-                        padding-top: 4px;
-                        CompactButton {
-                            width: max(76px, release-notes-button-metrics.preferred-width + 20px);
-                            text: UiStrings.view-release-notes;
+                }
+                if root.update-available || root.update-status-text != "": Rectangle {
+                    height: update-summary.preferred-height + 24px;
+                    background: root.update-check-status == UpdateCheckStatus.failed ? #fef2f2 : WorkbenchStyle.field-surface;
+                    border-radius: UiRadius.control;
+                    border-width: 1px;
+                    border-color: root.update-check-status == UpdateCheckStatus.failed ? #f3d4d1 : WorkbenchStyle.separator;
+                    update-summary := VerticalLayout {
+                        x: 12px; y: 12px; width: parent.width - 24px;
+                        height: self.preferred-height;
+                        padding: 0px; spacing: 10px;
+                        if root.update-available: Rectangle {
+                            height: version-link.preferred-height;
                             accessible-role: button;
-                            accessible-label: self.text;
-                            accessible-action-default => { self.clicked(); }
-                            clicked => { root.about-open = false; root.update-open = true; }
-                            release-notes-button-metrics := Text { visible: false; text: UiStrings.view-release-notes; font-size: ImGuiFontStyle.body; }
+                            accessible-label: UiStrings.release-notes + " " + root.latest-version;
+                            accessible-action-default => { version-touch.clicked(); }
+                            version-link := Text {
+                                width: parent.width;
+                                text: UiStrings.update-available + ": " + root.latest-version;
+                                color: version-touch.has-hover ? #254cc0 : WorkbenchStyle.accent;
+                                font-size: 13px; font-weight: 500; wrap: word-wrap;
+                            }
+                            version-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.about-open = false; root.update-open = true; }
+                            }
+                        }
+                        if root.update-status-text != "": Text {
+                            text: root.update-status-text;
+                            color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
+                                : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
+                            font-size: 12px; wrap: word-wrap;
+                        }
+                        if root.update-available: HorizontalLayout {
+                            alignment: start;
+                            SettingsButton {
+                                width: max(116px, release-notes-button-metrics.preferred-width + 24px);
+                                text: UiStrings.view-release-notes;
+                                clicked => { root.about-open = false; root.update-open = true; }
+                                release-notes-button-metrics := Text { visible: false; text: UiStrings.view-release-notes; font-size: 12px; }
+                            }
                         }
                     }
-                    if root.update-status-text != "": Text {
-                        text: root.update-status-text;
-                        color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e : #61656c;
-                        font-size: ImGuiFontStyle.body;
-                        min-height: 18px;
-                        wrap: word-wrap;
-                    }
                 }
-
                 VerticalLayout {
-                    vertical-stretch: 0;
-                    spacing: 3px;
-                    Rectangle { height: 1px; background: #e6e8eb; }
-                    Text { height: 16px; text: UiStrings.copyright; color: #61656c; font-size: ImGuiFontStyle.body; vertical-alignment: center; }
-                    Text { height: 16px; text: UiStrings.license; color: #61656c; font-size: ImGuiFontStyle.body; vertical-alignment: center; }
+                    spacing: 5px;
+                    Text { text: UiStrings.copyright; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
+                    Text { text: UiStrings.license; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
                 }
-
-                HorizontalLayout {
-                    vertical-stretch: 0;
-                    alignment: end;
-                    spacing: 8px;
-                    CompactButton {
-                        width: max(76px, check-button-metrics.preferred-width + 20px);
-                        text: UiStrings.check-for-updates;
-                        enabled: root.update-check-status != UpdateCheckStatus.checking;
-                        accessible-role: button;
-                        accessible-label: self.text;
-                        accessible-action-default => { if self.enabled { root.check-for-updates(); } }
-                        clicked => { root.check-for-updates(); }
-                        check-button-metrics := Text { visible: false; text: UiStrings.check-for-updates; font-size: ImGuiFontStyle.body; }
+                VerticalLayout {
+                    spacing: 16px;
+                    Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                    HorizontalLayout {
+                        alignment: end; spacing: 8px;
+                        SettingsButton {
+                            width: max(116px, check-button-metrics.preferred-width + 24px);
+                            text: UiStrings.check-for-updates;
+                            enabled: root.update-check-status != UpdateCheckStatus.checking;
+                            clicked => { root.check-for-updates(); }
+                            check-button-metrics := Text { visible: false; text: UiStrings.check-for-updates; font-size: 12px; }
+                        }
+                        SettingsButton { width: 80px; primary: true; text: UiStrings.ok; clicked => { root.about-open = false; } }
                     }
-                    CompactButton { width: 48px; primary: true; text: UiStrings.ok; clicked => { root.about-open = false; } }
                 }
             }
         }
@@ -2151,6 +2158,8 @@ export component MainWindow inherits Window {
                                         text: block.content;
                                         default-color: WorkbenchStyle.text;
                                         default-font-size: 13px;
+                                        // Match the 1.5em line height of message bodies.
+                                        default-font-family: "CrossDesk Message Spacing";
                                     }
                                 }
                             }

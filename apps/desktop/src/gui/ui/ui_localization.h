@@ -46,6 +46,7 @@ inline int ApplyMainWindowStrings(
   messages.set_messages(Text(localization::messages[language]));
   messages.set_unread(Text(localization::message_unread[language]));
   messages.set_read(Text(localization::message_read[language]));
+  messages.set_read_all(Text(localization::message_read_all[language]));
   messages.set_empty(Text(localization::message_empty[language]));
   messages.set_select_message(Text(localization::message_select[language]));
   messages.set_loading(Text(localization::message_loading[language]));

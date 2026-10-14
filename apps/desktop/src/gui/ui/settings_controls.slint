@@ -1,5 +1,5 @@
 import { UiRadius } from "ui_radius.slint";
-import { CompactComboBox, ToggleSwitch } from "common.slint";
+import { CompactComboBox, ToggleSwitch, DialogSurface, IconButton, FontAwesomeIcons } from "common.slint";
 import { WorkbenchStyle } from "workbench_controls.slint";
 
 // Shared visual treatment for the global settings pages.
@@ -26,6 +26,66 @@ export component SettingsButton inherits Rectangle {
         horizontal-alignment: root.align-left ? left : center; vertical-alignment: center; overflow: elide;
     }
     touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+export component SettingsDialog inherits DialogSurface {
+    in property <string> title;
+    in property <string> close-label;
+    in property <int> badge-count: 0;
+    in property <string> badge-label;
+    in property <string> header-status;
+    in property <string> action-text;
+    in property <bool> action-enabled: true;
+    out property <length> content-top: 64px;
+    callback action();
+    callback close();
+    background: #f8fafc;
+    border-color: WorkbenchStyle.separator;
+    drop-shadow-color: #14294424;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 8px;
+    TouchArea { }
+    HorizontalLayout {
+        x: 24px; y: 18px; width: parent.width - 48px; height: 28px;
+        spacing: 10px;
+        Text {
+            text: root.title; font-size: 20px; font-weight: 600;
+            color: WorkbenchStyle.text; vertical-alignment: center;
+        }
+        if root.badge-count > 0: Rectangle {
+            width: max(24px, count-label.preferred-width + 14px); height: 22px;
+            border-radius: 11px; background: #e8efff;
+            accessible-role: text; accessible-label: root.badge-label;
+            count-label := Text {
+                text: "" + root.badge-count; color: WorkbenchStyle.accent;
+                font-size: 11px; font-weight: 600;
+                horizontal-alignment: center; vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        if root.header-status != "": Text {
+            text: root.header-status; color: WorkbenchStyle.muted;
+            font-size: 11px; vertical-alignment: center;
+        }
+        if root.action-text != "": SettingsButton {
+            width: action-label-metrics.preferred-width + 24px; height: 28px;
+            text: root.action-text; enabled: root.action-enabled;
+            clicked => { root.action(); }
+            action-label-metrics := Text { visible: false; text: root.action-text; font-size: 12px; }
+        }
+        IconButton {
+            width: 28px; height: 28px;
+            icon: FontAwesomeIcons.xmark; icon-size: 14px;
+            icon-color: WorkbenchStyle.muted;
+            hover-background: WorkbenchStyle.hover-surface;
+            pressed-background: WorkbenchStyle.pressed-surface;
+            accessible-role: button; accessible-label: root.close-label;
+            accessible-action-default => { root.close(); }
+            clicked => { root.close(); }
+        }
+    }
+    @children
 }
 
 export component SettingsSelect inherits CompactComboBox {
