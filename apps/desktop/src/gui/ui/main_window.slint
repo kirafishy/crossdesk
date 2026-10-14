@@ -11,7 +11,7 @@ import { GroupFilter } from "group_filter.slint";
 import { ScrollView } from "std-widgets.slint";
 import { RoundedLineEdit } from "rounded_line_edit.slint";
 import { AnnouncementItem, MessagePanel, MessageStrings } from "message_panel.slint";
-import { FontAwesomeIcons, IconButton, CompactComboBox, ImGuiCheckBox, MiniToggleSwitch, CompactButton, PrimaryButton, SecondaryButton, ToggleSwitch, SectionTitle, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
+import { FontAwesomeIcons, IconButton, CompactComboBox, ImGuiCheckBox, CompactButton, PrimaryButton, SecondaryButton, ToggleSwitch, SectionTitle, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
 import "../assets/fonts/message_spacing.ttf";
 
 export struct RecentConnection {
@@ -1724,42 +1724,94 @@ export component MainWindow inherits Window {
 
     // macOS permission gate. On other platforms this remains hidden.
     if root.permission-dialog-open: Rectangle {
-        background: transparent;
+        background: #15223850;
         z: 50;
         TouchArea { clicked => { focus-sink.focus(); } }
         DialogSurface {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: root.compact-language ? 130px : 260px;
-            height: 125px;
-            border-radius: UiRadius.surface;
-            Rectangle {
-                x: 0px;
-                y: 0px;
-                width: parent.width;
-                height: 21px;
-                background: #d3d3d3;
-                border-top-left-radius: UiRadius.surface;
-                border-top-right-radius: UiRadius.surface;
-                z: 5;
-                Text { x: 6px; text: UiStrings.request-permissions; font-size: ImGuiFontStyle.base; font-weight: 600; color: #202124; vertical-alignment: center; }
-            }
-            Text { x: 10px; y: 32px; width: root.compact-language ? 110px : 240px; height: 24px; text: UiStrings.permission-required; color: #202124; font-size: 8px; wrap: word-wrap; }
-            Text { x: 10px; y: 61px; width: root.compact-language ? 78px : 198px; height: 18px; text: "1. " + UiStrings.accessibility-permission + ":"; color: #202124; font-size: 8px; overflow: elide; vertical-alignment: center; }
-            MiniToggleSwitch {
-                x: root.compact-language ? 90px : 210px;
-                y: 61px;
-                checked: root.accessibility-granted;
-                enabled: !root.accessibility-granted;
-                toggled(value) => { if (value) { root.request-accessibility-permission(); } }
-            }
-            Text { x: 10px; y: 85px; width: root.compact-language ? 78px : 198px; height: 18px; text: "2. " + UiStrings.screen-recording-permission + ":"; color: #202124; font-size: 8px; overflow: elide; vertical-alignment: center; }
-            MiniToggleSwitch {
-                x: root.compact-language ? 90px : 210px;
-                y: 85px;
-                checked: root.screen-recording-granted;
-                enabled: !root.screen-recording-granted;
-                toggled(value) => { if (value) { root.request-screen-recording-permission(); } }
+            width: min(400px, parent.width - 40px);
+            height: permission-content.preferred-height;
+            background: #f8fafc; border-color: WorkbenchStyle.separator;
+            drop-shadow-color: #14294424; drop-shadow-blur: 24px; drop-shadow-offset-y: 8px;
+            TouchArea { clicked => { focus-sink.focus(); } }
+            permission-content := VerticalLayout {
+                padding: 24px; spacing: 20px;
+                VerticalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: UiStrings.request-permissions;
+                        font-size: 20px; font-weight: 600; color: WorkbenchStyle.text;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: UiStrings.permission-required;
+                        font-size: 12px; color: WorkbenchStyle.muted; wrap: word-wrap;
+                    }
+                }
+                VerticalLayout {
+                    spacing: 12px;
+                    for permission[index] in [
+                        {label: UiStrings.accessibility-permission, granted: root.accessibility-granted,
+                         description: GalleryStrings.tr("允许远程键盘和鼠标控制", "Allow remote keyboard and mouse input", "Разрешить удалённый ввод с клавиатуры и мыши")},
+                        {label: UiStrings.screen-recording-permission, granted: root.screen-recording-granted,
+                         description: GalleryStrings.tr("允许共享此 Mac 的屏幕画面", "Allow sharing this Mac’s screen", "Разрешить показ экрана этого Mac")},
+                    ]: WorkbenchCard {
+                        height: max(80px, permission-labels.preferred-height + 32px);
+                        permission-labels := VerticalLayout {
+                            x: 16px; y: 16px; width: parent.width - permission-action.width - 48px;
+                            height: parent.height - 32px; spacing: 6px; alignment: center;
+                            Text {
+                                text: permission.label; font-size: 13px; font-weight: 600;
+                                color: WorkbenchStyle.text; wrap: word-wrap;
+                            }
+                            Text {
+                                text: permission.description; font-size: 11px;
+                                color: WorkbenchStyle.muted; wrap: word-wrap;
+                            }
+                        }
+                        permission-action := Rectangle {
+                            x: parent.width - self.width - 16px; y: (parent.height - self.height) / 2;
+                            width: max(96px, permission-action-metrics.preferred-width + 24px);
+                            height: 36px;
+                            permission-action-metrics := Text {
+                                visible: false; font-size: 13px; font-weight: 600;
+                                text: GalleryStrings.tr("前往设置", "Open settings", "Настройки");
+                            }
+                            if !permission.granted: WorkbenchButton {
+                                width: parent.width; height: parent.height; primary: true;
+                                text: permission-action-metrics.text;
+                                accessible-label: permission.label + ": " + self.text;
+                                clicked => {
+                                    if index == 0 { root.request-accessibility-permission(); }
+                                    else { root.request-screen-recording-permission(); }
+                                }
+                            }
+                            if permission.granted: HorizontalLayout {
+                                alignment: center; spacing: 6px;
+                                Text {
+                                    text: FontAwesomeIcons.check; font-family: "Font Awesome 6 Free";
+                                    font-weight: 900; font-size: 12px; color: WorkbenchStyle.success;
+                                    vertical-alignment: center; accessible-role: none;
+                                }
+                                Text {
+                                    text: GalleryStrings.tr("已授权", "Granted", "Разрешено");
+                                    font-size: 12px; color: WorkbenchStyle.success; vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 12px;
+                    Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                    Text {
+                        text: GalleryStrings.tr("请在系统设置中允许 CrossDesk 访问。如系统提示重新打开应用，请按提示操作。",
+                            "Allow CrossDesk access in System Settings. Reopen the app if macOS asks you to.",
+                            "Разрешите доступ для CrossDesk в Системных настройках. Перезапустите приложение, если macOS попросит об этом.");
+                        font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
+                    }
+                }
             }
         }
     }
