@@ -6,10 +6,28 @@
 
 #include "spdlog/sinks/rotating_file_sink.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
+#if defined(__OHOS__)
+#include <hilog/log.h>
+#include "spdlog/sinks/base_sink.h"
+#endif
 
 namespace crossdesk {
 
 namespace {
+
+#if defined(__OHOS__)
+class HarmonyLogSink final : public spdlog::sinks::base_sink<std::mutex> {
+  void sink_it_(const spdlog::details::log_msg& message) override {
+    spdlog::memory_buf_t formatted;
+    formatter_->format(message, formatted);
+    const std::string text(formatted.data(), formatted.size());
+    const auto level = message.level >= spdlog::level::err ? LOG_ERROR :
+        message.level >= spdlog::level::warn ? LOG_WARN : LOG_INFO;
+    OH_LOG_Print(LOG_APP, level, 0, "CrossDeskDesktop", "%{public}s", text.c_str());
+  }
+  void flush_() override {}
+};
+#endif
 
 std::string g_log_dir = "logs";
 std::string g_logger_name = LOGGER_NAME;
@@ -56,7 +74,11 @@ std::shared_ptr<spdlog::logger> get_logger() {
         g_log_dir + "/" + g_logger_name + ".log", 5 * 1024 * 1024, 3);
 
     std::vector<spdlog::sink_ptr> sinks;
+#if defined(__OHOS__)
+    sinks.push_back(std::make_shared<HarmonyLogSink>());
+#else
     sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+#endif
     sinks.push_back(file_sink);
 
     auto logger = std::make_shared<spdlog::logger>(g_logger_name, sinks.begin(),

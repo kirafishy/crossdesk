@@ -45,6 +45,9 @@ class KeyboardCapturer : public DeviceController {
   // Backends with an asynchronous capture loop override this so the UI can
   // fall back to window events if that loop stops unexpectedly.
   virtual bool IsHookActive() const { return true; }
+  // Permission-denied backends can wait for an OS grant notification rather
+  // than repeatedly releasing held fallback keys to retry an impossible hook.
+  virtual bool ShouldRetryHook() const { return true; }
   virtual int SendKeyboardCommand(int key_code, bool is_down,
                                   uint32_t scan_code = 0,
                                   bool extended = false) = 0;

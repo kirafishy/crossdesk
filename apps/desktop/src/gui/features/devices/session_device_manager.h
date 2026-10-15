@@ -111,8 +111,10 @@ private:
   std::vector<DisplayInfo> display_info_list_;
   size_t registered_display_stream_count_ = 0;
   CapturedKeyboardQueue captured_keyboard_inputs_;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__OHOS__)
   std::chrono::steady_clock::time_point next_keyboard_capture_retry_{};
+#endif
+#ifdef _WIN32
   std::mutex service_mouse_mutex_;
   unsigned service_mouse_buttons_ = 0;
   int service_mouse_x_ = 0, service_mouse_y_ = 0;

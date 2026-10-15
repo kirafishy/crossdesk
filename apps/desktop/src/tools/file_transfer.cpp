@@ -2,6 +2,9 @@
 
 #include <cstdlib>
 #include "rd_log.h"
+#if defined(__OHOS__)
+#include "platform/path_backend.h"
+#endif
 
 namespace crossdesk {
 
@@ -18,6 +21,11 @@ FileReceiver::FileReceiver(const std::filesystem::path& output_dir)
 }
 
 std::filesystem::path FileReceiver::GetDefaultDesktopPath() {
+#if defined(__OHOS__)
+  // Harmony has no process HOME/Desktop. Use writable application storage
+  // until the user selects and authorizes a public directory in settings.
+  const auto desktop_path = platform::GetCachePath("CrossDesk") / "Received Files";
+#else
 #ifdef _WIN32
   const char* home_env = std::getenv("USERPROFILE");
 #else
@@ -29,6 +37,7 @@ std::filesystem::path FileReceiver::GetDefaultDesktopPath() {
 
   std::filesystem::path desktop_path =
       std::filesystem::path(home_env) / "Desktop";
+#endif
 
   std::error_code ec;
   std::filesystem::create_directories(desktop_path, ec);

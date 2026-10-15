@@ -16,7 +16,7 @@ PrivacyController::PrivacyController(Factory factory) {
   if (!factory) factory = CreateWindowsPrivacyBackend;
 #elif defined(__APPLE__)
   if (!factory) factory = CreateMacPrivacyBackend;
-#elif defined(__linux__)
+#elif (defined(__linux__) && !defined(__OHOS__))
   if (!factory) factory = CreateLinuxPrivacyBackend;
 #endif
   thread_ = std::thread([this, factory] { Run(factory); });

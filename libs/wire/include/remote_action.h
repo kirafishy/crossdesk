@@ -116,7 +116,7 @@ struct CursorState {
   CursorHiddenReason hidden_reason;
 };
 
-enum class HostPlatform { Unknown, Windows, MacOS, Linux, IOS, Android };
+enum class HostPlatform { Unknown, Windows, MacOS, Linux, IOS, Android, HarmonyOS };
 
 const char* HostPlatformName(HostPlatform platform);
 HostPlatform ParseHostPlatform(const std::string& platform);

@@ -1,0 +1,7 @@
+{
+  "modelVersion": "6.0.0",
+  "name": "crossdesk-harmony",
+  "version": "0.1.0",
+  "description": "CrossDesk for HarmonyOS PC and phone",
+  "dependencies": {}
+}

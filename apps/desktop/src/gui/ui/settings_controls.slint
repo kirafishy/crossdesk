@@ -130,9 +130,13 @@ export component SettingsRow inherits Rectangle {
 
 export component SettingsToggleRow inherits SettingsRow {
     in-out property <bool> checked;
+    in property <bool> toggle-on-click: true;
+    callback clicked();
     label-reserve: 64px;
     ToggleSwitch {
         x: parent.width - self.width - 12px; y: (parent.height - self.height) / 2;
         checked <=> root.checked; enabled: root.enabled;
+        toggle-on-click: root.toggle-on-click;
+        clicked => { root.clicked(); }
     }
 }

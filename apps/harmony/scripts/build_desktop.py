@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+"""Build a separate HarmonyOS HAP using the unchanged desktop Slint UI."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tarfile
+import urllib.request
+
+import build as native_build
+
+APP = Path(__file__).resolve().parents[1]
+ROOT = APP.parents[1]
+PORT = APP / 'desktop-port'
+CACHE = APP / '.native/slint-poc'
+SOURCE = CACHE / 'slint-1.17.1'
+PROJECT = CACHE / 'desktop-project'
+TARGET = 'aarch64-unknown-linux-ohos'
+SHA256 = '68222567f8c70ff677cd4a98cd94fb4765ac0f797eb8f8608a646911c908dc2a'
+
+
+def run(args, *, cwd=ROOT, env=None):
+    subprocess.run([str(arg) for arg in args], cwd=cwd, env=env, check=True)
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists() or path.read_text() != text:
+        path.write_text(text)
+
+
+def copy(source, dest):
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if not dest.exists() or source.read_bytes() != dest.read_bytes():
+        shutil.copy2(source, dest)
+
+
+def write_json(path, value):
+    write(path, json.dumps(value, ensure_ascii=False, indent=2) + '\n')
+
+
+def main():
+    bundle = json.loads((APP / 'AppScope/app.json5').read_text())['app']['bundleName']
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--reuse-runtime', action='store_true', help='Skip an already completed Rust runtime build')
+    parser.add_argument('--install', action='store_true', help='Install/start the desktop app')
+    parser.add_argument('--hap-only', action='store_true', help='Reuse MiniRTC dependencies; rebuild the desktop HAP')
+    parser.add_argument('--release', action='store_true', help='Build a release HAP')
+    parser.add_argument('--version', default=os.environ.get('CROSSDESK_VERSION', '0.0.0'))
+    parser.add_argument('--device', default='127.0.0.1:5555')
+    parser.add_argument('--slint-compiler', default=os.environ.get('SLINT_COMPILER'))
+    parser.add_argument('--desktop-permissions', action='store_true',
+                        help='Declare HOOK_KEY_EVENT/READ_PASTEBOARD (requires approved signing-profile ACLs)')
+    parser.add_argument('--host-permissions', action='store_true',
+                        help='Declare CUSTOM_SCREEN_RECORDING/CONTROL_DEVICE for persistent host authorization (requires approved signing-profile ACLs)')
+    parser.add_argument('--cursor-position-permission', action='store_true',
+                        help='Declare INPUT_MONITORING for host cursor position during recording (requires an approved signing-profile ACL)')
+    parser.add_argument('--signing-config', type=Path,
+                        help='Private JSON file containing one DevEco signingConfigs entry; use absolute material paths')
+    parser.add_argument('--bundle-name', choices=[bundle],
+                        help='Compatibility option; PC and mobile use the shared AppScope bundle name (requires --signing-config)')
+    args = parser.parse_args()
+    if sys.version_info < (3, 12):
+        parser.error('Use Python >= 3.12 (for example /opt/homebrew/bin/python3).')
+    if args.bundle_name and not args.signing_config:
+        parser.error('--bundle-name requires --signing-config')
+    signing = None
+    if args.signing_config:
+        signing = json.loads(args.signing_config.read_text())
+        if not isinstance(signing, dict) or not signing.get('name') or not isinstance(signing.get('material'), dict):
+            parser.error('--signing-config must contain one named DevEco signingConfigs entry with material')
+        for name in ['certpath', 'storeFile', 'profile']:
+            path = Path(signing['material'].get(name, ''))
+            if not path.is_absolute() or not path.is_file():
+                parser.error(f'signing material {name} must be an existing absolute path')
+    if not args.version or not all(char.isascii() and (char.isalnum() or char in '.-+') for char in args.version):
+        parser.error('Invalid application version')
+    studio, native, xmake, env = native_build.environment()
+    sdk = Path(env['DEVECO_SDK_HOME'])
+    env['OHOS_NATIVE'] = str(native)
+    env['PATH'] = str(Path.home() / '.cargo/bin') + os.pathsep + env['PATH']
+    if not args.hap_only:
+        native_build.build_native(native, xmake, env)
+    compiler = Path(args.slint_compiler) if args.slint_compiler else next(
+        (Path.home() / '.xmake/packages/s/slint/1.17.1').glob('*/bin/slint-compiler'), None)
+    if not compiler or not compiler.is_file():
+        raise SystemExit('Set SLINT_COMPILER to a host slint-compiler 1.17.1 executable.')
+    version = subprocess.check_output([compiler, '--version'], text=True).strip()
+    if version != 'slint-compiler 1.17.1':
+        raise SystemExit(f'Expected slint-compiler 1.17.1, got {version}')
+    CACHE.mkdir(parents=True, exist_ok=True)
+    archive = CACHE / 'slint-1.17.1.tar.gz'
+    if not archive.exists():
+        urllib.request.urlretrieve('https://codeload.github.com/slint-ui/slint/tar.gz/refs/tags/v1.17.1', archive)
+    if hashlib.sha256(archive.read_bytes()).hexdigest() != SHA256:
+        raise SystemExit('Slint source checksum mismatch')
+    if not SOURCE.exists():
+        with tarfile.open(archive) as tar:
+            tar.extractall(CACHE, filter='data')
+    patches = [PORT / name for name in ['font-discovery.patch', 'os-services.patch', 'window-properties.patch']]
+    # A changed patch cannot reverse its older installed version. Restore only
+    # our patch targets from the verified archive before applying the full set.
+    targets = {line[6:] for patch in patches for line in patch.read_text().splitlines()
+               if line.startswith('+++ b/')}
+    with tarfile.open(archive) as tar:
+        for relative in targets:
+            if Path(relative).is_absolute() or '..' in Path(relative).parts:
+                raise SystemExit('Invalid runtime patch path')
+            with tar.extractfile(f'slint-1.17.1/{relative}') as original:
+                (SOURCE / relative).write_bytes(original.read())
+    for patch in patches:
+        run(['git', 'apply', patch], cwd=SOURCE)
+    linker = CACHE / 'linker.sh'
+    write(linker, '#!/bin/sh\nexec "${OHOS_NATIVE}/llvm/bin/clang" --target=aarch64-linux-ohos --sysroot="${OHOS_NATIVE}/sysroot" "$@"\n')
+    linker.chmod(0o755)
+    env.update(CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER=str(linker),
+               CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_RUSTFLAGS='-C link-arg=-Wl,-soname,libslint_cpp.so',
+               SLINT_GENERATED_INCLUDE_DIR=str(CACHE / 'include'))
+    runtime_signature = hashlib.sha256(b''.join(path.read_bytes() for path in patches)).hexdigest()
+    runtime_stamp = CACHE / 'runtime.sha256'
+    if not args.reuse_runtime or not runtime_stamp.exists() or runtime_stamp.read_text() != runtime_signature:
+        run(['rustup', 'target', 'add', TARGET], env=env)
+        run(['cargo', 'build', '--manifest-path', SOURCE / 'Cargo.toml', '--locked', '-p', 'slint-cpp',
+             '--target', TARGET, '--release', '--no-default-features', '--features', 'std,renderer-software'], env=env)
+        write(runtime_stamp, runtime_signature)
+
+    # Reuse the actual entry point, including MainWindow/StreamWindow/ServerWindow
+    # and their imported components. No copied or rewritten Slint layout.
+    generated = CACHE / 'generated'
+    generated.mkdir(exist_ok=True)
+    cpp_files = [generated / f'crossdesk_ui_{index}.cpp' for index in range(4)]
+    command = [compiler, ROOT / 'apps/desktop/src/gui/ui/crossdesk_ui.slint', '-f', 'cpp',
+               '-o', generated / 'crossdesk_ui.h', '--style', 'fluent-light',
+               '--embed-resources=embed-files', '--cpp-namespace', 'crossdesk::ui']
+    for path in cpp_files:
+        command += ['--cpp-file', path]
+    digest = hashlib.sha256('\0'.join(map(str, command)).encode())
+    for path in sorted((ROOT / 'apps/desktop/src/gui').rglob('*')):
+        if '/ui/' not in str(path) and '/assets/' not in str(path):
+            continue
+        if path.is_file():
+            digest.update(str(path).encode())
+            digest.update(path.read_bytes())
+    stamp = generated / 'input.sha256'
+    signature = digest.hexdigest()
+    if not stamp.exists() or stamp.read_text() != signature or not all(path.exists() for path in [generated / 'crossdesk_ui.h', *cpp_files]):
+        run(command, env=env)
+        write(stamp, signature)
+    deps = CACHE / 'desktop-deps'
+    deps.mkdir(exist_ok=True)
+    header = deps / 'httplib.h'
+    if not header.exists():
+        urllib.request.urlretrieve('https://raw.githubusercontent.com/yhirose/cpp-httplib/v0.26.0/httplib.h', header)
+    if hashlib.sha256(header.read_bytes()).hexdigest() != '4a42da28ce477d06f53942c172197d3b83b4fe42b7e37b8af78c70e063c06da7':
+        raise SystemExit('cpp-httplib source checksum mismatch')
+    legacy_types = PROJECT / 'entry/src/main/cpp/types/libslint_probe'
+    if legacy_types.exists():
+        run([studio / 'tools/hvigor/bin/hvigorw', 'clean', '--no-daemon'], cwd=PROJECT, env=env)
+        shutil.rmtree(legacy_types)
+    (PROJECT / 'entry/libs/arm64-v8a/libslint_probe.so').unlink(missing_ok=True)
+    for name in ['build-profile.json5', 'hvigorfile.ts', 'hvigor/hvigor-config.json5', 'entry/hvigorfile.ts',
+                 'entry/src/main/resources/base/profile/main_pages.json',
+                 'entry/src/main/resources/base/element/color.json', 'AppScope/resources/base/media/app_icon.png',
+                 'AppScope/app.json5', 'AppScope/resources/base/element/string.json']:
+        copy(APP / name, PROJECT / name)
+    profile = json.loads((APP / 'build-profile.json5').read_text())
+    # The PC project contains only its own Index page.
+    write_json(PROJECT / 'entry/src/main/resources/base/profile/main_pages.json', {'src': ['pages/Index']})
+    # The source project can have an IDE-managed signature for a different
+    # bundle. Only use signing material explicitly selected for this build.
+    profile['app']['signingConfigs'] = [signing] if signing else []
+    for product in profile['app']['products']:
+        product.pop('signingConfig', None)
+        product['compatibleSdkVersion'] = '26.0.0'
+        if signing:
+            product['signingConfig'] = signing['name']
+    write_json(PROJECT / 'build-profile.json5', profile)
+    (PROJECT / 'build-profile.json5').chmod(0o600)
+    write_json(PROJECT / 'oh-package.json5', {'modelVersion': '6.0.0', 'name': 'crossdesk-slint-desktop',
+        'version': '0.1.0', 'dependencies': {}})
+    write_json(PROJECT / 'entry/src/main/resources/base/element/string.json',
+               {'string': [{'name': 'keyboard_permission_reason', 'value': '控制远程桌面时将系统快捷键发送到远端'},
+                           {'name': 'screen_recording_permission_reason', 'value': '用于向已通过连接密码验证的远程设备共享本机屏幕'},
+                           {'name': 'control_device_permission_reason', 'value': '用于接收已通过连接密码验证的远程设备的键盘和鼠标操作'},
+                           {'name': 'clipboard_permission_reason', 'value': '在远程会话中同步本机和远端的剪贴板文本'}]})
+    module = json.loads((APP / 'entry/src/main/module.json5').read_text())
+    module['module']['deviceTypes'] = ['2in1']
+    module['module']['requestPermissions'] = [
+        {'name': 'ohos.permission.INTERNET'},
+        {'name': 'ohos.permission.FILE_ACCESS_PERSIST'},
+        {'name': 'ohos.permission.PREPARE_APP_TERMINATE'}]
+    for ability in module['module']['abilities']:
+        ability['srcEntry'] = './ets/entryability/EntryAbility.ets'
+        ability.pop('backgroundModes', None)
+    if args.desktop_permissions:
+        module['module']['requestPermissions'] += [
+            {'name': 'ohos.permission.HOOK_KEY_EVENT', 'reason': '$string:keyboard_permission_reason',
+             'usedScene': {'abilities': ['EntryAbility'], 'when': 'inuse'}},
+            {'name': 'ohos.permission.READ_PASTEBOARD', 'reason': '$string:clipboard_permission_reason',
+             'usedScene': {'abilities': ['EntryAbility'], 'when': 'always'}}]
+    if args.host_permissions:
+        module['module']['requestPermissions'] += [
+            {'name': 'ohos.permission.CUSTOM_SCREEN_RECORDING', 'reason': '$string:screen_recording_permission_reason',
+             'usedScene': {'abilities': ['EntryAbility'], 'when': 'always'}},
+            {'name': 'ohos.permission.CONTROL_DEVICE', 'reason': '$string:control_device_permission_reason',
+             'usedScene': {'abilities': ['EntryAbility'], 'when': 'always'}}]
+    if args.cursor_position_permission:
+        module['module']['requestPermissions'].append({'name': 'ohos.permission.INPUT_MONITORING'})
+    write(PROJECT / 'entry/src/main/ets/pages/DesktopCapabilities.ets',
+          f'export const desktopPermissions: boolean = {str(args.desktop_permissions).lower()};\n'
+          f'export const hostPermissions: boolean = {str(args.host_permissions).lower()};\n')
+    write_json(PROJECT / 'entry/src/main/module.json5', module)
+    profile = json.loads((APP / 'entry/build-profile.json5').read_text())
+    profile['buildOption']['externalNativeOptions']['cppFlags'] = '-std=c++20'
+    write_json(PROJECT / 'entry/build-profile.json5', profile)
+    write_json(PROJECT / 'entry/oh-package.json5', {'name': 'entry', 'version': '0.1.0',
+        'dependencies': {'libslint_desktop.so': 'file:./src/main/cpp/types/libslint_desktop'}})
+    types = PROJECT / 'entry/src/main/cpp/types/libslint_desktop'
+    write_json(types / 'oh-package.json5', {'name': 'libslint_desktop.so', 'version': '0.1.0',
+                                         'types': './index.d.ts'})
+    copy(PORT / 'index.d.ts', types / 'index.d.ts')
+    copy(PORT / 'Index.ets', PROJECT / 'entry/src/main/ets/pages/Index.ets')
+    copy(PORT / 'EntryAbility.ets', PROJECT / 'entry/src/main/ets/entryability/EntryAbility.ets')
+    for name in ['DesktopHost.ets', 'DesktopAccess.ets', 'AutostartHost.ets', 'TextInputHost.ets', 'KeyboardHost.ets', 'TrayHost.ets', 'FileHost.ets', 'DisplayHost.ets']:
+        copy(PORT / name, PROJECT / 'entry/src/main/ets/pages' / name)
+    runtime = PROJECT / 'entry/libs/arm64-v8a/libslint_cpp.so'
+    copy(SOURCE / f'target/{TARGET}/release/libslint_cpp.so', runtime)
+    def quote(path):
+        return '"' + str(path).replace('\\', '/') + '"'
+    cmake = f'''cmake_minimum_required(VERSION 3.16)
+project(crossdesk_slint_desktop LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+add_library(slint_cpp SHARED IMPORTED)
+set_target_properties(slint_cpp PROPERTIES IMPORTED_LOCATION {quote(runtime)} IMPORTED_SONAME "libslint_cpp.so")
+add_library(slint_desktop SHARED {quote(PORT / 'desktop.cpp')} {' '.join(map(quote, cpp_files))})
+set_target_properties(slint_desktop PROPERTIES SKIP_BUILD_RPATH TRUE)
+target_compile_options(slint_desktop PRIVATE -Os)
+target_compile_definitions(slint_desktop PRIVATE _LIBCPP_ENABLE_EXPERIMENTAL)
+target_include_directories(slint_desktop PRIVATE
+  {quote(SOURCE / 'api/cpp/include')} {quote(CACHE / 'include')} {quote(generated)}
+  {quote(ROOT / 'apps/desktop/src/gui/ui')}
+  {quote(ROOT / 'apps/desktop/src/gui/assets/localization')}
+  {quote(ROOT / 'apps/desktop/src/gui/assets/fonts')})
+target_link_libraries(slint_desktop PRIVATE slint_cpp ace_napi.z hilog_ndk.z EGL GLESv3 native_window)
+'''
+    cmake += f'set(CROSSDESK_ROOT {quote(ROOT)})\nset(SLINT_DESKTOP_DEPS {quote(deps)})\nset(CROSSDESK_VERSION "{args.version}")\ninclude({quote(PORT / "CMakeLists.txt")})\n'
+    write(PROJECT / 'entry/src/main/cpp/CMakeLists.txt', cmake)
+    run([studio / 'tools/ohpm/bin/ohpm', 'install'], cwd=PROJECT, env=env)
+    run([studio / 'tools/hvigor/bin/hvigorw', '--mode', 'module', '-p', 'product=default',
+         '-p', 'module=entry@default', '-p', 'buildMode=' + ('release' if args.release else 'debug'), 'assembleHap', '--no-daemon'], cwd=PROJECT, env=env)
+    hap = PROJECT / ('entry/build/default/outputs/default/entry-default-' +
+                     ('signed' if signing else 'unsigned') + '.hap')
+    verify = [sys.executable, APP / 'tests/verify_hap.py', hap, '--bundle-name', bundle]
+    for option in ['desktop_permissions', 'host_permissions', 'cursor_position_permission']:
+        if getattr(args, option):
+            verify.append('--' + option.replace('_', '-'))
+    run(verify, env=env)
+    print(f'Desktop HAP: {hap}')
+    if args.install:
+        hdc = sdk / 'default/openharmony/toolchains/hdc'
+        run([hdc, '-t', args.device, 'install', '-r', hap], env=env)
+        run([hdc, '-t', args.device, 'shell', 'aa', 'force-stop', bundle], env=env)
+        run([hdc, '-t', args.device, 'shell', 'aa', 'start', '-a', 'EntryAbility', '-b', bundle], env=env)
+
+
+if __name__ == '__main__':
+    with native_build.build_lock():
+        main()

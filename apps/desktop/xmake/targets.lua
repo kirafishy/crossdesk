@@ -230,6 +230,32 @@ function setup_targets()
         add_files("apps/desktop/tests/slint_ui_smoke_test.cpp")
         add_rules("crossdesk.slint_runtime")
 
+    target("slint_stream_render_test")
+        set_kind("binary")
+        set_languages("c++20")
+        set_default(false)
+        if is_os("windows") then
+            add_cxxflags("/bigobj")
+        end
+        add_packages("slint")
+        add_deps("crossdesk_ui")
+        add_includedirs("apps/desktop/src/gui")
+        add_files("apps/desktop/tests/slint_stream_render_test.cpp")
+        add_rules("crossdesk.slint_runtime")
+
+    target("slint_popup_render_test")
+        set_kind("binary")
+        set_languages("c++20")
+        set_default(false)
+        if is_os("windows") then
+            add_cxxflags("/bigobj")
+        end
+        add_packages("slint")
+        add_deps("crossdesk_ui")
+        add_includedirs("apps/desktop/src/gui")
+        add_files("apps/desktop/tests/slint_popup_render_test.cpp")
+        add_rules("crossdesk.slint_runtime")
+
     target("version_checker_test")
         set_kind("binary")
         set_default(false)

@@ -63,7 +63,7 @@ bool CursorStateProvider::Sample(const std::vector<DisplayInfo>& displays,
 
 }  // namespace crossdesk
 
-#elif defined(__linux__) && !defined(__APPLE__)
+#elif (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
 
 #include <X11/Xlib.h>
 #include <X11/extensions/Xfixes.h>

@@ -4,6 +4,8 @@
 #include "ui/release_notes_text.h"
 #include "ui/ui_localization.h"
 
+#include <slint-platform.h>
+
 #include <algorithm>
 #include <cassert>
 #include <charconv>
@@ -14,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -845,9 +848,71 @@ bool VerifyWorkbenchActions() {
   return true;
 }
 
+bool VerifySystemShortcutMenu() {
+  auto stream = crossdesk::ui::StreamWindow::create();
+  stream->window().set_size(slint::LogicalSize(slint::Size<float>{1280, 720}));
+  std::vector<std::string> commands;
+  stream->on_send_shortcut([&](slint::SharedString command) { commands.emplace_back(command); });
+  const auto click = [&](float y) {
+    const slint::LogicalPosition point({55, stream->get_video_area_top() + y});
+    stream->window().dispatch_pointer_move_event(point);
+    stream->window().dispatch_pointer_press_event(point, slint::PointerEventButton::Left);
+    stream->window().dispatch_pointer_release_event(point, slint::PointerEventButton::Left);
+  };
+  click(20);
+  if (!stream->invoke_is_local_control_area(55, 90)) return false;
+  click(58);
+  stream->set_secure_attention_supported(false);
+  click(20);
+  if (stream->invoke_is_local_control_area(55, 90)) return false;
+  click(58);
+  stream->set_secure_attention_supported(true);
+  click(20); click(88);
+  return commands == std::vector<std::string>{"Ctrl+Alt+Del", "Win+L", "Win+L"};
+}
+
+bool VerifyRemoteIdEditing() {
+  auto window = crossdesk::ui::MainWindow::create();
+  window->window().set_size(slint::LogicalSize(slint::Size<float>{
+      window->get_minimum_window_width(), window->get_minimum_window_height()}));
+  window->on_format_remote_id([](slint::SharedString text) { return text; });
+  window->invoke_reset_remote_id();
+  const auto key = [&](const slint::SharedString& text) {
+    window->window().dispatch_key_press_event(text);
+    window->window().dispatch_key_release_event(text);
+  };
+  const auto settle = [] {
+    for (int i = 0; i < 10; ++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      slint::platform::update_timers_and_animations();
+    }
+  };
+  settle(); // Let the initial timer state settle before the first user edit.
+  for (char digit : std::string("1234")) {
+    key(slint::SharedString(std::string(1, digit)));
+    settle(); // Separate edits must not leave the formatter repeating.
+  }
+  if (std::string(window->get_remote_id_input()) != "1234") return false;
+  window->window().dispatch_key_press_event(slint::platform::key_codes::Control);
+  key("a");
+  window->window().dispatch_key_release_event(slint::platform::key_codes::Control);
+  settle(); // Formatting must not repeatedly collapse the selection.
+  key("5");
+  settle();
+  return std::string(window->get_remote_id_input()) == "5";
+}
+
 } // namespace
 
 int main() {
+  if (!VerifySystemShortcutMenu()) {
+    std::cerr << "Shortcut menu must omit unsupported SAS and resize its input area\n";
+    return 13;
+  }
+  if (!VerifyRemoteIdEditing()) {
+    std::cerr << "Remote ID editor must preserve Ctrl+A selection after formatting\n";
+    return 12;
+  }
   const CaptureOptions capture_options = LoadCaptureOptions();
   if (!VerifyMainWindowGeometry()) {
     std::cerr << "Main window dimensions must stay stable through startup\n";

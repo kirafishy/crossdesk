@@ -22,7 +22,7 @@
 #include "platform/video_renderer.h"
 #include "rd_log.h"
 #include "runtime/gui_runtime.h"
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
 #include "platform/linux/headless/headless_console.h"
 #endif
 
@@ -38,7 +38,9 @@ namespace {
 constexpr HostPlatform kClientPlatform = HostPlatform::Windows;
 #elif defined(__APPLE__)
 constexpr HostPlatform kClientPlatform = HostPlatform::MacOS;
-#elif defined(__linux__)
+#elif defined(__OHOS__)
+constexpr HostPlatform kClientPlatform = HostPlatform::HarmonyOS;
+#elif (defined(__linux__) && !defined(__OHOS__))
 constexpr HostPlatform kClientPlatform = HostPlatform::Linux;
 #else
 constexpr HostPlatform kClientPlatform = HostPlatform::Unknown;
@@ -558,7 +560,7 @@ void PeerEventHandler::OnNetStatusReport(
       LOG_INFO("Use client id [{}] and save id into cache file", id);
       runtime->settings_.Save();
     }
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
     HeadlessConsole::Instance().SetIdentity(id + "@" + password);
 #endif
   }

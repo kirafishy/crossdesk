@@ -1,18 +1,18 @@
 # CrossDesk Privacy Policy
 
-Last updated: October 10, 2026
+Last updated: October 15, 2026
 
 [中文](#中文) | [English](#english)
 
 ## 中文
 
-更新日期：2026 年 10 月 10 日
+更新日期：2026 年 10 月 15 日
 
 CrossDesk 重视您的个人信息与隐私保护。本政策说明我们在提供远程桌面服务时如何处理相关信息，以及您可以如何管理授权、保存的内容和数据请求。请在使用前阅读并了解本政策。
 
 ### 一、适用范围
 
-本政策适用于 CrossDesk 桌面客户端、iOS 与 Android 客户端，以及由 CrossDesk 项目维护者（以下简称“我们”）提供的默认网络服务。
+本政策适用于 CrossDesk 桌面客户端、iOS、Android 与鸿蒙移动客户端，以及由 CrossDesk 项目维护者（以下简称“我们”）提供的默认网络服务。
 
 如果您选择自行部署或使用其他运营者提供的服务器，该服务器所处理的信息、保存期限及安全管理由相应运营者负责。请在使用前了解其隐私政策。本政策中有关客户端本地数据处理的说明仍适用。
 
@@ -50,11 +50,13 @@ Android 中的设备身份及您选择保存的访问密码使用 Android Keysto
 
 iOS 通过系统钥匙串和文件保护机制保护相应本地数据，默认信令连接进行 TLS 证书校验。请妥善保管设备和连接凭据，避免向无关人员共享访问密码。
 
-Android 默认信令连接同样进行 TLS 证书校验。
+Android 与鸿蒙移动端默认信令连接同样进行 TLS 证书校验。
+
+鸿蒙移动端使用系统 Asset Store 加密保存设备身份及您选择保存的访问密码，明确禁止凭据跨设备同步。设置和连接记录按服务器隔离。远程预览默认关闭，单独确认后从下一次连接起保存一张 640×360 预览；预览保存在应用私有缓存中，不上传，可随时清除，也可能被系统回收。关闭预览或撤回联网授权会清除预览。接收文件保存在应用私有目录，您可在会话中通过系统文件选择器导出。
 
 ### 五、移动端权限与授权选择
 
-**隐私授权。** iOS 与 Android 首次使用，或从未提供此选择的旧版升级时，您需阅读本政策、主动勾选并点击同意后，客户端才会登记本机身份、连接信令服务和查询设备在线状态。拒绝后仍可查看设置、离线隐私政策和本地连接记录，远程连接功能暂不可用。未授权时，重新打开或从后台返回应用会再次提示。
+**隐私授权。** iOS、Android 与鸿蒙移动端 首次使用，或从未提供此选择的旧版升级时，您需阅读本政策、主动勾选并点击同意后，客户端才会登记本机身份、连接信令服务和查询设备在线状态。拒绝后仍可查看设置、离线隐私政策和本地连接记录，远程连接功能暂不可用。未授权时，重新打开或从后台返回应用会再次提示。
 
 **撤回同意。** 您可以在“设置 → 隐私 → 隐私与授权”中查看隐私政策、授权状态或撤回授权。客户端将停止远程会话、信令连接和版本检查，关闭并清除本地画面预览。再次使用连接功能前需重新同意；重新同意不会自动开启画面预览保存。撤回不影响撤回前已经发生的信息处理，也不等同于删除服务端数据。
 
@@ -63,6 +65,8 @@ Android 默认信令连接同样进行 TLS 证书校验。
 Android 客户端同样作为控制端接收远程画面与音频，不采集本机屏幕、摄像头或麦克风。发送及保存文件通过系统文件选择器完成，不要求开放整个文件库。剪贴板文本仅在您主动发送或复制远端文本时传输或写入本机，会话结束时清除应用内缓存的远端剪贴板文本。
 
 Android 远程会话优先使用系统画中画在切换应用后继续显示画面。画中画不可用时，通过前台服务和连接通知保持您已建立的远程连接；后台暂停本地画面渲染和音频播放，不申请悬浮窗权限。通知权限用于提供返回及断开入口，CPU 唤醒锁用于会话后台期间维持连接，返回前台或会话结束时释放。您可以在应用或连接通知中断开，移除应用任务也会结束会话及保活服务。
+
+鸿蒙手机和平板只作为控制端，不申请本机录屏、输入注入、摄像头或麦克风权限；文件选择和剪贴板操作由您主动触发。已建立会话在切入后台时优先使用系统画中画，提供静音控制；画中画不可用时申请数据传输后台任务并显示系统通知。若系统不允许或停止后台任务且画中画不可用，会话会断开。后台切换释放远端按键；空闲后台不维持信令连接。完成联网授权后，应用在前台检查鸿蒙本机版本，并在连接后检查远端版本；版本请求不携带设备身份或远端版本。
 
 应用及通信组件使用本地文件元数据、应用偏好和计时接口实现文件传输、设置保存及网络计时，不使用这些信息制作设备指纹或进行广告追踪。
 
@@ -86,13 +90,13 @@ Android 远程会话优先使用系统画中画在切换应用后继续显示画
 
 ## English
 
-Updated: October 2, 2026
+Updated: October 15, 2026
 
 CrossDesk respects your privacy. This policy explains how information is processed when we provide remote desktop services and how you can manage consent, locally saved content and data requests. Please read this policy before using the software.
 
 ### 1. Scope
 
-This policy applies to the CrossDesk desktop, iOS and Android clients and the default network services provided by the CrossDesk project maintainers ("we" or "us").
+This policy applies to the CrossDesk desktop, iOS, Android and HarmonyOS mobile clients and the default network services provided by the CrossDesk project maintainers ("we" or "us").
 
 If you deploy your own server or choose a server provided by another operator, that operator is responsible for its data processing, retention and security practices. Please review its privacy policy before use. The descriptions of local client data processing in this policy still apply.
 
@@ -130,11 +134,13 @@ On Android, device identities and access passwords you choose to save are encryp
 
 On iOS, the system Keychain and file protection mechanisms protect the relevant local data, and default signaling connections validate TLS certificates. Keep your devices and connection credentials secure and avoid sharing access passwords with unrelated people.
 
-Default signaling connections on Android also validate TLS certificates.
+Default signaling connections on Android and HarmonyOS mobile also validate TLS certificates.
+
+HarmonyOS mobile uses the system Asset Store to encrypt device identities and saved access passwords, with cross-device credential synchronization disabled. Settings and connection records are scoped to the server. Remote previews are off by default. After separate confirmation, one 640×360 preview is saved per connection starting with the next connection. Previews remain in private app cache, are never uploaded, can be cleared and may be reclaimed by the system. Disabling previews or withdrawing network consent clears them. Received files remain in private app storage and can be exported through the system document picker during the session.
 
 ### 5. Mobile permissions and consent choices
 
-**Privacy authorization.** On first use of iOS or Android, or when upgrading from a version without this choice, you must read this policy, actively select the checkbox and agree before the client registers a local identity, connects to signaling or queries device presence. If you decline, settings, the offline policy and local connection history remain available, while remote connections are unavailable. Without consent, reopening the app or returning from the background presents the notice again.
+**Privacy authorization.** On first use of iOS, Android or HarmonyOS mobile, or when upgrading from a version without this choice, you must read this policy, actively select the checkbox and agree before the client registers a local identity, connects to signaling or queries device presence. If you decline, settings, the offline policy and local connection history remain available, while remote connections are unavailable. Without consent, reopening the app or returning from the background presents the notice again.
 
 **Withdrawal.** You can review the privacy policy and your authorization status or withdraw consent in Settings → Privacy → Privacy and Authorization. The client stops remote sessions, signaling and version checks, disables preview saving and clears local previews. Consent is required again before reconnecting. Agreeing again does not automatically enable preview saving. Withdrawal does not undo processing that already occurred or delete server data.
 
@@ -143,6 +149,8 @@ Default signaling connections on Android also validate TLS certificates.
 The Android client also receives remote screens and audio as a controller and does not capture the local screen, camera or microphone. Sending and saving files uses the system document picker without requiring access to the entire file library. Clipboard text is transmitted or written locally only when you explicitly send text or copy remote text. The app clears cached remote clipboard text when the session ends.
 
 Android remote sessions prefer system picture-in-picture to continue displaying video when you switch apps. If picture-in-picture is unavailable, a foreground service and connection notification maintain the remote connection you have established. Local video rendering and audio playback pause in the background; no overlay permission is requested. Notification permission provides return and disconnect actions. A CPU wake lock helps maintain the connection while the session is backgrounded and is released on foreground return or session end. You can disconnect in the app or its connection notification; removing the app task also ends the session and its foreground service.
+
+HarmonyOS phones and tablets act only as controllers and do not request local screen recording, input injection, camera or microphone permissions. File selection and clipboard actions are user initiated. An established session prefers system picture-in-picture with a mute control when backgrounded. If unavailable, the app requests a data-transfer background task with a system notification. The session ends if the system disallows or stops that task while picture-in-picture is unavailable. Backgrounding releases remote keys; idle background sessions do not retain signaling. After network consent, the foreground app checks the local HarmonyOS version and checks the remote version after connection. These requests contain neither device identity nor the remote version.
 
 The app and its communication components use local file metadata, preferences and timing APIs for file transfer, settings and network timing, not for device fingerprinting or advertising tracking.
 

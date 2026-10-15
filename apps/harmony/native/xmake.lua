@@ -1,0 +1,38 @@
+set_project("crossdesk_harmony")
+set_xmakever("3.1.1")
+set_languages("c++17")
+add_rules("mode.release", "mode.debug")
+set_policy("package.precompiled", false)
+add_cxflags("-fPIC")
+includes("../../../deps/submodules/minirtc")
+
+target("crossdesk_harmony_mobile")
+    set_kind("shared")
+    set_default(false)
+    add_deps("minirtc")
+    add_packages("nlohmann_json", "libyuv", "spdlog")
+    add_files("mobile_session.cpp", "media.cpp", "audio.cpp", "../../../libs/wire/src/remote_action.cpp", "../../../libs/wire/src/file_transfer.cpp", "../../../libs/wire/src/app_version.cpp")
+    -- Export only the bridge API; bundled static dependencies are internal.
+    add_cxflags("-fvisibility=hidden", "-fvisibility-inlines-hidden")
+    add_shflags("-Wl,--exclude-libs,ALL", {force = true})
+    set_targetdir("../.native/mobile-libs/arm64-v8a")
+    set_filename("libcrossdesk_harmony_core.so")
+    add_includedirs("../../../deps/submodules/minirtc/src/api", "../../../libs/wire/include")
+    add_includedirs("../../desktop/src/platform/common/input")
+    add_includedirs("../../../libs/controller/include")
+    add_shflags("-Wl,--no-undefined", {force = true})
+    -- CMake imports this file by absolute path. An ELF SONAME keeps that build
+    -- machine path out of libcrossdesk.so's runtime DT_NEEDED entries.
+    add_shflags("-Wl,-soname,libcrossdesk_harmony_core.so", {force = true})
+    add_syslinks("EGL", "GLESv3", "native_window", "ohaudio", "native_media_core", "hilog_ndk.z")
+target_end()
+
+-- Opt-in integration fixture: synthetic NV12/PCM only, without screen capture/input APIs.
+target("crossdesk_harmony_mobile_fixture")
+    set_default(false)
+    set_kind("binary")
+    add_deps("minirtc")
+    add_packages("nlohmann_json", "spdlog")
+    add_files("../tests/mobile_synthetic_host.cpp", "../../../libs/wire/src/remote_action.cpp", "../../../libs/wire/src/file_transfer.cpp")
+    add_includedirs("../../../deps/submodules/minirtc/src/api", "../../../libs/wire/include", "../../../libs/controller/include")
+    set_targetdir("../.native")

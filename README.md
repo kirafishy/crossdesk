@@ -80,6 +80,7 @@ CrossDesk 支持 Windows、macOS、Linux 之间的远程访问，也可从浏览
 | Linux | Ubuntu 20.04+，amd64 / arm64，glibc 2.31 基线 | 普通版 / Xfce 虚拟桌面版 `.deb` |
 | iOS / iPadOS | iOS 16.0+，arm64 真机 | 原生客户端；使用 Xcode 构建并签名，CI 产物为未签名应用 |
 | Android | Android 8.0+，arm64 | 原生控制端；使用 Gradle 构建 APK，见 [开发说明](apps/android/README.md) |
+| HarmonyOS（开发版） | Slint PC：API 26；ArkUI 移动端：API 20+；arm64，待真机验收 | [Slint PC 共用桌面实现](apps/harmony/desktop-port/README.md)；[鸿蒙构建与移动端说明](apps/harmony/README.md)，使用 DevEco 构建并签名 |
 | Web | 支持 WebRTC 的浏览器 | 访问 [web.crossdesk.cn](https://web.crossdesk.cn/) |
 
 Linux 每个架构提供两个可独立安装的包，**选择其中一个**：

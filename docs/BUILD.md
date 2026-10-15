@@ -9,6 +9,8 @@
 - Git、[Xmake](https://xmake.io/guide/quick-start.html)（桌面端和移动端均要求 3.1.1 或更新版本）及下文对应平台的编译工具链。
 - 构建脚本通过 Xmake 管理 **CMake 3.x（≥ 3.21、< 4.0）**、**Rust 1.92.0** 等依赖；首次构建需要下载工具与源码。具体约束见 [Slint 包配置](../deps/thirdparty/slint/xmake.lua)。
 
+鸿蒙 PC 的 Slint 移植直接编译桌面公共界面和业务代码，见 [Slint 桌面构建与一致性验收](../apps/harmony/desktop-port/README.md)（API 26）。独立 ArkUI 手机 / 平板工程见 [HarmonyOS 构建与真机验证](../apps/harmony/README.md)。请使用各自说明中的脚本，不要通过桌面根工程切换鸿蒙配置。
+
 ## Windows
 
 安装 Visual Studio 2022 的“使用 C++ 的桌面开发”工作负载、Windows SDK 和“适用于 Windows 的 C++ Clang 编译器”组件，并安装 Xmake。Windows x64 的 libyuv 使用 clang-cl 编译，以启用 SIMD 图像转换和缩放；主程序仍使用 MSVC。在开发者 PowerShell 中执行：

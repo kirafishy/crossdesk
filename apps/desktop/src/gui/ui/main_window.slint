@@ -32,6 +32,7 @@ export struct ReleaseNoteBlock {
 }
 
 export enum UpdateCheckStatus { idle, checking, up-to-date, available, failed }
+export enum AutostartStatus { checking, enabled, disabled, unsupported, failed }
 enum CopyFeedback { idle, success, failed }
 
 export global UiStrings {
@@ -401,6 +402,16 @@ export component MainWindow inherits Window {
     }
     in-out property <bool> self-hosted-enabled: false;
     in-out property <bool> autostart-enabled: false;
+    in property <bool> autostart-system-managed: false;
+    in property <AutostartStatus> autostart-status: AutostartStatus.checking;
+    out property <string> autostart-status-text:
+        root.autostart-status == AutostartStatus.checking ? GalleryStrings.tr("正在读取…", "Checking…", "Проверка…") :
+        root.autostart-status == AutostartStatus.enabled ? GalleryStrings.tr("已开启", "Enabled", "Включён") :
+        root.autostart-status == AutostartStatus.disabled ? GalleryStrings.tr("未开启", "Disabled", "Выключен") :
+        root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.tr("设备不支持", "Unsupported", "Не поддерживается") :
+        GalleryStrings.tr("读取失败", "Read failed", "Ошибка чтения");
+    in-out property <bool> autostart-guide-open: false;
+    changed autostart-guide-open => { if root.autostart-guide-open { focus-sink.focus(); } }
     in-out property <bool> daemon-enabled: false;
     in-out property <bool> save-remote-previews: true;
     // Show the preference on every platform; only adapted hosts can change it.
@@ -427,6 +438,7 @@ export component MainWindow inherits Window {
     callback recent-delete(string);
     callback save-settings() -> bool;
     callback cancel-settings;
+    callback refresh-autostart-status;
     callback save-self-hosted-settings() -> bool;
     callback cancel-self-hosted-settings;
     callback browse-save-path;
@@ -494,7 +506,10 @@ export component MainWindow inherits Window {
             root.gallery-frame-rate-draft = root.gallery-frame-rate-index;
             root.gallery-bandwidth-draft = root.gallery-bandwidth-index;
             root.gallery-action("settings-open", "");
+            if root.autostart-system-managed { root.refresh-autostart-status(); }
             focus-sink.focus();
+        } else {
+            root.autostart-guide-open = false;
         }
     }
 
@@ -721,6 +736,10 @@ export component MainWindow inherits Window {
         focus-sink := FocusScope {
             x: 0px; y: 0px; width: 0px; height: 0px;
             key-pressed(event) => {
+                if root.autostart-guide-open {
+                    if event.text == Key.Return || event.text == Key.Escape { root.autostart-guide-open = false; }
+                    return accept;
+                }
                 if root.wayland-notice-open {
                     if event.text == Key.Return || event.text == Key.Escape {
                         root.wayland-notice-open = false;
@@ -939,7 +958,7 @@ export component MainWindow inherits Window {
                         accessible-label: UiStrings.remote-id;
                         vertical-alignment: center;
                         selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
-                        edited => { root.connection-input-error = ""; remote-id-format-timer.restart(); }
+                        edited => { root.connection-input-error = ""; remote-id-format-timer.running = true; }
                         accepted => { if !root.connection-pending { root.connect-requested(root.remote-id-input); } }
                     }
                 }
@@ -1550,7 +1569,12 @@ export component MainWindow inherits Window {
     }
     remote-id-format-timer := Timer {
         interval: 1ms;
+        running: false;
         triggered => {
+            // Use the running property for both transitions. restart() resumes
+            // the native repeating timer without restoring this property, so
+            // a later stop() cannot change it and the selection keeps resetting.
+            self.stop();
             let formatted = root.format-remote-id(root.remote-id-input);
             root.remote-id-input = formatted;
             // IDs are ASCII-only, so character-count is also the UTF-8 offset
@@ -1963,7 +1987,13 @@ export component MainWindow inherits Window {
                         }
                         SettingsGroup {
                             title: GalleryStrings.tr("启动与后台", "Startup & background", "Запуск и фоновая работа"); rows: 2;
-                            SettingsToggleRow { label: UiStrings.autostart; checked <=> root.autostart-enabled; enabled: !root.settings-session-active; }
+                            if !root.autostart-system-managed: SettingsToggleRow { label: UiStrings.autostart; checked <=> root.autostart-enabled; enabled: !root.settings-session-active; }
+                            if root.autostart-system-managed: SettingsToggleRow {
+                                label: UiStrings.autostart;
+                                checked: root.autostart-status == AutostartStatus.enabled;
+                                toggle-on-click: false;
+                                clicked => { root.autostart-guide-open = true; }
+                            }
                             SettingsToggleRow { label: UiStrings.daemon; checked <=> root.daemon-enabled; enabled: !root.settings-session-active; divider: false; }
                         }
                     }
@@ -1994,6 +2024,59 @@ export component MainWindow inherits Window {
                     text: GalleryStrings.tr("保存", "Save", "Сохранить");
                     clicked => { if root.save-settings() { root.settings-open = false; root.self-host-settings-open = false; } }
                 }
+            }
+        }
+    }
+
+    if root.autostart-guide-open && root.settings-open: Rectangle {
+        background: #15223835; z: 49;
+        TouchArea { clicked => { focus-sink.focus(); } }
+        DialogSurface {
+            x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+            width: min(460px, parent.width - 32px);
+            height: min(380px, parent.height - 24px);
+            background: #f8fafc; border-color: #e1e7ef;
+            drop-shadow-color: #14294424; drop-shadow-blur: 18px; drop-shadow-offset-y: 6px;
+            TouchArea { clicked => { focus-sink.focus(); } }
+            Text {
+                x: 24px; y: 18px; width: parent.width - 48px; height: 26px;
+                text: GalleryStrings.tr("设置开机自启动", "Set up auto start", "Настройка автозапуска");
+                font-size: 18px; font-weight: 600; color: WorkbenchStyle.text;
+            }
+            ScrollView {
+                x: 24px; y: 58px; width: parent.width - 48px; height: parent.height - 120px;
+                viewport-width: self.visible-width;
+                horizontal-scrollbar-policy: always-off;
+                viewport-height: guide-content.preferred-height;
+                guide-content := VerticalLayout {
+                    width: parent.width; padding: 0px; spacing: 12px;
+                    Text { text: root.autostart-status-text; color: WorkbenchStyle.accent; font-size: 13px; wrap: word-wrap; }
+                    Text {
+                        text: root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.tr(
+                            "当前设备不支持开机自启动。", "This device does not support auto start.", "Это устройство не поддерживает автозапуск.") :
+                            root.autostart-status == AutostartStatus.failed ? GalleryStrings.tr(
+                            "无法读取系统状态。请刷新重试，或在系统设置中核对。", "Could not read the system status. Retry or check it in Settings.", "Не удалось прочитать состояние. Повторите попытку или проверьте настройки системы.") :
+                            GalleryStrings.tr("请在系统设置中添加或移除本应用，返回后会自动刷新状态。", "Add or remove this app in system Settings. The status refreshes when you return.", "Добавьте или удалите приложение в настройках системы. После возвращения статус обновится.");
+                        color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
+                    }
+                    if root.autostart-status != AutostartStatus.unsupported: Text {
+                        text: GalleryStrings.tr(
+                            "设置 → 应用和元服务 → 应用启动管理\n\n开启：点击“添加应用”，选择 CrossDesk，然后点击“完成”。\n\n关闭：在自启动列表中找到本应用，点击“移除”。",
+                            "Settings → Apps & services → App startup management\n\nEnable: choose Add app, select CrossDesk, then choose Done.\n\nDisable: find this app in the startup list and choose Remove.",
+                            "Настройки → Приложения и сервисы → Управление запуском\n\nВключить: добавьте CrossDesk в список и подтвердите выбор.\n\nВыключить: удалите приложение из списка автозапуска.");
+                        color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
+                    }
+                }
+            }
+            SettingsButton {
+                x: 24px; y: parent.height - 48px; width: 112px;
+                text: GalleryStrings.tr("刷新状态", "Refresh status", "Обновить");
+                enabled: root.autostart-status != AutostartStatus.checking;
+                clicked => { root.refresh-autostart-status(); }
+            }
+            SettingsButton {
+                x: parent.width - 116px; y: parent.height - 48px; width: 92px; primary: true;
+                text: UiStrings.ok; clicked => { root.autostart-guide-open = false; }
             }
         }
     }

@@ -238,6 +238,11 @@ export component StreamWindow inherits Window {
     callback reorder-tab(int, length, length);
     callback close-tab(string);
     callback switch-display(int);
+    in property <bool> secure-attention-supported: true;
+    private property <[string]> secure-shortcut-items: ["Ctrl+Alt+Del", "Win+L"];
+    private property <[string]> ordinary-shortcut-items: ["Win+L"];
+    private property <[string]> shortcut-items: root.secure-attention-supported ? root.secure-shortcut-items : root.ordinary-shortcut-items;
+    private property <length> shortcut-menu-height: root.shortcut-items.length * 30px + 8px;
     callback send-shortcut(string);
     callback toggle-mouse-control;
     callback toggle-privacy;
@@ -265,6 +270,10 @@ export component StreamWindow inherits Window {
     private property <length> stats-header-height: 18px;
     private property <length> stats-content-height:
         root.stats-header-height + root.stats-rows.length * root.stats-row-height + 65px;
+    private property <length> file-panel-x: 18px;
+    private property <length> file-panel-y: video.height - min(210px, video.height * 0.35);
+    private property <length> file-panel-width: min(430px, video.width * 0.6);
+    private property <length> file-panel-height: min(190px, video.height * 0.32);
     private property <bool> display-menu-open: false;
     private property <bool> display-menu-animation-enabled: false;
     private property <float> display-menu-progress: 0.0;
@@ -392,11 +401,14 @@ export component StreamWindow inherits Window {
             && pointer-x >= shortcut-menu-x
             && pointer-x <= shortcut-menu-x + 180px
             && pointer-y >= shortcut-menu-y
-            && pointer-y <= shortcut-menu-y + 68px;
+            && pointer-y <= shortcut-menu-y + root.shortcut-menu-height;
         let over-video-menu = root.video-menu-open
             && pointer-x >= root.video-menu-x && pointer-x <= root.video-menu-x + root.video-menu-width
             && pointer-y >= root.video-menu-y && pointer-y <= root.video-menu-y + root.video-menu-height;
-        return over-control || over-display-menu || over-shortcut-menu || over-video-menu;
+        let over-file-panel = root.file-transfer-visible
+            && pointer-x >= root.file-panel-x && pointer-x <= root.file-panel-x + root.file-panel-width
+            && pointer-y >= root.file-panel-y && pointer-y <= root.file-panel-y + root.file-panel-height;
+        return over-control || over-display-menu || over-shortcut-menu || over-video-menu || over-file-panel;
     }
 
     begin-control-drag(press-x, press-y) => {
@@ -1246,11 +1258,11 @@ export component StreamWindow inherits Window {
             }
 
             if root.shortcut-menu-open: Rectangle {
-                x: control.x + shortcut-button.x; y: control.y + 40px; width: 180px; height: 68px;
+                x: control.x + shortcut-button.x; y: control.y + 40px; width: 180px; height: root.shortcut-menu-height;
                 background: white; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.menu; z: 11;
                 VerticalLayout {
                     padding: 4px; spacing: 1px;
-                    for shortcut in ["Ctrl+Alt+Del", "Win+L"]: Rectangle {
+                    for shortcut in root.shortcut-items: Rectangle {
                         height: 29px; background: shortcut-touch.has-hover ? #e8eef9 : transparent;
                         Text { x: 8px; text: shortcut; color: #30343b; font-size: ImGuiFontStyle.body; vertical-alignment: center; }
                         shortcut-touch := TouchArea {
@@ -1365,10 +1377,21 @@ export component StreamWindow inherits Window {
 
             // Transfer progress overlay at bottom-left.
             if root.file-transfer-visible: Rectangle {
-                x: 18px; y: parent.height - min(210px, parent.height * 0.35); width: min(430px, parent.width * 0.6); height: min(190px, parent.height * 0.32);
+                x: root.file-panel-x; y: root.file-panel-y;
+                width: root.file-panel-width; height: root.file-panel-height;
                 background: #fffffff0; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.surface; z: 7;
+                // Header/padding and drags leaving the panel belong to local UI.
+                TouchArea {
+                    pointer-event(event) => {
+                        if event.kind == PointerEventKind.down { root.suppress-next-remote-pointer-release = true; }
+                    }
+                    scroll-event(event) => { accept }
+                }
                 Text { x: 12px; y: 8px; text: StreamStrings.file-transfer; color: #2d3138; font-weight: 600; }
-                IconButton { x: parent.width - 32px; y: 1px; icon: FontAwesomeIcons.xmark; icon-size: 13px; clicked => { root.close-file-transfer(); } }
+                IconButton {
+                    x: parent.width - 32px; y: 1px; icon: FontAwesomeIcons.xmark; icon-size: 13px;
+                    clicked => { root.suppress-next-remote-pointer-release = true; root.close-file-transfer(); }
+                }
                 ScrollView {
                     x: 10px; y: 32px; width: parent.width - 20px; height: parent.height - 42px;
                     VerticalLayout {

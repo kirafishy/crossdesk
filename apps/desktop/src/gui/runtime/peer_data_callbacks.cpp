@@ -24,6 +24,9 @@
 #include "platform.h"
 #include "rd_log.h"
 #include "runtime/gui_runtime.h"
+#ifdef __OHOS__
+#include "platform/harmony/input/system_shortcuts.h"
+#endif
 
 #if _WIN32
 #include "desktop_transition_policy.h"
@@ -308,6 +311,10 @@ void PeerEventHandler::OnReceiveDataBuffer(
                  GetLastError());
       }
     }
+#elif defined(__OHOS__)
+    if (!SendHarmonySystemShortcut(remote_action.c.flag))
+      LOG_WARN("Harmony system shortcut unsupported or unauthorized, command={}",
+               static_cast<int>(remote_action.c.flag));
 #endif
     return;
   }

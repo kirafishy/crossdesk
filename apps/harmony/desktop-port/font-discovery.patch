@@ -1,0 +1,41 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -200,7 +200,7 @@
+ wgpu-29 = { package = "wgpu", version = "29.0.4", default-features = false }
+ input = { version = "0.10.0", default-features = false }
+ tr = { version = "0.1", default-features = false }
+-fontique = { version = "0.10.0" }
++fontique = { version = "0.10.0", default-features = false, features = ["std"] }
+ # Pinned to match parley's version
+ read-fonts = { version = "0.39" }
+ # Pinned to match parley's version
+--- a/internal/core/Cargo.toml
++++ b/internal/core/Cargo.toml
+@@ -130,7 +130,7 @@
+ unicode-script = { version = "0.5.7", optional = true }
+ icu_normalizer = { workspace = true, optional = true }
+ sys-locale = { version = "0.3.2", optional = true, features = ["js"] }
+-parley = { version = "0.10.0", optional = true, features = ["complex-scripts"] }
++parley = { version = "0.10.0", optional = true, default-features = false, features = ["std", "complex-scripts"] }
+ 
+ image = { workspace = true, optional = true, default-features = false }
+ clru = { workspace = true, optional = true }
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -3960,16 +3960,9 @@
+  "hashbrown 0.17.1",
+  "linebender_resource_handle",
+  "memmap2",
+- "objc2 0.6.4",
+- "objc2-core-foundation",
+- "objc2-core-text",
+- "objc2-foundation 0.3.2",
+  "parlance",
+  "read-fonts",
+- "roxmltree",
+  "smallvec",
+- "windows 0.62.2",
+- "windows-core 0.62.2",
+  "yeslogic-fontconfig-sys",
+ ]
+ 

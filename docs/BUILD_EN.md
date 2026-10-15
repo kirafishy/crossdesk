@@ -9,6 +9,8 @@ After cloning, run build and packaging commands from the repository root. The [X
 - Git, [Xmake](https://xmake.io/guide/quick-start.html) (3.1.1 or newer for both desktop and mobile), and the platform toolchain listed below.
 - The build scripts use Xmake to manage **CMake 3.x (≥ 3.21, < 4.0)**, **Rust 1.92.0**, and other dependencies. The first build downloads tools and source archives. See the [Slint package configuration](../deps/thirdparty/slint/xmake.lua) for the constraints.
 
+The HarmonyOS Slint desktop port compiles the shared desktop UI and application logic; see its [build and parity validation guide (Chinese)](../apps/harmony/desktop-port/README.md) (API 26). The separate ArkUI phone / tablet project is documented in the [HarmonyOS guide (Chinese)](../apps/harmony/README.md). Use the respective scripts instead of reconfiguring the desktop root project.
+
 ## Windows
 
 Install Visual Studio 2022 with the **Desktop development with C++** workload, Windows SDK, and **C++ Clang Compiler for Windows** component, plus Xmake. Windows x64 builds use clang-cl for libyuv to enable SIMD conversion and scaling; the application still uses MSVC. In a developer PowerShell, run:

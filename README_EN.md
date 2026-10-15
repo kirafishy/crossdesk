@@ -80,6 +80,7 @@ Choose a package matching your OS and CPU architecture from [GitHub Releases](ht
 | Linux | Ubuntu 20.04+, amd64 / arm64, glibc 2.31 baseline | Standard / Xfce virtual desktop `.deb` |
 | iOS / iPadOS | iOS 16.0+, arm64 physical device | Native controller; build and sign with Xcode, or sign the unsigned CI app |
 | Android | Android 8.0+, arm64 | Native controller; build an APK with Gradle ([guide](apps/android/README.md)) |
+| HarmonyOS (development) | Slint PC: API 26; ArkUI mobile: API 20+; arm64, device validation pending | [Shared Slint desktop port](apps/harmony/desktop-port/README.md); [HarmonyOS build and mobile guide](apps/harmony/README.md) (Chinese), build and sign with DevEco |
 | Web | A WebRTC-capable browser | Open [web.crossdesk.cn](https://web.crossdesk.cn/) |
 
 Linux provides two standalone packages per architecture. **Choose one**:

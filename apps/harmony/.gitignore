@@ -1,0 +1,25 @@
+.hvigor/
+.native/
+.idea/
+**/__pycache__/
+*.py[cod]
+oh_modules/
+**/oh_modules/
+**/build/
+**/.cxx/
+native/.xmake/
+entry/libs/
+local.properties
+*.p12
+*.p7b
+*.cer
+*.csr
+
+# Generated mobile legal resources; regenerated from checked-in sources and the SDK.
+entry/src/main/resources/rawfile/about/
+entry/src/main/resources/rawfile/LICENSE
+entry/src/main/resources/rawfile/PRIVACY.md
+entry/src/main/resources/rawfile/OPEN_SOURCE_NOTICE.txt
+entry/src/main/resources/rawfile/THIRD_PARTY_NOTICES.txt
+entry/src/main/resources/rawfile/ThirdPartyLicenses.json
+entry/src/main/resources/rawfile/SourceMetadata.json

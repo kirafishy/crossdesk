@@ -1,0 +1,118 @@
+--- a/api/cpp/platform.rs
++++ b/api/cpp/platform.rs
+@@ -47,6 +47,11 @@
+ }
+ 
+ impl WindowAdapter for CppWindowAdapter {
++    #[cfg(target_env = "ohos")]
++    fn internal(&self, _: i_slint_core::InternalToken) -> Option<&dyn i_slint_core::window::WindowAdapterInternal> {
++        Some(self)
++    }
++
+     fn window(&self) -> &Window {
+         &self.window
+     }
+@@ -186,6 +191,103 @@
+     }
+ }
+ 
++
++// Harmony's native editor and cursor services are provided by the C++ host.
++// Keep this extension target-local; the public C++ adapter ABI stays unchanged.
++#[cfg(target_env = "ohos")]
++mod harmony_services {
++    use super::*;
++    use core::cell::Cell;
++    use i_slint_core::window::{InputMethodRequest, WindowAdapterInternal, WindowInner};
++    type HarmonyOsCallback = unsafe extern "C" fn(*mut c_void, *const c_void, i32,
++        *const u8, usize, usize, usize, f32, f32, f32, f32, i32);
++    std::thread_local! { static CALLBACK: Cell<Option<HarmonyOsCallback>> = const { Cell::new(None) }; }
++    #[unsafe(no_mangle)]
++    pub extern "C" fn crossdesk_slint_set_os_callback(callback: HarmonyOsCallback) {
++        CALLBACK.set(Some(callback));
++    }
++    impl WindowAdapterInternal for CppWindowAdapter {
++        fn input_method_request(&self, request: InputMethodRequest) {
++            let Some(callback) = CALLBACK.get() else { return };
++            let (kind, properties) = match request {
++                InputMethodRequest::Enable(p) => (1, Some(p)),
++                InputMethodRequest::Update(p) => (2, Some(p)),
++                InputMethodRequest::Disable => (0, None),
++                _ => return,
++            };
++            let p = properties.unwrap_or_default();
++            let cursor = p.text[..p.cursor_position].encode_utf16().count();
++            let anchor = p.text[..p.anchor_position.unwrap_or(p.cursor_position)].encode_utf16().count();
++            unsafe { callback(self.user_data, self as *const Self as *const c_void, kind, p.text.as_ptr(), p.text.len(), cursor, anchor,
++                p.cursor_rect_origin.x, p.cursor_rect_origin.y, p.cursor_rect_size.width,
++                p.cursor_rect_size.height, p.input_type as i32); }
++        }
++        fn set_mouse_cursor(&self, cursor: i_slint_core::items::MouseCursor) {
++            if let Some(callback) = CALLBACK.get() {
++                unsafe { callback(self.user_data, self as *const Self as *const c_void, 3, core::ptr::null(), 0, 0, 0,
++                    0., 0., 0., 0., cursor as i32); }
++            }
++        }
++    }
++    // IME commands target the editor that owns the native input session. Use
++    // Slint's normal key handling (selection, clipboard, validation and undo)
++    // without mutating the window's physical modifier state.
++    #[unsafe(no_mangle)]
++    pub unsafe extern "C" fn crossdesk_slint_edit(adapter: *const c_void,
++        text: *const u8, length: usize, modifiers: i32) {
++        use i_slint_core::input::{InternalKeyEvent, KeyEvent, KeyEventType};
++        let Ok(text) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(text, length) }) else { return };
++        let window = WindowInner::from_pub(&unsafe { &*(adapter as *const CppWindowAdapter) }.window);
++        let Some(item) = window.focus_item.borrow().upgrade() else { return };
++        if item.downcast::<i_slint_core::items::TextInput>().is_none() { return; }
++        let mut key_event = KeyEvent::default();
++        key_event.text = text.into();
++        key_event.modifiers.shift = modifiers & 1 != 0;
++        key_event.modifiers.control = modifiers & 2 != 0;
++        for event_type in [KeyEventType::KeyPressed, KeyEventType::KeyReleased] {
++            item.borrow().as_ref().key_event(&InternalKeyEvent {
++                key_event: key_event.clone(), event_type, ..Default::default()
++            }, &window.window_adapter(), &item);
++        }
++    }
++    #[unsafe(no_mangle)]
++    pub unsafe extern "C" fn crossdesk_slint_selection(adapter: *const c_void, anchor: i32, cursor: i32) {
++        let window = WindowInner::from_pub(&unsafe { &*(adapter as *const CppWindowAdapter) }.window);
++        let Some(item) = window.focus_item.borrow().upgrade() else { return };
++        let Some(input) = item.downcast::<i_slint_core::items::TextInput>() else { return };
++        let input = input.as_pin_ref();
++        let text = input.text();
++        // Harmony uses UTF-16 indices; Slint uses UTF-8 byte offsets. Clamp
++        // malformed ranges to character boundaries, including surrogate pairs.
++        let byte_offset = |offset: i32| -> i32 {
++            let mut utf16 = 0;
++            for (byte, ch) in text.char_indices() {
++                if utf16 + ch.len_utf16() > offset.max(0) as usize { return byte as i32; }
++                utf16 += ch.len_utf16();
++            }
++            text.len() as i32
++        };
++        input.set_selection_offsets(&window.window_adapter(), &item, byte_offset(anchor), byte_offset(cursor));
++    }
++    // Called only on the Slint thread while the owning C++ window is alive.
++    #[unsafe(no_mangle)]
++    pub unsafe extern "C" fn crossdesk_slint_composition(adapter: *const c_void,
++        commit: bool, text: *const u8, length: usize) {
++        use i_slint_core::input::{InternalKeyEvent, KeyEvent, KeyEventType};
++        let Ok(text) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(text, length) }) else { return };
++        let mut key_event = KeyEvent::default();
++        key_event.text = text.into();
++        let event = if commit {
++            InternalKeyEvent { event_type: KeyEventType::CommitComposition,
++                key_event, ..Default::default() }
++        } else {
++            InternalKeyEvent { event_type: KeyEventType::UpdateComposition, preedit_text: text.into(),
++                preedit_selection: Some(text.len() as i32..text.len() as i32), ..Default::default() }
++        };
++        WindowInner::from_pub(&unsafe { &*(adapter as *const CppWindowAdapter) }.window).process_key_input(event);
++    }
++}
++
+ type PlatformUserData = *mut c_void;
+ 
+ struct CppPlatform {

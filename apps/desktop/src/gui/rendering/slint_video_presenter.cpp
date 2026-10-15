@@ -16,7 +16,7 @@
 
 #if defined(__APPLE__)
 #include "platform/macos/gui/metal_video_renderer.h"
-#else
+#elif !defined(__OHOS__)
 #if defined(_WIN32)
 #include <windows.h>
 #endif
@@ -28,10 +28,10 @@
 namespace crossdesk {
 namespace {
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(__OHOS__)
 constexpr GLint kGlClampToEdge = 0x812F;
 constexpr float kStreamWindowCornerRadius = 12.0f;
-#else
+#elif defined(__APPLE__)
 constexpr int kMetalAttachmentAttemptLimit = 30;
 #endif
 
@@ -78,7 +78,7 @@ struct SlintVideoPresenter::Impl {
 #if defined(__APPLE__)
   int attachment_attempts = 0;
   bool skip_attachment_once = false;
-#else
+#elif !defined(__OHOS__)
   std::mutex gl_mutex;
   std::vector<uint8_t> gl_conversion_frame;
   std::vector<uint8_t> gl_pending_frame;
@@ -109,7 +109,7 @@ struct SlintVideoPresenter::Impl {
     return true;
   }
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(__OHOS__)
   void ConfigureOpenGlNotifier() {
     if (!stream) {
       return;
@@ -238,7 +238,7 @@ void SlintVideoPresenter::PrepareWindow(
   stream->set_native_video_enabled(false);
   impl_->attachment_attempts = kMetalAttachmentAttemptLimit;
   impl_->skip_attachment_once = true;
-#else
+#elif !defined(__OHOS__)
   impl_->ConfigureOpenGlNotifier();
 #endif
 }
@@ -351,7 +351,7 @@ SlintVideoPresenter::PresentResult SlintVideoPresenter::Present(
     }
     return result;
   }
-#else
+#elif !defined(__OHOS__)
   auto* opengl_renderer =
       dynamic_cast<OpenGlVideoRenderer*>(&impl_->renderer);
   if (opengl_renderer && opengl_renderer->IsReady()) {
@@ -419,7 +419,7 @@ SlintVideoPresenter::PresentResult SlintVideoPresenter::Present(
     }
   }
 
-#if !defined(__APPLE__)
+#if !defined(__APPLE__) && !defined(__OHOS__)
   uint32_t texture_id = 0;
   {
     std::lock_guard lock(impl_->gl_mutex);

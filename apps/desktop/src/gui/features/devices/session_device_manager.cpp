@@ -30,7 +30,7 @@ namespace {
 
 constexpr uint64_t kCaptureResumeKeyFrameGapMs = 500;
 constexpr auto kFrameDeadlineTolerance = std::chrono::milliseconds(1);
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__OHOS__)
 constexpr auto kKeyboardCaptureRetryDelay = std::chrono::seconds(1);
 #endif
 
@@ -419,7 +419,7 @@ int SessionDeviceManager::StartMouseController() {
     return -1;
   }
 
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   if (IsWaylandSession()) {
     if (!screen_capturer_) {
       return 1;
@@ -467,7 +467,7 @@ int SessionDeviceManager::StopMouseController() {
 int SessionDeviceManager::StartKeyboardCapturer() {
   captured_keyboard_inputs_.Clear();
   owner_.keyboard_capturer_uses_window_events_ = false;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__OHOS__)
   next_keyboard_capture_retry_ =
       std::chrono::steady_clock::now() + kKeyboardCaptureRetryDelay;
 #endif
@@ -479,7 +479,7 @@ int SessionDeviceManager::StartKeyboardCapturer() {
   }
 #endif
 
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   if (IsWaylandSession()) {
     owner_.keyboard_capturer_uses_window_events_ = true;
     LOG_INFO("Start keyboard capturer with Slint Wayland backend");
@@ -546,7 +546,7 @@ int SessionDeviceManager::InitializeAudioOutput() {
   };
 
   if (!open_device()) {
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
     LOG_WARN("Failed to open output stream with driver [{}]: {}",
              getenv("SDL_AUDIODRIVER") ? getenv("SDL_AUDIODRIVER")
                                        : "(default)",
@@ -629,7 +629,7 @@ void SessionDeviceManager::UpdateInteractions() {
     }
   }
 #endif
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   const bool is_wayland_session = IsWaylandSession();
   const bool stop_wayland_mouse_before_screen =
       is_wayland_session && !owner_.start_screen_capturer_ &&
@@ -664,24 +664,27 @@ void SessionDeviceManager::UpdateInteractions() {
   }
 
   if (owner_.screen_capturer_is_started_ && mouse_controller_ && SyncDisplayInfo()) {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__OHOS__)
     const int active_display = screen_capturer_->GetCurrentMonitorIndex();
     const auto displays = display_info_list();
     if (active_display >= 0 &&
         active_display < static_cast<int>(displays.size())) {
       owner_.selected_display_ = active_display;
+#ifdef _WIN32
       if (displays[active_display].width <= 0 ||
           displays[active_display].height <= 0)
         ReleaseRemoteMouseButtons();
+#endif
     }
 #endif
   }
 
   if (owner_.start_keyboard_capturer_ && owner_.focus_on_stream_window_ &&
       !owner_.privacy_.Snapshot().input_blocked) {
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__OHOS__)
     if (owner_.keyboard_capturer_is_started_ &&
         owner_.keyboard_capturer_uses_window_events_ && keyboard_capturer_ &&
+        keyboard_capturer_->ShouldRetryHook() &&
         std::chrono::steady_clock::now() >= next_keyboard_capture_retry_) {
       // A transient installation failure or stalled hook must not leave
       // system shortcuts in the window-event fallback until focus changes.
@@ -699,7 +702,7 @@ void SessionDeviceManager::UpdateInteractions() {
         owner_.keyboard_.ForceReleasePressedKeys();
         owner_.keyboard_capturer_uses_window_events_ = true;
         owner_.keyboard_capturer_is_started_ = true;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__OHOS__)
         next_keyboard_capture_retry_ =
             std::chrono::steady_clock::now() + kKeyboardCaptureRetryDelay;
 #endif

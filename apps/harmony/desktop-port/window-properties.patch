@@ -1,0 +1,28 @@
+--- a/api/cpp/platform.rs
++++ b/api/cpp/platform.rs
+@@ -98,6 +98,8 @@
+     }
+ 
+     fn update_window_properties(&self, properties: WindowProperties<'_>) {
++        #[cfg(target_env = "ohos")]
++        harmony_services::window_chrome(self);
+         unsafe { (self.update_window_properties)(self.user_data, &properties) }
+     }
+ }
+@@ -206,6 +208,16 @@
+     pub extern "C" fn crossdesk_slint_set_os_callback(callback: HarmonyOsCallback) {
+         CALLBACK.set(Some(callback));
+     }
++    // Read these properties inside the normal property tracker so subsequent
++    // Slint changes propagate without a separate UI/window state machine.
++    pub(super) fn window_chrome(adapter: &CppWindowAdapter) {
++        let Some(callback) = CALLBACK.get() else { return };
++        let Some(item) = WindowInner::from_pub(&adapter.window).window_item() else { return };
++        let item = item.as_pin_ref();
++        let flags = i32::from(item.no_frame()) | (i32::from(item.always_on_top()) << 1);
++        unsafe { callback(adapter.user_data, adapter as *const _ as *const c_void, 4,
++            core::ptr::null(), 0, 0, 0, 0., 0., 0., 0., flags); }
++    }
+     impl WindowAdapterInternal for CppWindowAdapter {
+         fn input_method_request(&self, request: InputMethodRequest) {
+             let Some(callback) = CALLBACK.get() else { return };

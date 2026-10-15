@@ -16,7 +16,7 @@
 #include "localization.h"
 #include "platform/video_renderer.h"
 #include "rd_log.h"
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
 #include "platform/linux/headless/headless_console.h"
 #endif
 
@@ -143,7 +143,7 @@ int GuiRuntime::CreateConnectionPeer() {
 
   const char *active_identity =
       self_hosted ? self_hosted_user_id_ : client_id_with_password_;
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
   // Publish the committed identity; an unconfirmed recovery credential must
   // not be advertised as the current connection password.
   HeadlessConsole::Instance().SetIdentity(active_identity);
@@ -177,7 +177,7 @@ int GuiRuntime::CreateConnectionPeer() {
           sizeof(params_.log_path) - 1);
   params_.log_path[sizeof(params_.log_path) - 1] = '\0';
   params_.hardware_acceleration = config_center_->IsHardwareVideoCodec();
-#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
+#if defined(_WIN32) || (defined(__linux__) && !defined(__OHOS__)) || defined(__APPLE__)
   // Windows and Linux retain pooled CPU NV12 frames or CUDA device frames;
   // macOS retains VideoToolbox CVPixelBuffers for direct Metal sampling. All
   // platforms fall back to a packed CPU copy when native upload is unavailable.

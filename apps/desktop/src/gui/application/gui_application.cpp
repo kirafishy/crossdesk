@@ -53,7 +53,12 @@
 #elif defined(__APPLE__)
 #include "platform/macos/gui/tray/mac_tray.h"
 #include "platform/window_drag.h"
-#elif defined(__linux__)
+#elif defined(__OHOS__)
+#include "platform/harmony/harmony_autostart.h"
+#include "platform/harmony/gui/tray/harmony_tray.h"
+#include "platform/harmony/gui/window_state.h"
+#include "tools/file_transfer.h"
+#elif (defined(__linux__) && !defined(__OHOS__))
 #include <GL/gl.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
@@ -70,6 +75,7 @@
 #include "signal_server_settings.h"
 #include "signal_server_address.h"
 #include "ui/announcement_text.h"
+#include "ui/model_update.h"
 #include "ui/release_notes_text.h"
 #include "ui/ui_localization.h"
 #include "update_checker.h"
@@ -111,7 +117,7 @@ std::string CreatePasswordChangeRequestId(uint64_t sequence) {
          std::to_string(sequence);
 }
 
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
 bool HasNonEmptyEnvironmentVariable(const char* name) {
   const char* value = std::getenv(name);
   return value != nullptr && value[0] != '\0';
@@ -639,14 +645,14 @@ struct WindowDragState {
   float global_to_physical_scale = 1;
   slint::PhysicalPosition window_start;
   slint::PhysicalPosition last_target;
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   std::unique_ptr<Display, decltype(&XCloseDisplay)> x11_display{nullptr,
                                                               XCloseDisplay};
   slint::Timer pointer_timer;
 #endif
 
   bool ReadGlobalPointer(float* x, float* y, bool* left_pressed = nullptr) {
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
     const char* driver = SDL_GetCurrentVideoDriver();
     if (driver && std::strcmp(driver, "x11") == 0) {
       // Slint can dispatch motion before SDL pumps its XInput2 events, and
@@ -683,7 +689,7 @@ bool CanUseGlobalPointerPosition() {
   if (driver == nullptr) {
     return false;
   }
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   // Wayland deliberately does not expose global pointer coordinates or allow
   // clients to position top-level windows.
   return std::strcmp(driver, "wayland") != 0;
@@ -821,7 +827,7 @@ void DragWindow(WindowHandle& component, int phase, float mouse_x,
       state.global_to_physical_scale = 1.0f;
 #endif
     }
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
     if (state.use_global_pointer && state.x11_display) {
       // Moving the window can leave consecutive pointer events at identical
       // local coordinates, so Slint need not emit another TouchArea::moved.
@@ -841,7 +847,7 @@ void DragWindow(WindowHandle& component, int phase, float mouse_x,
     return;
   }
   if (phase == 0) {
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
     state.pointer_timer.stop();
     if (state.use_global_pointer && state.x11_display) {
       DragWindow(component, 2, mouse_x, mouse_y, state);
@@ -1017,14 +1023,16 @@ struct GuiApplication::SlintUi {
   std::unique_ptr<WinTray> tray;
 #elif defined(__APPLE__)
   std::unique_ptr<MacTray> tray;
-#elif defined(__linux__)
+#elif defined(__OHOS__)
+  std::unique_ptr<HarmonyTray> tray;
+#elif (defined(__linux__) && !defined(__OHOS__))
   std::unique_ptr<LinuxTray> tray;
   Display* x11_focus_display = nullptr;
   std::chrono::steady_clock::time_point last_x11_activation_poll{};
 #endif
 
   ~SlintUi() {
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
     if (x11_focus_display) {
       XCloseDisplay(x11_focus_display);
     }
@@ -1059,7 +1067,7 @@ int GuiApplication::Run() {
   }
 
   InitializeSettings();
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
   HeadlessConsole::Instance().BindSettings(
       config_center_.get(), [this] {
         std::lock_guard<std::mutex> lock(password_change_mutex_);
@@ -1121,7 +1129,7 @@ void GuiApplication::InitializeSettings() {
 }
 
 bool GuiApplication::InitializeSDL() {
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   ConfigureLinuxCudaGraphics(config_center_->IsHardwareVideoCodec());
   // Standard Wayland top-level windows cannot choose an absolute screen
   // position. Use the session's XWayland compatibility server for the GUI so
@@ -1146,7 +1154,7 @@ bool GuiApplication::InitializeSDL() {
     LOG_ERROR("SDL initialization failed: {}", SDL_GetError());
     return false;
   }
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   const char* active_video_driver = SDL_GetCurrentVideoDriver();
   // X11 permits the manual move/position operations used by the frameless
   // main window. Keep native Wayland decorations as a compatibility fallback.
@@ -1192,7 +1200,7 @@ void GuiApplication::InitializeUi() {
     LOG_INFO("Using requested Slint backend: {}", requested_slint_backend);
   }
 #endif
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   // Detect the desktop session before temporarily hiding Wayland variables
   // for the XWayland GUI backend below.
   const bool is_wayland_session = IsWaylandSession();
@@ -1214,7 +1222,7 @@ void GuiApplication::InitializeUi() {
       std::make_unique<SlintVideoPresenter>(*video_renderer_);
 #if _WIN32
   ui_->main->set_custom_titlebar(true);
-#elif defined(__linux__)
+#elif (defined(__linux__) && !defined(__OHOS__))
   ui_->main->set_custom_titlebar(use_x11_custom_titlebar_);
   ui_->main->set_wayland_titlebar(use_xwayland_gui_);
   // Set this only at startup so dismissing the notice lasts until exit.
@@ -1342,7 +1350,11 @@ void GuiApplication::InitializeSystemTray() {
   ui_->tray = std::make_unique<MacTray>(
       std::move(show_window), std::move(hide_window), std::move(open_settings),
       std::move(exit_app), "CrossDesk", localization_language_index_);
-#elif defined(__linux__)
+#elif defined(__OHOS__)
+  ui_->tray = std::make_unique<HarmonyTray>(
+      std::move(show_window), std::move(hide_window), std::move(open_settings),
+      std::move(exit_app), "CrossDesk", localization_language_index_);
+#elif (defined(__linux__) && !defined(__OHOS__))
   ui_->tray = std::make_unique<LinuxTray>(
       std::move(show_window), std::move(hide_window),
       std::move(open_settings), std::move(exit_app), "CrossDesk",
@@ -1384,6 +1396,9 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   main->set_force_relay_enabled(config_center_->IsForceRelay());
   main->set_self_hosted_enabled(enable_self_hosted_);
   main->set_autostart_enabled(enable_autostart_);
+#if defined(__OHOS__)
+  main->set_autostart_system_managed(true);
+#endif
   main->set_daemon_enabled(enable_daemon_);
   main->set_save_remote_previews(config_center_->IsSaveRemotePreviews());
   main->set_privacy_on_connect_enabled(
@@ -1393,12 +1408,20 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   main->set_capture_method_index(
       static_cast<int>(config_center_->GetScreenCaptureMethod()));
 #endif
-#if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
+#if defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__OHOS__))
   main->set_privacy_setting_available(true);
 #else
   main->set_privacy_setting_available(false);
 #endif
+#if defined(__OHOS__)
+  // The sandbox default is not the system desktop. Show the actual receive
+  // location until a public directory has been selected and authorized.
+  main->set_file_save_path(UiText(file_transfer_save_path_buf_[0]
+      ? std::string(file_transfer_save_path_buf_)
+      : FileReceiver().OutputDir().string()));
+#else
   main->set_file_save_path(file_transfer_save_path_buf_);
+#endif
   main->set_server_host(signal_server_ip_self_);
   main->set_server_port(signal_server_port_self_);
   main->set_self_host_settings_error("");
@@ -1633,6 +1656,9 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
   main->on_cancel_settings([this, main] {
     ResetSettingsUi(main->get_gallery_mode());
   });
+#if defined(__OHOS__)
+  main->on_refresh_autostart_status([] { RefreshHarmonyAutostartStatus(); });
+#endif
   main->on_save_self_hosted_settings([this, main] {
     // Stage the endpoint until the surrounding settings dialog is confirmed.
     return ValidateSelfHostedSettingsFromUi(main->get_gallery_mode());
@@ -1832,12 +1858,19 @@ void GuiApplication::BindStreamCallbacks() {
   });
   stream->on_send_shortcut([this](slint::SharedString shortcut) {
     auto props = SelectedSession();
-    if (!props || !props->peer_) {
+    if (!props || !props->peer_ || !props->control_mouse_ ||
+        props->connection_status_.load() != ConnectionStatus::Connected) {
       return;
+    }
+    const std::string name(shortcut);
+    if (name != "Ctrl+Alt+Del" && name != "Win+L") return;
+    {
+      std::lock_guard lock(props->remote_version_mutex_);
+      if (name == "Ctrl+Alt+Del" && props->remote_platform_ == HostPlatform::HarmonyOS) return;
     }
     RemoteAction action{};
     action.type = ControlType::service_command;
-    action.c.flag = std::string(shortcut) == "Ctrl+Alt+Del"
+    action.c.flag = name == "Ctrl+Alt+Del"
                         ? ServiceCommandFlag::send_sas
                         : ServiceCommandFlag::lock_workstation;
     const std::string message = action.to_json();
@@ -2099,7 +2132,7 @@ void GuiApplication::Tick() {
     signal_connection_indicator_.Reset();
     CreateConnectionPeer();
   }
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
   HeadlessConsole::Instance().Poll(
       signal_connected_.load(),
       [this](const std::string& password) { RequestPasswordChange(password); },
@@ -2130,7 +2163,7 @@ void GuiApplication::Tick() {
     }
   }
   clipboard_.ApplyPendingRemoteText();
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   if (ui_->tray) {
     ui_->tray->ProcessEvents();
   }
@@ -2156,7 +2189,7 @@ void GuiApplication::Tick() {
   HandlePresenceProbeTimeout();
   HandlePrivacy();
   HandleWindowsServiceIntegration();
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   SyncXWaylandWindowActivation();
 #else
   SyncStreamKeyboardFocus();
@@ -2367,7 +2400,7 @@ void GuiApplication::ShareLocalCursorState() {
 
 bool GuiApplication::RequestPasswordChange(const std::string &password) {
   const auto notify = [](const std::string& message) {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
     HeadlessConsole::Instance().NotifyKey(message.c_str());
 #else
     (void)message;
@@ -2486,7 +2519,7 @@ void GuiApplication::HandlePasswordChangeResult() {
   }
 
   if (!succeeded) {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
     HeadlessConsole::Instance().NotifyKey(
         uncertain ? "console_password_uncertain" : "console_password_rejected");
 #endif
@@ -2517,7 +2550,7 @@ void GuiApplication::HandlePasswordChangeResult() {
   }
 
   LOG_INFO("Password changed successfully for [{}]", client_id_);
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
   HeadlessConsole::Instance().NotifyKey("console_password_confirmed");
 #endif
   if (peer_) {
@@ -2551,7 +2584,7 @@ void GuiApplication::HandleCredentialRecovery() {
   }
 
   if (promote_pending) {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
     HeadlessConsole::Instance().NotifyKey("console_password_recovered");
 #endif
     if (!settings_.PromotePendingPasswordChange()) {
@@ -2560,7 +2593,7 @@ void GuiApplication::HandleCredentialRecovery() {
       LOG_INFO("Recovered password change with pending credential");
     }
   } else if (clear_pending) {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
     HeadlessConsole::Instance().NotifyKey("console_password_retained");
 #endif
     if (!settings_.ClearPendingPasswordChange()) {
@@ -2699,6 +2732,17 @@ void GuiApplication::SyncMainWindow() {
   const bool signal_online = signal_connected_.load();
   const bool signal_reconnecting = signal_connection_indicator_.Update(signal_online);
   for (const auto& main : {ui_->main, ui_->wall}) {
+#if defined(__OHOS__)
+    // Only the operating system owns this setting. Never bind it to the local
+    // saved checkbox or wait for an ArkTS request in this 16 ms GUI tick.
+    switch (GetHarmonyAutostartStatus()) {
+      case HarmonyAutostartStatus::checking: main->set_autostart_status(ui::AutostartStatus::Checking); break;
+      case HarmonyAutostartStatus::enabled: main->set_autostart_status(ui::AutostartStatus::Enabled); break;
+      case HarmonyAutostartStatus::disabled: main->set_autostart_status(ui::AutostartStatus::Disabled); break;
+      case HarmonyAutostartStatus::unsupported: main->set_autostart_status(ui::AutostartStatus::Unsupported); break;
+      case HarmonyAutostartStatus::failed: main->set_autostart_status(ui::AutostartStatus::Failed); break;
+    }
+#endif
     main->set_signal_connected(signal_online);
     main->set_signal_reconnecting(signal_reconnecting);
     main->set_signal_tls_error(signal_status_ ==
@@ -2983,7 +3027,7 @@ void GuiApplication::SyncPlatformDialogs() {
 #endif
 }
 
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
 void GuiApplication::SyncXWaylandWindowActivation() {
   if (!ui_ || !use_xwayland_gui_) {
     return;
@@ -3057,12 +3101,20 @@ void GuiApplication::SetStreamKeyboardFocus(bool focused) {
 }
 
 void GuiApplication::SyncStreamKeyboardFocus() {
+#if defined(__OHOS__)
+  if (ui_) {
+    ui_->main->set_window_active(IsHarmonyWindowActive(ui_->main->window()));
+    ui_->wall->set_window_active(IsHarmonyWindowActive(ui_->wall->window()));
+  }
+#endif
   if (ui_ && !ui_->gallery_control_id.empty()) {
 #if defined(__APPLE__)
     if (!IsGalleryWindowActive()) ReleaseControl();
 #elif defined(_WIN32)
     if (GetForegroundWindow() != ui_->wall->window().win32_hwnd())
       ReleaseControl();
+#elif defined(__OHOS__)
+    if (!IsHarmonyWindowActive(ui_->wall->window())) ReleaseControl();
 #endif
     return;
   }
@@ -3077,6 +3129,10 @@ void GuiApplication::SyncStreamKeyboardFocus() {
                          GetForegroundWindow() == stream_hwnd);
 #elif defined(__APPLE__)
   SetStreamKeyboardFocus(IsStreamWindowActive());
+#elif defined(__OHOS__)
+  const bool active = IsHarmonyWindowActive((*ui_->stream)->window());
+  (*ui_->stream)->set_window_active(active);
+  SetStreamKeyboardFocus(active);
 #endif
 }
 
@@ -3093,7 +3149,7 @@ void GuiApplication::SyncStreamWindow() {
   if (!has_sessions) need_to_create_stream_window_ = false;
   if (need_to_create_stream_window_ && !ui_->stream) {
     ui_->stream.emplace(ui::StreamWindow::create());
-#if defined(__linux__)
+#if (defined(__linux__) && !defined(__OHOS__))
     (*ui_->stream)->set_custom_titlebar(use_xwayland_gui_);
 #endif
     RegisterFontAwesome((*ui_->stream)->window());
@@ -3257,6 +3313,9 @@ void GuiApplication::SyncStreamWindow() {
     }
   }
   (*ui_->stream)->set_remote_update_visible(remote_update_available);
+  // All desktop clients use the same menu for a Harmony host. Windows SAS is
+  // not an ordinary key chord and has no public Harmony implementation.
+  (*ui_->stream)->set_secure_attention_supported(remote_platform != HostPlatform::HarmonyOS);
   if (remote_update_available) {
     SetStreamKeyboardFocus(false);
   }
@@ -3358,7 +3417,7 @@ void GuiApplication::SyncStreamWindow() {
         index, props->display_info_list_[index].name,
         localization_language_index_)));
   }
-  ui_->display_model->set_vector(std::move(displays));
+  ui::UpdateModelRows(*ui_->display_model, std::move(displays));
   (*ui_->stream)->set_selected_display(props->selected_display_);
 
   const auto net = props->net_traffic_stats_.Load();
@@ -3383,7 +3442,7 @@ void GuiApplication::SyncStreamWindow() {
                    net.data_inbound_stats, net.data_outbound_stats);
   append_stats_row(localization::total[localization_language_index_],
                    net.total_inbound_stats, net.total_outbound_stats);
-  ui_->stats_model->set_vector(std::move(stats_rows));
+  ui::UpdateModelRows(*ui_->stats_model, std::move(stats_rows));
   (*ui_->stream)
       ->set_stats_resolution(UiText(std::to_string(props->video_width_) + "x" +
                                     std::to_string(props->video_height_)));
@@ -3444,7 +3503,7 @@ void GuiApplication::SyncStreamWindow() {
     item.size = UiText(FormatFileSize(info.file_size));
     transfers.push_back(std::move(item));
   }
-  ui_->transfer_model->set_vector(std::move(transfers));
+  ui::UpdateModelRows(*ui_->transfer_model, std::move(transfers));
   (*ui_->stream)
       ->set_file_transfer_visible(
           props->file_transfer_.file_transfer_window_visible_);
@@ -3698,7 +3757,7 @@ void GuiApplication::SyncServerWindow() {
   // Keep the panel alive throughout privacy transitions so remote
   // controllers can still see and operate it without resetting its UI state.
   bool show_controller_window = has_connected_controller;
-#if !defined(_WIN32) && !defined(__APPLE__) && !defined(__linux__)
+#if !defined(_WIN32) && !defined(__APPLE__) && !(defined(__linux__) && !defined(__OHOS__))
   // Preserve the existing panel behavior on other platforms.
   const auto privacy_status = privacy_.Snapshot();
   const bool privacy_covering = privacy_status.overlay_active ||
@@ -3902,7 +3961,9 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
                                   main->get_hardware_codec_enabled();
   enable_turn_ = main->get_turn_enabled();
   enable_self_hosted_ = main->get_self_hosted_enabled();
+#if !defined(__OHOS__)
   enable_autostart_ = main->get_autostart_enabled();
+#endif
   enable_daemon_ = main->get_daemon_enabled();
 
   localization_language_ =
@@ -3917,7 +3978,9 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   config_center_->SetHardwareVideoCodec(enable_hardware_video_codec_);
   config_center_->SetTurn(enable_turn_, main->get_force_relay_enabled());
   main->set_force_relay_enabled(config_center_->IsForceRelay());
+#if !defined(__OHOS__)
   config_center_->SetAutostart(enable_autostart_);
+#endif
   config_center_->SetDaemon(enable_daemon_);
   if (config_center_->SetSaveRemotePreviews(main->get_save_remote_previews()) != 0) {
     LOG_ERROR("Failed to save remote preview preference");
@@ -3945,7 +4008,7 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   main->set_capture_method_index(
       static_cast<int>(config_center_->GetScreenCaptureMethod()));
 #endif
-#if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
+#if defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__OHOS__))
   if (config_center_->SetPrivacyScreen(main->get_privacy_on_connect_enabled()) !=
       0) {
     main->set_privacy_on_connect_enabled(
@@ -4000,7 +4063,7 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
   enable_autostart_last_ = enable_autostart_;
   enable_daemon_last_ = enable_daemon_;
   file_transfer_save_path_last_ = path;
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
   HeadlessConsole::Instance().SetLanguage(localization_language_index_);
 #endif
   if (ui_) {
@@ -4449,7 +4512,7 @@ void GuiApplication::ShowGalleryWindow() {
 #elif defined(_WIN32)
   ConfigureWindowsWindowIcons(window.win32_hwnd());
   SetForegroundWindow(window.win32_hwnd());
-#else
+#elif defined(__linux__) && !defined(__OHOS__)
   if (!ui_->x11_focus_display) ui_->x11_focus_display = XOpenDisplay(nullptr);
   X11ActivateGalleryWindow(ui_->x11_focus_display);
 #endif
@@ -5758,7 +5821,7 @@ void GuiApplication::SyncGallery() {
 }
 
 void GuiApplication::Cleanup() {
-#ifdef __linux__
+#if defined(__linux__) && !defined(__OHOS__)
   HeadlessConsole::Instance().BindSettings(nullptr, {}, {});
 #endif
   if (!ui_) {

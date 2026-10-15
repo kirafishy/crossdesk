@@ -182,6 +182,17 @@ export component CompactComboBox inherits Rectangle {
     property <float> popup-progress: 0.0;
     callback selected(int);
 
+    // Session state can disable a setting while its popup is already open.
+    // Remove the stale options and stop a pending reveal on every backend.
+    changed enabled => {
+        if !root.enabled {
+            popup-open-timer.running = false;
+            root.popup-animation-enabled = false;
+            root.popup-progress = 0.0;
+            combo-popup.close();
+        }
+    }
+
     animate popup-progress {
         duration: 160ms;
         easing: ease-out;
@@ -278,12 +289,15 @@ export component CompactComboBox inherits Rectangle {
                 background: option-touch.has-hover ? #dbeafb : index == root.current-index ? #eef5fd : white;
                 Text { x: 5px; width: parent.width - 10px; text: choice; color: #202124; font-size: root.subtle ? 12px : ImGuiFontStyle.body; overflow: elide; vertical-alignment: center; }
                 option-touch := TouchArea {
+                    enabled: root.enabled;
                     clicked => {
                         popup-open-timer.running = false;
                         root.popup-animation-enabled = false;
                         root.popup-progress = 0.0;
-                        root.current-index = index;
-                        root.selected(index);
+                        if root.enabled && index >= 0 && index < root.model.length {
+                            root.current-index = index;
+                            root.selected(index);
+                        }
                         combo-popup.close();
                     }
                 }
@@ -439,6 +453,8 @@ export component SecondaryButton inherits Rectangle {
 export component ToggleSwitch inherits Rectangle {
     in-out property <bool> checked;
     in property <bool> enabled: true;
+    in property <bool> toggle-on-click: true;
+    callback clicked();
     callback toggled(bool);
 
     width: 36px;
@@ -459,8 +475,11 @@ export component ToggleSwitch inherits Rectangle {
     TouchArea {
         enabled: root.enabled;
         clicked => {
-            root.checked = !root.checked;
-            root.toggled(root.checked);
+            if root.toggle-on-click {
+                root.checked = !root.checked;
+                root.toggled(root.checked);
+            }
+            root.clicked();
         }
     }
 }

@@ -122,7 +122,11 @@ std::optional<VersionInfo> CheckUpdate() {
         const auto manifest = nlohmann::json::parse(res->body);
         auto info = ParseVersionInfo(manifest);
         if (info) {
-#if defined(__linux__)
+#if defined(__OHOS__)
+          // A Linux package cannot be installed by Harmony's package manager.
+          // Until the manifest has a Harmony artifact, use the release website.
+          info->download_url = "https://crossdesk.cn";
+#elif defined(__linux__)
           std::string architecture;
 #if defined(__x86_64__)
           architecture = "amd64";

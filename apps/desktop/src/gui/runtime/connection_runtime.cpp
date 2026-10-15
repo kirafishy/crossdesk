@@ -229,7 +229,7 @@ void GuiRuntime::HandleServerControllerDisconnected(
   need_to_create_server_window_.store(false, std::memory_order_release);
   need_to_destroy_server_window_.store(true, std::memory_order_release);
   is_server_mode_ = false;
-#if defined(__linux__) && !defined(__APPLE__)
+#if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   if (IsWaylandSession()) {
     // Keep Wayland capture session warm to avoid black screen on subsequent
     // reconnects.
