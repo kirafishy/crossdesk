@@ -44,7 +44,7 @@ struct FileTransferState {
   std::chrono::steady_clock::time_point file_send_start_time_;
   std::chrono::steady_clock::time_point file_send_last_update_time_;
   uint64_t file_send_last_bytes_ = 0;
-  bool file_transfer_window_visible_ = false;
+  std::atomic<bool> file_transfer_window_visible_ = false;
   std::atomic<uint32_t> current_file_id_{0};
 
   struct QueuedFile {

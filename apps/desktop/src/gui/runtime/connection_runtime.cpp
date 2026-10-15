@@ -188,6 +188,7 @@ void GuiRuntime::HandlePresenceProbeTimeout() {
 
 void GuiRuntime::HandleServerControllerDisconnected(
     const std::string& remote_id, const char* reason) {
+  transfers_.Cancel(peer_events_.get(), remote_id);
   preview_subscriptions_.Remove(remote_id);
   keyboard_.ReleaseRemotePressedKeys(remote_id, reason);
 #ifdef _WIN32
@@ -298,7 +299,10 @@ int GuiRuntime::ForceSignalReconnect() {
 void GuiRuntime::CloseRemoteSession(std::shared_ptr<RemoteSession> props) {
   if (!props || props->closing_.exchange(true)) return;
   MuteRemoteAudio(props);
-  if (props->peer_events_) props->peer_events_->Deactivate();
+  if (props->peer_events_) {
+    props->peer_events_->Deactivate();
+    transfers_.Cancel(props->peer_events_.get());
+  }
   props->connection_established_ = false;
   props->streaming_ = false;
   props->connection_status_.store(ConnectionStatus::Closed);
@@ -392,6 +396,7 @@ void GuiRuntime::CloseConnectionPeer() {
     return;
   }
   peer_events_->Deactivate();
+  transfers_.Cancel(peer_events_.get());
   announcements_.Reset();
   std::vector<std::string> controllers;
   {
@@ -439,6 +444,7 @@ void GuiRuntime::CloseAllRemoteSessions() {
 }
 
 void GuiRuntime::HandleSessionCleanup() {
+  transfers_.Poll();
   auto completed = [](std::future<void>& task) {
     if (!task.valid() || task.wait_for(std::chrono::seconds(0)) !=
                              std::future_status::ready) return false;

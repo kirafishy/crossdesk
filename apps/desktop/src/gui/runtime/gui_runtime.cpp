@@ -26,7 +26,10 @@ GuiRuntime::GuiRuntime()
     : clipboard_(*this), devices_(*this), transfers_(*this), settings_(*this),
       keyboard_(*this) {}
 
-GuiRuntime::~GuiRuntime() { WaitForSessionCleanup(); }
+GuiRuntime::~GuiRuntime() {
+  transfers_.Shutdown();
+  WaitForSessionCleanup();
+}
 
 void GuiRuntime::SendRemoteInput(const RemoteAction& action) {
   const bool mouse = action.type == ControlType::mouse;

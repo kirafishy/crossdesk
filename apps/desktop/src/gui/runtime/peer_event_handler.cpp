@@ -61,7 +61,9 @@ void PeerEventHandler::SendClientInfo(PeerPtr* peer,
   }
 }
 
-PeerEventHandler::PeerEventHandler(GuiRuntime& owner) : owner_(owner) {}
+PeerEventHandler::PeerEventHandler(GuiRuntime& owner) : owner_(owner) {
+  owner_.transfers_.Connected(this, "");
+}
 
 void PeerEventHandler::OnSignalMessage(const char* message, size_t size,
                                        void* user_data) {
@@ -257,6 +259,9 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
   if (!runtime) return;
 
   std::string remote_id(user_id, user_id_size);
+  if (status == ConnectionStatus::Connected) runtime->transfers_.Connected(handler, remote_id);
+  else if (status == ConnectionStatus::Disconnected || status == ConnectionStatus::Failed ||
+           status == ConnectionStatus::Closed) runtime->transfers_.Cancel(handler, remote_id);
   std::shared_ptr<GuiRuntime::RemoteSession> props;
   {
     std::shared_lock lock(runtime->remote_sessions_mutex_);

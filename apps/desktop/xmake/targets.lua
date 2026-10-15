@@ -485,6 +485,7 @@ function setup_targets()
             add_files("apps/desktop/src/platform/linux/clipboard.cpp")
         end
         add_includedirs("apps/desktop/src", "apps/desktop/src/tools", {public = true})
+        add_includedirs("libs/controller/include", {public = true})
 
     target("gui")
         set_kind("object")

@@ -101,38 +101,7 @@ void PeerEventHandler::OnReceiveDataBuffer(
        source_id == runtime->clipboard_label_))
     return;
   if (source_id == runtime->file_label_) {
-    std::string remote_user_id = std::string(user_id, user_id_size);
-
-    static FileReceiver receiver;
-    // Update output directory from config
-    std::string configured_path =
-        runtime->config_center_->GetFileTransferSavePath();
-    if (!configured_path.empty()) {
-      receiver.SetOutputDir(PathFromUtf8(configured_path));
-    } else if (receiver.OutputDir().empty()) {
-      receiver = FileReceiver(); // re-init with default desktop path
-    }
-    receiver.SetOnSendAck([runtime,
-                           remote_user_id](const FileTransferAck &ack) -> int {
-      const auto encoded_ack = EncodeFileTransferAck(ack);
-      bool is_server_sending = remote_user_id.rfind("C-", 0) != 0;
-      if (is_server_sending) {
-        auto props =
-            runtime->FindRemoteSession(remote_user_id);
-        if (props) {
-          PeerPtr *peer = props->peer_;
-          return SendReliableDataFrame(
-              peer, encoded_ack.data(), encoded_ack.size(),
-              runtime->file_feedback_label_.c_str());
-        }
-      }
-
-      return SendReliableDataFrame(
-          runtime->peer_, encoded_ack.data(), encoded_ack.size(),
-          runtime->file_feedback_label_.c_str());
-    });
-
-    receiver.OnData(data, size);
+    runtime->transfers_.Receive(data, size, handler, std::string(user_id, user_id_size));
     return;
   } else if (source_id == runtime->clipboard_label_) {
     if (size > 0) {
@@ -148,7 +117,7 @@ void PeerEventHandler::OnReceiveDataBuffer(
     }
     return;
   } else if (source_id == runtime->file_feedback_label_) {
-    runtime->transfers_.HandleAck(data, size);
+    runtime->transfers_.HandleAck(data, size, handler, std::string(user_id, user_id_size));
     return;
   }
 
