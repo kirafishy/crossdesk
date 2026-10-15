@@ -7,7 +7,7 @@
 
 <div align="center">
 
-[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-blue)](#download)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20iOS%20%7C%20Android%20%7C%20HarmonyOS-blue)](#download)
 [![Release](https://img.shields.io/github/v/release/kunkundi/crossdesk)](https://github.com/kunkundi/crossdesk/releases)
 [![Build](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml/badge.svg)](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
@@ -15,11 +15,11 @@
 
 </div>
 
-CrossDesk connects Windows, macOS, and Linux desktops, with browser and native iOS / Android clients for controlling computers. The desktop client now includes **DeskHub**, a separate window for viewing multiple remote desktops, organizing devices into groups, and performing batch actions or synchronized control. Built on [MiniRTC](https://github.com/kunkundi/minirtc), it supports real-time video and audio, keyboard and mouse control, file transfer, and self-hosting. The project is under active development.
+CrossDesk connects Windows, macOS, Linux, and **HarmonyOS PCs**, with browser and native iOS / Android / HarmonyOS phone and tablet clients for controlling computers. The HarmonyOS PC and mobile clients are development builds; see [HarmonyOS support](#harmonyos) for requirements. The desktop client includes **DeskHub**, a separate window for viewing multiple remote desktops, organizing devices into groups, and performing batch actions or synchronized control. Built on [MiniRTC](https://github.com/kunkundi/minirtc), it supports real-time video and audio, keyboard and mouse control, file transfer, and self-hosting. The project is under active development.
 
 > This guide follows the current repository source. Desktop screenshots render the current Slint UI with sample IDs, passwords, online statuses, and recent devices; thumbnails show public pages. Check each release's notes for the features and requirements of its binaries. Native iOS build and signing instructions are below.
 
-[Preview](#preview) · [Download](#download) · [Quick start](#quick-start) · [DeskHub](#deskhub) · [Session controls](#session) · [Settings](#settings) · [iOS](#ios) · [Self-hosting](#self-hosting) · [Build](docs/BUILD_EN.md) · [FAQ](docs/FAQ.md#english)
+[Preview](#preview) · [Download](#download) · [Quick start](#quick-start) · [DeskHub](#deskhub) · [Session controls](#session) · [Settings](#settings) · [iOS](#ios) · [HarmonyOS](#harmonyos) · [Self-hosting](#self-hosting) · [Build](docs/BUILD_EN.md) · [FAQ](docs/FAQ.md#english)
 
 <a id="preview"></a>
 
@@ -55,7 +55,7 @@ See the [screenshot notes](docs/images/README.md) for image sources and refresh 
 
 | Capability | Current support |
 | --- | --- |
-| Cross-platform control | Windows / macOS / Linux desktop control; browser and native iOS / Android controllers |
+| Cross-platform control | Windows / macOS / Linux / HarmonyOS PC desktop control; browser and native iOS / Android / HarmonyOS phone and tablet controllers; HarmonyOS clients are development builds |
 | Live video and audio | H.264 / AV1, hardware codecs, and remote audio; adjust quality, 30 / 60 fps, and video preference during a session |
 | Devices and displays | Recent connections, device aliases and group filtering, session tabs, and remote display switching |
 | DeskHub | Live multi-desktop previews, groups and drag reordering, enlarged views with control, synchronized input, and batch connection / disconnection / audio / file actions; configurable resolution, frame rate, and shared video budget |
@@ -65,7 +65,7 @@ See the [screenshot notes](docs/images/README.md) for image sources and refresh 
 | Windows protected desktops | CrossDesk Service forwards input on lock screens, sign-in screens, and secure desktops |
 | Linux headless operation | Reuse existing desktops and applications or create separate Xvfb desktops; use the terminal console to check status and change passwords or settings; see [setup](docs/HEADLESS_EN.md) |
 
-Controls and capabilities vary by client. Desktop controls are described below; see the [iOS guide](apps/ios/README.md) for native mobile features.
+Controls and capabilities vary by client. Desktop controls are described below; see the [iOS](apps/ios/README.md), [Android](apps/android/README.md), and [HarmonyOS](apps/harmony/README.md) guides for native mobile features.
 
 <a id="download"></a>
 
@@ -80,7 +80,7 @@ Choose a package matching your OS and CPU architecture from [GitHub Releases](ht
 | Linux | Ubuntu 20.04+, amd64 / arm64, glibc 2.31 baseline | Standard / Xfce virtual desktop `.deb` |
 | iOS / iPadOS | iOS 16.0+, arm64 physical device | Native controller; build and sign with Xcode, or sign the unsigned CI app |
 | Android | Android 8.0+, arm64 | Native controller; build an APK with Gradle ([guide](apps/android/README.md)) |
-| HarmonyOS (development) | Slint PC: API 26; ArkUI mobile: API 20+; arm64, device validation pending | [Shared Slint desktop port](apps/harmony/desktop-port/README.md); [HarmonyOS build and mobile guide](apps/harmony/README.md) (Chinese), build and sign with DevEco |
+| HarmonyOS (development) | PC: API 26; phones / tablets: API 20+; arm64, physical-device validation pending | Build and sign HAPs with DevEco; see [HarmonyOS support](#harmonyos) and the [build guide](apps/harmony/README.md) (Chinese) |
 | Web | A WebRTC-capable browser | Open [web.crossdesk.cn](https://web.crossdesk.cn/) |
 
 Linux provides two standalone packages per architecture. **Choose one**:
@@ -239,6 +239,21 @@ The app currently receives remote text into the iOS clipboard. Its UI does not y
 
 Gestures include one-finger click, two-finger right-click, long-press drag, and pinch-to-zoom. When zoomed in, two-finger panning moves the viewport. The native and browser clients are maintained separately, so their controls and gestures may differ. The current native UI uses Chinese labels.
 
+<a id="harmonyos"></a>
+
+## HarmonyOS support
+
+CrossDesk supports HarmonyOS PCs, phones, and tablets. PC and mobile clients use separate HAP builds, both named **CrossDesk** with the bundle name `com.chunkdash.crossdesk`.
+
+| Client | System and architecture | Features |
+| --- | --- | --- |
+| HarmonyOS PC (`2in1`) | API 26, arm64 | Controller and host roles, sharing the Slint desktop UI, session management, DeskHub, and file transfer |
+| HarmonyOS phones / tablets | API 20+, arm64 | Native ArkUI controller with remote video/audio, touch and external keyboard/mouse input, display switching, text clipboard, and bidirectional file transfer |
+
+HarmonyOS PC and mobile clients share the file transfer core with other PC platforms. Mobile clients use the system picker to send and export files; PC users can choose the receive directory in Settings.
+
+These are development builds. Follow the [HarmonyOS build guide](apps/harmony/README.md) to build and sign them with DevEco before installation. PC screen capture and input control require system authorization, and physical-device and long-session validation are ongoing. See the [PC guide](apps/harmony/desktop-port/README.md) and [mobile feature guide](apps/harmony/MOBILE_PARITY.md) for permissions, platform differences, and validation coverage (Chinese).
+
 <a id="windows-service"></a>
 
 ## Windows lock screens and sign-in
@@ -306,6 +321,7 @@ Host your own signaling and TURN services, then enter their connection details u
 - [Build from source](docs/BUILD_EN.md): Windows, macOS, Linux, optional flags, and packaging.
 - [iOS development](apps/ios/README.md): native build and physical-device checks.
 - [Android development](apps/android/README.md): APK builds, installation, and emulator checks.
+- [HarmonyOS development](apps/harmony/README.md): PC and phone / tablet HAP builds, signing, permissions, and validation (Chinese).
 - [GUI architecture](docs/gui-architecture.md): desktop UI and platform organization.
 - [FAQ](docs/FAQ.md#english): connection failures, blank video, received files, and build issues.
 - [Report an issue](https://github.com/kunkundi/crossdesk/issues): include both operating systems, client versions, connection mode, and reproduction steps.
@@ -314,7 +330,9 @@ Host your own signaling and TURN services, then enter their connection details u
 
 Thanks to [HelloGitHub](https://hellogithub.com/), [Ruanyf Weekly](https://github.com/ruanyf/weekly), and the [LinuxDo](https://linux.do) community for featuring CrossDesk and contributing feedback.
 
-CrossDesk is licensed under [GPL-3.0](LICENSE). See the [Privacy Policy](PRIVACY.md#english).
+Copyright (c) 2026 JUNKUN DI.
+
+CrossDesk is licensed under [GPL-3.0-only](LICENSE). See the [Privacy Policy](PRIVACY.md#english).
 
 ### Code signing policy
 

@@ -7,7 +7,7 @@
 
 <div align="center">
 
-[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-blue)](#download)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20iOS%20%7C%20Android%20%7C%20HarmonyOS-blue)](#download)
 [![Release](https://img.shields.io/github/v/release/kunkundi/crossdesk)](https://github.com/kunkundi/crossdesk/releases)
 [![Build](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml/badge.svg)](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
@@ -15,11 +15,11 @@
 
 </div>
 
-CrossDesk 支持 Windows、macOS、Linux 之间的远程访问，也可从浏览器或原生 iOS / Android 客户端控制电脑。桌面端新增 **桌面墙（DeskHub）**，可在独立窗口中同时查看多台远程桌面，按分组管理设备，并进行批量操作与群控。项目基于 [MiniRTC](https://github.com/kunkundi/minirtc)，提供实时音视频传输、键鼠控制、文件传输与自托管能力，仍在持续开发中。
+CrossDesk 支持 Windows、macOS、Linux 与 **鸿蒙（HarmonyOS）PC** 之间的远程访问，也可从浏览器或原生 iOS / Android / 鸿蒙手机和平板客户端控制电脑。鸿蒙 PC 与移动端目前为开发版，具体要求见 [鸿蒙支持](#harmonyos)。桌面端提供 **桌面墙（DeskHub）**，可在独立窗口中同时查看多台远程桌面，按分组管理设备，并进行批量操作与群控。项目基于 [MiniRTC](https://github.com/kunkundi/minirtc)，提供实时音视频传输、键鼠控制、文件传输与自托管能力，仍在持续开发中。
 
 > 本文按当前仓库代码整理。截图展示当前 Slint 桌面界面，使用演示 ID、密码、在线状态和连接记录；缩略图来自公开页面；下载包的功能与系统要求请同时核对对应 Release 说明。原生 iOS 客户端的构建、签名方式见下文。
 
-[界面预览](#preview) · [下载与安装](#download) · [快速连接](#quick-start) · [桌面墙](#deskhub) · [会话操作](#session) · [设置](#settings) · [iOS](#ios) · [Android](#android) · [自托管](#self-hosting) · [源码构建](docs/BUILD.md) · [常见问题](docs/FAQ.md)
+[界面预览](#preview) · [下载与安装](#download) · [快速连接](#quick-start) · [桌面墙](#deskhub) · [会话操作](#session) · [设置](#settings) · [iOS](#ios) · [Android](#android) · [鸿蒙](#harmonyos) · [自托管](#self-hosting) · [源码构建](docs/BUILD.md) · [常见问题](docs/FAQ.md)
 
 <a id="preview"></a>
 
@@ -55,7 +55,7 @@ CrossDesk 支持 Windows、macOS、Linux 之间的远程访问，也可从浏览
 
 | 能力 | 当前支持 |
 | --- | --- |
-| 跨平台控制 | Windows / macOS / Linux 桌面互控；浏览器与原生 iOS / Android 作为控制端 |
+| 跨平台控制 | Windows / macOS / Linux / 鸿蒙 PC 桌面互控；浏览器与原生 iOS / Android / 鸿蒙手机和平板作为控制端；鸿蒙目前为开发版 |
 | 实时画面与声音 | H.264 / AV1、硬件编解码、远端声音播放；会话中可调整画质、30 / 60 fps 与画面偏好 |
 | 多设备与多显示器 | 近期连接、设备别名与分组筛选、会话标签与远端显示器切换 |
 | 桌面墙（DeskHub） | 多桌面实时预览、分组与拖动排序、放大接管、群控、批量连接 / 断开 / 静音 / 文件分发；可配置分辨率、帧率与视频总带宽 |
@@ -65,7 +65,7 @@ CrossDesk 支持 Windows、macOS、Linux 之间的远程访问，也可从浏览
 | Windows 锁屏控制 | 通过 CrossDesk Service 支持锁屏、登录界面及安全桌面的输入转发 |
 | Linux 无头运行 | 复用已有桌面和应用，或创建独立 Xvfb 虚拟桌面；终端控制台可查看状态、修改密码和设置，见 [运行说明](docs/HEADLESS.md) |
 
-各客户端的入口和能力有所不同；桌面会话操作见下文，iOS 的具体功能见 [开发说明](apps/ios/README.md)。
+各客户端的入口和能力有所不同；桌面会话操作见下文，移动端具体功能见 [iOS](apps/ios/README.md)、[Android](apps/android/README.md) 与 [鸿蒙](apps/harmony/README.md) 开发说明。
 
 <a id="download"></a>
 
@@ -80,7 +80,7 @@ CrossDesk 支持 Windows、macOS、Linux 之间的远程访问，也可从浏览
 | Linux | Ubuntu 20.04+，amd64 / arm64，glibc 2.31 基线 | 普通版 / Xfce 虚拟桌面版 `.deb` |
 | iOS / iPadOS | iOS 16.0+，arm64 真机 | 原生客户端；使用 Xcode 构建并签名，CI 产物为未签名应用 |
 | Android | Android 8.0+，arm64 | 原生控制端；使用 Gradle 构建 APK，见 [开发说明](apps/android/README.md) |
-| HarmonyOS（开发版） | Slint PC：API 26；ArkUI 移动端：API 20+；arm64，待真机验收 | [Slint PC 共用桌面实现](apps/harmony/desktop-port/README.md)；[鸿蒙构建与移动端说明](apps/harmony/README.md)，使用 DevEco 构建并签名 |
+| 鸿蒙 HarmonyOS（开发版） | PC：API 26；手机 / 平板：API 20+；arm64，待真机验收 | 使用 DevEco 构建并签名 HAP；见 [鸿蒙支持](#harmonyos) 与 [构建说明](apps/harmony/README.md) |
 | Web | 支持 WebRTC 的浏览器 | 访问 [web.crossdesk.cn](https://web.crossdesk.cn/) |
 
 Linux 每个架构提供两个可独立安装的包，**选择其中一个**：
@@ -247,6 +247,21 @@ sudo apt install "./crossdesk-virtual-desktop-xfce-linux-amd64-<version>.deb"
 
 按 [Android 开发说明](apps/android/README.md) 构建并安装 APK，在首页填写电脑端的设备 ID 和密码即可连接。长按右键、双指滚动，横屏可扩大画面；切换到后台会结束会话。
 
+<a id="harmonyos"></a>
+
+## 鸿蒙（HarmonyOS）支持
+
+CrossDesk 已支持鸿蒙 PC、手机和平板，PC 与移动端分别构建 HAP，应用名称统一为 **CrossDesk**，包名统一为 `com.chunkdash.crossdesk`。
+
+| 客户端 | 系统与架构 | 功能 |
+| --- | --- | --- |
+| 鸿蒙 PC（`2in1`） | API 26，arm64 | 可作为控制端和被控端，复用公共 Slint 桌面界面、会话管理、桌面墙与文件传输 |
+| 鸿蒙手机 / 平板 | API 20+，arm64 | 原生 ArkUI 控制端，支持远端画面与声音、触控和外接键鼠、多屏切换、文本剪贴板及双向文件传输 |
+
+鸿蒙 PC、移动端与其他 PC 平台共用文件传输核心。移动端通过系统文件选择器发送和导出文件，PC 可在设置中选择接收目录。
+
+当前为开发版，需按 [鸿蒙构建说明](apps/harmony/README.md) 使用 DevEco 构建并签名后安装。PC 录屏和输入控制需获得相应系统授权，真机与长期会话验收仍在进行；具体权限、平台差异及验证范围见 [PC 说明](apps/harmony/desktop-port/README.md) 与 [移动端功能说明](apps/harmony/MOBILE_PARITY.md)。
+
 <a id="windows-service"></a>
 
 ## Windows 锁屏与登录界面
@@ -314,6 +329,7 @@ Windows 的“开机自启”在当前用户登录后启动客户端。安装版
 - [源码构建](docs/BUILD.md)：Windows、macOS、Linux、可选编译参数与打包。
 - [iOS 开发说明](apps/ios/README.md)：原生端构建和真机验证。
 - [Android 开发说明](apps/android/README.md)：APK 构建、安装与模拟器验证。
+- [鸿蒙开发说明](apps/harmony/README.md)：PC 与手机 / 平板 HAP 构建、签名、权限及验证。
 - [GUI 架构](docs/gui-architecture.md)：桌面 UI、平台实现与工程结构。
 - [常见问题](docs/FAQ.md)：连接失败、黑屏、文件位置与编译问题。
 - [提交问题](https://github.com/kunkundi/crossdesk/issues)：请附上两端系统、客户端版本、连接方式和可复现步骤。
@@ -322,7 +338,9 @@ Windows 的“开机自启”在当前用户登录后启动客户端。安装版
 
 感谢 [HelloGitHub](https://hellogithub.com/)、[阮一峰的科技爱好者周刊](https://github.com/ruanyf/weekly) 与 [LinuxDo](https://linux.do) 社区的推荐、交流与支持。
 
-CrossDesk 使用 [GPL-3.0](LICENSE) 许可。隐私说明见 [隐私政策](PRIVACY.md#中文)。
+Copyright (c) 2026 JUNKUN DI.
+
+CrossDesk 使用 [GPL-3.0-only](LICENSE) 许可。隐私说明见 [隐私政策](PRIVACY.md#中文)。
 
 ### Code signing policy
 
