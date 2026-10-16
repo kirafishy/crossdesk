@@ -92,6 +92,13 @@ struct PeerState {
 struct PlatformIntegrationState {
 #if _WIN32
   std::unique_ptr<ServiceQueryWorker> windows_service_worker_;
+  // Lifecycle gate for interactive hosts; revoked before shutdown.
+  std::shared_ptr<std::atomic<bool>> windows_rdp_handoff_allowed_ =
+      std::make_shared<std::atomic<bool>>(false);
+  // Transport callbacks revoke this immediately; a stale UI snapshot cannot
+  // authorize a request after the last authenticated controller disconnects.
+  std::shared_ptr<std::atomic<bool>> windows_rdp_handoff_connected_ =
+      std::make_shared<std::atomic<bool>>(false);
   // Published by the UI, read by transport callbacks without sharing a mutable string.
   mutable std::mutex windows_input_stage_mutex_;
   std::string windows_input_stage_;

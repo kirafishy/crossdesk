@@ -611,7 +611,8 @@ function setup_targets()
             add_deps("rd_log", "path_manager", "windows_unattended_config")
             add_links("Advapi32", "Wtsapi32", "Ole32", "Userenv")
             add_files("apps/desktop/src/platform/windows/service/main.cpp",
-                "apps/desktop/src/platform/windows/service/service_host.cpp")
+                "apps/desktop/src/platform/windows/service/service_host.cpp",
+                "apps/desktop/src/platform/windows/service/rdp_session_handoff.cpp")
             add_files("apps/desktop/resources/windows/crossdesk_service.rc",
                 {defines = windows_resource_defines})
             add_includedirs("apps/desktop/src/platform/windows/service",
@@ -643,7 +644,8 @@ function setup_targets()
         add_includedirs("apps/desktop/src", "apps/desktop/src/app", {public = true})
         if is_os("windows") then
             add_files("apps/desktop/src/platform/windows/daemon_backend.cpp")
-            add_files("apps/desktop/src/platform/windows/service/service_host.cpp")
+            add_files("apps/desktop/src/platform/windows/service/service_host.cpp",
+                "apps/desktop/src/platform/windows/service/rdp_session_handoff.cpp")
             add_includedirs("apps/desktop/src/platform/windows/service",
                 "apps/desktop/src/platform/windows/screen_capturer")
             add_links("Advapi32", "Wtsapi32", "Ole32", "Userenv")

@@ -860,9 +860,17 @@ int ScreenCapturerWin::Start(bool show_cursor) {
   const bool needs_wgc = usbmmidd &&
       capture_method_ == ScreenCaptureMethod::Auto &&
       dynamic_cast<WgcPluginCapturer*>(impl_.get()) == nullptr;
-  if (headless != was_headless || (headless && !backend_is_gdi) || needs_wgc) {
+  // A prior session may have fallen back while RDP was changing its output.
+  // Retry the preferred GPU backend on a new connection instead of retaining
+  // WGC/GDI indefinitely. Keep the headless and usbmmidd cursor policies.
+  const bool needs_dxgi = capture_method_ == ScreenCaptureMethod::Auto &&
+      !headless && !usbmmidd &&
+      dynamic_cast<ScreenCapturerDxgi*>(impl_.get()) == nullptr;
+  if (headless != was_headless || (headless && !backend_is_gdi) || needs_wgc ||
+      needs_dxgi) {
     LOG_INFO("Windows capturer: reselecting capture backend "
-             "(headless={}, usbmmidd={})", headless, usbmmidd);
+             "(headless={}, usbmmidd={}, retry_dxgi={})", headless, usbmmidd,
+             needs_dxgi);
     impl_->Destroy();
     // Keep an instance around on failure so the next Start can retry.
     std::unique_ptr<ScreenCapturer> previous;
@@ -1229,9 +1237,22 @@ bool ScreenCapturerWin::RestartCaptureBackendAfterSecureDesktop() {
   const bool show_cursor = show_cursor_.load(std::memory_order_relaxed);
   const int current_monitor = monitor_index_.load(std::memory_order_relaxed);
   const bool usbmmidd = virtual_display_.active() || CapturesUsbmmiddOutput(impl_.get());
+  const bool headless = DetectHeadlessDesktop(capture_method_, false, true);
+  headless_compat_.store(headless, std::memory_order_relaxed);
 
   LOG_INFO("Windows capturer: restarting capture backend after secure desktop");
   impl_->Stop();
+  if (capture_method_ == ScreenCaptureMethod::Auto && !headless && !usbmmidd &&
+      dynamic_cast<ScreenCapturerDxgi*>(impl_.get()) == nullptr) {
+    LOG_INFO("Windows capturer: desktop recovered; retrying DXGI before {}",
+             CaptureBackendName(impl_.get()));
+    if (StartPreferredBackend(headless, current_monitor, usbmmidd)) {
+      NotifyPrivacyCapture(true);
+      return true;
+    }
+    // Failed candidates retain the previous instance, which may still recover
+    // even if constructing a replacement failed during the display transition.
+  }
   last_capture_progress_tick_.store(GetTickCount64(), std::memory_order_relaxed);
   int ret = impl_->Start(show_cursor);
   if (ret == 0) {
@@ -1282,7 +1303,7 @@ void ScreenCapturerWin::CheckDisplayPresence(ULONGLONG now) {
   last_display_probe_tick_ = now;
   const bool topology_changed =
       display_probe_requested_.exchange(false, std::memory_order_relaxed);
-  if (!IsWindowsPrivacyDesktopAvailable()) {
+  if (!IsCurrentSessionUserDesktopActive()) {
     headless_recovery_.ShouldProvision(now, false, false, false);
     return;
   }
@@ -1621,6 +1642,8 @@ void ScreenCapturerWin::SecureDesktopCaptureLoop() {
   ULONGLONG capture_stage_started_tick = 0;
   bool post_secure_restart_pending = false;
   bool desktop_was_unavailable = false;
+  std::string last_desktop_probe_reason;
+  bool privacy_recovery_pending = false;
   bool normal_backend_suspended = false;
   ULONGLONG post_secure_restart_deadline_tick = 0;
   ULONGLONG last_post_secure_restart_tick = 0;
@@ -1664,11 +1687,22 @@ void ScreenCapturerWin::SecureDesktopCaptureLoop() {
   };
 
   while (running_.load(std::memory_order_relaxed)) {
+    // Capture follows this process's session, including an active RDP session.
+    // Privacy additionally requires the console desktop and must not gate video.
+    std::string desktop_probe_reason;
+    const bool desktop_available = IsCurrentSessionUserDesktopActive(&desktop_probe_reason);
+    if (desktop_probe_reason != last_desktop_probe_reason) {
+      LOG_INFO("Windows capturer: user desktop probe: {}",
+               desktop_available ? "available" : desktop_probe_reason);
+      last_desktop_probe_reason = desktop_probe_reason;
+    }
+    const bool privacy_available =
+        desktop_available && IsWindowsPrivacyDesktopAvailable();
+    if (!desktop_available) desktop_was_unavailable = true;
     // Remember automatic privacy even if the connection started while locked
     // and its first enable attempt has already failed.
-    const bool desktop_available = IsWindowsPrivacyDesktopAvailable();
-    if (!desktop_available) {
-      desktop_was_unavailable = true;
+    if (!privacy_available) {
+      privacy_recovery_pending = true;
       if (privacy_) privacy_->SuspendForDesktop();
     }
     if (paused_.load(std::memory_order_relaxed)) {
@@ -1772,7 +1806,13 @@ void ScreenCapturerWin::SecureDesktopCaptureLoop() {
       if (impl_) {
         impl_->Stop();
         normal_backend_suspended = true;
-        LOG_INFO("Windows capturer: normal backend suspended for secure desktop");
+        DWORD process_session_id = 0xFFFFFFFF;
+        ProcessIdToSessionId(GetCurrentProcessId(), &process_session_id);
+        LOG_INFO("Windows capturer: normal backend suspended, "
+                 "user_desktop_available={}, secure_capture_active={}, "
+                 "process_session_id={}, console_session_id={}",
+                 desktop_available, status.capture_active, process_session_id,
+                 WTSGetActiveConsoleSessionId());
       }
     }
 
@@ -1801,10 +1841,17 @@ void ScreenCapturerWin::SecureDesktopCaptureLoop() {
           last_post_secure_restart_tick = now;
           post_secure_restart_pending =
               !RestartCaptureBackendAfterSecureDesktop();
-          if (!post_secure_restart_pending) normal_backend_suspended = false;
-          if (!post_secure_restart_pending && privacy_)
-            privacy_->ResumeAfterDesktopRecovery();
+          if (!post_secure_restart_pending) {
+            normal_backend_suspended = false;
+            // Input callbacks may have suspended privacy between local probes.
+            privacy_recovery_pending = true;
+          }
         }
+      }
+      if (privacy_recovery_pending && privacy_available &&
+          !post_secure_restart_pending && !normal_backend_suspended) {
+        privacy_recovery_pending = false;
+        if (privacy_) privacy_->ResumeAfterDesktopRecovery();
       }
       if (!post_secure_restart_pending && !normal_backend_suspended &&
           now >= next_cursor_update_tick) {

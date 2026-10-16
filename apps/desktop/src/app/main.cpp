@@ -314,6 +314,12 @@ static int RunApplication(
   auto path_manager = std::make_unique<crossdesk::PathManager>("CrossDesk");
   crossdesk::InitLogger(path_manager->GetLogPath().string());
 
+#ifdef _WIN32
+  crossdesk::get_logger()->info(
+      "CrossDesk executable: {}",
+      std::filesystem::path(GetCurrentExecutablePathW()).u8string());
+#endif
+
   if (IsDaemonChild(argc, argv)) {
     // child process: run render directly
     crossdesk::Render render;

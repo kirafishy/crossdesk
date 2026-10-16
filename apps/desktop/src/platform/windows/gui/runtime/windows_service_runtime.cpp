@@ -18,6 +18,7 @@
 #include "interactive_state.h"
 #include "service_host.h"
 #include "unattended_config.h"
+#include "rdp_session_handoff.h"
 #endif
 
 namespace crossdesk {
@@ -126,11 +127,36 @@ void GuiRuntime::HandleWindowsServiceIntegration() {
     ResetLocalWindowsServiceState(false);
     return;
   }
+  windows_rdp_handoff_allowed_->store(
+      !unattended_host_, std::memory_order_relaxed);
 
   if (!windows_service_worker_) {
     windows_service_worker_ = std::make_unique<ServiceQueryWorker>(
-        [](const std::string& command) {
+        [allowed = windows_rdp_handoff_allowed_,
+         connected = windows_rdp_handoff_connected_, next_handoff_tick = ULONGLONG{0},
+         last_handoff_response = std::string{}]
+        (const std::string& command) mutable {
           ServiceQueryResult result;
+          if (command == "status") {
+            const bool eligible = allowed->load(std::memory_order_relaxed) &&
+                connected->load(std::memory_order_relaxed) &&
+                IsCurrentProcessSessionDisconnected();
+            const ULONGLONG now = GetTickCount64();
+            if (!eligible) {
+              next_handoff_tick = 0;
+              last_handoff_response.clear();
+            } else if (now >= next_handoff_tick &&
+                       allowed->load(std::memory_order_relaxed) &&
+                       connected->load(std::memory_order_relaxed)) {
+              next_handoff_tick = now + 5000;
+              const auto response = QueryCrossDeskService(kRdpHandoffCommand, 1000);
+              if (response != last_handoff_response) {
+                // A reply timeout does not imply that Windows rejected the switch.
+                LOG_INFO("RDP auto handoff service response: {}", response);
+                last_handoff_response = response;
+              }
+            }
+          }
           result.response = QueryCrossDeskService(
               command, command == "sas" ? kWindowsServiceSasTimeoutMs
                                         : kWindowsServiceQueryTimeoutMs);
@@ -277,6 +303,7 @@ void GuiRuntime::HandleWindowsServiceIntegration() {
 
 #if _WIN32
 void GuiRuntime::ResetLocalWindowsServiceState(bool clear_pending_sas) {
+  windows_rdp_handoff_allowed_->store(false, std::memory_order_relaxed);
   if (windows_service_worker_) windows_service_worker_->Reset();
   last_windows_service_status_tick_ = 0;
   if (clear_pending_sas) {

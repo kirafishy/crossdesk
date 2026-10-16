@@ -25,6 +25,7 @@
 #include "session_helper_shared.h"
 #include "unattended_config.h"
 #include "unattended_policy.h"
+#include "rdp_session_handoff.h"
 
 namespace crossdesk {
 
@@ -1021,6 +1022,24 @@ int CrossDeskServiceHost::InitializeRuntime() {
   if (!session_state_event_) return static_cast<int>(GetLastError());
   last_sas_tick_ = 0;
   active_session_id_ = WTSGetActiveConsoleSessionId();
+  // A service started inside an existing RDP login may not receive its earlier
+  // remote-connect notification. Seed currently identifiable RDP sessions.
+  PWTS_SESSION_INFOW sessions = nullptr;
+  DWORD session_count = 0;
+  if (WTSEnumerateSessionsW(WTS_CURRENT_SERVER_HANDLE, 0, 1, &sessions, &session_count)) {
+    for (DWORD index = 0; index < session_count; ++index) {
+      LPWSTR protocol = nullptr;
+      DWORD bytes = 0;
+      if (WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, sessions[index].SessionId,
+                                     WTSClientProtocolType, &protocol, &bytes)) {
+        if (protocol && bytes >= sizeof(USHORT) &&
+            *reinterpret_cast<USHORT*>(protocol) == 2)
+          rdp_sessions_.insert(sessions[index].SessionId);
+        WTSFreeMemory(protocol);
+      }
+    }
+    WTSFreeMemory(sessions);
+  }
   process_session_id_ = 0xFFFFFFFF;
   input_desktop_error_code_ = 0;
   session_helper_process_id_ = 0;
@@ -1415,7 +1434,7 @@ void CrossDeskServiceHost::IpcServerLoop() {
       const std::string response =
           GetNamedPipeClientSessionId(pipe, &client_session_id)
               ? HandleIpcCommand(std::string(buffer, buffer + bytes_read),
-                                  client_session_id)
+                                  client_session_id, pipe)
               : BuildErrorJson("client_session_query_failed", GetLastError());
       DWORD bytes_written = 0;
       if (pipe_deadline_detail::Transfer(
@@ -2174,6 +2193,10 @@ void CrossDeskServiceHost::RecordSessionEvent(DWORD event_type,
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
     last_session_event_type_ = event_type;
+    if (event_type == WTS_REMOTE_CONNECT || event_type == WTS_REMOTE_DISCONNECT)
+      rdp_sessions_.insert(session_id);
+    else if (event_type == WTS_CONSOLE_CONNECT || event_type == WTS_SESSION_LOGOFF)
+      rdp_sessions_.erase(session_id);
     ++session_state_generation_;
     last_session_event_session_id_ = session_id;
     const DWORD previous_session_id = active_session_id_;
@@ -2210,8 +2233,28 @@ void CrossDeskServiceHost::RecordSessionEvent(DWORD event_type,
 }
 
 std::string CrossDeskServiceHost::HandleIpcCommand(const std::string& command,
-                                                 DWORD client_session_id) {
+                                                 DWORD client_session_id,
+                                                 HANDLE client_pipe) {
   std::string normalized = ToLower(Trim(command));
+  if (normalized == kRdpHandoffCommand) {
+    bool observed_rdp = false;
+    {
+      std::lock_guard<std::mutex> lock(state_mutex_);
+      observed_rdp = rdp_sessions_.count(client_session_id) != 0;
+    }
+    const auto result = HandoffDisconnectedRdpSession(client_pipe, client_session_id,
+                                                     observed_rdp);
+    if (result.error) {
+      LOG_WARN("RDP handoff refused: session_id={}, error={}, code={}",
+               client_session_id, result.error, result.error_code);
+      return BuildErrorJson(result.error, result.error_code);
+    }
+    LOG_INFO("RDP handoff accepted: session_id={}, already_console={}",
+             client_session_id, result.already_console);
+    WakeSessionState();
+    return Json{{"ok", true}, {"rdp_handoff", result.already_console ?
+                  "already_console" : "requested"}, {"session_id", client_session_id}}.dump();
+  }
   if (normalized == "ping") {
     return "{\"ok\":true,\"reply\":\"pong\"}";
   }

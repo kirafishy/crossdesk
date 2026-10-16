@@ -216,6 +216,10 @@ void GuiRuntime::HandleServerControllerDisconnected(
         remaining_controller_id = id;
       }
     }
+#if _WIN32
+    windows_rdp_handoff_connected_->store(has_connected_controller,
+                                          std::memory_order_relaxed);
+#endif
   }
   if (has_connected_controller) {
     remote_client_id_ = remaining_controller_id;

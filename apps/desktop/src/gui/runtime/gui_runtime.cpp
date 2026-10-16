@@ -27,6 +27,11 @@ GuiRuntime::GuiRuntime()
       keyboard_(*this) {}
 
 GuiRuntime::~GuiRuntime() {
+#if _WIN32
+  windows_rdp_handoff_allowed_->store(false, std::memory_order_relaxed);
+  windows_rdp_handoff_connected_->store(false, std::memory_order_relaxed);
+  if (windows_service_worker_) windows_service_worker_->Reset();
+#endif
   transfers_.Shutdown();
   WaitForSessionCleanup();
 }

@@ -14,6 +14,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_set>
 
 namespace crossdesk {
 
@@ -72,7 +73,7 @@ class CrossDeskServiceHost {
   void RefreshSessionHelperReportedState();
   void RecordSessionEvent(DWORD event_type, DWORD session_id);
   std::string HandleIpcCommand(const std::string& command,
-                               DWORD client_session_id);
+                               DWORD client_session_id, HANDLE client_pipe);
   std::string BuildStatusResponse(DWORD client_session_id);
   std::string SendSecureAttentionSequence(DWORD client_session_id);
   struct SecureInputTarget {
@@ -109,6 +110,8 @@ class CrossDeskServiceHost {
   DWORD unattended_session_ = 0xFFFFFFFF;
   std::atomic<uint64_t> unattended_logoff_generation_{0};
   std::mutex state_mutex_;
+  // Preserve RDP ownership when Windows clears the protocol after disconnect.
+  std::unordered_set<DWORD> rdp_sessions_;
   uint64_t session_state_generation_ = 0;
   ULONGLONG last_session_transition_tick_ = 0;
   bool session_lock_state_known_ = false;

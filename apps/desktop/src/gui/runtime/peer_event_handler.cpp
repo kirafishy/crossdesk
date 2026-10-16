@@ -436,6 +436,12 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
         runtime->ApplyPrivacyAdmission(automatic_enable);
       }
       runtime->connection_status_[remote_id] = status;
+#if _WIN32
+      runtime->windows_rdp_handoff_connected_->store(std::any_of(
+          runtime->connection_status_.begin(), runtime->connection_status_.end(),
+          [](const auto& entry) { return entry.second == ConnectionStatus::Connected; }),
+          std::memory_order_relaxed);
+#endif
       runtime->devices_.OnControllerConnectionsChanged();
     }
 

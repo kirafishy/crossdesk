@@ -54,35 +54,53 @@ inline bool IsCurrentProcessSession(DWORD session_id) {
          session_id == process_session_id;
 }
 
-inline bool IsCurrentSessionUnlocked() {
+inline bool DesktopProbeFailed(std::string* reason, const char* stage, DWORD value) {
+  if (reason) *reason = std::string(stage) + ":" + std::to_string(value);
+  return false;
+}
+
+inline bool IsCurrentSessionUnlocked(std::string* reason = nullptr) {
+  if (reason) reason->clear();
   DWORD session_id = 0xFFFFFFFF;
-  if (!ProcessIdToSessionId(GetCurrentProcessId(), &session_id)) return false;
+  if (!ProcessIdToSessionId(GetCurrentProcessId(), &session_id))
+    return DesktopProbeFailed(reason, "session_id_query_failed", GetLastError());
   PWTSINFOEXW info = nullptr;
   DWORD bytes = 0;
   if (!WTSQuerySessionInformationW(
           WTS_CURRENT_SERVER_HANDLE, session_id, WTSSessionInfoEx,
           reinterpret_cast<LPWSTR*>(&info), &bytes)) {
-    return false;
+    return DesktopProbeFailed(reason, "session_info_query_failed", GetLastError());
   }
-  const bool unlocked =
-      info != nullptr && bytes >= sizeof(WTSINFOEXW) && info->Level == 1 &&
-      info->Data.WTSInfoExLevel1.SessionState == WTSActive &&
-      info->Data.WTSInfoExLevel1.SessionFlags == WTS_SESSIONSTATE_UNLOCK;
+  const bool valid = info && bytes >= sizeof(WTSINFOEXW) && info->Level == 1;
+  const DWORD state = valid ? info->Data.WTSInfoExLevel1.SessionState : 0xFFFFFFFF;
+  const DWORD flags = valid ? info->Data.WTSInfoExLevel1.SessionFlags : 0xFFFFFFFF;
   if (info != nullptr) WTSFreeMemory(info);
-  return unlocked;
+  if (!valid) return DesktopProbeFailed(reason, "session_info_invalid", bytes);
+  if (state != WTSActive) return DesktopProbeFailed(reason, "session_not_active", state);
+  if (flags != WTS_SESSIONSTATE_UNLOCK)
+    return DesktopProbeFailed(reason, "session_not_unlocked", flags);
+  return true;
 }
 
-inline bool IsCurrentSessionUserDesktopActive() {
+inline bool IsCurrentSessionUserDesktopActive(std::string* reason = nullptr) {
   // LockApp can be visible on Default while the session is still locked.
-  if (!IsCurrentSessionUnlocked()) return false;
+  if (!IsCurrentSessionUnlocked(reason)) return false;
   HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
-  if (desktop == nullptr) return false;
-  // OpenInputDesktop also succeeds in disconnected RDP sessions. The name
-  // alone does not tell us whether this desktop can currently receive input.
-  const bool active = IsDesktopReceivingInput(desktop) &&
-                      _wcsicmp(GetDesktopNameW(desktop).c_str(), L"Default") == 0;
+  if (desktop == nullptr)
+    return DesktopProbeFailed(reason, "open_input_desktop_failed", GetLastError());
+  // A minimized RDP connection can suppress desktop output while WTS still
+  // reports Active/Unlocked. Do not treat its black WGC callbacks as recovery.
+  BOOL receiving_input = FALSE;
+  const bool queried = GetUserObjectInformationW(
+      desktop, UOI_IO, &receiving_input, sizeof(receiving_input), nullptr) != FALSE;
+  const DWORD error = queried ? ERROR_SUCCESS : GetLastError();
+  const bool is_default = queried && receiving_input &&
+      _wcsicmp(GetDesktopNameW(desktop).c_str(), L"Default") == 0;
   CloseDesktop(desktop);
-  return active;
+  if (!queried) return DesktopProbeFailed(reason, "desktop_input_query_failed", error);
+  if (!receiving_input) return DesktopProbeFailed(reason, "desktop_not_receiving_input", 0);
+  if (!is_default) return DesktopProbeFailed(reason, "desktop_not_default", 0);
+  return true;
 }
 
 // Use only on worker threads without windows or hooks. Restore the original

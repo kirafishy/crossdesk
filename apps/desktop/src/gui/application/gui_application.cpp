@@ -5821,6 +5821,11 @@ void GuiApplication::SyncGallery() {
 }
 
 void GuiApplication::Cleanup() {
+#if _WIN32
+  windows_rdp_handoff_allowed_->store(false, std::memory_order_relaxed);
+  windows_rdp_handoff_connected_->store(false, std::memory_order_relaxed);
+  if (windows_service_worker_) windows_service_worker_->Reset();
+#endif
 #if defined(__linux__) && !defined(__OHOS__)
   HeadlessConsole::Instance().BindSettings(nullptr, {}, {});
 #endif
