@@ -4,6 +4,7 @@
 
 #include <app_version.h>
 #include <remote_action.h>
+#include <stream_names.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -233,7 +234,10 @@ void PeerEventHandler::OnReceiveDataBuffer(
     return;
   }
   if (remote_action.type == ControlType::video_settings) {
-    if (source_id != runtime->control_data_label_ ||
+    // Web multiplexes its reliable control actions on a single DataChannel.
+    // Accept that transport's source alias while retaining controller admission.
+    if ((source_id != runtime->control_data_label_ &&
+         source_id != kWebControlStream) ||
         !runtime->IsAuthorizedController(remote_id))
       return;
     const auto& settings = remote_action.vs;
@@ -242,6 +246,10 @@ void PeerEventHandler::OnReceiveDataBuffer(
             runtime->peer_, remote_id.data(), remote_id.size(),
             static_cast<VideoQuality>(settings.quality), settings.frame_rate,
             static_cast<VideoDegradationPreference>(settings.preference)) == 0;
+    LOG_INFO("Video settings: peer={} source={} request={} quality={} fps={} "
+             "preference={} accepted={}",
+             remote_id, source_id, settings.request_id, settings.quality,
+             settings.frame_rate, settings.preference, remote_action.vs.accepted);
     remote_action.type = ControlType::video_settings_status;
     const auto message = remote_action.to_json();
     SendReliableDataFrameToPeer(runtime->peer_, message.data(), message.size(),

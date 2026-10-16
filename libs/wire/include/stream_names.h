@@ -16,6 +16,8 @@ inline constexpr char kDataStream[] = "data";
 inline constexpr char kMouseStream[] = "mouse";
 inline constexpr char kKeyboardStream[] = "keyboard";
 inline constexpr char kControlStream[] = "control_data";
+// MiniRTC's reliable WebRTC control channel uses this legacy callback source.
+inline constexpr char kWebControlStream[] = "data-stream";
 inline constexpr char kFileStream[] = "file";
 inline constexpr char kFileFeedbackStream[] = "file_feedback";
 inline constexpr char kClipboardStream[] = "clipboard";
