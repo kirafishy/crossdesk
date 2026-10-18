@@ -1314,8 +1314,8 @@ export component StreamWindow inherits Window {
                 visible: root.remote-update-visible;
                 x: (parent.width - self.width) / 2;
                 y: min(max(64px, parent.height * 0.18), max(16px, parent.height - self.height - 16px));
-                width: min(520px, parent.width - 48px);
-                height: max(208px, remote-update-message.y + remote-update-message.height + 92px);
+                width: min(400px, parent.width - 48px);
+                height: remote-update-message.y + remote-update-message.height + 84px;
                 border-color: #e5e9f0;
                 border-radius: UiRadius.surface;
                 drop-shadow-color: #07142b30;
@@ -1331,19 +1331,8 @@ export component StreamWindow inherits Window {
                     }
                     scroll-event(event) => { accept }
                 }
-                Rectangle {
-                    x: 32px; y: 32px; width: 48px; height: 48px;
-                    background: #edf4ff; border-radius: UiRadius.surface;
-                    Path {
-                        x: 12px; y: 12px; width: 24px; height: 24px;
-                        viewbox-width: 24; viewbox-height: 24;
-                        commands: "M 12 16 L 12 3 M 6.5 8.5 L 12 3 L 17.5 8.5 M 4 15 L 4 20 Q 4 21 5 21 L 19 21 Q 20 21 20 20 L 20 15";
-                        fill: transparent;
-                        stroke: #2463c7; stroke-width: 1.8px;
-                    }
-                }
                 remote-update-title := Text {
-                    x: 100px; y: 34px; width: parent.width - 144px;
+                    x: 24px; y: 24px; width: parent.width - 80px;
                     height: max(28px, self.preferred-height);
                     text: StreamStrings.remote-update-title;
                     color: #1b2433; font-size: 20px; font-weight: 600;
@@ -1352,7 +1341,7 @@ export component StreamWindow inherits Window {
                 remote-update-message := Text {
                     x: remote-update-title.x;
                     y: remote-update-title.y + remote-update-title.height + 8px;
-                    width: remote-update-title.width;
+                    width: parent.width - 48px;
                     height: max(22px, self.preferred-height);
                     text: StreamStrings.remote-update;
                     color: #667085; font-size: 15px;
@@ -1366,7 +1355,7 @@ export component StreamWindow inherits Window {
                     clicked => { root.dismiss-remote-update(); }
                 }
                 PrimaryButton {
-                    x: parent.width - 136px; y: parent.height - 68px;
+                    x: parent.width - 128px; y: parent.height - 60px;
                     width: 104px; height: 36px;
                     border-radius: UiRadius.control;
                     text: StreamStrings.remote-update-dismiss;

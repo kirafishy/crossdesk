@@ -1219,7 +1219,7 @@ int main() {
 
   stream->set_remote_update_visible(true);
   const auto notice_button = slint::LogicalPosition(slint::Point<float>{
-      816.0f, stream->get_video_area_top() + notice_y - 24.0f + 158.0f});
+      764.0f, stream->get_video_area_top() + notice_y - 24.0f + 124.0f});
   stream->window().dispatch_pointer_press_event(
       notice_button, slint::PointerEventButton::Left);
   stream->window().dispatch_pointer_release_event(
