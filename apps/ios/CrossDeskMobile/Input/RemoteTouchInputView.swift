@@ -52,6 +52,14 @@ enum RemoteVideoGeometry {
             height: baseRect.height * scale
         )
     }
+
+    static func verticalPointerOverflow(y: CGFloat, dy: CGFloat, visibleRect: CGRect) -> CGFloat {
+        guard !visibleRect.isNull, !visibleRect.isEmpty else { return 0 }
+        if dy > 0 { return min(dy, max(0, y + dy - visibleRect.maxY)) }
+        if dy < 0 { return max(dy, min(0, y + dy - visibleRect.minY)) }
+        return 0
+    }
+
 }
 
 struct RemoteTouchInputView: UIViewRepresentable {
@@ -90,7 +98,15 @@ struct RemoteTouchInputView: UIViewRepresentable {
 }
 
 final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
-    var mouseInput: RemoteMouseInput?
+    var mouseInput: RemoteMouseInput? {
+        didSet {
+            guard oldValue !== mouseInput else { return }
+            oldValue?.relativeMotion = nil
+            mouseInput?.relativeMotion = { [weak self] dx, dy in
+                _ = self?.updateRelativeCursor(by: CGPoint(x: CGFloat(dx), y: CGFloat(dy)))
+            }
+        }
+    }
     private var gestureRevisions: [ObjectIdentifier: UInt64] = [:]
     var videoSize = CGSize.zero {
         didSet { setNeedsLayout() }
@@ -128,10 +144,13 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
     private var hoverLastLocation: CGPoint?
     private var viewportScale: CGFloat = 1
     private var viewportOffset = CGSize.zero
+    private var edgePanned = false
+    private var needsViewportRestore = true
     private var pinchActive = false
     private var viewportPanActive = false
     private let relativePointerSpeed: CGFloat = 1.35
     private let maximumViewportScale: CGFloat = 10
+    private let minimumVisibleHeightFraction: CGFloat = 0.2
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -187,6 +206,7 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        if needsViewportRestore { restoreEdgePanAllowance() }
         mouseInput?.viewportSize = renderRect()?.size ?? .zero
         let constrained = constrainedViewportOffset(viewportOffset,
                                                      scale: viewportScale)
@@ -198,8 +218,20 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
     func setViewport(scale: CGFloat, offset: CGSize) {
         let nextScale = min(max(scale, 1), maximumViewportScale)
         viewportScale = nextScale
+        if nextScale == 1 && offset == .zero { edgePanned = false }
+        viewportOffset = offset
+        if needsViewportRestore { restoreEdgePanAllowance() }
         viewportOffset = constrainedViewportOffset(offset, scale: nextScale)
         mouseInput?.viewportSize = renderRect()?.size ?? .zero
+    }
+
+    private func restoreEdgePanAllowance() {
+        // SwiftUI can restore state before assigning the new surface's bounds.
+        guard let baseRect = baseRenderRect() else { return }
+        needsViewportRestore = false
+        if abs(viewportOffset.height) > baseRect.height * (viewportScale - 1) / 2 {
+            edgePanned = true
+        }
     }
 
     func synchronizeRemoteCursor(_ position: CGPoint?, revision: UInt64) {
@@ -369,7 +401,7 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
             pinchActive = false
             if viewportScale <= 1.001 {
                 viewportScale = 1
-                viewportOffset = .zero
+                viewportOffset = constrainedViewportOffset(viewportOffset, scale: 1)
                 publishViewport()
             }
         default:
@@ -514,10 +546,24 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
     private func updateRelativeCursor(by translation: CGPoint) -> (Float, Float)? {
         guard let renderRect = renderRect(),
               renderRect.width > 0, renderRect.height > 0 else { return nil }
-        let nextX = CGFloat(relativeCursorPoint.0) +
-            translation.x / renderRect.width * relativePointerSpeed
-        let nextY = CGFloat(relativeCursorPoint.1) +
-            translation.y / renderRect.height * relativePointerSpeed
+        let delta = CGPoint(x: translation.x * relativePointerSpeed,
+                            y: translation.y * relativePointerSpeed)
+        guard delta.x.isFinite, delta.y.isFinite else { return nil }
+        let cursorY = renderRect.minY + CGFloat(relativeCursorPoint.1) * renderRect.height
+        let overflowY = RemoteVideoGeometry.verticalPointerOverflow(
+            y: cursorY, dy: delta.y, visibleRect: renderRect.intersection(bounds))
+        if overflowY != 0 {
+            edgePanned = true
+            let proposedOffset = CGSize(width: viewportOffset.width,
+                                        height: viewportOffset.height - overflowY)
+            let nextOffset = constrainedViewportOffset(proposedOffset, scale: viewportScale)
+            if nextOffset != viewportOffset {
+                viewportOffset = nextOffset
+                publishViewport()
+            }
+        }
+        let nextX = CGFloat(relativeCursorPoint.0) + delta.x / renderRect.width
+        let nextY = CGFloat(relativeCursorPoint.1) + delta.y / renderRect.height
         relativeCursorPoint = (
             Float(min(max(nextX, 0), 1)),
             Float(min(max(nextY, 0), 1))
@@ -549,10 +595,20 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
                                            scale: CGFloat) -> CGSize {
         guard let baseRect = baseRenderRect() else { return offset }
         let maximumX = max(0, baseRect.width * (scale - 1) / 2)
-        let maximumY = max(0, baseRect.height * (scale - 1) / 2)
+        var minimumY = -max(0, baseRect.height * (scale - 1) / 2)
+        var maximumY = -minimumY
+        if edgePanned {
+            // Reserve 20% of the viewport height at any zoom; keep the entire
+            // image visible when its height is below that minimum.
+            let visibleHeight = min(baseRect.height * scale,
+                                    bounds.height * minimumVisibleHeightFraction)
+            let halfHeight = baseRect.height * scale / 2
+            minimumY = visibleHeight - baseRect.midY - halfHeight
+            maximumY = bounds.height - visibleHeight - baseRect.midY + halfHeight
+        }
         return CGSize(
             width: min(max(offset.width, -maximumX), maximumX),
-            height: min(max(offset.height, -maximumY), maximumY)
+            height: min(max(offset.height, minimumY), maximumY)
         )
     }
 

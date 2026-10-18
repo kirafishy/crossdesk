@@ -51,6 +51,7 @@ final class RemoteVideoView extends FrameLayout implements SurfaceHolder.Callbac
     RemoteVideoView(Context context, NativeSession session) {
         super(context); this.session = session;
         mouseInput = new RemoteMouseInput(this::sendMouse);
+        mouseInput.relativeMotion = this::moveRelative;
         setBackgroundColor(Color.BLACK);
         video = new SurfaceView(context); video.getHolder().addCallback(this);
         addView(video, new LayoutParams(1, 1, android.view.Gravity.CENTER));
@@ -147,14 +148,21 @@ final class RemoteVideoView extends FrameLayout implements SurfaceHolder.Callbac
         cursor.invalidate();
     }
     @Override protected void onSizeChanged(int w,int h,int oldw,int oldh) { post(this::fit); }
+    private void moveRelative(float dx, float dy) {
+        if (pictureInPicture || viewport.width() <= 0 || viewport.height() <= 0) return;
+        viewport.panForPointer(y, dy);
+        applyViewport();
+        mouseInput.move(x + dx / viewport.width(), y + dy / viewport.height());
+    }
     private boolean point(MotionEvent e) {
         boolean touchpad = relative && e.getToolType(0) != MotionEvent.TOOL_TYPE_MOUSE;
         float px=e.getX(),py=e.getY();
         if (!touchpad && !viewport.contains(px,py)) return false;
         if(touchpad){
             if(e.getActionMasked()==MotionEvent.ACTION_MOVE){
-                x=Math.max(0,Math.min(1,x+(px-lastX)/Math.max(1,viewport.width())));
-                y=Math.max(0,Math.min(1,y+(py-lastY)/Math.max(1,viewport.height())));
+                moveRelative(px-lastX,py-lastY);
+                lastX=px;lastY=py;
+                return true;
             }
         }else{
             x=viewport.normalizedX(px);

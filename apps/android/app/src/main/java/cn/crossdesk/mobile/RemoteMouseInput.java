@@ -3,6 +3,8 @@ package cn.crossdesk.mobile;
 /** Shared button ownership and cursor position for the video surface and mouse bar. */
 final class RemoteMouseInput {
     interface Sender { void send(float x, float y, int flag, int wheel); }
+    interface RelativeMotion { void move(float dx, float dy); }
+    RelativeMotion relativeMotion;
     private final Sender sender;
     private float x = .5f, y = .5f;
     private boolean gestureLeft, virtualLeft, virtualRight;
@@ -19,7 +21,8 @@ final class RemoteMouseInput {
     }
     void drag(float dx, float dy) {
         if (!hasVirtualButton() || viewportWidth <= 0 || viewportHeight <= 0) return;
-        move(x + dx / viewportWidth, y + dy / viewportHeight);
+        if (relativeMotion != null) relativeMotion.move(dx, dy);
+        else move(x + dx / viewportWidth, y + dy / viewportHeight);
     }
     void gestureLeft(boolean down) {
         if (down && hasVirtualButton()) return;

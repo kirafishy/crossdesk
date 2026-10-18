@@ -3,11 +3,14 @@ package cn.crossdesk.mobile;
 /** Geometry shared by the video Surface, cursor and remote pointer input. */
 final class RemoteViewport {
     private static final float MAXIMUM_SCALE = 10;
-    private int baseWidth, baseHeight, baseLeft, baseTop;
+    private static final float MINIMUM_VISIBLE_HEIGHT_FRACTION = .2f;
+    private int baseWidth, baseHeight, baseLeft, baseTop, containerHeight;
+    private boolean edgePanned;
     private float scale = 1, offsetX, offsetY;
 
     void fit(int width, int height, int videoWidth, int videoHeight) {
         if (width <= 0 || height <= 0 || videoWidth <= 0 || videoHeight <= 0) return;
+        containerHeight = height;
         double fitScale = Math.min((double) width / videoWidth, (double) height / videoHeight);
         baseWidth = Math.max(1, (int) (videoWidth * fitScale));
         baseHeight = Math.max(1, (int) (videoHeight * fitScale));
@@ -54,18 +57,46 @@ final class RemoteViewport {
         constrainOffset();
     }
 
-    void finishGesture() {
-        if (!isZoomed()) reset();
+    void panForPointer(float y, float dy) {
+        if (baseHeight == 0 || !Float.isFinite(dy)) return;
+        float overflowY = pointerOverflow(top() + y * height(), dy,
+            Math.max(0, top()), Math.min(containerHeight, top() + height()));
+        if (overflowY == 0) return;
+        edgePanned = true;
+        panBy(0, -overflowY);
     }
 
-    void reset() { scale = 1; offsetX = offsetY = 0; }
+    // Only the outward portion of this movement pans; an offscreen cursor must
+    // not make a tiny movement jump the viewport by its entire hidden distance.
+    private static float pointerOverflow(float position, float delta, float low, float high) {
+        if (delta > 0) return Math.min(delta, Math.max(0, position + delta - high));
+        if (delta < 0) return Math.max(delta, Math.min(0, position + delta - low));
+        return 0;
+    }
+
+    void finishGesture() {
+        if (!isZoomed()) {
+            scale = 1;
+            constrainOffset();
+        }
+    }
+
+    void reset() { scale = 1; offsetX = offsetY = 0; edgePanned = false; }
 
     private void constrainOffset() {
-        // Keep the original fitted area covered, as on iOS, even with letterboxing.
         float maximumX = baseWidth * (scale - 1) / 2;
-        float maximumY = baseHeight * (scale - 1) / 2;
+        float minimumY = -baseHeight * (scale - 1) / 2;
+        float maximumY = -minimumY;
+        if (edgePanned) {
+            // Reserve 20% of the viewport height regardless of zoom. If the
+            // whole image is shorter than that, keep its full height visible.
+            float visibleHeight = Math.min(height(), containerHeight * MINIMUM_VISIBLE_HEIGHT_FRACTION);
+            float centerY = baseTop + baseHeight / 2f;
+            minimumY = visibleHeight - centerY - height() / 2;
+            maximumY = containerHeight - visibleHeight - centerY + height() / 2;
+        }
         offsetX = clamp(offsetX, -maximumX, maximumX);
-        offsetY = clamp(offsetY, -maximumY, maximumY);
+        offsetY = clamp(offsetY, minimumY, maximumY);
     }
 
     private static float clamp(float value, float minimum, float maximum) {

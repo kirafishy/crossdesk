@@ -5,6 +5,7 @@ import Foundation
 final class RemoteMouseInput {
     var send: ((Float, Float, Int, Int) -> Void)?
     var didCancel: (() -> Void)?
+    var relativeMotion: ((Float, Float) -> Void)?
     var viewportSize = CGSize(width: 0, height: 0)
     private(set) var x: Float = 0.5
     private(set) var y: Float = 0.5
@@ -21,8 +22,12 @@ final class RemoteMouseInput {
 
     func drag(dx: Float, dy: Float) {
         guard hasVirtualButton, viewportSize.width > 0, viewportSize.height > 0 else { return }
-        position(x: x + dx / Float(viewportSize.width) * 1.35,
-                 y: y + dy / Float(viewportSize.height) * 1.35)
+        if let relativeMotion {
+            relativeMotion(dx, dy)
+        } else {
+            position(x: x + dx / Float(viewportSize.width) * 1.35,
+                     y: y + dy / Float(viewportSize.height) * 1.35)
+        }
         emit(0)
     }
 

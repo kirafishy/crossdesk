@@ -429,6 +429,20 @@ and are excluded from device backups. Disabling saving or withdrawing consent
 clears them; clearing is serialized after pending writes to prevent resurrection.
 Old previews saved without this choice are removed on upgrade.
 
+## Pointer edge panning
+
+In relative mouse mode, continuing to move outward at the top or bottom of the
+visible image pans the video vertically in the opposite direction. Moving
+down-left at the bottom edge pans upward without shifting the video horizontally;
+left and right edges do not trigger panning.
+This also works at 1× scale and while dragging a held virtual mouse button.
+Panning stops with the pointer movement and retains its position after release.
+At the vertical limit, the visible image occupies at least 20% of the viewport
+height regardless of zoom. If the entire image is shorter than that, its full
+height remains visible. The bounds account for letterboxing. Ending a pinch,
+including returning to 1×, preserves the translated position within those bounds
+instead of recentering it. Switching displays restores the centered view.
+
 ## Physical-device test checklist
 
 The floating control menu includes **虚拟鼠标** (virtual mouse), a 140 × 48 pt
