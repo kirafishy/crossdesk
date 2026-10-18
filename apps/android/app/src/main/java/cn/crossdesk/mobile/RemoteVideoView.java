@@ -24,6 +24,7 @@ final class RemoteVideoView extends FrameLayout implements SurfaceHolder.Callbac
     private final Cursor cursor;
     private final NativeSession session;
     final RemoteMouseInput mouseInput;
+    Runnable remoteFocusChanged;
     private final GestureDetector gestures;
     private final ScaleGestureDetector scales;
     private final RemoteViewport viewport = new RemoteViewport();
@@ -141,6 +142,7 @@ final class RemoteVideoView extends FrameLayout implements SurfaceHolder.Callbac
     }
     private void sendMouse(float x, float y, int flag, int wheel) {
         this.x = x; this.y = y;
+        if((flag==1||flag==3||flag==5)&&remoteFocusChanged!=null)remoteFocusChanged.run();
         session.pointer(x,y,flag,wheel);
         cursor.invalidate();
     }

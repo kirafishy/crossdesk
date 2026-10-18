@@ -124,6 +124,9 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             else motion=navigatingBack||nextPage.equals("home")?PageHost.Motion.POP:PageHost.Motion.PUSH;
         }
         if(root!=null)hideKeyboard();page=nextPage;
+        // Remote controls own the IME inset. Android 11–14 otherwise also resize
+        // the content, unlike Android 15's enforced edge-to-edge layout.
+        if(android.os.Build.VERSION.SDK_INT>=30&&android.os.Build.VERSION.SDK_INT<35)getWindow().setDecorFitsSystemWindows(!dark);
         signalBadge=null;identitySummary=null;announcementBadge=null;announcementView=null;announcementRefresh=null;
         settingsUpdateDot=null;aboutUpdateDot=null;settingsUpdateButton=null;aboutUpdateRow=null;aboutUpdateLabel=null;
         previewSwitch=null;clearPreviewsButton=null;previewCleanupError=null;previewCards.clear();recentGrid=null;
@@ -132,7 +135,11 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         root=ui.pageColumn(dark?0:nextPage.equals("home")?1200:720);
         safeArea.addView(root,new FrameLayout.LayoutParams(-1,-1,Gravity.TOP|Gravity.CENTER_HORIZONTAL));
         safeArea.setOnApplyWindowInsetsListener((view,insets)->{
-            view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;
+            if(dark&&android.os.Build.VERSION.SDK_INT>=30){
+                android.graphics.Insets bars=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
+                view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
+                if(controls!=null)controls.keyboardInsets(Math.max(0,insets.getInsets(WindowInsets.Type.ime()).bottom-bars.bottom),insets.isVisible(WindowInsets.Type.ime()),bars.bottom);
+            }else view.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;
         });
         root.setFocusableInTouchMode(true);pageHost.show(canvas,motion);
         applySystemBars(dark);
@@ -320,12 +327,15 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             public void disconnect(){confirmDisconnect();}public void display(){selectDisplay();}public void clipboard(){MainActivity.this.clipboard();}
             public void sendFile(){chooseFile();}public void saveFile(){saveReceivedFile();}public void secureAttention(){MainActivity.this.secureAttention();}
             public void key(int code){tapKey(code);}
+            public boolean textEdit(int count,String value){return sendTextEdit(count,value);}
             public void chord(int code,int[] modifiers){if(session==null)return;for(int modifier:modifiers)session.key(modifier,true);tapKey(code);for(int i=modifiers.length-1;i>=0;i--)session.key(modifiers[i],false);}public void shortcut(int code){MainActivity.this.shortcut(code);}public void text(String value){sendText(value);}
             public void mute(){muted=!muted;if(session!=null)session.control(2,muted?0:1);controls.setMuted(muted);}
             public void mouse(){boolean relative=!preferences.getBoolean("relativeMouse",true);preferences.edit().putBoolean("relativeMouse",relative).apply();video.setRelative(relative);controls.setRelative(relative);}
             public void videoSettings(int field,int value){RemoteVideoSettings.Values old=MainActivity.this.videoSettings.selection;updateVideoSettings(new RemoteVideoSettings.Values(field==0?value:old.quality,field==1?value:old.frameRate,field==2?value:old.preference));}
         });controls.setRelative(preferences.getBoolean("relativeMouse",true));controls.setMuted(muted);controls.videoSettings(videoSettings);root.addView(controls,new LinearLayout.LayoutParams(-1,-1));getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         controls.attachMouseBar(canvas,new VirtualMouseBar(ui,video.mouseInput));
+        video.remoteFocusChanged=()->{if(controls!=null)controls.resetKeyboardContext();};
+        controls.requestApplyInsets();
         video.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
             if(!pictureInPictureUi&&!isInPictureInPictureMode())updatePictureInPicture();
         });
@@ -463,7 +473,12 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     private void about(){
         if(aboutPages==null)aboutPages=new AboutPages(this,ui,this::settings,appUpdates);aboutPages.show();
     }
-    private void sendText(String value){if(session==null)return;if(value.length()>2048){toast("单次最多 2048 个字符");return;}for(char ch:value.toCharArray())if(KeyMap.ascii(ch)==0){toast("中文等文本请通过剪贴板发送，再点击粘贴");return;}for(char ch:value.toCharArray()){int code=KeyMap.ascii(ch);boolean shift=(code&0x100)!=0;if(shift)session.key(0x10,true);tapKey(code&0xFF);if(shift)session.key(0x10,false);}}
+    private void sendText(String value){sendTextEdit(0,value);}
+    private boolean sendTextEdit(int count,String value){
+        if(session==null)return false;
+        if(session.textEdit(count,value))return true;
+        toast("当前远端不支持此文本，中文或表情需更新 macOS 被控端，或通过剪贴板发送");return false;
+    }
     private void tapKey(int code){if(session!=null){session.key(code,true);session.key(code,false);}}
     private void shortcut(int code){if(session!=null){int modifier=hostPlatform.equals("macos")?0x5B:0x11;session.key(modifier,true);tapKey(code);session.key(modifier,false);}}
     private void selectDisplay(){
@@ -635,11 +650,20 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     @Override public void clipboard(String value){remoteClipboard=value;}
     @Override public void statistics(RemoteNetworkStatistics.Snapshot value){if(controls!=null)controls.statistics(value);if(value.fps>0)capturePreviewIfNeeded();}
     @Override public boolean dispatchKeyEvent(KeyEvent event){
-        if(ready&&session!=null&&!pictureInPictureUi&&hasWindowFocus()&&!(getCurrentFocus() instanceof EditText)&&event.getKeyCode()!=KeyEvent.KEYCODE_BACK){int code=KeyMap.windowsCode(event.getKeyCode());if(code!=0){boolean down=event.getAction()==KeyEvent.ACTION_DOWN;if(down)pressed.add(code);else pressed.remove(code);session.key(code,down);return true;}}return super.dispatchKeyEvent(event);
+        int code=KeyMap.windowsCode(event.getKeyCode());View focus=getCurrentFocus();
+        boolean remoteEditor=focus instanceof RemoteKeyboardInput;
+        boolean desktopKey=event.isCtrlPressed()||event.isAltPressed()||event.isMetaPressed()||pressed.contains(code)
+            ||code==17||code==18||code==91||code==27||code==9||code>=33&&code<=40||code==45||code==46||code>=112&&code<=123;
+        if(ready&&session!=null&&!pictureInPictureUi&&hasWindowFocus()&&(!(focus instanceof EditText)||remoteEditor&&(!((RemoteKeyboardInput)focus).isAcceptingInput()||desktopKey))&&event.getKeyCode()!=KeyEvent.KEYCODE_BACK&&code!=0){
+            boolean down=event.getAction()==KeyEvent.ACTION_DOWN;
+            if(down){pressed.add(code);if(remoteEditor)controls.resetKeyboardContext();}else pressed.remove(code);
+            session.key(code,down);return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
     private void releaseKeys(){if(session!=null)for(int code:pressed)session.key(code,false);pressed.clear();}
     private void navigateBack(){if(backAction==null)return;navigatingBack=true;try{backAction.run();}finally{navigatingBack=false;}}
-    private void back(){pageHost.finish();if(session!=null){if(ready)confirmDisconnect();else end("");}else if(backAction!=null)navigateBack();else finish();}
+    private void back(){if(controls!=null&&controls.closeKeyboard())return;pageHost.finish();if(session!=null){if(ready)confirmDisconnect();else end("");}else if(backAction!=null)navigateBack();else finish();}
     @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);if(!focus)releaseKeys();else applySystemBars(ready);}
     @android.annotation.SuppressLint("GestureBackNavigation") @Override public void onBackPressed(){back();}
     @Override public void onConfigurationChanged(Configuration config){
@@ -751,7 +775,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     // onStart marks a new visit; focus/resume callbacks must not reopen a refused notice.
     @Override protected void onPause(){releaseKeys();if(controls!=null)controls.cancelMouseInput();if(video!=null)video.releaseMouse();super.onPause();}
     @Override protected void onStart(){super.onStart();foreground=true;restoreBackgroundSession();appUpdates.setEnabled(preferences.getBoolean("networkConsent",false));if(!preferences.getBoolean("networkConsent",false))consent(this::renderSignaling);ensureSignaling();showConnectionMessage();}
-    @Override protected void onStop(){foreground=false;appUpdates.setEnabled(false);if(privacyDialog!=null)privacyDialog.dismiss();pageHost.finish();
+    @Override protected void onStop(){if(controls!=null)controls.closeKeyboard();foreground=false;appUpdates.setEnabled(false);if(privacyDialog!=null)privacyDialog.dismiss();pageHost.finish();
         if(connectionDialog!=null)connectionDialog.dismiss();
         // Closing native PiP is an explicit end, not a request for invisible
         // fallback. An unavailable/failed PiP can hand its live session off.

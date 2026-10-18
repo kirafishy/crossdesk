@@ -6,12 +6,13 @@ import android.view.*;
 import android.widget.*;
 import static cn.crossdesk.mobile.MobileUi.*;
 
-/** Safe-area overlay: a draggable 54 dp orb, an adaptive menu and a floating keyboard. */
+/** Safe-area overlay: a draggable 54 dp orb, an adaptive menu and a docked keyboard. */
 @android.annotation.SuppressLint("ViewConstructor")
 final class SessionControls extends FrameLayout {
     interface Actions {
         void disconnect(); void display(); void clipboard(); void key(int code);
         void chord(int code,int[] modifiers); void shortcut(int code); void text(String value); void mute(); void mouse();
+        default boolean textEdit(int deletions,String value){return false;}
         void videoSettings(int field,int value);
         void sendFile(); void saveFile(); void secureAttention();
     }
@@ -20,14 +21,20 @@ final class SessionControls extends FrameLayout {
     private final View orb;
     private final LinearLayout waiting;
     private View shield;
-    private LinearLayout menu,keyboard;
+    private LinearLayout menu;
+    private final RemoteKeyboard keyboard;
     private VirtualMouseBar mouseBar;
     private FrameLayout mouseHost;
     private boolean mouseVisible,pictureInPicture;
-    private ScrollView keyboardKeys;
     private ScrollView menuScroll;
-    private int keyboardPreferredHeight;
     private int menuColumns=3;
+    private final ViewTreeObserver.OnGlobalLayoutListener legacyKeyboardLayout=this::legacyKeyboardLayout;
+    private void legacyKeyboardLayout(){
+        if(android.os.Build.VERSION.SDK_INT>=30)return;
+        android.graphics.Rect visible=new android.graphics.Rect();getWindowVisibleDisplayFrame(visible);
+        int height=Math.max(0,getRootView().getHeight()-visible.bottom);
+        keyboardInsets(height,height>ui.dp(80),0);
+    }
     private TextView networkLabel,videoFeedback;
     private TextView transferLabel,saveFileButton;
     private String transferStatus="";
@@ -40,10 +47,11 @@ final class SessionControls extends FrameLayout {
     private LinearLayout[] trafficRows;
     private TextView[] networkDetails;
     private View encryptionLock,encryptionOpen;
-    private boolean muted,relative=true,shift,computerKeyboard,orbPositioned;
-    private final java.util.Set<Integer> modifiers=new java.util.LinkedHashSet<>();
+    private boolean muted,relative=true,orbPositioned;
     SessionControls(Context context,MobileUi ui,Actions actions){
         super(context);this.ui=ui;this.actions=actions;
+        keyboard=new RemoteKeyboard(context,ui,actions,()->{requestLayout();positionMouse();});
+        addView(keyboard,new LayoutParams(-1,ui.dp(44),Gravity.BOTTOM));
         // This container must remain transparent to remote touch outside its controls.
         waiting=ui.column();waiting.setMinimumWidth(ui.dp(200));waiting.setGravity(Gravity.CENTER);waiting.setPadding(ui.dp(20),ui.dp(20),ui.dp(20),ui.dp(20));waiting.setBackground(ui.background(0xB0202024,14));
         ProgressBar progress=new ProgressBar(context);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));waiting.addView(progress,ui.size(28,28));ui.gap(waiting,12);TextView message=ui.text("等待远端画面…",14,false);message.setTextColor(Color.WHITE);message.setGravity(Gravity.CENTER);waiting.addView(message);addView(waiting,new LayoutParams(-2,-2,Gravity.CENTER));
@@ -65,7 +73,7 @@ final class SessionControls extends FrameLayout {
     void cancelMouseInput(){if(mouseBar!=null)mouseBar.cancelInput();}
     void setPictureInPicture(boolean value){
         pictureInPicture=value;
-        if(value){cancelMouseInput();closeMenu();closeKeyboard();modifiers.clear();}
+        if(value){cancelMouseInput();closeMenu();closeKeyboard();}
         setVisibility(value?GONE:VISIBLE);positionMouse();
     }
     private void toggleMouse(){cancelMouseInput();mouseVisible=!mouseVisible;closeMenu();positionMouse();}
@@ -80,7 +88,7 @@ final class SessionControls extends FrameLayout {
         // When the orb is near the middle of a narrow phone, use the adjacent
         // row rather than letting the two controls overlap.
         if(x+width>getWidth()-margin){x=bound(orb.getX(),margin,getWidth()-width-margin);y=orb.getY()+orb.getHeight()+gap;if(y+height>getHeight()-margin)y=orb.getY()-gap-height;}
-        if(keyboard!=null&&x<keyboard.getX()+keyboard.getWidth()&&x+width>keyboard.getX()&&y<keyboard.getY()+keyboard.getHeight()&&y+height>keyboard.getY()){
+        if(keyboard.isOpen()&&x<keyboard.getX()+keyboard.getWidth()&&x+width>keyboard.getX()&&y<keyboard.getY()+keyboard.getHeight()&&y+height>keyboard.getY()){
             y=keyboard.getY()-gap-height;if(y<margin)y=keyboard.getY()+keyboard.getHeight()+gap;
         }
         mouseBar.setX(location[0]-hostLocation[0]+bound(x,margin,getWidth()-width-margin));
@@ -201,38 +209,11 @@ final class SessionControls extends FrameLayout {
         return Math.min(contentHeight,Math.max(1,height-ui.dp(16)));
     }
     private void positionMenu(){if(menu==null)return;float ox=orb.getX()+orb.getWidth()/2f;float x=ox>getWidth()/2f?orb.getX()-ui.dp(12)-menu.getWidth():orb.getX()+orb.getWidth()+ui.dp(12);menu.setX(bound(x,ui.dp(8),getWidth()-menu.getWidth()-ui.dp(8)));menu.setY(bound(orb.getY(),ui.dp(8),getHeight()-menu.getHeight()-ui.dp(8)));}
-    private int keyboardWidth(int width){return Math.min(ui.dp(computerKeyboard?520:440),Math.max(1,width-ui.dp(16)));}
-    private int keyboardHeight(int height){return Math.min(keyboardPreferredHeight,Math.max(1,height-ui.dp(16)));}
-    private void positionKeyboard(){if(keyboard!=null){keyboard.setX(bound(keyboard.getX(),ui.dp(8),getWidth()-keyboard.getWidth()-ui.dp(8)));keyboard.setY(bound(keyboard.getY(),ui.dp(8),getHeight()-keyboard.getHeight()-ui.dp(8)));}positionMouse();}
-    private void closeKeyboard(){if(keyboard!=null){removeView(keyboard);keyboard=null;keyboardKeys=null;}}
-    private void toggleKeyboard(){if(keyboard!=null){closeKeyboard();modifiers.clear();return;}modifiers.clear();showKeyboard();}
-    private void showKeyboard(){
-        float oldX=keyboard==null?-1:keyboard.getX(),oldY=keyboard==null?-1:keyboard.getY();int oldScroll=keyboardKeys==null?0:keyboardKeys.getScrollY();closeKeyboard();keyboard=ui.column();keyboard.setPadding(ui.dp(5),ui.dp(5),ui.dp(5),ui.dp(5));keyboard.setBackground(ui.background(0xFFD1D6DE,12));keyboard.setElevation(ui.dp(10));
-        LinearLayout top=ui.row();TextView handle=ui.text("━",19,true);handle.setGravity(Gravity.CENTER);handle.setTextColor(SECONDARY);handle.setContentDescription("拖动键盘");top.addView(handle,new LinearLayout.LayoutParams(0,ui.dp(28),1));top.addView(ui.iconButton("close","收起键盘",this::closeKeyboard),ui.size(30,28));keyboard.addView(top);drag(handle,keyboard,()->{});
-        // Keep the drag/close row fixed while short split windows can scroll every key into view.
-        keyboardKeys=new ScrollView(getContext());keyboard.addView(keyboardKeys,new LinearLayout.LayoutParams(-1,0,1));LinearLayout keys=ui.column();keyboardKeys.addView(keys);
-        String[][] rows=computerKeyboard?new String[][]{{"Esc","F1","F2","F3","F4","F5","F6"},{"Tab","Ctrl","Alt","Win","↑","⌫"},{"复制","粘贴","全选","←","↓","→"},{"ABC","空格","Enter"}}:new String[][]{{"1","2","3","4","5","6","7","8","9","0"},{"q","w","e","r","t","y","u","i","o","p"},{"a","s","d","f","g","h","j","k","l"},{"⇧","z","x","c","v","b","n","m","⌫"},{"电脑","剪贴板","空格",".","Enter"}};
-        for(String[] values:rows){LinearLayout line=ui.row();for(String value:values){String shown=shift&&value.length()==1?value.toUpperCase(java.util.Locale.ROOT):value;TextView key=ui.action(shown,INK,()->keyboardKey(value));key.setTextSize(value.length()>2?11:14);key.setMinHeight(ui.dp(31));int modifier=value.equals("Ctrl")?17:value.equals("Alt")?18:value.equals("Win")?91:0;key.setBackground(ui.background(modifiers.contains(modifier)?0xFF9BC7F7:value.length()>1||value.equals("⇧")?0xFFAFB8C5:Color.WHITE,5));LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(31),value.equals("空格")?3:1);p.setMargins(ui.dp(1.5f),0,ui.dp(1.5f),0);line.addView(key,p);}keys.addView(line);ui.gap(keys,3);}
-        keyboardPreferredHeight=ui.dp(5)*2+ui.dp(28)+rows.length*(ui.dp(31)+ui.dp(3));
-        addView(keyboard,new LayoutParams(keyboardWidth(getWidth()),keyboardHeight(getHeight())));LinearLayout shownKeyboard=keyboard;ScrollView shownKeys=keyboardKeys;
-        keyboard.post(()->{if(keyboard==shownKeyboard){keyboard.setX(oldX<0?(getWidth()-keyboard.getWidth())/2f:oldX);keyboard.setY(oldY<0?getHeight()-keyboard.getHeight()-ui.dp(20):oldY);shownKeys.scrollTo(0,oldScroll);constrainPanels();}});
-    }
-    private void keyboardKey(String value){
-        switch(value){
-            case "⇧":shift=!shift;showKeyboard();return;
-            case "电脑":computerKeyboard=true;showKeyboard();return;
-            case "ABC":computerKeyboard=false;showKeyboard();return;
-            case "剪贴板":actions.clipboard();return;
-            case "复制":actions.shortcut(0x43);return;case "粘贴":actions.shortcut(0x56);return;case "全选":actions.shortcut(0x41);return;
-            case "空格":sendKey(32);return;case "⌫":sendKey(8);return;case "Enter":sendKey(13);return;case "Esc":sendKey(27);return;case "Tab":sendKey(9);return;
-            case "↑":sendKey(38);return;case "↓":sendKey(40);return;case "←":sendKey(37);return;case "→":sendKey(39);return;
-            // Latch locally; the next key sends a complete chord without leaving remote modifiers down.
-            case "Ctrl":toggleModifier(17);return;case "Alt":toggleModifier(18);return;case "Win":toggleModifier(91);return;
-            default:if(value.matches("F[1-6]")){sendKey(111+Integer.parseInt(value.substring(1)));return;}if(!modifiers.isEmpty())sendKey(KeyMap.ascii(value.charAt(0))&255);else actions.text(shift?value.toUpperCase(java.util.Locale.ROOT):value);
-        }
-    }
-    private void toggleModifier(int code){if(!modifiers.add(code))modifiers.remove(code);showKeyboard();}
-    private void sendKey(int code){if(modifiers.isEmpty())actions.key(code);else{actions.chord(code,modifiers.stream().mapToInt(Integer::intValue).toArray());modifiers.clear();showKeyboard();}}
+    private void positionKeyboard(){positionMouse();}
+    boolean closeKeyboard(){return keyboard.close();}
+    void resetKeyboardContext(){keyboard.resetContext();}
+    void keyboardInsets(int height,boolean visible,int navigation){keyboard.updateInsets(height,visible,navigation);}
+    private void toggleKeyboard(){keyboard.bringToFront();keyboard.toggle();}
     @android.annotation.SuppressLint("ClickableViewAccessibility") // Tap dispatches performClick; dragging is an additional action.
     private void drag(View handle,View target,Runnable tap){
         handle.setOnClickListener(v->tap.run());handle.setOnTouchListener(new View.OnTouchListener(){float startX,startY,originX,originY;boolean moved;
@@ -251,7 +232,7 @@ final class SessionControls extends FrameLayout {
         cancelMouseInput();
         if(menu!=null&&menuPage.equals("controls")&&menuColumns!=controlColumns())openMenu("controls");
         orb.setX(bound(orb.getX(),ui.dp(8),getWidth()-orb.getWidth()-ui.dp(8)));orb.setY(bound(orb.getY(),ui.dp(8),getHeight()-orb.getHeight()-ui.dp(8)));
-        if(menu!=null||keyboard!=null)requestLayout();
+        if(menu!=null||keyboard.isOpen())requestLayout();
         positionKeyboard();
         positionMouse();
     }
@@ -265,9 +246,10 @@ final class SessionControls extends FrameLayout {
             // measure again with the final cap, even when it did not change.
             p.width=width;p.height=height;resized=true;
         }
-        if(keyboard!=null){
-            ViewGroup.LayoutParams p=keyboard.getLayoutParams();int width=keyboardWidth(getMeasuredWidth()),height=keyboardHeight(getMeasuredHeight());
-            if(p.width!=width||p.height!=height){p.width=width;p.height=height;resized=true;}
+        if(keyboard.isOpen()){
+            LayoutParams p=(LayoutParams)keyboard.getLayoutParams();
+            int height=keyboard.preferredHeight(),inset=keyboard.bottomInset();
+            if(p.height!=height||p.bottomMargin!=inset){p.height=height;p.bottomMargin=inset;resized=true;}
         }
         if(resized)super.onMeasure(widthSpec,heightSpec);
     }
@@ -280,7 +262,8 @@ final class SessionControls extends FrameLayout {
         positionKeyboard();
         positionMouse();
     }
-    @Override protected void onDetachedFromWindow(){cancelMouseInput();super.onDetachedFromWindow();}
+    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();if(android.os.Build.VERSION.SDK_INT<30)getViewTreeObserver().addOnGlobalLayoutListener(legacyKeyboardLayout);}
+    @Override protected void onDetachedFromWindow(){getViewTreeObserver().removeOnGlobalLayoutListener(legacyKeyboardLayout);cancelMouseInput();super.onDetachedFromWindow();}
     @Override protected void onSizeChanged(int width,int height,int oldWidth,int oldHeight){super.onSizeChanged(width,height,oldWidth,oldHeight);post(this::constrainPanels);}
     private static float bound(float value,float min,float max){return Math.max(min,Math.min(value,Math.max(min,max)));}
 }

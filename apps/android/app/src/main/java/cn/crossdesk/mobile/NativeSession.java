@@ -47,7 +47,8 @@ final class NativeSession implements AutoCloseable {
     private String password, identity = "";
     private final int port;
     private long handle;
-    private boolean signalReady, joining, connected, started;
+    private boolean signalReady, joining, started;
+    private volatile boolean connected, supportsTextInput;
     private int signalState;
     private volatile long signalGeneration;
     private boolean presenceRequested;
@@ -189,7 +190,11 @@ final class NativeSession implements AutoCloseable {
                                 "远端密码错误", "找不到该设备 ID", "远端当前不可用"};
                         fail(status >= 0 && status < reasons.length ? reasons[status] : "连接已结束");
                     }
-                } else if (type == 4) ui(() -> listener.data(event));
+                } else if (type == 4) {
+                    JSONObject info=event.optJSONObject("host_info");
+                    if(info!=null)supportsTextInput=info.optBoolean("supports_text_input",false);
+                    ui(() -> listener.data(event));
+                }
                 else if (type == 5) {
                     int width = event.getInt("width"), height = event.getInt("height");
                     ui(() -> listener.videoSize(width, height));
@@ -239,6 +244,23 @@ final class NativeSession implements AutoCloseable {
     void surface(Surface value) { execute(() -> { surface = value; if (handle != 0) nSurface(handle, value); }); }
     void pointer(float x, float y, int flag, int wheel) { execute(() -> { if (connected) nPointer(handle, x, y, flag, wheel); }); }
     void key(int code, boolean down) { execute(() -> { if (connected) nKey(handle, code, down); }); }
+    boolean textEdit(int deletions,String text) {
+        byte[] bytes=text.getBytes(StandardCharsets.UTF_8);
+        boolean unicode=supportsTextInput;
+        if(closed||!connected||deletions<0||deletions>4096||bytes.length>16*1024||text.indexOf('\0')>=0)return false;
+        if(!unicode)for(char ch:text.toCharArray())if(KeyMap.ascii(ch)==0)return false;
+        // Validate the entire edit before deleting anything. One RTC task preserves order.
+        execute(()->{
+            if(!connected)return;
+            for(int i=0;i<deletions;i++){nKey(handle,8,true);nKey(handle,8,false);}
+            if(unicode){if(bytes.length>0)nText(handle,bytes);}
+            else for(char ch:text.toCharArray()){
+                int code=KeyMap.ascii(ch);boolean shift=(code&0x100)!=0;
+                if(shift)nKey(handle,16,true);nKey(handle,code&255,true);nKey(handle,code&255,false);if(shift)nKey(handle,16,false);
+            }
+        });
+        return true;
+    }
     void control(int type, int value) {
         AudioPlayer player = audio;
         if (type == 2 && player != null) player.setEnabled(value != 0);
@@ -290,6 +312,7 @@ final class NativeSession implements AutoCloseable {
     private static native void nReady(long handle);
     private static native void nPointer(long handle, float x, float y, int flag, int wheel);
     private static native void nKey(long handle, int code, boolean down);
+    private static native void nText(long handle,byte[] text);
     private static native void nControl(long handle, int type, int value);
     private static native boolean nVideoSettings(long handle,int quality,int frameRate,int preference,long requestId);
     private static native boolean nAnnouncementRequest(long handle,byte[] data);

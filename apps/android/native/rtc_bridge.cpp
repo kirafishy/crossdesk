@@ -392,6 +392,17 @@ extern "C" JNIEXPORT void JNICALL JNI_METHOD(nKey)(JNIEnv*, jclass, jlong handle
   if (down) s->pressed_keys.insert(key); else s->pressed_keys.erase(key);
   s->Send(kKeyboardStream, action.to_json());
 }
+extern "C" JNIEXPORT void JNICALL JNI_METHOD(nText)(JNIEnv* env, jclass, jlong handle, jbyteArray bytes) {
+  auto* s = From(handle); if (!s || !bytes) return;
+  const auto size = env->GetArrayLength(bytes);
+  if (size <= 0 || static_cast<size_t>(size) > kMaxTextInputBytes) return;
+  RemoteAction action{}; action.type = text_input;
+  action.text.resize(size);
+  env->GetByteArrayRegion(bytes, 0, size, reinterpret_cast<jbyte*>(action.text.data()));
+  if (env->ExceptionCheck() || action.text.find('\0') != std::string::npos) return;
+  // Java supplies standard UTF-8, including supplementary Unicode characters.
+  s->Send(kKeyboardStream, action.to_json());
+}
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nControl)(
     JNIEnv*, jclass, jlong handle, jint type, jint value) {
   auto* s = From(handle); if (!s) return;

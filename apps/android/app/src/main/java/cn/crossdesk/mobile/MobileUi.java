@@ -118,6 +118,8 @@ final class MobileUi {
                 case "refresh":c.drawArc(4,4,20,20,35,310,false,paint);path(c,20,3,20,9,14,9);break;
                 case "close":path(c,6,6,18,18);path(c,18,6,6,18);break;
                 case "arrow":path(c,4,12,20,12);path(c,14,6,20,12,14,18);break;
+                case "keyboard_hide":
+                    c.drawRoundRect(2,2,22,16,2,2,paint);for(int y=6;y<=9;y+=3)for(int x=6;x<=18;x+=4)c.drawPoint(x,y,paint);c.drawLine(7,13,17,13,paint);path(c,7,20,12,23,17,20);break;
                 case "keyboard":
                     c.drawRoundRect(2,5,22,19,3,3,paint);for(int y=9;y<=12;y+=3)for(int x=6;x<=18;x+=4)c.drawPoint(x,y,paint);c.drawLine(7,16,17,16,paint);break;
                 case "display":c.drawRoundRect(2,3,22,17,2,2,paint);path(c,12,17,12,21);path(c,7,21,17,21);break;
