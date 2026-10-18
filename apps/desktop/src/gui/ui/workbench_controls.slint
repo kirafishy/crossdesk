@@ -20,9 +20,13 @@ export component WorkbenchButton inherits Rectangle {
     in property <string> text;
     in property <string> icon;
     in property <string> tooltip;
+    in property <bool> tooltip-above: false;
     in property <bool> tooltip-suppressed: false;
-    in property <color> icon-color: root.primary ? white : WorkbenchStyle.muted;
+    in property <color> icon-color: root.primary
+        ? (root.soft && !touch.has-hover && !root.show-focus ? WorkbenchStyle.accent : white)
+        : WorkbenchStyle.muted;
     in property <bool> primary: false;
+    in property <bool> soft: false;
     in property <bool> quiet: false;
     in property <bool> enabled: true;
     out property <bool> has-focus: button-focus.has-focus;
@@ -37,12 +41,16 @@ export component WorkbenchButton inherits Rectangle {
     width: 112px;
     height: 36px;
     border-radius: UiRadius.control;
-    border-width: root.show-focus ? 2px : 1px;
+    border-width: root.show-focus ? 2px : root.soft ? 0px : 1px;
     border-color: root.show-focus ? (root.primary ? #193da0 : WorkbenchStyle.accent)
         : root.primary ? WorkbenchStyle.accent
         : touch.has-hover ? WorkbenchStyle.hover-border
         : root.quiet ? transparent : WorkbenchStyle.control-border;
-    background: root.primary
+    background: root.soft
+        ? (root.primary
+            ? (touch.pressed ? #254cc0 : touch.has-hover || root.show-focus ? WorkbenchStyle.accent : #edf2ff)
+            : (touch.pressed ? WorkbenchStyle.pressed-surface : touch.has-hover ? WorkbenchStyle.hover-surface : WorkbenchStyle.field-surface))
+        : root.primary
         ? (touch.pressed ? #254cc0 : touch.has-hover ? #4574f0 : WorkbenchStyle.accent)
         : (touch.pressed ? WorkbenchStyle.pressed-surface : touch.has-hover ? WorkbenchStyle.hover-surface : root.quiet ? transparent : white);
     opacity: root.enabled ? 1 : 0.45;
@@ -54,15 +62,15 @@ export component WorkbenchButton inherits Rectangle {
     accessible-action-default => { if root.enabled { root.clicked(); } }
 
     HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
+        padding-left: root.text == "" ? 0px : 10px;
+        padding-right: root.text == "" ? 0px : 10px;
         spacing: 8px;
         alignment: center;
         if root.icon != "": Text {
             text: root.icon;
             font-family: "Font Awesome 6 Free";
             font-weight: 900;
-            font-size: 14px;
+            font-size: root.soft ? 12px : 14px;
             color: root.icon-color;
             vertical-alignment: center;
             accessible-role: none;
@@ -113,7 +121,7 @@ export component WorkbenchButton inherits Rectangle {
     }
     if root.tooltip-active && root.tooltip-visible: Rectangle {
         x: min(0px, root.width - self.width);
-        y: root.height + 6px;
+        y: root.tooltip-above ? -self.height - 6px : root.height + 6px;
         width: min(260px, tip.preferred-width + 20px);
         height: max(28px, tip.preferred-height + 12px);
         background: #24324a;

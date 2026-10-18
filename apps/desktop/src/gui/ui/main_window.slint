@@ -1,7 +1,8 @@
 import { UiRadius } from "ui_radius.slint";
 import { WorkbenchStyle, WorkbenchButton, WorkbenchCard, WorkbenchNotice } from "workbench_controls.slint";
 import { GalleryStrings } from "device_strings.slint";
-import { DeviceCardActions, DeviceCardStyle } from "device_card_actions.slint";
+import { DeviceCardStyle } from "device_card_actions.slint";
+import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint";
 import { GalleryView, GalleryTile, GalleryRecentDevice, GalleryActionDevice } from "gallery_view.slint";
 import { GalleryNetworkDialog, GalleryNetworkDevice } from "gallery_network_dialog.slint";
@@ -986,7 +987,7 @@ export component MainWindow inherits Window {
             }
         }
 
-        // Recent connections: horizontal cards with thumbnail and hover actions.
+        // Recent connections: previews, presence badges, and separate primary/overflow actions.
         recent-panel := Rectangle {
             y: 260px;
             height: parent.height - self.y;
@@ -1060,8 +1061,12 @@ export component MainWindow inherits Window {
                         background: transparent;
                         private property <bool> available: connection.online || connection.connected;
                         private property <length> content-width: self.width;
-                        private property <length> toolbar-width: DeviceCardStyle.toolbar-width;
-                        private property <length> toolbar-right-padding: 3px;
+                        private property <length> scroll-offset: recent-scroll.viewport-x;
+                        private property <string> device-id: connection.remote-id;
+                        private property <int> group-index: root.recent-group-index;
+                        changed scroll-offset => { card-menu.close-menu(); }
+                        changed device-id => { card-menu.close-menu(); }
+                        changed group-index => { card-menu.close-menu(); }
 
                         Rectangle {
                             width: connection-card.content-width;
@@ -1104,6 +1109,22 @@ export component MainWindow inherits Window {
                                     vertical-alignment: center;
                                     overflow: elide;
                                 }
+                                Rectangle {
+                                    x: 8px; y: 8px;
+                                    width: presence-label.preferred-width + 24px; height: 20px;
+                                    background: #fffffff0; border-radius: self.height / 2;
+                                    Rectangle {
+                                        x: 8px; y: (parent.height - self.height) / 2;
+                                        width: 5px; height: 5px; border-radius: self.height / 2;
+                                        background: connection-card.available ? WorkbenchStyle.success : WorkbenchStyle.muted;
+                                    }
+                                    presence-label := Text {
+                                        x: 17px; width: self.preferred-width; height: parent.height;
+                                        text: connection-card.available ? UiStrings.online : UiStrings.offline;
+                                        color: connection-card.available ? WorkbenchStyle.success : WorkbenchStyle.muted;
+                                        font-size: 10px; font-weight: 500; vertical-alignment: center;
+                                    }
+                                }
                             }
                             Rectangle {
                                 x: 0px;
@@ -1111,24 +1132,19 @@ export component MainWindow inherits Window {
                                 width: parent.width;
                                 height: 44px;
                                 background: white;
-                                Rectangle { x: 0px; y: 0px; width: parent.width; height: 1px; background: WorkbenchStyle.border; }
+                                Rectangle { x: 0px; y: 0px; width: parent.width; height: 1px; background: WorkbenchStyle.separator; }
                                 Text {
-                                    x: 12px; y: 4px; height: 19px;
-                                    width: parent.width - 24px;
+                                    x: 12px; y: 5px; height: 19px;
+                                    width: parent.width - 56px;
                                     text: connection.display-name;
                                     color: WorkbenchStyle.text;
                                     font-size: 13px; font-weight: 600;
                                     overflow: elide; vertical-alignment: center;
                                 }
                                 Text {
-                                    x: 12px; y: 24px; height: 16px; width: parent.width - 92px;
+                                    x: 12px; y: 24px; height: 16px; width: parent.width - 56px;
                                     text: connection.remote-id; font-size: 11px; color: WorkbenchStyle.muted;
                                     overflow: elide;
-                                }
-                                presence-label := Text {
-                                    x: parent.width - self.preferred-width - 12px; y: 24px; height: 16px;
-                                    text: connection-card.available ? UiStrings.online : UiStrings.offline;
-                                    font-size: 10px; color: connection-card.available ? WorkbenchStyle.success : WorkbenchStyle.muted;
                                 }
                             }
                             // The software renderer only clips rectangular bounds.
@@ -1167,6 +1183,12 @@ export component MainWindow inherits Window {
                                 clicked => { root.copy-feedback = CopyFeedback.idle; root.recent-connect(connection.remote-id); }
                                 function show-details() {
                                     if !self.has-hover { return; }
+                                    // Leave the menu trigger and its popup free of device details.
+                                    if card-menu.menu-open || (self.mouse-x >= card-menu.x - 4px
+                                        && self.mouse-y <= card-menu.y + card-menu.height + 4px) {
+                                        root.recent-tooltip-visible = false;
+                                        return;
+                                    }
                                     root.recent-tooltip-name = connection.display-name;
                                     root.recent-tooltip-host = connection.host-name;
                                     root.recent-tooltip-id = connection.remote-id;
@@ -1192,32 +1214,57 @@ export component MainWindow inherits Window {
                                 changed mouse-x => { self.show-details(); }
                                 changed mouse-y => { self.show-details(); }
                             }
-                            if card-touch.has-hover: DeviceCardActions {
-                                x: parent.width - self.width - connection-card.toolbar-right-padding;
-                                y: 52px;
-                                remove-label: GalleryStrings.tr("删除记录", "Delete record", "Удалить запись");
-                                connected: connection.connected;
-                                edit-alias => {
+                            card-menu := GalleryMenuButton {
+                                x: parent.width - self.width - 8px; y: 8px;
+                                width: 24px; height: 24px;
+                                compact-trigger: true;
+                                compact-menu: true;
+                                enabled: !root.gallery-mode;
+                                text: GalleryStrings.tr("更多操作", "More actions", "Другие действия");
+                                menu-width: root.compact-language ? 116px : root.language-index == 2 ? 156px : 128px;
+                                items: [
+                                    {label: GalleryStrings.tr("修改名称", "Rename", "Переименовать"), enabled: true},
+                                    {label: GalleryStrings.tr("修改分组", "Edit groups", "Изменить группы"), enabled: true},
+                                    {label: GalleryStrings.tr("删除记录", "Delete record", "Удалить запись"), enabled: true},
+                                ];
+                                item-icons: [FontAwesomeIcons.pen, FontAwesomeIcons.tags, FontAwesomeIcons.trash-can];
+                                destructive-index: 2;
+                                opened => { root.recent-tooltip-visible = false; root.copy-feedback = CopyFeedback.idle; }
+                                selected(action) => {
                                     root.copy-feedback = CopyFeedback.idle;
-                                    root.alias-remote-id = connection.remote-id;
-                                    root.alias-input = connection.display-name;
-                                    root.alias-open = true;
+                                    if action == 0 {
+                                        root.alias-remote-id = connection.remote-id;
+                                        root.alias-input = connection.display-name;
+                                        root.alias-open = true;
+                                    } else if action == 1 {
+                                        root.open-device-groups(connection.remote-id, connection.display-name);
+                                    } else if action == 2 {
+                                        root.delete-remote-id = connection.remote-id;
+                                        root.delete-from-gallery = false;
+                                        root.delete-open = true;
+                                    }
                                 }
-                                edit-groups => { root.copy-feedback = CopyFeedback.idle; root.open-device-groups(connection.remote-id, connection.display-name); }
-                                remove-device => {
+                            }
+                            WorkbenchButton {
+                                x: parent.width - self.width - 8px; y: 88px;
+                                width: 28px; height: 28px;
+                                soft: true;
+                                primary: !connection.connected;
+                                icon: connection.connected ? FontAwesomeIcons.xmark : FontAwesomeIcons.arrow-right-long;
+                                tooltip: connection.connected ? GalleryStrings.tr("断开连接", "Disconnect", "Отключить") : UiStrings.connect;
+                                tooltip-above: true;
+                                clicked => {
                                     root.copy-feedback = CopyFeedback.idle;
-                                    root.delete-remote-id = connection.remote-id;
-                                    root.delete-from-gallery = false;
-                                    root.delete-open = true;
+                                    root.recent-tooltip-visible = false;
+                                    if connection.connected { root.recent-disconnect(connection.remote-id); }
+                                    else { root.recent-connect(connection.remote-id); }
                                 }
-                                connect-device => { root.copy-feedback = CopyFeedback.idle; root.recent-connect(connection.remote-id); }
-                                disconnect-device => { root.copy-feedback = CopyFeedback.idle; root.recent-disconnect(connection.remote-id); }
                             }
                         }
                         Rectangle {
                             width: parent.width; height: 124px;
                             border-width: 1px; border-radius: UiRadius.surface;
-                            border-color: card-touch.has-hover ? WorkbenchStyle.hover-border : WorkbenchStyle.border;
+                            border-color: card-touch.has-hover || card-menu.menu-open ? WorkbenchStyle.hover-border : WorkbenchStyle.border;
                             animate border-color { duration: 120ms; }
                         }
                     }
