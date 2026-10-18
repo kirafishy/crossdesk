@@ -958,7 +958,16 @@ export component MainWindow inherits Window {
                         accessible-label: UiStrings.remote-id;
                         vertical-alignment: center;
                         selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
-                        edited => { root.connection-input-error = ""; remote-id-format-timer.running = true; }
+                        edited => {
+                            root.connection-input-error = "";
+                            // Enforce the digit limit before the next frame can
+                            // render the text from typing, paste, or replacement.
+                            let formatted = root.format-remote-id(self.text);
+                            self.text = formatted;
+                            // Formatted IDs are ASCII, so these are UTF-8 offsets.
+                            self.set-selection-offsets(
+                                formatted.character-count, formatted.character-count);
+                        }
                         accepted => { if !root.connection-pending { root.connect-requested(root.remote-id-input); } }
                     }
                 }
@@ -1566,22 +1575,6 @@ export component MainWindow inherits Window {
         interval: root.copy-feedback == CopyFeedback.failed ? 4s : 2500ms;
         running: root.copy-feedback != CopyFeedback.idle;
         triggered => { root.copy-feedback = CopyFeedback.idle; }
-    }
-    remote-id-format-timer := Timer {
-        interval: 1ms;
-        running: false;
-        triggered => {
-            // Use the running property for both transitions. restart() resumes
-            // the native repeating timer without restoring this property, so
-            // a later stop() cannot change it and the selection keeps resetting.
-            self.stop();
-            let formatted = root.format-remote-id(root.remote-id-input);
-            root.remote-id-input = formatted;
-            // IDs are ASCII-only, so character-count is also the UTF-8 offset
-            // expected by set-selection-offsets().
-            remote-id-editor.set-selection-offsets(
-                formatted.character-count, formatted.character-count);
-        }
     }
     // Float above the workbench while keeping modal dialogs in front.
     if !root.gallery-mode && root.copy-feedback != CopyFeedback.idle: WorkbenchNotice {

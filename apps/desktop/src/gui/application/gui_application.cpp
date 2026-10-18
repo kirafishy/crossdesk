@@ -343,10 +343,14 @@ std::string FormatPeerId(const char* id) {
 
 std::string FormatRemotePeerIdInput(std::string_view input) {
   std::string digits = gallery::Workspace::NormalizeId(std::string(input));
-  if (digits.size() > 9 ||
-      !std::all_of(digits.begin(), digits.end(),
-                   [](unsigned char c) { return c >= '0' && c <= '9'; }))
-    return digits;
+  digits.erase(std::remove_if(digits.begin(), digits.end(),
+                              [](unsigned char c) {
+                                return c < '0' || c > '9';
+                              }),
+               digits.end());
+  if (digits.size() > 9) {
+    digits.resize(9);
+  }
   if (digits.size() > 3) {
     digits.insert(3, " ");
   }
