@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 常见问题 / FAQ
+    url: https://github.com/kunkundi/crossdesk/blob/deskhub/docs/FAQ.md
+    about: 连接、黑屏、系统权限与安装排查。Troubleshoot connections, blank video, permissions, and installation.
+  - name: 使用指南（中文）
+    url: https://github.com/kunkundi/crossdesk/blob/deskhub/docs/USER_GUIDE.md
+    about: 查看连接、桌面墙、移动端、无人值守和自托管的使用说明。
+  - name: User guide (English)
+    url: https://github.com/kunkundi/crossdesk/blob/deskhub/docs/USER_GUIDE_EN.md
+    about: Read about connections, DeskHub, mobile clients, unattended access, and self-hosting.
