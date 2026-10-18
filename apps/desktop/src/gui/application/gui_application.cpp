@@ -40,6 +40,9 @@
 #include "features/gallery/preview_bandwidth.h"
 #include "localization.h"
 #include "platform.h"
+#ifndef __OHOS__
+#include "platform/instance_activation.h"
+#endif
 #include "platform/video_renderer.h"
 #include "rendering/slint_video_presenter.h"
 #include "rendering/video_geometry.h"
@@ -66,6 +69,7 @@
 
 #include "platform/linux/gui/cuda_graphics.h"
 #include "platform/linux/gui/tray/linux_tray.h"
+#include "platform/linux/gui/wayland_activation.h"
 #include "platform/linux/headless/headless_console.h"
 // Xlib defines Status as a macro, which collides with UpdateChecker::Status.
 #undef Status
@@ -248,8 +252,9 @@ bool X11WindowMatches(Display* display, ::Window x11_window,
              kGeometryTolerance;
 }
 
-void X11ActivateGalleryWindow(Display* display) {
-  if (!display) return;
+bool X11ActivateWindow(Display* display, const slint::Window& target,
+                      bool gallery_window) {
+  if (!display) return false;
   Atom type = None;
   int format = 0;
   unsigned long count = 0, remaining = 0;
@@ -259,13 +264,15 @@ void X11ActivateGalleryWindow(Display* display) {
                          0, 4096, False, XA_WINDOW, &type, &format, &count,
                          &remaining, &data) != Success || !data) {
     if (data) XFree(data);
-    return;
+    return false;
   }
+  bool activated = false;
   if (type == XA_WINDOW && format == 32) {
     const auto* windows = reinterpret_cast<const ::Window*>(data);
     for (unsigned long i = 0; i < count; ++i) {
       if (X11GetWindowProcessId(display, windows[i]) !=
           static_cast<unsigned long>(getpid())) continue;
+      if (!gallery_window && !X11WindowMatches(display, windows[i], target)) continue;
       unsigned char* name = nullptr;
       unsigned long length = 0;
       Atom name_type = None;
@@ -273,8 +280,11 @@ void X11ActivateGalleryWindow(Display* display) {
       XGetWindowProperty(display, windows[i], XInternAtom(display, "_NET_WM_NAME", False),
                          0, 256, False, XInternAtom(display, "UTF8_STRING", False),
                          &name_type, &name_format, &length, &remaining, &name);
-      const bool matches = name && name_format == 8 &&
-          std::string_view(reinterpret_cast<char*>(name), length).starts_with("CrossDesk ");
+      const std::string_view title = name && name_format == 8
+          ? std::string_view(reinterpret_cast<char*>(name), length)
+          : std::string_view{};
+      const bool matches = gallery_window ? title.starts_with("CrossDesk ")
+                                          : title == "CrossDesk";
       if (name) XFree(name);
       if (!matches) continue;
       XEvent event{};
@@ -284,12 +294,15 @@ void X11ActivateGalleryWindow(Display* display) {
       event.xclient.format = 32;
       event.xclient.data.l[0] = 1;
       event.xclient.data.l[1] = CurrentTime;
-      XSendEvent(display, root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
+      activated = XSendEvent(display, root, False,
+                             SubstructureRedirectMask | SubstructureNotifyMask,
+                             &event) != 0;
       XFlush(display);
       break;
     }
   }
   XFree(data);
+  return activated;
 }
 
 #endif
@@ -1019,6 +1032,9 @@ struct GuiApplication::SlintUi {
   int localized_language = -1;
   std::chrono::steady_clock::time_point last_clipboard_poll{};
   slint::Timer video_timer;
+#ifndef __OHOS__
+  std::unique_ptr<platform::InstanceActivationReceiver> activation_receiver;
+#endif
 #if _WIN32
   std::unique_ptr<WinTray> tray;
 #elif defined(__APPLE__)
@@ -1028,6 +1044,8 @@ struct GuiApplication::SlintUi {
 #elif (defined(__linux__) && !defined(__OHOS__))
   std::unique_ptr<LinuxTray> tray;
   Display* x11_focus_display = nullptr;
+  int main_activation_attempts = 0;
+  std::string main_activation_token;
   std::chrono::steady_clock::time_point last_x11_activation_poll{};
 #endif
 
@@ -1044,6 +1062,14 @@ GuiApplication::GuiApplication() = default;
 GuiApplication::~GuiApplication() = default;
 
 int GuiApplication::Run() {
+#ifndef __OHOS__
+  // Publish the GUI endpoint before configuration/media initialization, so a
+  // second launch can queue activation even while this window is starting.
+  auto activation_receiver =
+      std::make_unique<platform::InstanceActivationReceiver>();
+  std::string activation_error;
+  activation_receiver->Start(activation_error);
+#endif
   path_manager_ = std::make_unique<PathManager>("CrossDesk");
   if (!path_manager_) {
     return -1;
@@ -1051,6 +1077,9 @@ int GuiApplication::Run() {
   exec_log_path_ = path_manager_->GetLogPath().string();
   dll_log_path_ = exec_log_path_;
   InitializeLogger();
+#ifndef __OHOS__
+  if (!activation_error.empty()) LOG_WARN("{}", activation_error);
+#endif
   cache_path_ = path_manager_->GetCachePath().string();
   announcements_.SetStorageDirectory(path_manager_->GetCachePath() /
                                      "announcement_reads");
@@ -1091,6 +1120,9 @@ int GuiApplication::Run() {
   InitializeModules();
   update_checker_ = std::make_unique<UpdateChecker>(CROSSDESK_VERSION);
   InitializeUi();
+#ifndef __OHOS__
+  ui_->activation_receiver = std::move(activation_receiver);
+#endif
   // Configure the initial geometry before the native window becomes visible.
   // Subsequent ticks only acknowledge that placement and its resolved DPI.
   RestoreWindowGeometry(true);
@@ -1303,28 +1335,41 @@ void GuiApplication::InitializeUi() {
   SyncMainWindow();
 }
 
+void GuiApplication::ShowMainWindow(const std::string& activation_token) {
+#if !defined(__linux__) || defined(__OHOS__)
+  (void)activation_token;
+#endif
+  if (!ui_) {
+    return;
+  }
+  ui_->main->show();
+  ui_->main->window().set_minimized(false);
+#if _WIN32
+  const HWND window = ui_->main->window().win32_hwnd();
+  ConfigureWindowsWindowIcons(window);
+  ShowWindow(window, IsIconic(window) ? SW_RESTORE : SW_SHOW);
+  SetForegroundWindow(window);
+#endif
+#if defined(__APPLE__)
+  ConfigureMainWindowChrome(ui_->main->window().appkit_view());
+  MacActivateWindow(ui_->main->window().appkit_view());
+  // A window restored from the tray may only obtain its NSWindow after the
+  // callback returns, so let the regular UI tick configure it.
+  ui_->main_native_titlebar_attempts = 30;
+#elif defined(__linux__) && !defined(__OHOS__)
+  // Mapping/unminimizing through Slint is asynchronous. Retry native lookup
+  // after the window manager has updated its client list and geometry.
+  ui_->main_activation_attempts = 30;
+  ui_->main_activation_token = activation_token;
+#endif
+}
+
 void GuiApplication::InitializeSystemTray() {
 #if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
   if (!ui_) {
     return;
   }
-  auto show_window = [this] {
-    if (!ui_) {
-      return;
-    }
-    ui_->main->show();
-#if _WIN32
-    ConfigureWindowsWindowIcons(ui_->main->window().win32_hwnd());
-#endif
-    ui_->main->window().set_minimized(false);
-#if defined(__APPLE__)
-    ConfigureMainWindowChrome(ui_->main->window().appkit_view());
-    MacActivateWindow(ui_->main->window().appkit_view());
-    // A window restored from the tray may only obtain its NSWindow after the
-    // callback returns, so let the regular UI tick configure it.
-    ui_->main_native_titlebar_attempts = 30;
-#endif
-  };
+  auto show_window = [this] { ShowMainWindow(); };
   auto hide_window = [this] {
     if (ui_) {
       ui_->main->hide();
@@ -2163,7 +2208,30 @@ void GuiApplication::Tick() {
     }
   }
   clipboard_.ApplyPendingRemoteText();
+#ifndef __OHOS__
+  std::string activation_token;
+  bool activation_requested =
+      ui_->activation_receiver && ui_->activation_receiver->TakeRequest(&activation_token);
+#ifdef __APPLE__
+  if (ui_->tray && ui_->tray->TakeReopenRequest()) activation_requested = true;
+#endif
+  if (activation_requested) ShowMainWindow(activation_token);
+#endif
 #if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
+  if (ui_->main_activation_attempts > 0) {
+    --ui_->main_activation_attempts;
+    const auto& window = ui_->main->window();
+    if (window.wayland_surface()) {
+      if (platform::ActivateWaylandWindow(window.wayland_display(),
+              window.wayland_surface(), ui_->main_activation_token))
+        ui_->main_activation_attempts = 0;
+    } else {
+      if (!ui_->x11_focus_display) ui_->x11_focus_display = XOpenDisplay(nullptr);
+      if (X11ActivateWindow(ui_->x11_focus_display, window, false))
+        ui_->main_activation_attempts = 0;
+    }
+    if (ui_->main_activation_attempts == 0) ui_->main_activation_token.clear();
+  }
   if (ui_->tray) {
     ui_->tray->ProcessEvents();
   }
@@ -4514,7 +4582,7 @@ void GuiApplication::ShowGalleryWindow() {
   SetForegroundWindow(window.win32_hwnd());
 #elif defined(__linux__) && !defined(__OHOS__)
   if (!ui_->x11_focus_display) ui_->x11_focus_display = XOpenDisplay(nullptr);
-  X11ActivateGalleryWindow(ui_->x11_focus_display);
+  X11ActivateWindow(ui_->x11_focus_display, window, true);
 #endif
   ui_->gallery_synced = {};
   SyncGallery();

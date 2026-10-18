@@ -154,9 +154,11 @@ function setup_targets()
         add_includedirs("apps/desktop/src", {public = true})
         if is_os("windows") then
             add_files("apps/desktop/src/platform/windows/single_instance.cpp")
-            add_syslinks("Advapi32")
+            add_files("apps/desktop/src/platform/windows/gui/instance_activation.cpp")
+            add_syslinks("Advapi32", "User32")
         else
             add_files("apps/desktop/src/platform/common/posix_single_instance.cpp")
+            add_files("apps/desktop/src/platform/common/posix_instance_activation.cpp")
         end
 
     target("repository_structure_test")
@@ -528,6 +530,7 @@ function setup_targets()
             add_defines("CROSSDESK_PORTABLE=1", {public = true})
         end
         add_deps("rd_log", "desktop_common", "assets", "config_center", "minirtc",
+            "single_instance",
             "path_manager", "screen_capturer", "speaker_capturer",
             "device_controller", "thumbnail", "version_checker", "tools",
             "crossdesk_wire", "privacy", "crossdesk_ui")
@@ -576,6 +579,7 @@ function setup_targets()
             add_links("GL")
             add_deps("headless_console")
             add_files("apps/desktop/src/platform/linux/gui/tray/linux_tray.cpp",
+                "apps/desktop/src/platform/linux/gui/wayland_activation.cpp",
                 "apps/desktop/src/platform/linux/gui/cuda_graphics.cpp",
                 "apps/desktop/src/platform/common/gui/opengl_video_renderer.cpp",
                 "apps/desktop/src/platform/common/gui/cuda_driver.cpp",

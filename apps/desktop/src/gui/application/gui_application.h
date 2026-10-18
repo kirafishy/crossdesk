@@ -49,6 +49,7 @@ private:
   void InitializeModules();
   void InitializeUi();
   void InitializeSystemTray();
+  void ShowMainWindow(const std::string& activation_token = {});
   bool MinimizeMainWindowToTray();
   void BindMainCallbacks(bool gallery_window = false);
   void BindStreamCallbacks();

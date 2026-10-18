@@ -33,6 +33,7 @@ class MacTray {
 
   void MinimizeToTray();
   void RemoveTrayIcon();
+  bool TakeReopenRequest();
 
  private:
   std::unique_ptr<MacTrayImpl> impl_;

@@ -48,7 +48,9 @@ InstanceResult SingleInstanceGuard::TryAcquire(InstanceRole role,
       std::wstring(role_name.begin(), role_name.end());
   LocalFree(sid);
   // Object lifetime is the lease. No thread-owned mutex to transfer to a daemon.
-  HANDLE mutex = CreateMutexW(nullptr, FALSE, name.c_str());
+  // CreateMutexW requests full access to an existing mutex, which can prevent
+  // an unelevated launch from recognizing the same user's elevated instance.
+  HANDLE mutex = CreateMutexExW(nullptr, name.c_str(), 0, SYNCHRONIZE);
   const DWORD code = GetLastError();
   if (!mutex) {
     error = "Cannot create single-instance mutex: " + std::to_string(code);

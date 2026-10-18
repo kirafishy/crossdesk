@@ -26,6 +26,7 @@
 #include "config_center.h"
 #include "daemon.h"
 #include "path_manager.h"
+#include "platform/instance_activation.h"
 #include "platform/single_instance.h"
 #include "rd_log.h"
 #include "render.h"
@@ -307,6 +308,25 @@ static crossdesk::platform::InstanceResult AcquireInstance(
   return result;
 }
 
+static int ExitForExistingInstance(
+    crossdesk::platform::InstanceResult result, bool interactive_launch) {
+  if (interactive_launch &&
+      result == crossdesk::platform::InstanceResult::kAlreadyRunning) {
+    std::string error;
+    if (!crossdesk::platform::RequestInstanceActivation(error)) {
+      std::cerr << error << '\n';
+#ifdef _WIN32
+      MessageBoxW(nullptr,
+                  L"CrossDesk is already running, but its window could not be "
+                  L"activated.\n\nIt may still be starting or be running in "
+                  L"another Windows session. Please check the system tray.",
+                  L"CrossDesk", MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+#endif
+    }
+  }
+  return result == crossdesk::platform::InstanceResult::kAlreadyRunning ? 0 : 1;
+}
+
 static int RunApplication(
     int argc, char* argv[],
     crossdesk::platform::SingleInstanceGuard& client_instance) {
@@ -458,11 +478,11 @@ int main(int argc, char* argv[]) {
   if (!IsDaemonChild(argc, argv)) {
     const auto result = AcquireInstance(launcher_instance, InstanceRole::kLauncher);
     if (result != InstanceResult::kAcquired)
-      return result == InstanceResult::kAlreadyRunning ? 0 : 1;
+      return ExitForExistingInstance(result, true);
   }
   const auto result = AcquireInstance(client_instance, InstanceRole::kClient);
   if (result != InstanceResult::kAcquired)
-    return result == InstanceResult::kAlreadyRunning ? 0 : 1;
+    return ExitForExistingInstance(result, !IsDaemonChild(argc, argv));
 
 #ifdef __linux__
   const int exit_code = crossdesk::RunWithLinuxDisplay(

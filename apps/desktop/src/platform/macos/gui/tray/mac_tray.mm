@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 
 #import <Cocoa/Cocoa.h>
+#import <CoreServices/CoreServices.h>
 
 #include "localization.h"
 
@@ -16,6 +17,8 @@
 - (void)showMainWindow:(id)sender;
 - (void)openSettings:(id)sender;
 - (void)exitApplication:(id)sender;
+- (void)reopenApplication:(NSAppleEventDescriptor *)event
+               withReply:(NSAppleEventDescriptor *)reply;
 @end
 
 namespace crossdesk {
@@ -28,6 +31,7 @@ struct MacTrayImpl {
         language_index(language_index_value),
         target([[CrossDeskMacTrayTarget alloc] initWithOwner:this]) {
     EnsureStatusItem();
+    InstallReopenHandler();
   }
 
   explicit MacTrayImpl(std::function<void()> show_window_callback,
@@ -43,9 +47,13 @@ struct MacTrayImpl {
         language_index(language_index_value),
         target([[CrossDeskMacTrayTarget alloc] initWithOwner:this]) {
     EnsureStatusItem();
+    InstallReopenHandler();
   }
 
   ~MacTrayImpl() {
+    [[NSAppleEventManager sharedAppleEventManager]
+        removeEventHandlerForEventClass:kCoreEventClass
+                            andEventID:kAEReopenApplication];
     RemoveTrayIcon();
     target = nil;
   }
@@ -156,7 +164,28 @@ struct MacTrayImpl {
     [NSApp activateIgnoringOtherApps:YES];
   }
 
+  void RequestReopen() { reopen_requested = true; }
+  bool TakeReopenRequest() {
+    if (!reopen_handler_ready) {
+      // AppKit may replace handlers even after its did-finish-launching
+      // notification. The first GUI tick runs after finishLaunching returns.
+      InstallReopenHandler();
+      reopen_handler_ready = true;
+    }
+    return std::exchange(reopen_requested, false);
+  }
+
  private:
+  void InstallReopenHandler() {
+    // Finder/Dock normally sends a reopen Apple event instead of launching a
+    // second process. Queue it for the UI tick, just like the IPC notification.
+    [[NSAppleEventManager sharedAppleEventManager]
+        setEventHandler:target
+            andSelector:@selector(reopenApplication:withReply:)
+          forEventClass:kCoreEventClass
+             andEventID:kAEReopenApplication];
+  }
+
   void EnsureStatusItem() {
     if (status_item) {
       return;
@@ -265,6 +294,8 @@ struct MacTrayImpl {
   int language_index = 0;
   NSStatusItem *status_item = nil;
   CrossDeskMacTrayTarget *target = nil;
+  bool reopen_requested = false;
+  bool reopen_handler_ready = false;
 };
 
 MacTray::MacTray(::SDL_Window *app_window, const std::string &tooltip,
@@ -285,8 +316,12 @@ MacTray::MacTray(std::function<void()> show_window,
 MacTray::~MacTray() = default;
 
 void MacActivateWindow(void *appkit_view) {
+  // IPC/Finder activation bypasses the tray's ShowWindow(), including when
+  // MinimizeToTray() previously removed the app from the Dock.
+  [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
   NSView *view = (__bridge NSView *)appkit_view;
   NSWindow *window = [view window];
+  [window deminiaturize:nil];
   [NSApp activateIgnoringOtherApps:YES];
   [window makeKeyAndOrderFront:nil];
 }
@@ -294,6 +329,8 @@ void MacActivateWindow(void *appkit_view) {
 void MacTray::MinimizeToTray() { impl_->MinimizeToTray(); }
 
 void MacTray::RemoveTrayIcon() { impl_->RemoveTrayIcon(); }
+
+bool MacTray::TakeReopenRequest() { return impl_->TakeReopenRequest(); }
 
 }  // namespace crossdesk
 
@@ -315,6 +352,13 @@ void MacTray::RemoveTrayIcon() { impl_->RemoveTrayIcon(); }
     return;
   }
   owner_->ShowMenu();
+}
+
+- (void)reopenApplication:(NSAppleEventDescriptor *)event
+               withReply:(NSAppleEventDescriptor *)reply {
+  (void)event;
+  (void)reply;
+  if (owner_) owner_->RequestReopen();
 }
 
 - (void)exitApplication:(id)sender {
