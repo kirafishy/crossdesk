@@ -431,6 +431,11 @@ Old previews saved without this choice are removed on upgrade.
 
 ## Pointer edge panning
 
+Pinch-to-zoom can start anywhere on the touch surface, including black margins
+outside the image, in either pointer mode. A pinch also follows the fingers'
+midpoint movement when it starts in a margin. Held virtual mouse buttons still
+prevent viewport gestures.
+
 In relative mouse mode, continuing to move outward at the top or bottom of the
 visible image pans the video vertically in the opposite direction. Moving
 down-left at the bottom edge pans upward without shifting the video horizontally;

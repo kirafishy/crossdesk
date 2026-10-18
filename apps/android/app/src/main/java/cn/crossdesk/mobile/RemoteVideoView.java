@@ -78,7 +78,8 @@ final class RemoteVideoView extends FrameLayout implements SurfaceHolder.Callbac
         scales = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override public boolean onScaleBegin(ScaleGestureDetector detector) {
                 if (mouseInput.hasVirtualButton()) return false;
-                if (!viewport.contains(detector.getFocusX(), detector.getFocusY())) return false;
+                // Pinches can start anywhere on the touch surface, including letterboxing.
+                if (viewport.width() <= 0 || viewport.height() <= 0) return false;
                 viewportGesture = true;
                 viewportPanActive = true;
                 return true;

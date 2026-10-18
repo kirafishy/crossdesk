@@ -375,7 +375,8 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
         let focus = recognizer.location(in: self)
         switch recognizer.state {
         case .began:
-            pinchActive = renderRect()?.contains(focus) == true
+            // The full touch surface accepts pinches, including letterboxing.
+            pinchActive = bounds.contains(focus) && renderRect() != nil
             recognizer.scale = 1
         case .changed:
             guard pinchActive else { return }
@@ -414,13 +415,13 @@ final class RemoteTouchSurface: UIView, UIGestureRecognizerDelegate {
         if viewportScale > 1.001 || pinchActive {
             switch recognizer.state {
             case .began:
-                viewportPanActive = renderRect()?.contains(
+                viewportPanActive = pinchActive || renderRect()?.contains(
                     recognizer.location(in: self)
                 ) == true
                 recognizer.setTranslation(.zero, in: self)
             case .changed:
                 if !viewportPanActive {
-                    viewportPanActive = renderRect()?.contains(
+                    viewportPanActive = pinchActive || renderRect()?.contains(
                         recognizer.location(in: self)
                     ) == true
                 }
