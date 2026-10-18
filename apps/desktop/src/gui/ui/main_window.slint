@@ -1381,6 +1381,9 @@ export component MainWindow inherits Window {
         private property <string> group-names: root.gallery-mode ? gallery.hovered-device.group-names : root.recent-tooltip-groups;
         private property <bool> online: root.gallery-mode ? gallery.hovered-device.online : root.recent-tooltip-online;
         private property <bool> presence-known: !root.gallery-mode || gallery.hovered-device.presence-known;
+        private property <bool> has-host-name: self.host-name != "" && self.host-name != self.device-name;
+        private property <color> status-color: self.online ? WorkbenchStyle.success : WorkbenchStyle.muted;
+        private property <length> label-width: max(tooltip-id-label.preferred-width, tooltip-group-label.preferred-width);
         private property <length> pointer-x: root.gallery-mode ? gallery.x + gallery.device-tooltip-x : root.recent-tooltip-pointer-x;
         private property <length> pointer-y: root.gallery-mode ? gallery.y + gallery.device-tooltip-y : root.recent-tooltip-pointer-y;
         // Follow the pointer with a gap; change sides only when space runs out.
@@ -1390,50 +1393,92 @@ export component MainWindow inherits Window {
         y: clamp(self.pointer-y - self.height - 12px >= 8px
                  ? self.pointer-y - self.height - 12px : self.pointer-y + 16px,
                  8px, max(8px, parent.height - self.height - 8px));
-        width: min(260px, parent.width - 16px);
-        height: (self.host-name != "" && self.host-name != self.device-name
-                 ? 80px : 64px) + tooltip-groups.preferred-height + 2px;
-        background: #22252bf2;
+        // Fit the text instead of reserving empty space for short device names.
+        width: min(220px, parent.width - 16px, max(160px,
+            tooltip-name.preferred-width + 24px,
+            self.has-host-name ? tooltip-host.preferred-width + 24px : 0px,
+            tooltip-name-label.preferred-width + tooltip-status.width + 32px,
+            self.label-width + max(tooltip-id.preferred-width, tooltip-groups.preferred-width) + 32px));
+        height: tooltip-groups.y + tooltip-groups.height + 10px;
+        background: WorkbenchStyle.surface;
         border-width: 1px;
-        border-color: #ffffff38;
-        border-radius: UiRadius.control;
+        border-color: #d5dfea;
+        border-radius: UiRadius.menu;
+        drop-shadow-color: #14294424;
+        drop-shadow-blur: 14px;
+        drop-shadow-offset-y: 4px;
         z: 20;
 
-        VerticalLayout {
-            padding: 8px;
-            spacing: 2px;
-            Text {
-                text: UiStrings.device-name + ": " + device-tip.device-name;
-                color: white;
-                font-size: ImGuiFontStyle.small;
-                overflow: elide;
-            }
-            if device-tip.host-name != "" && device-tip.host-name != device-tip.device-name: Text {
-                text: device-tip.host-name;
-                color: #e1e4e8;
-                font-size: ImGuiFontStyle.small;
-                overflow: elide;
-            }
-            Text {
-                text: UiStrings.remote-id + ": " + device-tip.device-id;
-                color: #e1e4e8;
-                font-size: ImGuiFontStyle.small;
-                overflow: elide;
-            }
-            tooltip-groups := Text {
-                text: GalleryStrings.tr("分组", "Groups", "Группы") + ": " +
-                    (device-tip.group-names == "" ? GalleryStrings.tr("未分组", "Ungrouped", "Без группы") : device-tip.group-names);
-                color: #e1e4e8;
-                font-size: ImGuiFontStyle.small;
-                wrap: word-wrap;
-                vertical-stretch: 0;
-            }
-            Text {
+        tooltip-name-label := Text {
+            x: 12px; y: 10px;
+            width: tooltip-status.x - self.x - 8px; height: 18px;
+            text: UiStrings.device-name;
+            color: WorkbenchStyle.muted; font-size: 10px;
+            vertical-alignment: center; overflow: elide;
+        }
+        tooltip-status := Rectangle {
+            x: parent.width - self.width - 12px; y: 10px;
+            width: tooltip-status-text.preferred-width + 14px; height: 18px;
+            background: device-tip.online ? #e9f6ef : WorkbenchStyle.field-surface;
+            border-radius: self.height / 2;
+            tooltip-status-text := Text {
+                x: 7px; width: parent.width - 14px; height: parent.height;
                 text: device-tip.online ? UiStrings.online : device-tip.presence-known ? UiStrings.offline
                     : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
-                color: device-tip.online ? #62d98b : #d1d5db;
-                font-size: ImGuiFontStyle.small;
+                color: device-tip.status-color; font-size: 10px; font-weight: 600;
+                vertical-alignment: center;
             }
+        }
+        tooltip-name := Text {
+            x: 12px; y: 32px; width: parent.width - 24px;
+            height: self.preferred-height;
+            text: device-tip.device-name;
+            color: WorkbenchStyle.text; font-size: 12px; font-weight: 600;
+            wrap: word-wrap;
+        }
+        tooltip-host := Text {
+            x: 12px; y: tooltip-name.y + tooltip-name.height + 3px;
+            width: parent.width - 24px;
+            height: device-tip.has-host-name ? self.preferred-height : 0px;
+            visible: device-tip.has-host-name;
+            text: device-tip.host-name;
+            color: WorkbenchStyle.muted; font-size: 10px;
+            wrap: word-wrap;
+        }
+        tooltip-divider := Rectangle {
+            x: 12px; y: tooltip-name.y + tooltip-name.height
+                + (device-tip.has-host-name ? tooltip-host.height + 3px : 0px) + 8px;
+            width: parent.width - 24px; height: 1px;
+            background: WorkbenchStyle.separator;
+        }
+        tooltip-id-label := Text {
+            x: 12px; y: tooltip-divider.y + 7px;
+            width: device-tip.label-width; height: 16px;
+            text: UiStrings.remote-id;
+            color: WorkbenchStyle.muted; font-size: 10px;
+            vertical-alignment: center;
+        }
+        tooltip-id := Text {
+            x: 20px + device-tip.label-width; y: tooltip-id-label.y;
+            width: parent.width - self.x - 12px; height: 16px;
+            text: device-tip.device-id;
+            color: WorkbenchStyle.text; font-size: 11px; font-weight: 600;
+            horizontal-alignment: right; vertical-alignment: center;
+        }
+        tooltip-group-label := Text {
+            x: 12px; y: tooltip-groups.y;
+            width: device-tip.label-width; height: 16px;
+            text: GalleryStrings.tr("分组", "Groups", "Группы");
+            color: WorkbenchStyle.muted; font-size: 10px;
+            vertical-alignment: center;
+        }
+        tooltip-groups := Text {
+            x: 20px + device-tip.label-width; y: tooltip-id-label.y + tooltip-id-label.height + 4px;
+            width: parent.width - self.x - 12px; height: max(16px, self.preferred-height);
+            text: device-tip.group-names == "" ? GalleryStrings.tr("未分组", "Ungrouped", "Без группы") : device-tip.group-names;
+            color: device-tip.group-names == "" ? WorkbenchStyle.muted : WorkbenchStyle.accent;
+            font-size: 10px;
+            wrap: word-wrap; horizontal-alignment: right; vertical-alignment: center;
         }
     }
 
