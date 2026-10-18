@@ -35,6 +35,7 @@ export struct ReleaseNoteBlock {
 export enum UpdateCheckStatus { idle, checking, up-to-date, available, failed }
 export enum AutostartStatus { checking, enabled, disabled, unsupported, failed }
 enum CopyFeedback { idle, success, failed }
+enum SponsorPlatform { afdian, kofi, github }
 
 export global UiStrings {
     in-out property <string> local-desktop: "Local Desktop";
@@ -51,6 +52,8 @@ export global UiStrings {
     in-out property <string> connect: "Connect";
     in-out property <string> settings: "Settings";
     in-out property <string> about: "About";
+    in-out property <string> sponsorship-title: "Sponsorship";
+    in-out property <string> sponsor-via-afdian: "AFDIAN";
     in-out property <string> ok: "OK";
     in-out property <string> cancel: "Cancel";
     in-out property <string> save: "Save";
@@ -122,6 +125,48 @@ export global UiStrings {
     in-out property <string> self-hosted-settings: "Self-hosted server settings";
     in-out property <string> access-website: "Website: ";
     in-out property <string> release-date-label: "Release Date: ";
+}
+
+// Keep sponsor labels, order, and sizing consistent across both dialogs.
+component SponsorshipSection inherits VerticalLayout {
+    callback open-afdian;
+    callback open-kofi;
+    callback open-github;
+    vertical-stretch: 0;
+    spacing: 10px;
+    Text {
+        text: UiStrings.sponsorship-title;
+        color: WorkbenchStyle.text; font-size: 12px; font-weight: 600;
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        for platform in (GalleryStrings.language == 0
+            ? [SponsorPlatform.afdian, SponsorPlatform.kofi, SponsorPlatform.github]
+            : [SponsorPlatform.kofi, SponsorPlatform.github, SponsorPlatform.afdian]): Rectangle {
+            // Size to the label, icon, and padding, then share extra row space.
+            min-width: sponsor-label-metrics.preferred-width + 56px;
+            preferred-width: self.min-width;
+            horizontal-stretch: 1;
+            height: 32px;
+            SettingsButton {
+                width: parent.width; height: parent.height;
+                icon: platform == SponsorPlatform.afdian ? @image-url("icons/sponsors/afdian.png")
+                    : platform == SponsorPlatform.kofi ? @image-url("icons/sponsors/kofi.png")
+                    : @image-url("icons/sponsors/github.svg");
+                text: platform == SponsorPlatform.afdian ? UiStrings.sponsor-via-afdian
+                    : platform == SponsorPlatform.kofi ? "Ko-fi" : "GitHub Sponsors";
+                sponsor-label-metrics := Text {
+                    visible: false; text: parent.text; font-size: 12px;
+                }
+                clicked => {
+                    if platform == SponsorPlatform.afdian { root.open-afdian(); }
+                    else if platform == SponsorPlatform.kofi { root.open-kofi(); }
+                    else { root.open-github(); }
+                }
+            }
+        }
+    }
 }
 
 // Prompt copy in modal dialogs sits slightly low in the legacy ImGui layout.
@@ -444,6 +489,9 @@ export component MainWindow inherits Window {
     callback cancel-self-hosted-settings;
     callback browse-save-path;
     callback open-download;
+    callback open-afdian-sponsor;
+    callback open-github-sponsor;
+    callback open-kofi-sponsor;
     callback check-for-updates;
     callback signal-reconnect-requested;
     callback connection-cancel;
@@ -2211,102 +2259,123 @@ export component MainWindow inherits Window {
         TouchArea { clicked => { focus-sink.focus(); } }
         SettingsDialog {
             x: (parent.width - self.width) / 2;
-            y: (parent.height - self.height) / 2;
-            width: min(400px, parent.width - 40px);
-            height: self.content-top + about-content.preferred-height + 24px;
+            y: (root.height - self.height) / 2;
+            width: min(480px, parent.width - 40px);
+            min-height: 0px; max-height: root.height - 32px;
+            height: min(root.height - 32px, self.content-top + about-content.preferred-height
+                + 16px + about-footer.preferred-height + 24px);
             title: UiStrings.about;
             close-label: MessageStrings.close;
             close => { root.about-open = false; }
 
-            // Content-driven height keeps translated update states and actions
-            // above the footer without reserving an empty update section.
-            about-content := VerticalLayout {
-                x: 24px; y: parent.content-top; width: parent.width - 48px;
-                height: self.preferred-height;
-                padding: 0px; spacing: 20px;
-                Rectangle {
-                    height: max(96px, product-info.preferred-height + 32px);
-                    background: WorkbenchStyle.surface;
-                    border-radius: UiRadius.surface;
-                    border-width: 1px; border-color: WorkbenchStyle.border;
-                    Image {
-                        x: 16px; y: (parent.height - self.height) / 2;
-                        width: 56px; height: 56px;
-                        source: @image-url("../../../resources/linux/crossdesk_128x128.png");
-                        image-fit: contain;
-                    }
-                    product-info := VerticalLayout {
-                        x: 88px; y: 16px; width: parent.width - 104px; height: parent.height - 32px;
-                        alignment: center; spacing: 5px;
-                        Text { text: "CrossDesk"; font-size: 22px; font-weight: 600; color: WorkbenchStyle.text; }
-                        Text {
-                            text: UiStrings.version + " " + root.current-version;
-                            color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
+            // Preserve section spacing and keep actions visible when longer
+            // translations need scrolling inside a small window.
+            about-scroll := ScrollView {
+                x: 24px; y: parent.content-top;
+                width: parent.width - 48px + 22px;
+                height: about-footer.y - self.y - 16px;
+                viewport-width: self.visible-width;
+                viewport-height: about-content.preferred-height;
+                horizontal-scrollbar-policy: always-off;
+                vertical-scrollbar-policy: as-needed;
+                about-content := VerticalLayout {
+                    min-width: 0px;
+                    width: about-scroll.width; height: self.preferred-height;
+                    // Keep the expanding scrollbar outside the content.
+                    padding: 0px; padding-right: 22px; spacing: 16px;
+                    Rectangle {
+                        height: max(80px, product-info.preferred-height + 32px);
+                        background: WorkbenchStyle.surface;
+                        border-radius: UiRadius.surface;
+                        border-width: 1px; border-color: WorkbenchStyle.border;
+                        Image {
+                            x: 16px; y: (parent.height - self.height) / 2;
+                            width: 56px; height: 56px;
+                            source: @image-url("../../../resources/linux/crossdesk_128x128.png");
+                            image-fit: contain;
                         }
-                    }
-                }
-                if root.update-available || root.update-status-text != "": Rectangle {
-                    height: update-summary.preferred-height + 24px;
-                    background: root.update-check-status == UpdateCheckStatus.failed ? #fef2f2 : WorkbenchStyle.field-surface;
-                    border-radius: UiRadius.control;
-                    border-width: 1px;
-                    border-color: root.update-check-status == UpdateCheckStatus.failed ? #f3d4d1 : WorkbenchStyle.separator;
-                    update-summary := VerticalLayout {
-                        x: 12px; y: 12px; width: parent.width - 24px;
-                        height: self.preferred-height;
-                        padding: 0px; spacing: 10px;
-                        if root.update-available: Rectangle {
-                            height: version-link.preferred-height;
-                            accessible-role: button;
-                            accessible-label: UiStrings.release-notes + " " + root.latest-version;
-                            accessible-action-default => { version-touch.clicked(); }
-                            version-link := Text {
-                                width: parent.width;
-                                text: UiStrings.update-available + ": " + root.latest-version;
-                                color: version-touch.has-hover ? #254cc0 : WorkbenchStyle.accent;
-                                font-size: 13px; font-weight: 500; wrap: word-wrap;
-                            }
-                            version-touch := TouchArea {
-                                mouse-cursor: pointer;
-                                clicked => { root.about-open = false; root.update-open = true; }
-                            }
-                        }
-                        if root.update-status-text != "": Text {
-                            text: root.update-status-text;
-                            color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
-                                : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
-                            font-size: 12px; wrap: word-wrap;
-                        }
-                        if root.update-available: HorizontalLayout {
-                            alignment: start;
-                            SettingsButton {
-                                width: max(116px, release-notes-button-metrics.preferred-width + 24px);
-                                text: UiStrings.view-release-notes;
-                                clicked => { root.about-open = false; root.update-open = true; }
-                                release-notes-button-metrics := Text { visible: false; text: UiStrings.view-release-notes; font-size: 12px; }
+                        product-info := VerticalLayout {
+                            x: 88px; y: 16px; width: parent.width - 104px; height: parent.height - 32px;
+                            alignment: center; spacing: 5px;
+                            Text { text: "CrossDesk"; font-size: 22px; font-weight: 600; color: WorkbenchStyle.text; }
+                            Text {
+                                text: UiStrings.version + " " + root.current-version;
+                                color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
                             }
                         }
                     }
-                }
-                VerticalLayout {
-                    spacing: 5px;
-                    Text { text: UiStrings.copyright; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
-                    Text { text: UiStrings.license; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
-                }
-                VerticalLayout {
-                    spacing: 16px;
-                    Rectangle { height: 1px; background: WorkbenchStyle.separator; }
-                    HorizontalLayout {
-                        alignment: end; spacing: 8px;
-                        SettingsButton {
-                            width: max(116px, check-button-metrics.preferred-width + 24px);
-                            text: UiStrings.check-for-updates;
-                            enabled: root.update-check-status != UpdateCheckStatus.checking;
-                            clicked => { root.check-for-updates(); }
-                            check-button-metrics := Text { visible: false; text: UiStrings.check-for-updates; font-size: 12px; }
+                    if root.update-available || root.update-status-text != "": Rectangle {
+                        height: update-summary.preferred-height + 24px;
+                        background: root.update-check-status == UpdateCheckStatus.failed ? #fef2f2 : WorkbenchStyle.field-surface;
+                        border-radius: UiRadius.control;
+                        border-width: 1px;
+                        border-color: root.update-check-status == UpdateCheckStatus.failed ? #f3d4d1 : WorkbenchStyle.separator;
+                        update-summary := VerticalLayout {
+                            x: 12px; y: 12px; width: parent.width - 24px;
+                            height: self.preferred-height;
+                            padding: 0px; spacing: 10px;
+                            if root.update-available: HorizontalLayout {
+                                spacing: 12px;
+                                height: max(32px, version-link.preferred-height);
+                                Rectangle {
+                                    min-width: 0px; horizontal-stretch: 1;
+                                    accessible-role: button;
+                                    accessible-label: UiStrings.release-notes + " " + root.latest-version;
+                                    accessible-action-default => { version-touch.clicked(); }
+                                    version-link := Text {
+                                        width: parent.width; height: parent.height;
+                                        text: UiStrings.update-available + ": " + root.latest-version;
+                                        color: version-touch.has-hover ? #254cc0 : WorkbenchStyle.accent;
+                                        font-size: 13px; font-weight: 500; wrap: word-wrap;
+                                        vertical-alignment: center;
+                                    }
+                                    version-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.about-open = false; root.update-open = true; }
+                                    }
+                                }
+                                SettingsButton {
+                                    width: max(116px, release-notes-button-metrics.preferred-width + 24px);
+                                    text: UiStrings.view-release-notes;
+                                    clicked => { root.about-open = false; root.update-open = true; }
+                                    release-notes-button-metrics := Text { visible: false; text: UiStrings.view-release-notes; font-size: 12px; }
+                                }
+                            }
+                            if root.update-status-text != "": Text {
+                                text: root.update-status-text;
+                                color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
+                                    : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
+                                font-size: 12px; wrap: word-wrap;
+                            }
                         }
-                        SettingsButton { width: 80px; primary: true; text: UiStrings.ok; clicked => { root.about-open = false; } }
                     }
+                    SponsorshipSection {
+                        open-afdian => { root.open-afdian-sponsor(); }
+                        open-kofi => { root.open-kofi-sponsor(); }
+                        open-github => { root.open-github-sponsor(); }
+                    }
+                    VerticalLayout {
+                        spacing: 5px;
+                        Text { text: UiStrings.copyright; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
+                        Text { text: UiStrings.license; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
+                    }
+                }
+            }
+            about-footer := VerticalLayout {
+                x: 24px; y: parent.height - self.height - 24px;
+                width: parent.width - 48px; height: self.preferred-height;
+                spacing: 16px;
+                Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                HorizontalLayout {
+                    alignment: end; spacing: 8px;
+                    SettingsButton {
+                        width: max(116px, check-button-metrics.preferred-width + 24px);
+                        text: UiStrings.check-for-updates;
+                        enabled: root.update-check-status != UpdateCheckStatus.checking;
+                        clicked => { root.check-for-updates(); }
+                        check-button-metrics := Text { visible: false; text: UiStrings.check-for-updates; font-size: 12px; }
+                    }
+                    SettingsButton { width: 80px; primary: true; text: UiStrings.ok; clicked => { root.about-open = false; } }
                 }
             }
         }
@@ -2320,8 +2389,9 @@ export component MainWindow inherits Window {
         DialogSurface {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: 464px;
-            height: 400px;
+            width: min(480px, parent.width - 40px);
+            min-height: 0px; max-height: root.height - 32px;
+            height: min(488px, root.height - 32px);
             border-radius: UiRadius.surface;
             border-color: WorkbenchStyle.border;
             drop-shadow-color: #07142b24;
@@ -2360,7 +2430,7 @@ export component MainWindow inherits Window {
                             update-website-label := Text {
                                 text: UiStrings.access-website + "https://crossdesk.cn";
                                 color: website-touch.has-hover ? #254cc0 : WorkbenchStyle.accent;
-                                font-size: 11px;
+                                font-size: 13px;
                                 vertical-alignment: center;
                             }
                             website-touch := TouchArea { mouse-cursor: pointer; clicked => { root.open-download(); } }
@@ -2369,6 +2439,7 @@ export component MainWindow inherits Window {
                 }
 
                 VerticalLayout {
+                    vertical-stretch: 1;
                     spacing: 8px;
                     Text {
                         height: 18px;
@@ -2417,6 +2488,12 @@ export component MainWindow inherits Window {
                             }
                         }
                     }
+                }
+
+                SponsorshipSection {
+                    open-afdian => { root.open-afdian-sponsor(); }
+                    open-kofi => { root.open-kofi-sponsor(); }
+                    open-github => { root.open-github-sponsor(); }
                 }
 
                 VerticalLayout {

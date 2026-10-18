@@ -288,6 +288,8 @@ struct TranslationRow {
   X(p2p_closed, u8"对等连接已关闭", "P2P closed", u8"P2P закрыто")             \
   X(no_such_id, u8"无此ID", "No such ID", u8"ID не найден")                    \
   X(about, u8"关于", "About", u8"О программе")                                 \
+  X(sponsorship_title, u8"赞助支持", "Sponsorship", u8"Поддержка проекта")    \
+  X(sponsor_via_afdian, u8"爱发电", "AFDIAN", "AFDIAN")                       \
   X(notification, u8"通知", "Notification", u8"Уведомление")                   \
   X(new_version, u8"新版本", "New version", u8"Новая версия")                 \
   X(new_version_available, u8"新版本可用", "New Version Available",            \

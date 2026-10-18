@@ -5,10 +5,13 @@ import { WorkbenchStyle } from "workbench_controls.slint";
 // Shared visual treatment for the global settings pages.
 export component SettingsButton inherits Rectangle {
     in property <string> text;
+    in property <image> icon;
     in property <bool> primary: false;
     in property <bool> quiet: false;
     in property <bool> align-left: false;
     in property <bool> enabled: true;
+    private property <bool> has-icon: root.icon.width > 0;
+    private property <length> content-padding: root.has-icon ? 8px : 12px;
     callback clicked();
     width: 88px; height: 32px; border-radius: UiRadius.control;
     background: !root.enabled ? #f0f3f7
@@ -19,11 +22,26 @@ export component SettingsButton inherits Rectangle {
         : touch.has-hover ? WorkbenchStyle.hover-border : WorkbenchStyle.control-border;
     accessible-role: button; accessible-label: root.text;
     accessible-action-default => { if root.enabled { root.clicked(); } }
-    Text {
-        x: 12px; width: parent.width - 24px;
-        text: root.text; font-size: 12px; font-weight: root.primary ? 600 : 400;
-        color: !root.enabled ? #98a2b3 : root.primary ? white : root.quiet ? #65758b : #3c4d63;
-        horizontal-alignment: root.align-left ? left : center; vertical-alignment: center; overflow: elide;
+    Rectangle {
+        x: root.align-left ? root.content-padding : (parent.width - self.width) / 2;
+        width: root.has-icon
+            ? min(parent.width - 2 * root.content-padding, button-label.preferred-width + 24px)
+            : parent.width - 2 * root.content-padding;
+        height: parent.height;
+        if root.has-icon: Image {
+            x: 0px; y: (parent.height - self.height) / 2;
+            width: 18px; height: 18px;
+            source: root.icon; image-fit: contain;
+            opacity: root.enabled ? 1 : 0.45;
+            accessible-role: none;
+        }
+        button-label := Text {
+            x: root.has-icon ? 24px : 0px;
+            width: parent.width - self.x; height: parent.height;
+            text: root.text; font-size: 12px; font-weight: root.primary ? 600 : 400;
+            color: !root.enabled ? #98a2b3 : root.primary ? white : root.quiet ? #65758b : #3c4d63;
+            horizontal-alignment: root.align-left ? left : center; vertical-alignment: center; overflow: elide;
+        }
     }
     touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
 }

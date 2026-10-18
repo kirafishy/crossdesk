@@ -74,6 +74,8 @@ inline int ApplyMainWindowStrings(
   strings.set_connect(Text(localization::connect[language]));
   strings.set_settings(Text(localization::settings[language]));
   strings.set_about(Text(localization::about[language]));
+  strings.set_sponsorship_title(Text(localization::sponsorship_title[language]));
+  strings.set_sponsor_via_afdian(Text(localization::sponsor_via_afdian[language]));
   strings.set_ok(Text(localization::ok[language]));
   strings.set_cancel(Text(localization::cancel[language]));
   strings.set_new_password(Text(localization::new_password[language]));
