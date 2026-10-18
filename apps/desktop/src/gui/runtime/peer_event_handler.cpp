@@ -295,6 +295,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               /*supports_privacy_screen=*/!runtime->unattended_host_,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
+          remote_action.i.supports_text_input = runtime->devices_.SupportsTextInput();
           remote_action.i.supports_deskhub_preview = true;
           remote_action.i.supports_deskhub_resolution = true;
           remote_action.i.supports_deskhub_fps15 = true;
@@ -457,6 +458,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               /*supports_privacy_screen=*/!runtime->unattended_host_,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
+          remote_action.i.supports_text_input = runtime->devices_.SupportsTextInput();
           remote_action.i.supports_deskhub_preview = true;
           remote_action.i.supports_deskhub_resolution = true;
           remote_action.i.supports_deskhub_fps15 = true;

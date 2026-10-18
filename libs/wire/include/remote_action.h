@@ -31,6 +31,7 @@ enum ControlType {
   privacy_status = 10,
   video_settings = 11,
   video_settings_status = 12,
+  text_input = 13,
 };
 
 enum MouseFlag {
@@ -137,6 +138,7 @@ struct HostInfo {
   // Optional capability; absent in legacy desktop and web host information.
   bool supports_privacy_screen;
   bool supports_video_settings;
+  bool supports_text_input;
   bool supports_deskhub_preview;
   bool supports_deskhub_resolution;
   bool supports_deskhub_fps15;
@@ -183,6 +185,8 @@ inline bool ValidVideoSettings(const VideoSettings& settings) {
          settings.preference >= 0 && settings.preference <= 2;
 }
 
+inline constexpr std::size_t kMaxTextInputBytes = 16 * 1024;
+
 struct RemoteAction {
   ControlType type = ControlType::invalid;
   union {
@@ -200,6 +204,9 @@ struct RemoteAction {
     VideoSettings vs;
   };
 
+  // Committed UTF-8 text. Kept outside the POD union for automatic ownership.
+  std::string text;
+
   std::string to_json() const;
   bool from_json(const std::string& json_string);
 
@@ -208,7 +215,7 @@ struct RemoteAction {
 };
 
 // Releases the dynamically allocated display arrays held by host information.
-// Other RemoteAction variants do not own memory and are left unchanged.
+// Other RemoteAction variants require no explicit cleanup and are left unchanged.
 void FreeRemoteAction(RemoteAction& action);
 
 // One display as advertised in host information; bounds are virtual-desktop

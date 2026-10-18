@@ -336,6 +336,8 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     @Published var selectedDisplay = 0
     @Published var audioEnabled = true
     @Published private(set) var clipboardStatus = ""
+    @Published private(set) var keyboardInputStatus = ""
+    @Published private(set) var supportsTextInput = false
     @Published private(set) var controlStatus = ""
     @Published private(set) var transferStatus = ""
     @Published private(set) var transferProgress = 0.0
@@ -735,6 +737,8 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         remoteVersionCheckAttempted = false
         remoteAppVersion = ""
         remotePlatform = .unknown
+        supportsTextInput = false
+        keyboardInputStatus = ""
         remoteHostInfoReceived = false
         remoteUpdateMessage = nil
     }
@@ -1092,6 +1096,34 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         transferProgress = 0
     }
 
+    /// Validate the full edit before deleting anything at the remote caret.
+    /// Corrections and dictation revisions share the ordered keyboard stream.
+    func sendSystemTextEdit(deleting count: Int, inserting text: String) -> Bool {
+        guard hasNetworkConsent, isConnected else { return false }
+        guard (0...16 * 1024).contains(count), text.utf8.count <= 16 * 1024, !text.unicodeScalars.contains(where: { $0.value == 0 }) else {
+            keyboardInputStatus = "单次输入最多 16 KiB，且不能包含空字符"
+            return false
+        }
+        let isASCII = text.unicodeScalars.allSatisfy({
+            (0x20...0x7e).contains($0.value) || [9, 10, 13].contains($0.value)
+        })
+        guard supportsTextInput || isASCII else {
+            keyboardInputStatus = "被控端不支持直接输入中文，请更新 macOS 被控端；也可先复制文字，通过远控菜单的剪贴板发送后粘贴"
+            return false
+        }
+        for _ in 0..<count { sendKeyStroke(0x08) }
+        if !text.isEmpty {
+            if supportsTextInput {
+                bridge.sendCommittedText(text)
+            } else {
+                bridge.sendText(text.replacingOccurrences(of: "\r\n", with: "\n")
+                    .replacingOccurrences(of: "\r", with: "\n"))
+            }
+        }
+        keyboardInputStatus = ""
+        return true
+    }
+
     func sendKeyStroke(_ keyCode: UInt) {
         bridge.sendWindowsKeyCode(keyCode, isDown: true)
         bridge.sendWindowsKeyCode(keyCode, isDown: false)
@@ -1287,7 +1319,9 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
                    platform: String,
                    displayNames remoteDisplayNames: [String],
                    displaySizes remoteDisplaySizes: [NSValue],
-                   supportsVideoSettings: Bool) {
+                   supportsVideoSettings: Bool,
+                   supportsTextInput: Bool) {
+        self.supportsTextInput = supportsTextInput
         let previouslySupported = videoSettings.supported
         videoSettings.setSupported(supportsVideoSettings)
         if !supportsVideoSettings {

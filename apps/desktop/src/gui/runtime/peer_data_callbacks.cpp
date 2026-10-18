@@ -280,6 +280,13 @@ void PeerEventHandler::OnReceiveDataBuffer(
       runtime->QueuePrivacyCommand(remote_id, remote_action.pc);
     return;
   }
+  if (remote_action.type == ControlType::text_input) {
+    // Share the ordered keyboard stream with delete/return and shortcuts.
+    if (source_id == runtime->keyboard_label_ &&
+        runtime->IsAuthorizedController(remote_id))
+      runtime->keyboard_.ApplyRemoteText(remote_id, remote_action.text);
+    return;
+  }
   const bool operates_host = remote_action.type == ControlType::mouse ||
       remote_action.type == ControlType::keyboard || remote_action.type == ControlType::keyboard_state ||
       remote_action.type == ControlType::service_command || remote_action.type == ControlType::display_id ||

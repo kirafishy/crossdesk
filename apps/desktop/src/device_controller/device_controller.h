@@ -1,7 +1,7 @@
 /*
  * @Author: DI JUNKUN
  * @Date: 2023-12-14
- * Copyright (c) 2023 by DI JUNKUN, All Rights Reserved.
+ * Copyright (c) 2026 by DI JUNKUN, All Rights Reserved.
  */
 
 #ifndef _DEVICE_CONTROLLER_H_
@@ -48,6 +48,8 @@ class KeyboardCapturer : public DeviceController {
   // Permission-denied backends can wait for an OS grant notification rather
   // than repeatedly releasing held fallback keys to retry an impossible hook.
   virtual bool ShouldRetryHook() const { return true; }
+  virtual bool SupportsTextInput() const { return false; }
+  virtual int SendTextCommand(const std::string&) { return -1; }
   virtual int SendKeyboardCommand(int key_code, bool is_down,
                                   uint32_t scan_code = 0,
                                   bool extended = false) = 0;

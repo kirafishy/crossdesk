@@ -3,20 +3,29 @@ import UIKit
 import UniformTypeIdentifiers
 
 private enum RemoteKeyboardPalette {
-    static let background = Color(red: 0.82, green: 0.84, blue: 0.87)
-    static let characterKey = Color.white
-    static let specialKey = Color(red: 0.68, green: 0.71, blue: 0.75)
-    static let accentKey = Color(red: 0.04, green: 0.48, blue: 1.00)
-    static let keyText = Color.black.opacity(0.88)
+    static let background = adaptive(light: .systemGray4,
+                                     dark: .secondarySystemBackground)
+    static let characterKey = adaptive(light: .white,
+                                       dark: UIColor(white: 0.36, alpha: 1))
+    static let specialKey = adaptive(light: .systemGray2,
+                                     dark: UIColor(white: 0.22, alpha: 1))
+    static let pressedKey = adaptive(light: .systemGray3,
+                                     dark: UIColor(white: 0.48, alpha: 1))
+    static let keyText = Color(uiColor: .label)
+    static let keyShadow = Color.black.opacity(0.3)
+
+    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
 }
 
 private enum RemoteKeyboardMetrics {
-    static let rowHeight: CGFloat = 31
-    static let keySpacing: CGFloat = 3
-    static let rowSpacing: CGFloat = 3
-    static let cornerRadius: CGFloat = 5
-    static let panelPadding: CGFloat = 5
-    static let dragHandleHeight: CGFloat = 10
+    static let keySpacing: CGFloat = 5
+    static let rowSpacing: CGFloat = 6
+    static let cornerRadius: CGFloat = 7
+    static let panelPadding: CGFloat = 6
 }
 
 private enum RemoteKeyboardMode: String {
@@ -34,17 +43,19 @@ struct RemoteSessionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var mouseInput = RemoteMouseInput()
     @State private var virtualMouseVisible = false
+    @StateObject private var systemKeyboardContext = RemoteKeyboardInputContext()
+    @StateObject private var keyboardGeometry = RemoteKeyboardGeometry()
     @State private var keyboardInputVisible = false
     @State private var keyboardMode: RemoteKeyboardMode = .system
+    @State private var animateSystemKeyboardPresentation = true
+    @State private var waitingForSystemKeyboard = false
     @State private var viewport = RemoteViewportState()
     @State private var showingFileImporter = false
     @State private var disconnectConfirmationVisible = false
     @State private var cursorPosition: CGPoint?
     @State private var statusMenuVisible = false
     @State private var statusOrbCenter: CGPoint?
-    @State private var keyboardPanelCenter: CGPoint?
     @GestureState private var statusOrbDragTranslation = CGSize.zero
-    @GestureState private var keyboardDragTranslation = CGSize.zero
 
     var body: some View {
         ZStack {
@@ -113,6 +124,7 @@ struct RemoteSessionView: View {
                             mouseInput.setGestureLeft(false)
                         },
                         rightClick: { x, y in
+                            systemKeyboardContext.remoteFocusWillChange()
                             session.bridge.sendPointer(x: x, y: y, action: .rightDown)
                             session.bridge.sendPointer(x: x, y: y, action: .rightUp)
                         },
@@ -149,7 +161,20 @@ struct RemoteSessionView: View {
             }
 
             if keyboardInputVisible {
-                draggableKeyboard
+                ZStack {
+                    if keyboardMode == .system {
+                        RemoteSystemKeyboard(session: session,
+                            inputContext: systemKeyboardContext,
+                            geometry: keyboardGeometry,
+                            animatePresentation: animateSystemKeyboardPresentation,
+                            didPresent: { waitingForSystemKeyboard = false },
+                            switchKeyboard: { keyboardMode = .computer },
+                            dismiss: { keyboardInputVisible = false })
+                    }
+                    if keyboardMode == .computer || waitingForSystemKeyboard {
+                        dockedKeyboard
+                    }
+                }
                 .zIndex(20)
             }
 
@@ -172,6 +197,7 @@ struct RemoteSessionView: View {
         .onAppear {
             mouseInput.send = { x, y, flag, wheel in
                 cursorPosition = CGPoint(x: CGFloat(x), y: CGFloat(y))
+                if flag == 1 || flag == 3 { systemKeyboardContext.remoteFocusWillChange() }
                 switch flag {
                 case 0: session.bridge.sendPointer(x: x, y: y, action: .move)
                 case 1: session.bridge.sendPointer(x: x, y: y, action: .leftDown)
@@ -195,9 +221,9 @@ struct RemoteSessionView: View {
             cursorPosition = nil
             statusMenuVisible = false
             statusOrbCenter = nil
-            keyboardPanelCenter = nil
         }
         .onChange(of: session.selectedDisplay) { _ in
+            systemKeyboardContext.remoteFocusWillChange()
             mouseInput.releaseAll()
             mouseInput.position(x: 0.5, y: 0.5)
             cursorPosition = nil
@@ -212,9 +238,19 @@ struct RemoteSessionView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase != .active { mouseInput.releaseAll() }
+            if phase == .background { keyboardInputVisible = false }
+        }
+        .onChange(of: keyboardInputVisible) { visible in
+            if !visible {
+                animateSystemKeyboardPresentation = true
+                waitingForSystemKeyboard = false
+            }
         }
         .onChange(of: session.isConnected) { connected in
-            if !connected { mouseInput.releaseAll() }
+            if !connected {
+                mouseInput.releaseAll()
+                keyboardInputVisible = false
+            }
         }
         .onChange(of: session.remoteCursorPositionRevision) { _ in
             guard !mouseInput.hasVirtualButton, let position = session.remoteCursorPosition else { return }
@@ -351,6 +387,7 @@ struct RemoteSessionView: View {
                             },
                             chooseFile: {
                                 statusMenuVisible = false
+                                keyboardInputVisible = false
                                 showingFileImporter = true
                             },
                             close: {
@@ -427,10 +464,9 @@ struct RemoteSessionView: View {
             }
         }
         x = min(max(x, halfWidth + 8), max(halfWidth + 8, size.width - halfWidth - 8))
-        if keyboardInputVisible {
+        if keyboardInputVisible && keyboardMode == .computer {
             let keyboardSize = keyboardPanelSize(in: size)
-            let resting = constrainedKeyboardCenter(keyboardPanelCenter ?? defaultKeyboardCenter(in: size, panelSize: keyboardSize), in: size, panelSize: keyboardSize)
-            let center = constrainedKeyboardCenter(CGPoint(x: resting.x + keyboardDragTranslation.width, y: resting.y + keyboardDragTranslation.height), in: size, panelSize: keyboardSize)
+            let center = keyboardCenter(in: size, panelSize: keyboardSize)
             let keyboardRect = CGRect(x: center.x - keyboardSize.width / 2, y: center.y - keyboardSize.height / 2, width: keyboardSize.width, height: keyboardSize.height)
             if keyboardRect.intersects(CGRect(x: x - halfWidth, y: y - halfHeight, width: 140, height: 48)) {
                 y = keyboardRect.minY - 6 - halfHeight
@@ -440,129 +476,53 @@ struct RemoteSessionView: View {
         return CGPoint(x: x, y: min(max(y, halfHeight + 8), max(halfHeight + 8, size.height - halfHeight - 8)))
     }
 
-    private var draggableKeyboard: some View {
+    private var dockedKeyboard: some View {
         GeometryReader { proxy in
-            let containerSize = proxy.size
-            let panelSize = keyboardPanelSize(in: containerSize)
-            let restingCenter = constrainedKeyboardCenter(
-                keyboardPanelCenter ?? defaultKeyboardCenter(
-                    in: containerSize,
-                    panelSize: panelSize
-                ),
-                in: containerSize,
-                panelSize: panelSize
-            )
-            let visibleCenter = constrainedKeyboardCenter(
-                CGPoint(
-                    x: restingCenter.x + keyboardDragTranslation.width,
-                    y: restingCenter.y + keyboardDragTranslation.height
-                ),
-                in: containerSize,
-                panelSize: panelSize
-            )
-
-            remoteKeyboardPanel(containerSize: containerSize,
-                                panelSize: panelSize)
+            let containerSize = CGSize(width: proxy.size.width,
+                                       height: proxy.size.height + proxy.safeAreaInsets.bottom)
+            let windowSize = CGSize(
+                width: proxy.size.width + proxy.safeAreaInsets.leading + proxy.safeAreaInsets.trailing,
+                height: containerSize.height + proxy.safeAreaInsets.top)
+            let panelSize = keyboardPanelSize(in: containerSize,
+                                             bottomInset: proxy.safeAreaInsets.bottom,
+                                             windowSize: windowSize)
+            remoteKeyboardPanel(bottomInset: proxy.safeAreaInsets.bottom)
                 .frame(width: panelSize.width, height: panelSize.height)
-                .position(restingCenter)
-                .offset(x: visibleCenter.x - restingCenter.x,
-                        y: visibleCenter.y - restingCenter.y)
+                .position(keyboardCenter(in: containerSize, panelSize: panelSize))
                 .transaction { transaction in
                     transaction.animation = nil
                 }
         }
+        .ignoresSafeArea(.keyboard)
     }
 
-    private func remoteKeyboardPanel(containerSize: CGSize,
-                                     panelSize: CGSize) -> some View {
-        VStack(spacing: RemoteKeyboardMetrics.rowSpacing) {
-            Capsule()
-                .fill(Color.black.opacity(0.28))
-                .frame(width: 38, height: 4)
-                .frame(maxWidth: .infinity)
-                .frame(height: RemoteKeyboardMetrics.dragHandleHeight)
-                .contentShape(Rectangle())
-                .gesture(keyboardDragGesture(containerSize: containerSize,
-                                             panelSize: panelSize))
-                .accessibilityLabel("拖动键盘")
-
-            Group {
-                if keyboardMode == .system {
-                    RemoteSystemKeyboard(
-                        session: session,
-                        switchKeyboard: { keyboardMode = .computer },
-                        dismiss: { keyboardInputVisible = false }
-                    )
-                } else {
-                    RemoteComputerKeyboard(
-                        session: session,
-                        switchKeyboard: { keyboardMode = .system },
-                        dismiss: { keyboardInputVisible = false }
-                    )
-                }
-            }
-        }
-        .padding(RemoteKeyboardMetrics.panelPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(RemoteKeyboardPalette.background,
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .shadow(color: .black.opacity(0.2), radius: 10, y: 4)
+    private func remoteKeyboardPanel(bottomInset: CGFloat) -> some View {
+        RemoteComputerKeyboard(
+            session: session,
+            switchKeyboard: {
+                animateSystemKeyboardPresentation = false
+                waitingForSystemKeyboard = true
+                keyboardMode = .system
+            },
+            dismiss: { keyboardInputVisible = false }
+        )
+        .padding(.bottom, bottomInset)
+        .background(RemoteKeyboardPalette.background)
     }
 
-    private func keyboardPanelSize(in containerSize: CGSize) -> CGSize {
-        let rowCount: CGFloat = keyboardMode == .system ? 4 : 6
-        let keyboardHeight = rowCount * RemoteKeyboardMetrics.rowHeight +
-            (rowCount - 1) * RemoteKeyboardMetrics.rowSpacing
-        let height = keyboardHeight +
-            RemoteKeyboardMetrics.dragHandleHeight +
-            RemoteKeyboardMetrics.rowSpacing +
-            RemoteKeyboardMetrics.panelPadding * 2
-        return CGSize(width: min(780, max(0, containerSize.width - 12)),
-                      height: height)
+    private func keyboardPanelSize(in containerSize: CGSize,
+                                   bottomInset: CGFloat = 0,
+                                   windowSize: CGSize? = nil) -> CGSize {
+        CGSize(width: min(780, max(0, containerSize.width)),
+               height: min(containerSize.height,
+                           keyboardGeometry.panelHeight(in: windowSize ?? containerSize,
+                                                        bottomInset: bottomInset)))
     }
 
-    private func defaultKeyboardCenter(in containerSize: CGSize,
-                                       panelSize: CGSize) -> CGPoint {
+    private func keyboardCenter(in containerSize: CGSize,
+                                panelSize: CGSize) -> CGPoint {
         CGPoint(x: containerSize.width / 2,
-                y: containerSize.height - panelSize.height / 2 - 6)
-    }
-
-    private func constrainedKeyboardCenter(_ point: CGPoint,
-                                           in containerSize: CGSize,
-                                           panelSize: CGSize) -> CGPoint {
-        let margin: CGFloat = 6
-        let minimumX = panelSize.width / 2 + margin
-        let maximumX = max(minimumX,
-                           containerSize.width - panelSize.width / 2 - margin)
-        let minimumY = panelSize.height / 2 + margin
-        let maximumY = max(minimumY,
-                           containerSize.height - panelSize.height / 2 - margin)
-        return CGPoint(x: min(max(point.x, minimumX), maximumX),
-                       y: min(max(point.y, minimumY), maximumY))
-    }
-
-    private func keyboardDragGesture(containerSize: CGSize,
-                                     panelSize: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 1, coordinateSpace: .global)
-            .updating($keyboardDragTranslation) { value, state, _ in
-                state = value.translation
-            }
-            .onEnded { value in
-                let restingCenter = constrainedKeyboardCenter(
-                    keyboardPanelCenter ?? defaultKeyboardCenter(
-                        in: containerSize,
-                        panelSize: panelSize
-                    ),
-                    in: containerSize,
-                    panelSize: panelSize
-                )
-                keyboardPanelCenter = constrainedKeyboardCenter(
-                    CGPoint(x: restingCenter.x + value.translation.width,
-                            y: restingCenter.y + value.translation.height),
-                    in: containerSize,
-                    panelSize: panelSize
-                )
-            }
+                y: containerSize.height - panelSize.height / 2)
     }
 
     private func boundedOrbCenter(in size: CGSize) -> CGPoint {
@@ -595,32 +555,16 @@ struct RemoteSessionView: View {
 
 }
 
-private enum RemoteSystemKeyboardPage {
-    case letters
-    case numbers
-    case symbols
-}
-
-private enum RemoteSystemKeyAction {
-    case text(String)
-    case shift
-    case backspace
-    case returnKey
-    case page(RemoteSystemKeyboardPage)
-    case switchKeyboard
-    case dismiss
-}
-
-private enum RemoteSystemKeyStyle {
+private enum RemoteKeyboardKeyStyle {
     case character
     case special
-    case accent
 }
 
 private struct RemoteKeyboardKeyCap: View {
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let title: String?
     let symbol: String?
-    let style: RemoteSystemKeyStyle
+    let style: RemoteKeyboardKeyStyle
     let active: Bool
     let action: () -> Void
 
@@ -629,261 +573,93 @@ private struct RemoteKeyboardKeyCap: View {
             Group {
                 if let symbol {
                     Image(systemName: symbol)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 17, weight: .regular))
+                } else if let title, title.contains("\n") {
+                    let legends = title.components(separatedBy: "\n")
+                    if verticalSizeClass == .compact {
+                        HStack(spacing: 3) {
+                            Text(legends[1]).font(.system(size: 17))
+                            Text(legends[0]).font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        VStack(spacing: 0) {
+                            Text(legends[0])
+                                .font(.system(size: 10))
+                                .foregroundStyle(.secondary)
+                            Text(legends[1])
+                                .font(.system(size: 18))
+                        }
+                    }
                 } else {
                     Text(title ?? "")
                         .font(.system(size: labelFontSize,
-                                      weight: .medium,
-                                      design: .rounded))
+                                      weight: .regular))
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                        .lineLimit(1)
                         .minimumScaleFactor(0.62)
                 }
             }
-            .foregroundStyle(usesAccentColor
-                             ? Color.white : RemoteKeyboardPalette.keyText)
+            .foregroundStyle(active ? Color.black : RemoteKeyboardPalette.keyText)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(backgroundColor,
-                        in: RoundedRectangle(
-                            cornerRadius: RemoteKeyboardMetrics.cornerRadius,
-                            style: .continuous
-                        ))
-            .shadow(color: .black.opacity(0.14), radius: 0.4, y: 0.8)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(RemoteKeyboardPressStyle())
+        .buttonStyle(RemoteKeyboardPressStyle(backgroundColor: backgroundColor))
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     private var labelFontSize: CGFloat {
         guard let title else { return 14 }
-        if title.contains("\n") { return 9 }
         switch title.count {
-        case 0...1: return 14
-        case 2...3: return 11.5
-        default: return 10
+        case 0...1: return 20
+        case 2...3: return 14
+        default: return 14
         }
     }
 
-    private var usesAccentColor: Bool {
-        if active { return true }
-        if case .accent = style { return true }
-        return false
-    }
-
     private var backgroundColor: Color {
-        if usesAccentColor { return RemoteKeyboardPalette.accentKey }
+        // Match the system keyboard's latched Shift appearance.
+        if active { return .white }
         switch style {
         case .character: return RemoteKeyboardPalette.characterKey
         case .special: return RemoteKeyboardPalette.specialKey
-        case .accent: return RemoteKeyboardPalette.accentKey
         }
     }
 }
 
 private struct RemoteKeyboardPressStyle: ButtonStyle {
+    let backgroundColor: Color
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .brightness(configuration.isPressed ? -0.08 : 0)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .background {
+                RoundedRectangle(cornerRadius: RemoteKeyboardMetrics.cornerRadius,
+                                 style: .continuous)
+                    .fill(configuration.isPressed
+                          ? RemoteKeyboardPalette.pressedKey : backgroundColor)
+                    .shadow(color: RemoteKeyboardPalette.keyShadow, radius: 0, y: 1)
+            }
     }
 }
 
-private struct RemoteSystemKey {
-    let title: String?
-    let symbol: String?
-    let width: CGFloat
-    let style: RemoteSystemKeyStyle
-    let action: RemoteSystemKeyAction
+private final class RemoteKeyboardFeedback: ObservableObject {
+    private var generator: UIImpactFeedbackGenerator?
 
-    init(_ title: String,
-         width: CGFloat = 1,
-         style: RemoteSystemKeyStyle = .character,
-         action: RemoteSystemKeyAction) {
-        self.title = title
-        self.symbol = nil
-        self.width = width
-        self.style = style
-        self.action = action
+    func prepare() {
+        if generator == nil { generator = UIImpactFeedbackGenerator(style: .light) }
+        generator?.prepare()
     }
 
-    init(symbol: String,
-         width: CGFloat = 1,
-         style: RemoteSystemKeyStyle = .special,
-         action: RemoteSystemKeyAction) {
-        self.title = nil
-        self.symbol = symbol
-        self.width = width
-        self.style = style
-        self.action = action
+    func keyPressed() {
+        let generator = generator ?? UIImpactFeedbackGenerator(style: .light)
+        self.generator = generator
+        generator.impactOccurred(intensity: 1.0)
+        // Keep rapid typing responsive without repeatedly allocating generators.
+        generator.prepare()
     }
 
-    var isShift: Bool {
-        if case .shift = action { return true }
-        return false
-    }
-
-    var isLetter: Bool {
-        guard case let .text(value) = action else { return false }
-        return value.rangeOfCharacter(from: .letters) != nil
-    }
-}
-
-private struct RemoteSystemKeyboard: View {
-    @ObservedObject var session: RemoteSessionModel
-    let switchKeyboard: () -> Void
-    let dismiss: () -> Void
-
-    @State private var page: RemoteSystemKeyboardPage = .letters
-    @State private var shiftEnabled = false
-
-    var body: some View {
-        VStack(spacing: RemoteKeyboardMetrics.rowSpacing) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                RemoteSystemKeyboardRow(
-                    keys: row,
-                    shiftEnabled: shiftEnabled,
-                    action: handleKey
-                )
-            }
-        }
-    }
-
-    private var rows: [[RemoteSystemKey]] {
-        switch page {
-        case .letters:
-            return letterRows
-        case .numbers:
-            return numberRows
-        case .symbols:
-            return symbolRows
-        }
-    }
-
-    private var letterRows: [[RemoteSystemKey]] {
-        [
-            textKeys("qwertyuiop"),
-            textKeys("asdfghjkl"),
-            [RemoteSystemKey(symbol: "shift",
-                             width: 1.55,
-                             action: .shift)] +
-                textKeys("zxcvbnm") +
-                [RemoteSystemKey(symbol: "delete.left",
-                                 width: 1.55,
-                                 action: .backspace)],
-            bottomRow(pageTitle: "123", targetPage: .numbers)
-        ]
-    }
-
-    private var numberRows: [[RemoteSystemKey]] {
-        [
-            valueKeys(["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]),
-            valueKeys(["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""]),
-            [RemoteSystemKey("#+=", width: 1.55, style: .special,
-                             action: .page(.symbols))] +
-                valueKeys([".", ",", "?", "!", "'"]) +
-                [RemoteSystemKey(symbol: "delete.left", width: 1.55,
-                                 action: .backspace)],
-            bottomRow(pageTitle: "ABC", targetPage: .letters)
-        ]
-    }
-
-    private var symbolRows: [[RemoteSystemKey]] {
-        [
-            valueKeys(["[", "]", "{", "}", "#", "%", "^", "*", "+", "="]),
-            valueKeys(["_", "\\", "|", "~", "<", ">", "$", "&", "@", "`"]),
-            [RemoteSystemKey("123", width: 1.55, style: .special,
-                             action: .page(.numbers))] +
-                valueKeys([".", ",", "?", "!", "'"]) +
-                [RemoteSystemKey(symbol: "delete.left", width: 1.55,
-                                 action: .backspace)],
-            bottomRow(pageTitle: "ABC", targetPage: .letters)
-        ]
-    }
-
-    private func textKeys(_ letters: String) -> [RemoteSystemKey] {
-        letters.map { character in
-            let value = String(character)
-            return RemoteSystemKey(value, action: .text(value))
-        }
-    }
-
-    private func valueKeys(_ values: [String]) -> [RemoteSystemKey] {
-        values.map { RemoteSystemKey($0, action: .text($0)) }
-    }
-
-    private func bottomRow(pageTitle: String,
-                           targetPage: RemoteSystemKeyboardPage)
-        -> [RemoteSystemKey] {
-        [
-            RemoteSystemKey(pageTitle, width: 1.45, style: .special,
-                            action: .page(targetPage)),
-            RemoteSystemKey(symbol: "arrow.left.arrow.right", width: 1.2,
-                            action: .switchKeyboard),
-            RemoteSystemKey("空格", width: 5, action: .text(" ")),
-            RemoteSystemKey("回车", width: 1.55, style: .accent,
-                            action: .returnKey),
-            RemoteSystemKey(symbol: "keyboard.chevron.compact.down", width: 1.2,
-                            action: .dismiss)
-        ]
-    }
-
-    private func handleKey(_ key: RemoteSystemKey) {
-        switch key.action {
-        case let .text(value):
-            let isLetter = value.rangeOfCharacter(from: .letters) != nil
-            session.bridge.sendText(shiftEnabled && isLetter
-                                    ? value.uppercased() : value)
-        case .shift:
-            withTransaction(Transaction(animation: nil)) {
-                shiftEnabled.toggle()
-            }
-        case .backspace:
-            session.sendKeyStroke(0x08)
-        case .returnKey:
-            session.sendKeyStroke(0x0D)
-        case let .page(newPage):
-            page = newPage
-        case .switchKeyboard:
-            switchKeyboard()
-        case .dismiss:
-            dismiss()
-        }
-    }
-}
-
-private struct RemoteSystemKeyboardRow: View {
-    let keys: [RemoteSystemKey]
-    let shiftEnabled: Bool
-    let action: (RemoteSystemKey) -> Void
-
-    var body: some View {
-        GeometryReader { proxy in
-            let spacing = RemoteKeyboardMetrics.keySpacing
-            let totalWidth = keys.reduce(CGFloat.zero) { $0 + $1.width }
-            let keySpace = max(0, proxy.size.width -
-                               CGFloat(max(0, keys.count - 1)) * spacing)
-
-            HStack(spacing: spacing) {
-                ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
-                    let isActive = key.isShift && shiftEnabled
-                    let visibleTitle = shiftEnabled && key.isLetter
-                        ? key.title?.uppercased() : key.title
-                    let visibleSymbol = isActive && key.isShift
-                        ? "shift.fill" : key.symbol
-                    RemoteKeyboardKeyCap(
-                        title: visibleTitle,
-                        symbol: visibleSymbol,
-                        style: key.style,
-                        active: isActive
-                    ) {
-                        action(key)
-                    }
-                    .id("\(visibleTitle ?? visibleSymbol ?? "key")-\(isActive)")
-                    .frame(width: keySpace * key.width / totalWidth)
-                    .accessibilityLabel(visibleTitle ?? "键盘操作")
-                }
-            }
-        }
-        .frame(height: RemoteKeyboardMetrics.rowHeight)
+    func stop() {
+        generator = nil
     }
 }
 
@@ -898,14 +674,14 @@ private struct RemoteComputerKey {
     let title: String?
     let symbol: String?
     let width: CGFloat
-    let style: RemoteSystemKeyStyle
+    let style: RemoteKeyboardKeyStyle
     let action: RemoteComputerKeyAction
 
     init(_ title: String,
          _ keyCode: UInt,
          width: CGFloat = 1,
          isModifier: Bool = false,
-         style: RemoteSystemKeyStyle? = nil) {
+         style: RemoteKeyboardKeyStyle? = nil) {
         self.title = title
         self.symbol = nil
         self.width = width
@@ -915,7 +691,7 @@ private struct RemoteComputerKey {
 
     init(_ title: String,
          width: CGFloat = 1,
-         style: RemoteSystemKeyStyle = .special,
+         style: RemoteKeyboardKeyStyle = .special,
          action: RemoteComputerKeyAction) {
         self.title = title
         self.symbol = nil
@@ -928,7 +704,7 @@ private struct RemoteComputerKey {
          _ keyCode: UInt,
          width: CGFloat = 1,
          isModifier: Bool = false,
-         style: RemoteSystemKeyStyle? = nil) {
+         style: RemoteKeyboardKeyStyle? = nil) {
         self.title = nil
         self.symbol = symbol
         self.width = width
@@ -938,13 +714,22 @@ private struct RemoteComputerKey {
 
     init(symbol: String,
          width: CGFloat = 1,
-         style: RemoteSystemKeyStyle = .special,
+         style: RemoteKeyboardKeyStyle = .special,
          action: RemoteComputerKeyAction) {
         self.title = nil
         self.symbol = symbol
         self.width = width
         self.style = style
         self.action = action
+    }
+
+    var accessibilityLabel: String {
+        if let title { return title.replacingOccurrences(of: "\n", with: " ") }
+        switch symbol {
+        case "shift": return "Shift"
+        case "delete.left": return "退格"
+        default: return "键盘操作"
+        }
     }
 
     var modifierCode: UInt? {
@@ -953,88 +738,189 @@ private struct RemoteComputerKey {
     }
 }
 
+private enum RemoteComputerKeyboardPage: String, CaseIterable {
+    case input = "字母数字"
+    case controls = "符号功能"
+
+    var rows: [[RemoteComputerKey]] {
+        let shift = RemoteComputerKey(symbol: "shift", 0x10, isModifier: true)
+        let backspace = RemoteComputerKey(symbol: "delete.left", 0x08, style: .special)
+        switch self {
+        case .input:
+            return [
+                [.init("!\n1", 0x31), .init("@\n2", 0x32), .init("#\n3", 0x33),
+                 .init("$\n4", 0x34), .init("%\n5", 0x35), .init("^\n6", 0x36),
+                 .init("&\n7", 0x37), .init("*\n8", 0x38), .init("(\n9", 0x39),
+                 .init(")\n0", 0x30)],
+                [.init("Q", 0x51), .init("W", 0x57), .init("E", 0x45),
+                 .init("R", 0x52), .init("T", 0x54), .init("Y", 0x59),
+                 .init("U", 0x55), .init("I", 0x49), .init("O", 0x4F),
+                 .init("P", 0x50)],
+                [.init("A", 0x41), .init("S", 0x53), .init("D", 0x44),
+                 .init("F", 0x46), .init("G", 0x47), .init("H", 0x48),
+                 .init("J", 0x4A), .init("K", 0x4B), .init("L", 0x4C)],
+                [shift, .init("Z", 0x5A), .init("X", 0x58), .init("C", 0x43),
+                 .init("V", 0x56), .init("B", 0x42), .init("N", 0x4E),
+                 .init("M", 0x4D), backspace]
+            ]
+        case .controls:
+            return [
+                [.init("~\n`", 0xC0), .init("_\n-", 0xBD), .init("+\n=", 0xBB),
+                 .init("{\n[", 0xDB), .init("}\n]", 0xDD), .init("|\n\\", 0xDC),
+                 .init(":\n;", 0xBA), .init("\"\n'", 0xDE),
+                 .init("<\n,", 0xBC), .init(">\n.", 0xBE), .init("?\n/", 0xBF)],
+                [.init("F1", 0x70), .init("F2", 0x71), .init("F3", 0x72),
+                 .init("F4", 0x73), .init("F5", 0x74), .init("F6", 0x75)],
+                [.init("F7", 0x76), .init("F8", 0x77), .init("F9", 0x78),
+                 .init("F10", 0x79), .init("F11", 0x7A), .init("F12", 0x7B)],
+                [.init("Esc", 0x1B, style: .special), .init("Tab", 0x09, style: .special),
+                 .init("Caps", 0x14), .init("Ins", 0x2D), .init("Del", 0x2E),
+                 .init("Home", 0x24), .init("End", 0x23)],
+                [shift, .init("←", 0x25), .init("↑", 0x26), .init("↓", 0x28),
+                 .init("→", 0x27), .init("PgUp", 0x21), .init("PgDn", 0x22), backspace]
+            ]
+        }
+    }
+
+    func rows(compact: Bool) -> [[RemoteComputerKey]] {
+        let rows = self.rows
+        guard compact, self == .controls else { return rows }
+        // Landscape has room for one full function-key row, leaving the same
+        // five-row height budget as the input page (including common keys).
+        return [rows[0], rows[1] + rows[2], rows[3], rows[4]]
+    }
+}
+
 private struct RemoteComputerKeyboard: View {
     @ObservedObject var session: RemoteSessionModel
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @StateObject private var feedback = RemoteKeyboardFeedback()
     let switchKeyboard: () -> Void
     let dismiss: () -> Void
     @State private var activeModifiers: Set<UInt> = []
+    @State private var page: RemoteComputerKeyboardPage = .input
 
-    private static let rows: [[RemoteComputerKey]] = [
-        [
-            .init("Esc", 0x1B, width: 1.2),
-            .init("F1", 0x70), .init("F2", 0x71), .init("F3", 0x72),
-            .init("F4", 0x73), .init("F5", 0x74), .init("F6", 0x75),
-            .init("F7", 0x76), .init("F8", 0x77), .init("F9", 0x78),
-            .init("F10", 0x79), .init("F11", 0x7A), .init("F12", 0x7B),
-            .init("Del", 0x2E, width: 1.2)
-        ],
-        [
-            .init("~\n`", 0xC0),
-            .init("!\n1", 0x31), .init("@\n2", 0x32),
-            .init("#\n3", 0x33), .init("$\n4", 0x34),
-            .init("%\n5", 0x35), .init("^\n6", 0x36),
-            .init("&\n7", 0x37), .init("*\n8", 0x38),
-            .init("(\n9", 0x39), .init(")\n0", 0x30),
-            .init("_\n-", 0xBD), .init("+\n=", 0xBB),
-            .init(symbol: "delete.left", 0x08, width: 1.65,
-                  style: .special)
-        ],
-        [
-            .init("Tab", 0x09, width: 1.45, style: .special),
-            .init("Q", 0x51), .init("W", 0x57), .init("E", 0x45),
-            .init("R", 0x52), .init("T", 0x54), .init("Y", 0x59),
-            .init("U", 0x55), .init("I", 0x49), .init("O", 0x4F),
-            .init("P", 0x50), .init("{\n[", 0xDB),
-            .init("}\n]", 0xDD), .init("|\n\\", 0xDC, width: 1.25)
-        ],
-        [
-            .init("Caps", 0x14, width: 1.7, style: .special),
-            .init("A", 0x41), .init("S", 0x53), .init("D", 0x44),
-            .init("F", 0x46), .init("G", 0x47), .init("H", 0x48),
-            .init("J", 0x4A), .init("K", 0x4B), .init("L", 0x4C),
-            .init(":\n;", 0xBA), .init("\"\n'", 0xDE),
-            .init("回车", 0x0D, width: 1.9, style: .accent)
-        ],
-        [
-            .init(symbol: "shift", 0x10, width: 2.15, isModifier: true),
-            .init("Z", 0x5A), .init("X", 0x58), .init("C", 0x43),
-            .init("V", 0x56), .init("B", 0x42), .init("N", 0x4E),
-            .init("M", 0x4D), .init("<\n,", 0xBC),
-            .init(">\n.", 0xBE), .init("?\n/", 0xBF),
-            .init(symbol: "shift", 0x10, width: 2.15, isModifier: true)
-        ],
-        [
-            .init("Ctrl", 0x11, width: 1.35, isModifier: true),
-            .init("Win", 0x5B, width: 1.25, isModifier: true),
-            .init("Alt", 0x12, width: 1.25, isModifier: true),
-            .init("空格", 0x20, width: 3.8),
-            .init("Alt", 0x12, width: 1.25, isModifier: true),
-            .init("Ctrl", 0x11, width: 1.35, isModifier: true),
-            .init("←", 0x25, style: .special),
-            .init("↑", 0x26, style: .special),
-            .init("↓", 0x28, style: .special),
-            .init("→", 0x27, style: .special),
-            .init(symbol: "arrow.left.arrow.right", width: 1.35,
-                  action: .switchKeyboard),
-            .init(symbol: "keyboard.chevron.compact.down", width: 1.35,
-                  action: .dismiss)
-        ]
+    private static let commonRow: [RemoteComputerKey] = [
+        .init("Ctrl", 0x11, isModifier: true),
+        .init("Win", 0x5B, isModifier: true),
+        .init("Alt", 0x12, isModifier: true),
+        .init("空格", 0x20, width: 2.6),
+        .init("回车", 0x0D, width: 1.4, style: .special)
     ]
 
     var body: some View {
-        VStack(spacing: RemoteKeyboardMetrics.rowSpacing) {
-            ForEach(Array(Self.rows.enumerated()), id: \.offset) { _, row in
-                RemoteComputerKeyboardRow(
-                    keys: row,
-                    activeModifiers: activeModifiers,
-                    action: handleKey
-                )
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                Button("系统键盘") {
+                    feedback.keyPressed()
+                    releaseModifiers()
+                    switchKeyboard()
+                }
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 80, height: 44)
+                .accessibilityLabel("切换到系统键盘")
+                if verticalSizeClass == .compact {
+                    pageTabs
+                } else {
+                    Spacer(minLength: 0)
+                }
+                RemoteKeyboardDismissButton(accessibilityLabel: "收起电脑键盘") {
+                    feedback.keyPressed()
+                    releaseModifiers()
+                    dismiss()
+                }
+                .frame(width: RemoteKeyboardDismissButton.sideLength,
+                       height: RemoteKeyboardDismissButton.sideLength)
+            }
+            .padding(.horizontal, 4)
+            .frame(height: 44)
+
+            if verticalSizeClass != .compact {
+                pageTabs
+                    .padding(.horizontal, RemoteKeyboardMetrics.panelPadding)
+            }
+
+            GeometryReader { proxy in
+                // Anchor both bottom rows to the input page's dimensions so
+                // shared controls keep their size and position across pages.
+                let inputRows = RemoteComputerKeyboardPage.input
+                    .rows(compact: verticalSizeClass == .compact)
+                let rows = page.rows(compact: verticalSizeClass == .compact)
+                let inputRowCount = CGFloat(inputRows.count)
+                let sharedRowHeight = max(0, (proxy.size.height -
+                    inputRowCount * RemoteKeyboardMetrics.rowSpacing) / (inputRowCount + 1))
+                let inputEdgeRow = inputRows.last ?? []
+                let edgeKeyWidth = max(0, proxy.size.width -
+                    CGFloat(max(0, inputEdgeRow.count - 1)) * RemoteKeyboardMetrics.keySpacing) /
+                    max(1, inputEdgeRow.reduce(CGFloat.zero) { $0 + $1.width })
+
+                VStack(spacing: RemoteKeyboardMetrics.rowSpacing) {
+                    VStack(spacing: RemoteKeyboardMetrics.rowSpacing) {
+                        ForEach(Array(rows.dropLast().enumerated()), id: \.offset) { _, row in
+                            RemoteComputerKeyboardRow(
+                                keys: row,
+                                activeModifiers: activeModifiers,
+                                action: handleKey
+                            )
+                        }
+                    }
+                    .frame(maxHeight: .infinity)
+
+                    if let row = rows.last {
+                        RemoteComputerKeyboardRow(
+                            keys: row,
+                            activeModifiers: activeModifiers,
+                            action: handleKey,
+                            fixedEdgeWidth: edgeKeyWidth
+                        )
+                        .frame(height: sharedRowHeight)
+                    }
+
+                    RemoteComputerKeyboardRow(
+                        keys: Self.commonRow,
+                        activeModifiers: activeModifiers,
+                        action: handleKey
+                    )
+                    .frame(height: sharedRowHeight)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+            }
+            .padding(RemoteKeyboardMetrics.panelPadding)
+        }
+        .foregroundStyle(RemoteKeyboardPalette.keyText)
+        .buttonStyle(.plain)
+        .background(RemoteKeyboardPalette.background)
+        .onAppear { feedback.prepare() }
+        .onDisappear {
+            releaseModifiers()
+            feedback.stop()
+        }
+    }
+
+    private var pageTabs: some View {
+        HStack(spacing: 6) {
+            ForEach(RemoteComputerKeyboardPage.allCases, id: \.self) { item in
+                Button {
+                    guard page != item else { return }
+                    feedback.keyPressed()
+                    page = item
+                } label: {
+                    Text(item.rawValue)
+                        .font(.system(size: 14, weight: page == item ? .semibold : .regular))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(page == item ? RemoteKeyboardPalette.specialKey : .clear,
+                                    in: RoundedRectangle(cornerRadius: 6))
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("\(item.rawValue)键盘页")
+                .accessibilityAddTraits(page == item ? .isSelected : [])
             }
         }
-        .onDisappear(perform: releaseModifiers)
+        .frame(height: 36)
     }
 
     private func handleKey(_ key: RemoteComputerKey) {
+        feedback.keyPressed()
         switch key.action {
         case let .modifier(keyCode):
             if activeModifiers.contains(keyCode) {
@@ -1067,16 +953,23 @@ private struct RemoteComputerKeyboardRow: View {
     let keys: [RemoteComputerKey]
     let activeModifiers: Set<UInt>
     let action: (RemoteComputerKey) -> Void
+    var fixedEdgeWidth: CGFloat? = nil
 
     var body: some View {
         GeometryReader { proxy in
             let spacing = RemoteKeyboardMetrics.keySpacing
-            let totalWidth = keys.reduce(CGFloat.zero) { $0 + $1.width }
+            let edgeWidth = keys.count > 2 ? fixedEdgeWidth : nil
+            let flexibleKeys = edgeWidth == nil ? keys[...] : keys.dropFirst().dropLast()
+            let totalWidth = flexibleKeys.reduce(CGFloat.zero) { $0 + $1.width }
             let keySpace = max(0, proxy.size.width -
+                               2 * (edgeWidth ?? 0) -
                                CGFloat(max(0, keys.count - 1)) * spacing)
+            let unitWidth = keySpace / totalWidth
 
             HStack(spacing: spacing) {
-                ForEach(Array(keys.enumerated()), id: \.offset) { _, key in
+                ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
+                    let width = index == 0 || index == keys.count - 1
+                        ? (edgeWidth ?? unitWidth * key.width) : unitWidth * key.width
                     let isActive = key.modifierCode.map(activeModifiers.contains) ?? false
                     let visibleSymbol = isActive && key.symbol == "shift"
                         ? "shift.fill" : key.symbol
@@ -1088,13 +981,13 @@ private struct RemoteComputerKeyboardRow: View {
                     ) {
                         action(key)
                     }
-                    .frame(width: keySpace * key.width / totalWidth)
-                    .accessibilityLabel((key.title ?? "键盘操作")
-                        .replacingOccurrences(of: "\n", with: " "))
+                    .frame(width: width)
+                    .accessibilityLabel(key.accessibilityLabel)
                 }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .frame(height: RemoteKeyboardMetrics.rowHeight)
+        .frame(maxHeight: .infinity)
     }
 }
 

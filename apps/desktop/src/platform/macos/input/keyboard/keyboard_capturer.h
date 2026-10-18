@@ -1,7 +1,7 @@
 /*
  * @Author: DI JUNKUN
  * @Date: 2024-11-22
- * Copyright (c) 2024 by DI JUNKUN, All Rights Reserved.
+ * Copyright (c) 2026 by DI JUNKUN, All Rights Reserved.
  */
 
 #ifndef _KEYBOARD_CAPTURER_H_
@@ -22,6 +22,8 @@ class PlatformKeyboardCapturer final : public KeyboardCapturer {
  public:
   virtual int Hook(OnKeyAction on_key_action, void* user_ptr);
   virtual int Unhook();
+  bool SupportsTextInput() const override { return true; }
+  int SendTextCommand(const std::string& text) override;
   virtual int SendKeyboardCommand(int key_code, bool is_down,
                                   uint32_t scan_code = 0,
                                   bool extended = false);

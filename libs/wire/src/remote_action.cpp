@@ -26,6 +26,7 @@ void ResetHostInfo(HostInfo& info) {
   info.bottom = nullptr;
   info.supports_privacy_screen = false;
   info.supports_video_settings = false;
+  info.supports_text_input = false;
   info.supports_deskhub_preview = false;
   info.supports_deskhub_resolution = false;
   info.supports_deskhub_fps15 = false;
@@ -136,6 +137,11 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
                          {"s", action.m.s},
                          {"flag", action.m.flag}};
       break;
+    case ControlType::text_input:
+      if (action.text.empty() || action.text.size() > kMaxTextInputBytes ||
+          action.text.find('\0') != std::string::npos) return {};
+      object["text"] = action.text;
+      break;
     case ControlType::keyboard:
       object["keyboard"] = {{"key_value", action.k.key_value},
                             {"scan_code", action.k.scan_code},
@@ -226,6 +232,7 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
           {"displays", displays},
           {"supports_privacy_screen", action.i.supports_privacy_screen},
           {"supports_video_settings", action.i.supports_video_settings},
+          {"supports_text_input", action.i.supports_text_input},
           {"supports_deskhub_preview", action.i.supports_deskhub_preview},
           {"supports_deskhub_resolution", action.i.supports_deskhub_resolution},
           {"supports_deskhub_fps15", action.i.supports_deskhub_fps15},
@@ -252,6 +259,11 @@ bool RemoteAction::FromJson(const std::string& json_string,
         output.m.s = object.at("mouse").at("s").get<int>();
         output.m.flag = static_cast<MouseFlag>(
             object.at("mouse").at("flag").get<int>());
+        break;
+      case ControlType::text_input:
+        output.text = object.at("text").get<std::string>();
+        if (output.text.empty() || output.text.size() > kMaxTextInputBytes ||
+            output.text.find('\0') != std::string::npos) return false;
         break;
       case ControlType::keyboard:
         output.k.key_value =
@@ -420,6 +432,8 @@ bool RemoteAction::FromJson(const std::string& json_string,
         output.i.supports_privacy_screen =
             privacy_support != host_info_object.end() &&
             privacy_support->is_boolean() && privacy_support->get<bool>();
+        output.i.supports_text_input =
+            host_info_object.value("supports_text_input", false);
         output.i.supports_video_settings =
             host_info_object.value("supports_video_settings", false);
         output.i.supports_deskhub_preview =

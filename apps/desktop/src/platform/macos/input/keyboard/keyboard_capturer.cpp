@@ -331,4 +331,48 @@ int PlatformKeyboardCapturer::SendKeyboardCommand(int key_code, bool is_down,
 
   return 0;
 }
+int PlatformKeyboardCapturer::SendTextCommand(const std::string& text) {
+  if (text.empty() || text.size() > kMaxTextInputBytes) return -1;
+  CFStringRef string = CFStringCreateWithBytes(
+      kCFAllocatorDefault, reinterpret_cast<const UInt8*>(text.data()),
+      text.size(), kCFStringEncodingUTF8, false);
+  if (!string) return -1;
+  const CFIndex length = CFStringGetLength(string);
+  std::vector<UniChar> characters(length);
+  CFStringGetCharacters(string, CFRangeMake(0, length), characters.data());
+  CFRelease(string);
+  for (CFIndex index = 0; index < length;) {
+    const UniChar character = characters[index];
+    if (character == '\n' || character == '\r' || character == '\t') {
+      const int key = character == '\t' ? 0x09 : 0x0D;
+      SendKeyboardCommand(key, true, 0, false);
+      SendKeyboardCommand(key, false, 0, false);
+      ++index;
+      if (character == '\r' && index < length && characters[index] == '\n') ++index;
+      continue;
+    }
+    // Keep surrogate pairs together. Separate events let apps handle long
+    // dictation results without CGEvent's small inline Unicode buffer limit.
+    const CFIndex count = CFStringIsSurrogateHighCharacter(character) &&
+                                  index + 1 < length ? 2 : 1;
+    CGEventRef down = CGEventCreateKeyboardEvent(nullptr, 0, true);
+    CGEventRef up = CGEventCreateKeyboardEvent(nullptr, 0, false);
+    if (!down || !up) {
+      if (down) CFRelease(down);
+      if (up) CFRelease(up);
+      return -1;
+    }
+    for (CGEventRef event : {down, up}) {
+      CGEventSetFlags(event, 0);
+      CGEventKeyboardSetUnicodeString(event, count, characters.data() + index);
+      CGEventSetIntegerValueField(event, kCGEventSourceUserData,
+                                 kCrossDeskInjectedEvent);
+      CGEventPost(kCGHIDEventTap, event);
+      CFRelease(event);
+    }
+    index += count;
+  }
+  return 0;
+}
+
 }  // namespace crossdesk

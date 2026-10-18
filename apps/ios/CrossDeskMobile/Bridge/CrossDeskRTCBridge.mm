@@ -887,8 +887,10 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
   NSData *utf8 = [text dataUsingEncoding:NSUTF8StringEncoding];
   if (!utf8.length) return;
   const std::string bytes(static_cast<const char *>(utf8.bytes), utf8.length);
+  const uint64_t generation = _activeControllerGeneration.load();
   dispatch_async(_rtcQueue, ^{
-    if (!self->_state->controller_peer) return;
+    if (![self isControllerGenerationActive:generation] ||
+        !self->_state->controller_peer) return;
     for (unsigned char character : bytes) {
       KeyMapping mapping = MapASCII(character);
       if (!mapping.valid) continue;
@@ -911,6 +913,16 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
       }
     }
   });
+}
+
+- (void)sendCommittedText:(NSString *)text {
+  NSData *utf8 = [text dataUsingEncoding:NSUTF8StringEncoding];
+  if (!utf8.length || utf8.length > crossdesk::kMaxTextInputBytes ||
+      std::memchr(utf8.bytes, '\0', utf8.length)) return;
+  RemoteAction action{};
+  action.type = ControlType::text_input;
+  action.text.assign(static_cast<const char *>(utf8.bytes), utf8.length);
+  [self sendMessage:action.to_json() reliable:YES stream:kKeyboardStream];
 }
 
 - (void)switchToDisplay:(NSInteger)displayIndex {
@@ -1059,8 +1071,10 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
   // std::strings.
   const std::string owned_message(message);
   const std::string owned_stream(stream ? stream : "");
+  const uint64_t generation = _activeControllerGeneration.load();
   dispatch_async(_rtcQueue, ^{
-    if (!self->_state->controller_peer) return;
+    if (![self isControllerGenerationActive:generation] ||
+        !self->_state->controller_peer) return;
     if (reliable) {
       SendReliableDataFrame(self->_state->controller_peer,
                             owned_message.data(), owned_message.size(),
@@ -1697,6 +1711,7 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
     }
     if (action.type != ControlType::host_infomation) return;
     const BOOL supports_video_settings = action.i.supports_video_settings;
+    const BOOL supports_text_input = action.i.supports_text_input;
     NSString *platform = [NSString stringWithUTF8String:
         crossdesk::HostPlatformName(action.i.platform)];
     NSString *host_name = [[NSString alloc]
@@ -1729,14 +1744,15 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
       id<CrossDeskRTCBridgeDelegate> delegate = self.delegate;
       if ([delegate respondsToSelector:
               @selector(rtcBridge:didReceiveHostName:appVersion:platform:displayNames:
-                                  displaySizes:supportsVideoSettings:)]) {
+                                  displaySizes:supportsVideoSettings:supportsTextInput:)]) {
         [delegate rtcBridge:self
             didReceiveHostName:host_name ?: @""
                     appVersion:app_version ?: @""
                       platform:platform
                   displayNames:display_names
                   displaySizes:display_sizes
-         supportsVideoSettings:supports_video_settings];
+         supportsVideoSettings:supports_video_settings
+             supportsTextInput:supports_text_input];
       }
     });
     return;

@@ -27,6 +27,7 @@ public:
   void SendHeartbeat(bool force);
   void ApplyRemoteEvent(const std::string &remote_id,
                         const RemoteAction &remote_action);
+  void ApplyRemoteText(const std::string& remote_id, const std::string& text);
   void ApplyRemoteState(const std::string &remote_id,
                         const RemoteAction &remote_action);
   void ReleaseRemotePressedKeys(const std::string &remote_id,

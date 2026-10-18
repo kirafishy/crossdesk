@@ -733,6 +733,14 @@ void SessionDeviceManager::DrainCapturedKeyboardInput() {
   }
 }
 
+bool SessionDeviceManager::SupportsTextInput() const {
+  return keyboard_capturer_ && keyboard_capturer_->SupportsTextInput();
+}
+
+bool SessionDeviceManager::SendTextCommand(const std::string& text) {
+  return keyboard_capturer_ && keyboard_capturer_->SendTextCommand(text) == 0;
+}
+
 bool SessionDeviceManager::SendKeyboardCommand(int key_code, bool is_down,
                                                uint32_t scan_code,
                                                bool extended) {

@@ -268,6 +268,15 @@ void KeyboardController::ApplyRemoteEvent(const std::string& remote_id,
   }
 }
 
+void KeyboardController::ApplyRemoteText(const std::string& remote_id,
+                                         const std::string& text) {
+  std::lock_guard input_lock(remote_input_mutex_);
+  if (!owner_.IsAuthorizedController(remote_id) ||
+      !owner_.devices_.SupportsTextInput()) return;
+  if (!owner_.devices_.SendTextCommand(text))
+    LOG_WARN("Failed to inject committed remote text");
+}
+
 void KeyboardController::ApplyRemoteState(const std::string& remote_id,
                                           const RemoteAction& action) {
   std::lock_guard input_lock(remote_input_mutex_);

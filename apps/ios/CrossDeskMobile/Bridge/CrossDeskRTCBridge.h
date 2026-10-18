@@ -89,7 +89,8 @@ typedef struct {
               platform:(NSString *)platform
           displayNames:(NSArray<NSString *> *)displayNames
           displaySizes:(NSArray<NSValue *> *)displaySizes
- supportsVideoSettings:(BOOL)supportsVideoSettings;
+ supportsVideoSettings:(BOOL)supportsVideoSettings
+     supportsTextInput:(BOOL)supportsTextInput;
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge
     didReceiveVideoSettingsQuality:(NSInteger)quality
                         frameRate:(NSInteger)frameRate
@@ -179,6 +180,7 @@ typedef struct {
               deltaY:(NSInteger)deltaY;
 - (void)sendWindowsKeyCode:(NSUInteger)keyCode isDown:(BOOL)isDown;
 - (void)sendText:(NSString *)text;
+- (void)sendCommittedText:(NSString *)text;
 - (void)switchToDisplay:(NSInteger)displayIndex;
 - (void)setAudioEnabled:(BOOL)enabled;
 - (void)sendClipboardText:(NSString *)text;

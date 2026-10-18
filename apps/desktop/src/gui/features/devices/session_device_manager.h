@@ -73,6 +73,8 @@ public:
   void ClearAudio(const std::string& remote_id);
   void PushAudio(const std::string& remote_id, const char *data, size_t size);
 
+  bool SupportsTextInput() const;
+  bool SendTextCommand(const std::string& text);
   bool SendKeyboardCommand(int key_code, bool is_down, uint32_t scan_code,
                            bool extended);
   bool SendMouseCommand(const RemoteAction &action, int selected_display);

@@ -203,6 +203,74 @@ the available space. Settings and reading pages are limited to 720 points.
 Resizing preserves the connection fields and active session. iPhone retains its
 portrait home screen and two-column recent-connection grid.
 
+## System keyboard and remote text
+
+The session keyboard button opens the iPhone/iPad's selected system keyboard.
+Chinese candidates, nine-key layouts, handwriting, emoji and dictation use the
+installed keyboard's own UI and availability. Confirmed text is sent immediately
+without a visible local draft or a separate send action. Pinyin preedit stays in
+the system IME until composition is confirmed. Return presses remote Enter;
+Backspace edits an active composition locally, otherwise it deletes remotely.
+A hidden native text field retains the current input context so autocorrection,
+candidate replacement and continuous dictation can revise previously sent text.
+Only the changed suffix is replaced, using Backspace events followed by text on
+the same ordered keyboard stream. Remote clicks reset this context before moving
+the insertion point, and Return starts a new context. Text edited directly on
+the host is not mirrored back; automatic corrections assume the remote caret
+still follows the text entered from the phone.
+
+Only the **电脑键盘** switch and keyboard hide button are visible in the 44-point
+native input row, anchored to `UIKeyboardLayoutGuide`. Its background continues
+behind the system keyboard; no input accessory slot is reserved. The IME's
+candidate bar remains native. Chinese nine-key Pinyin reserves its own
+spelling-choice row above the candidates (for example `m`, `n`, `o`); this may
+be empty before typing and is not an app spacer. An input error expands the
+row only while its message is visible. Computer keys such as Escape, Tab,
+arrows and modifiers are available on the computer keyboard.
+Switching between the system and computer keyboards replaces the panel in place
+in both directions. Opening the system keyboard after it has been hidden keeps
+the normal iOS presentation animation.
+
+The computer keyboard has two pages: **字母数字** for letters and numbers,
+and **符号功能** for punctuation, F1–F12 and navigation. Keys fill each row
+with consistent 5-point horizontal and 6-point vertical gaps; there are no
+fixed keycap size limits or extra spacing around individual rows. The second
+page uses two function-key rows in portrait and one in landscape.
+The two bottom rows keep their height and position when changing pages.
+Shift and Backspace also keep the same width at the ends of the penultimate
+row; its middle keys fill the remaining width. Ctrl, Win, Alt, Space and Return
+share the last row. Only the upper rows redistribute the remaining height.
+Computer-key taps, page changes and keyboard controls use a light impact haptic
+at a fixed intensity of 1.0 alongside the existing pressed-key highlight.
+The public feedback API lets the system decide whether haptics are enabled;
+iOS does not expose the native keyboard's intensity for custom controls to read.
+One feedback generator is reused
+while the keyboard is visible and released when it closes. Haptics require
+supported hardware; the simulator can only verify the feedback trigger.
+Latched modifiers survive page changes and are released when the
+keyboard closes or switches back to the system keyboard. The panel reuses the
+last measured native keyboard height, including the 44-point control row, for
+the current window width and orientation. Before landscape has been measured,
+the iPhone fallback uses a 161-point compact keybed plus the actual bottom safe
+area and the 44-point control row, avoiding the oversized first rotation.
+Measured native heights take precedence over fallback sizes. Horizontal layouts
+put the page selectors in the control row to preserve key height. The bottom
+safe area stays clear. Both keyboards stay docked to the bottom of the screen;
+the computer keyboard has no drag handle or repositioning gesture.
+Closing the keyboard, switching keyboards, disconnecting or entering the
+background discards unfinished composition and pending callbacks. Already sent
+text remains on the remote computer.
+
+Direct UTF-8 text requires a host advertising `supports_text_input`. The macOS
+host implements this with native Unicode keyboard events and does not modify
+the clipboard. Each replacement is validated before remote Backspace events are
+sent; text is limited to 16 KiB and deletions to 16,384 characters per update.
+Hosts without this capability retain ASCII key input. Unsupported input is
+rejected with an explanation and is not queued for later replay. For Windows,
+Linux or older macOS hosts, copy text from another app and send it with
+**剪贴板** in the remote session menu, then use the computer keyboard's paste
+shortcut.
+
 ## App updates
 
 After network consent, the app checks the public version manifest once on each
@@ -366,7 +434,7 @@ Old previews saved without this choice are removed on upgrade.
 The floating control menu includes **虚拟鼠标** (virtual mouse), a 140 × 48 pt
 horizontal left-button / wheel / right-button bar attached to the status orb.
 Drag the orb to reposition it, or use **收起鼠标** to hide it. The bar overlays
-the video without resizing it and avoids the floating keyboard. Hold either mouse
+the video without resizing it and avoids the computer keyboard. Hold either mouse
 button and drag the same finger, including beyond the key bounds, to drag at the
 remote cursor; lifting the finger releases that button. Moving another finger on
 the video while holding a button also works. The flat split design has unlabelled
