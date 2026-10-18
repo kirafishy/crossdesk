@@ -1202,6 +1202,8 @@ private struct FloatingSessionMenu: View {
                 LazyVGrid(columns: columns, spacing: 7) {
                     FloatingControlButton(title: "键盘", symbol: "keyboard",
                                           action: showKeyboard)
+                    FloatingControlButton(title: virtualMouseVisible ? "收起鼠标" : "虚拟鼠标",
+                                          symbol: "computermouse", action: toggleMouse)
                     FloatingControlButton(
                         title: session.mouseControlMode == .relative ? "相对鼠标" : "绝对鼠标",
                         symbol: "computermouse",
@@ -1210,8 +1212,6 @@ private struct FloatingSessionMenu: View {
                                 ? .absolute : .relative
                         }
                     )
-                    FloatingControlButton(title: virtualMouseVisible ? "收起鼠标" : "虚拟鼠标",
-                                          symbol: "computermouse", action: toggleMouse)
 
                     Menu {
                         ForEach(Array(session.displays.enumerated()), id: \.offset) { index, name in

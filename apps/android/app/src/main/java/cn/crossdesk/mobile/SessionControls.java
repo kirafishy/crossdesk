@@ -121,9 +121,9 @@ final class SessionControls extends FrameLayout {
             scroll.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_INSET);body.setPadding(0,0,ui.dp(6),0);
         }
         if(page.equals("controls")){
-            String[] labels={"键盘",relative?"相对鼠标":"绝对鼠标",mouseVisible?"收起鼠标":"虚拟鼠标","显示器","画面设置",muted?"静音":"声音","发送文件","网络状态","Ctrl+Alt+Del","剪贴板"};
+            String[] labels={"键盘",mouseVisible?"收起鼠标":"虚拟鼠标",relative?"相对鼠标":"绝对鼠标","显示器","画面设置",muted?"静音":"声音","发送文件","网络状态","Ctrl+Alt+Del","剪贴板"};
             String[] icons={"keyboard","mouse","mouse","display","sliders","audio","folder","chart","lock","clipboard"};
-            Runnable[] clicks={()->{closeMenu();toggleKeyboard();},actions::mouse,this::toggleMouse,actions::display,()->openMenu("video"),actions::mute,actions::sendFile,()->openMenu("network"),actions::secureAttention,actions::clipboard};
+            Runnable[] clicks={()->{closeMenu();toggleKeyboard();},this::toggleMouse,actions::mouse,actions::display,()->openMenu("video"),actions::mute,actions::sendFile,()->openMenu("network"),actions::secureAttention,actions::clipboard};
             menuColumns=controlColumns();
             for(int row=0;row<(labels.length+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int index=row*menuColumns+col;if(index>=labels.length){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));control.addView(ui.icon(icons[index],INK),ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setSingleLine();caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
                     LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(control,p);
