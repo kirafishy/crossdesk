@@ -20,11 +20,52 @@
 
 </div>
 
-CrossDesk 支持 Windows、macOS、Linux 与 **鸿蒙（HarmonyOS）PC** 之间的远程访问，也可从浏览器或原生 iOS / Android / 鸿蒙手机和平板客户端控制电脑。鸿蒙 PC 与移动端目前为开发版，具体要求见 [鸿蒙支持](#harmonyos)。桌面端提供 **桌面墙（DeskHub）**，可在独立窗口中同时查看多台远程桌面，按分组管理设备，并进行批量操作与群控。项目基于 [MiniRTC](https://github.com/kunkundi/minirtc)，提供实时音视频传输、键鼠控制、文件传输与自托管能力，仍在持续开发中。
+CrossDesk 让你从电脑、浏览器或手机连接远端电脑，也能通过 **桌面墙（DeskHub）** 集中查看与操控多台设备。项目基于 [MiniRTC](https://github.com/kunkundi/minirtc)，支持自托管。
 
-> 本文按当前仓库代码整理。截图展示当前 Slint 桌面界面，使用演示 ID、密码、在线状态和连接记录；缩略图来自公开页面；下载包的功能与系统要求请同时核对对应 Release 说明。原生 iOS 客户端的构建、签名方式见下文。
+[主要功能](#features) · [下载与平台支持](#download) · [快速连接](#quick-start) · [界面预览](#preview) · [使用指南](docs/USER_GUIDE.md) · [自托管](#self-hosting) · [构建与反馈](#development) · [赞助](#sponsor)
 
-[界面预览](#preview) · [下载与安装](#download) · [快速连接](#quick-start) · [桌面墙](#deskhub) · [会话操作](#session) · [设置](#settings) · [iOS](#ios) · [Android](#android) · [鸿蒙](#harmonyos) · [自托管](#self-hosting) · [源码构建](docs/BUILD.md) · [常见问题](docs/FAQ.md)
+<a id="features"></a>
+
+## 主要功能
+
+- **跨平台远控：** Windows、macOS、Linux 桌面互控，浏览器及原生 iOS / Android 客户端访问电脑；鸿蒙 PC 与移动端处于开发阶段。
+- **桌面墙：** 多设备实时预览、分组、放大操控、群控和批量文件分发。
+- **画面与声音：** H.264 / AV1、硬件编解码、远端音频，以及会话内画质和帧率调整；可用能力随平台与设备而异。
+- **日常协作：** 多显示器切换、键鼠与组合键、文本剪贴板、文件传输。
+- **部署与运维：** P2P 直连、TURN 中继、SRTP 媒体加密、自托管，以及 Windows 登录前远控和 Linux 无头运行。
+
+<a id="download"></a>
+
+## 下载与平台支持
+
+从 [官方网站](https://www.crossdesk.cn/) 或 [GitHub Releases](https://github.com/kunkundi/crossdesk/releases) 下载与你的系统和 CPU 架构匹配的安装包；也可直接打开 [Web 客户端](https://web.crossdesk.cn/)。
+
+| 平台 | 支持范围与安装要求 |
+| --- | --- |
+| Windows | **控制 / 被控**；Windows 10+，x64；`.exe` 安装包，也支持便携构建 |
+| macOS | **控制 / 被控**；macOS 14.0+；按 Intel / Apple Silicon 选择 x64 / arm64 `.pkg` |
+| Linux | **控制 / 被控**；Ubuntu 20.04+、glibc 2.31 基线；amd64 / arm64 `.deb` |
+| iOS / iPadOS | **仅控制**；iOS 16.0+；发布包为未签名应用，需自行签名，或使用 Xcode 构建安装 |
+| Android | **仅控制**；Android 8.0+，arm64；下载已签名 APK 安装，或自行构建 |
+| 鸿蒙 PC（开发版） | **控制 / 被控**；API 26，arm64；使用 DevEco 构建并签名 HAP，仍在进行真机验收 |
+| 鸿蒙手机 / 平板（开发版） | **仅控制**；API 20+，arm64；使用 DevEco 构建并签名 HAP，仍在进行真机验收 |
+| Web | **仅控制**；支持 WebRTC 的浏览器；无需在控制端安装客户端 |
+
+系统要求按当前源码与构建配置整理，具体安装包以对应 Release 说明为准。各客户端的功能范围见 [移动端与鸿蒙](#mobile)。
+
+- **Linux：** 已有桌面选普通版 `crossdesk-linux-…deb`；需要独立 Xfce 桌面的服务器选 `crossdesk-virtual-desktop-xfce-…deb`。两者选择其一，安装与启动方法见 [使用指南](docs/USER_GUIDE.md#installation) 和 [无头运行](docs/HEADLESS.md)。
+- **macOS：** 首次运行时按提示授予屏幕录制及辅助功能权限；前者用于桌面采集，后者用于远程键鼠输入。[权限说明](docs/USER_GUIDE.md#installation)
+- **iOS / 鸿蒙：** 签名与构建步骤分别见 [iOS](apps/ios/README.md) 和 [鸿蒙](apps/harmony/README.md)，不要将未签名产物当作可直接安装的应用。
+
+<a id="quick-start"></a>
+
+## 快速连接
+
+1. **准备被控电脑。** 安装并运行 CrossDesk，等待显示“已连接服务器”，查看“本桌面”中的本机 ID 和密码。
+2. **发起连接。** 在另一台电脑的 CrossDesk 中输入被控电脑的 9 位 ID，点击“连接”；也可使用原生移动端或 [Web 客户端](https://web.crossdesk.cn/)。
+3. **验证密码。** 输入被控电脑当前的连接密码，等待远程画面出现。桌面端可勾选“记住密码”，后续从“近期连接”重连。
+
+使用自建服务器时，两端需要接入同一服务。更多连接、密码及浏览器操作见 [使用指南](docs/USER_GUIDE.md#quick-start)；连接失败、黑屏或无法操作键鼠时先查阅 [常见问题](docs/FAQ.md)。
 
 <a id="preview"></a>
 
@@ -32,312 +73,86 @@ CrossDesk 支持 Windows、macOS、Linux 与 **鸿蒙（HarmonyOS）PC** 之间�
 
 ### 桌面客户端
 
-主窗口以“本桌面”和“远程桌面”两张卡片展示本机凭据与连接入口，下方是可按分组筛选的近期连接。左上角打开桌面墙，右上角菜单进入设置、消息与关于。
+本机凭据、远程连接和近期设备集中在主窗口，左上角进入桌面墙。
 
 <p align="center">
-  <img src="docs/images/desktop-main-zh.png" width="800" alt="新版主窗口：桌面墙入口、本机凭据、远程连接卡片和近期连接分组筛选；数据为演示" />
+  <img src="docs/images/desktop-main-zh.png" width="800" alt="CrossDesk 主窗口：本机凭据、远程连接入口和近期设备；数据为演示" />
 </p>
-
-### 桌面墙（DeskHub）
-
-在独立窗口中同时查看多台设备，支持分组、可调整大小的网格、精简模式、全屏与批量操作。点击画面可放大查看，再按需接管操控。
-
-<p align="center">
-  <img src="docs/images/desktop-deskhub-zh.png" width="960" alt="桌面墙网格：六台演示设备、分组筛选、添加、选择、精简模式和网络状态入口" />
-</p>
-
-### Web 客户端
-
-在浏览器中输入远程设备 ID 和密码，无需在控制端安装桌面客户端。
-
-<p align="center">
-  <img src="docs/images/web-client.png" width="800" alt="CrossDesk Web 客户端连接首页（2026-09-25 截图）" />
-</p>
-
-图片来源与更新方式见 [截图说明](docs/images/README.md)。
-
-## 主要功能
-
-| 能力 | 当前支持 |
-| --- | --- |
-| 跨平台控制 | Windows / macOS / Linux / 鸿蒙 PC 桌面互控；浏览器与原生 iOS / Android / 鸿蒙手机和平板作为控制端；鸿蒙目前为开发版 |
-| 实时画面与声音 | H.264 / AV1、硬件编解码、远端声音播放；会话中可调整画质、30 / 60 fps 与画面偏好 |
-| 多设备与多显示器 | 近期连接、设备别名与分组筛选、会话标签与远端显示器切换 |
-| 桌面墙（DeskHub） | 多桌面实时预览、分组与拖动排序、放大接管、群控、批量连接 / 断开 / 静音 / 文件分发；可配置分辨率、帧率与视频总带宽 |
-| 输入与协作 | 键鼠输入、远端光标同步、组合键、文本剪贴板同步、文件传输 |
-| 网络与部署 | P2P 直连、TURN 中继与强制中继、SRTP 媒体加密、自托管信令与中继服务 |
-| 隐私屏 | 被连接时自动开启，或在会话工具栏切换；可用性取决于被控端系统与采集方式 |
-| Windows 锁屏控制 | 通过 CrossDesk Service 支持锁屏、登录界面及安全桌面的输入转发 |
-| Linux 无头运行 | 复用已有桌面和应用，或创建独立 Xvfb 虚拟桌面；终端控制台可查看状态、修改密码和设置，见 [运行说明](docs/HEADLESS.md) |
-
-各客户端的入口和能力有所不同；桌面会话操作见下文，移动端具体功能见 [iOS](apps/ios/README.md)、[Android](apps/android/README.md) 与 [鸿蒙](apps/harmony/README.md) 开发说明。
-
-<a id="download"></a>
-
-## 下载与安装
-
-前往 [GitHub Releases](https://github.com/kunkundi/crossdesk/releases) 或 [官方网站](https://www.crossdesk.cn/)，按系统与 CPU 架构选择安装包。
-
-| 平台 | 当前源码 / CI 基线 | 安装方式 |
-| --- | --- | --- |
-| Windows | Windows 10+，x64 | `.exe` 安装包；便携构建也受支持 |
-| macOS | macOS 14.0+，Intel / Apple Silicon | 选择 x64 或 arm64 的 `.pkg` |
-| Linux | Ubuntu 20.04+，amd64 / arm64，glibc 2.31 基线 | 普通版 / Xfce 虚拟桌面版 `.deb` |
-| iOS / iPadOS | iOS 16.0+，arm64 真机 | 原生客户端；使用 Xcode 构建并签名，CI 产物为未签名应用 |
-| Android | Android 8.0+，arm64 | 原生控制端；使用 Gradle 构建 APK，见 [开发说明](apps/android/README.md) |
-| 鸿蒙 HarmonyOS（开发版） | PC：API 26；手机 / 平板：API 20+；arm64，待真机验收 | 使用 DevEco 构建并签名 HAP；见 [鸿蒙支持](#harmonyos) 与 [构建说明](apps/harmony/README.md) |
-| Web | 支持 WebRTC 的浏览器 | 访问 [web.crossdesk.cn](https://web.crossdesk.cn/) |
-
-Linux 每个架构提供两个可独立安装的包，**选择其中一个**：
-
-| 安装包 | 适用场景 |
-| --- | --- |
-| `crossdesk-linux-<arch>-<version>.deb`（推荐） | 已有桌面的电脑；不会额外安装 Xfce 或 Xvfb |
-| `crossdesk-virtual-desktop-xfce-linux-<arch>-<version>.deb` | 需要创建独立桌面的服务器；APT 会额外安装 **Xfce、Xvfb 和 D-Bus 会话工具** |
-
-普通版安装示例（将文件名替换为实际下载名称，arm64 选择对应架构）：
-
-```bash
-sudo apt install "./crossdesk-linux-amd64-<version>.deb"
-```
-
-如需虚拟桌面版，改为安装：
-
-```bash
-sudo apt install "./crossdesk-virtual-desktop-xfce-linux-amd64-<version>.deb"
-```
-
-两个包包含相同的完整程序，互相替换并保留用户配置；普通版自行补齐依赖后也能创建虚拟桌面。安装虚拟桌面版不会自动启动会话或切换默认桌面，启动方法见 [Linux 无头运行](docs/HEADLESS.md)。应用更新的下载按钮会选择已安装的包类型。已有版本升级后不会自动删除先前安装的 Xfce。
-
-**macOS 首次运行：** 按应用提示，在“系统设置 → 隐私与安全性”中授予 CrossDesk **屏幕录制**（新系统可能显示为“屏幕与系统音频录制”）及 **辅助功能**权限，再按系统提示重新打开应用。前者用于捕获桌面，后者用于远程键鼠输入。
-
-<a id="quick-start"></a>
-
-## 快速连接
-
-### 从另一台电脑连接
-
-1. **准备被控电脑。** 安装并运行 CrossDesk，等待底部显示“已连接服务器”。在左侧“本桌面”查看 **本机 ID** 和 **密码**，提供给控制端。
-2. **输入对端 ID。** 在控制端右侧“远程桌面 → 对端 ID”输入被控电脑的 **9 位 ID**，点击 **连接**。
-3. **完成密码验证。** 按弹窗输入被控电脑当前的连接密码，确认后等待远程画面出现。需要保存密码时勾选“记住密码”。
-4. **再次连接。** 成功连接过的设备会出现在“近期连接”中，可通过卡片重连。悬停卡片可编辑别名、修改分组、删除记录或连接 / 断开；标题右侧可按分组筛选设备。
-
-本机密码旁的眼睛按钮用于显示 / 隐藏密码，刷新按钮用于生成新的随机密码，铅笔按钮用于手动修改。密码统一为 **6 位数字或英文字母**。修改或刷新时需保持连接服务器；等待修改成功、客户端重新连接后，再复制当前密码。已保存旧密码的控制端需重新输入。
-
-### 从浏览器连接
-
-1. 保持被控电脑上的 CrossDesk 运行，并确认已连接服务器。
-2. 打开 [Web 客户端](https://web.crossdesk.cn/)，输入 **远程设备 ID** 和 **密码**，点击“连接”。
-3. 连接后使用页面提供的显示器、鼠标模式和键盘控件操作远端；手机和平板也可通过浏览器访问。
-
-如果使用自建服务器，需要让控制端与被控端接入同一服务；Web 部署配置见 [CrossDesk Web Client](https://github.com/kunkundi/crossdesk-web-client)。
 
 <a id="deskhub"></a>
 
-## 桌面墙：集中查看与操控多台设备
+### 桌面墙（DeskHub）
 
-点击主窗口左上角 **桌面墙**，打开独立窗口；连接窗口仍可用于普通远程连接和全局设置。桌面墙会保存设备成员、分组、排序与窗口布局，重启后需要手动连接设备。
-
-1. **添加设备。** 点击 **添加 → 通过设备 ID 添加**，填写 ID、密码及可选分组，点击“添加并连接”；只有勾选“记住密码”才保存凭据。也可选择 **从近期连接添加**，多选已有记录并导入；导入后用“选择 → 连接”发起连接。
-2. **查看与整理。** 从“全部设备”切换到指定分组；拖动网格分隔线统一调整画面大小，拖动设备到另一台设备上交换位置。精简模式隐藏名称和管理工具栏，全屏用于扩大查看区域；翻页保留连接。
-3. **放大与操控。** 点击设备画面进入只读放大视图，上方缩略图可切换设备，拖动中间分隔条可调整上下区域。点击 **接管操控** 后才发送键鼠；点击“释放操控”或按 **Ctrl / ⌘ + Shift + Esc** 释放。切换设备或窗口失焦也会释放操控。
-4. **批量操作。** 点击 **选择**，勾选设备或“全选”，执行连接、断开，或从“更多”中静音 / 取消静音、分发文件。“全选”覆盖当前分组的全部分页；切换分组会清空选择。
+按分组查看多台设备，点击画面放大，再选择接管操控；支持批量连接、静音与文件分发。
 
 <p align="center">
-  <img src="docs/images/desktop-deskhub-focus-zh.png" width="960" alt="桌面墙放大视图：上方设备缩略图、下方主画面，以及只读预览、开启群控和接管操控入口；画面为演示" />
+  <img src="docs/images/desktop-deskhub-zh.png" width="960" alt="DeskHub 桌面墙：六台演示设备的远程画面与管理工具栏" />
 </p>
 
-**群控：** 在放大视图点击“开启群控”，将当前设备的键鼠操作同步到 **所有已连接设备**，包含其他分组、分页及未显示在墙内的连接；范围不受批量勾选限制。各设备接收相同坐标与按键，屏幕尺寸不同时不会另做比例适配。释放操控会同时结束群控。
-
-桌面墙连接默认静音，需要声音时通过“选择 → 更多 → 取消静音”开启。底部 **网络状态** 可查看所有已连接设备的直连 / 中继、加密状态、收发速率、视频延时、丢包率、分辨率与帧率。需要显示器切换、隐私屏等完整单会话工具时，可在主窗口“近期连接”中点击已连接设备，打开独立会话窗口。
-
-**关闭桌面墙会断开全部远程设备连接，并关闭共用连接的独立会话窗口；最小化不会断开。** 分组、分页和选择范围不会限制关闭时的断开范围。更多操作、预览策略与版本兼容性见 [桌面墙说明](docs/deskhub.md)。
+群控会向所有已连接设备发送输入；关闭桌面墙会断开全部远程连接。操作范围与详细用法见 [桌面墙使用指南](docs/USER_GUIDE.md#deskhub)。截图使用演示数据，更多界面及来源见 [使用指南](docs/USER_GUIDE.md) 与 [截图说明](docs/images/README.md)。
 
 <a id="session"></a>
-
-## 会话中的常用操作
-
-远程窗口通过会话标签切换设备，控制栏提供以下操作；控制栏收起时先点击展开按钮。将鼠标悬停在图标上可查看提示。
-
-| 入口 | 用途 |
-| --- | --- |
-| 显示器 | 切换远端显示器 |
-| 键盘 | 发送组合键；Windows 的 `Ctrl+Alt+Del` 依赖远端服务 |
-| 鼠标 | 控制 / 释放远端鼠标 |
-| 扬声器 | 播放声音 / 静音 |
-| 文件夹 | 选择文件发送到远端，并查看传输进度 |
-| 画面设置 | 在当前会话中调整画面质量、采集帧率与画面偏好 |
-| 网络状态 | 查看流量、丢包率、帧率、分辨率、直连 / 中继及加密状态 |
-| 隐私屏 | 开启或关闭被控电脑的隐私屏；悬停查看当前状态与可用操作 |
-| 全屏 | 进入 / 退出全屏 |
-| 断开连接 | 结束当前远程会话 |
-
-桌面端可同步文本剪贴板。接收文件的位置可在“设置 → 常规 → 文件保存路径”调整。关闭主窗口会隐藏窗口并保持程序运行；需要完全退出时使用系统托盘或菜单栏中的退出入口。
-
-### 在会话中调整画面
-
-连接成功后，点击工具栏中的 **画面设置**（滑杆图标），直接选择低 / 中 / 高画质、**30 / 60 fps**，以及帧率优先 / 画质优先 / 平衡。选项会发送给当前被控端，无需断开重连；实际画面效果取决于网络、设备与编码器能力。旧版被控端不支持时，菜单会提示并禁用选项。
-
-<p align="center">
-  <img src="docs/images/desktop-stream-video-settings-zh.png" width="800" alt="当前远程会话的画面设置菜单：画面质量、采集帧率与画面偏好；背景为公开页面演示图" />
-</p>
-
 <a id="settings"></a>
 
-## 客户端设置与更新
+## 会话操作与设置
 
-点击主窗口右上角 **☰ → 设置**，顶部切换 **常规 / 桌面墙**，修改后点击 **保存**。切换选项卡会保留未保存的修改，点击“取消”放弃修改。“常规”按界面、视频、网络连接等类别组织选项，可向下滚动查看其余设置。编码与连接选项建议在建立连接前调整；会话进行中部分选项不可修改。普通会话的画质、帧率和画面偏好在远程会话工具栏中调整。
+远程会话支持显示器切换、画质与帧率调整、声音、文本剪贴板同步和文件传输。工具栏还可查看网络状态、控制隐私屏；桌面设置中可配置编码、中继、自托管与桌面墙画面预算。
 
-<p align="center">
-  <img src="docs/images/desktop-settings-zh.png" width="720" alt="新版常规设置：常规与桌面墙选项卡、语言、视频编码、硬件编解码及网络连接设置" />
-</p>
+- [会话操作](docs/USER_GUIDE.md#session)：工具栏、文本剪贴板、文件保存和隐私屏。
+- [客户端设置与更新](docs/USER_GUIDE.md#settings)：常规设置、桌面墙传输及版本检查。
+- [桌面墙技术说明](docs/deskhub.md)：预览订阅、带宽分配、协议与兼容性。
 
-| 设置 | 说明 |
-| --- | --- |
-| 语言 | 中文、English、Русский |
-| 采集方式（Windows） | 自动 / DXGI / WGC / GDI；无显示器主机使用“自动”启用自动适配 |
-| 视频编码格式 | H.264 / AV1；硬件编解码是否可用取决于平台、硬件与构建选项 |
-| 启用中继服务 | 允许借助 TURN 中继建立连接；P2P 连接失败时先检查此项 |
-| 强制中继连接 | 启用中继服务后可勾选，让连接通过中继建立；关闭中继服务会同时关闭此项 |
-| 保存远程画面预览 | 默认开启，保存远程画面预览；关闭后缩略图区域显示被控端平台，并清除已有预览，保留连接记录和密码 |
-| 被连接时开启隐私屏 | 设置本机被远程连接时是否自动启用隐私屏；会话中可从控制端工具栏切换 |
-| 自托管配置 | 填写服务器地址和信令服务端口，并勾选启用 |
-| 开机自启 / 启用守护进程 | 调整启动与进程守护行为，按界面提示重启后生效 |
-| 文件保存路径 | 选择接收文件的目录 |
+<a id="mobile"></a>
 
-### 桌面墙画面传输
-
-在 **设置 → 桌面墙** 中统一配置墙内设备，保存后立即应用到当前桌面墙会话，并用于后续连接；普通连接不受影响。
-
-| 设置 | 说明 |
-| --- | --- |
-| 分辨率上限 | 自动、320 × 180、640 × 360、1280 × 720、1920 × 1080、2560 × 1440、3840 × 2160 或原始分辨率；自动模式按网格 / 放大视图调整，固定上限保持比例且不放大源画面 |
-| 帧率 | 跟随设备设置，或指定 15 / 30 / 60 FPS |
-| 视频总带宽 | 默认 20 Mbps，可选 2 / 5 / 10 / 20 / 50 / 100 Mbps；由支持该能力的桌面墙会话共享，放大画面优先分配，不包含音频、文件传输与普通连接，也不是瞬时流量的硬上限 |
-
-<p align="center">
-  <img src="docs/images/desktop-settings-deskhub-zh.png" width="720" alt="桌面墙传输设置：自动分辨率、跟随设备帧率和 20 Mbps 视频总带宽" />
-</p>
-
-支持预览订阅的设备在不可见时可暂停视频传输，重新可见时恢复；旧版被控端按其能力回退，不保证所有分辨率、帧率或带宽选项都生效。
-
-### 检查更新
-
-客户端启动后会在后台检查版本，发现新版本时自动弹出更新提示，可查看更新说明并前往下载页面。关闭提示后，本次运行中的后台检查不会再次弹窗，主窗口菜单入口仍会显示更新提示；重新启动客户端后，如仍有新版本则再次提示。打开 **☰ → 关于** 可查看版本；有新版本时，点击版本信息下方的 **更新日志** 可再次打开更新提示，也可点击 **检查更新** 手动检查。
-
-<p align="center">
-  <img src="docs/images/desktop-about-zh.png" width="720" alt="关于窗口与检查更新按钮，版本号和检查结果为演示数据" />
-</p>
+## 移动端与鸿蒙
 
 <a id="ios"></a>
 
-## 原生 iOS / iPadOS 客户端
+### iOS / iPadOS
 
-仓库的 [`apps/ios`](apps/ios/README.md) 提供原生控制端，与桌面端使用同一套 MiniRTC 协议。它可以控制远端电脑；当前不提供将 iPhone / iPad 作为被控桌面的功能。
+原生控制端支持触控与虚拟鼠标、多显示器、远端音频、文件收发和文本剪贴板。悬浮菜单的“剪贴板”按钮可主动发送本机文本，单次上限为 128 KiB。iPhone / iPad 当前不能作为被控桌面。
 
-1. 按 [iOS 开发说明](apps/ios/README.md) 使用 Xcode 构建并签名，安装到 iOS 16+ 的真机。
-2. 在首页输入对端 ID，点击连接并填写密码；成功连接后可从“最近连接”中重连。
-3. 在设置中选择鼠标模式：**相对位置**像触控板一样移动光标，**绝对位置**将触摸位置直接映射到远端画面。
-4. 点击悬浮图标展开菜单，可切换显示器、显示键盘、控制声音或发送文件。收到的文件位于应用的 `Documents/Received`，可通过传输状态旁的分享按钮导出。
-
-当前支持接收远端文本到 iOS 剪贴板；界面暂未提供主动发送本机剪贴板的按钮。
-
-当前支持单指点击、双指右键、长按拖动与捏合缩放；缩放后的双指平移用于移动视图。原生端与浏览器端分别维护，使用入口和手势可能不同。
+[使用说明](docs/USER_GUIDE.md#ios) · [构建与签名](apps/ios/README.md)
 
 <a id="android"></a>
 
-## 原生 Android 控制端
+### Android
 
-[`apps/android`](apps/android/README.md) 提供独立 Android Studio / Gradle 工程，复用 MiniRTC 和桌面键鼠协议。支持连接电脑、H.264 / AV1 画面、声音、触控/外接键鼠、多屏切换和文本剪贴板。当前面向 Android 8.0+ arm64 设备，使用软件解码；尚未提供手机被控、文件传输和 iOS 全部附加功能。
+原生控制端支持触控与外接键鼠、多屏切换、文件收发、文本剪贴板和会话画面设置。H.264 / AV1 优先使用硬件解码，不支持或运行失败时回退到软件解码；切换应用时优先通过画中画保持会话，画中画不可用时尝试前台服务保活。当前不提供手机被控或隐私屏功能。
 
-按 [Android 开发说明](apps/android/README.md) 构建并安装 APK，在首页填写电脑端的设备 ID 和密码即可连接。长按右键、双指滚动，横屏可扩大画面；切换到后台会结束会话。
+[使用说明](docs/USER_GUIDE.md#android) · [源码构建](apps/android/README.md)
 
 <a id="harmonyos"></a>
 
-## 鸿蒙（HarmonyOS）支持
+### 鸿蒙 HarmonyOS（开发版）
 
-CrossDesk 已支持鸿蒙 PC、手机和平板，PC 与移动端分别构建 HAP，应用名称统一为 **CrossDesk**，包名统一为 `com.chunkdash.crossdesk`。
+PC 端可控制和被控制，复用桌面界面与桌面墙；手机和平板使用原生 ArkUI 控制端，支持触控、外接键鼠、多屏、文本剪贴板和文件收发。PC 录屏与输入控制需要系统授权，真机和长期会话验收仍在进行。
 
-| 客户端 | 系统与架构 | 功能 |
-| --- | --- | --- |
-| 鸿蒙 PC（`2in1`） | API 26，arm64 | 可作为控制端和被控端，复用公共 Slint 桌面界面、会话管理、桌面墙与文件传输 |
-| 鸿蒙手机 / 平板 | API 20+，arm64 | 原生 ArkUI 控制端，支持远端画面与声音、触控和外接键鼠、多屏切换、文本剪贴板及双向文件传输 |
-
-鸿蒙 PC、移动端与其他 PC 平台共用文件传输核心。移动端通过系统文件选择器发送和导出文件，PC 可在设置中选择接收目录。
-
-当前为开发版，需按 [鸿蒙构建说明](apps/harmony/README.md) 使用 DevEco 构建并签名后安装。PC 录屏和输入控制需获得相应系统授权，真机与长期会话验收仍在进行；具体权限、平台差异及验证范围见 [PC 说明](apps/harmony/desktop-port/README.md) 与 [移动端功能说明](apps/harmony/MOBILE_PARITY.md)。
+[使用与限制](docs/USER_GUIDE.md#harmonyos) · [构建与签名](apps/harmony/README.md) · [PC 说明](apps/harmony/desktop-port/README.md) · [移动端功能](apps/harmony/MOBILE_PARITY.md)
 
 <a id="windows-service"></a>
 
-## Windows 锁屏与登录界面
+## 无人值守与无头运行
 
-**CrossDesk Service**（服务名 `CrossDeskService`）提供锁屏、登录、凭据输入及安全桌面的状态上报、`Ctrl+Alt+Del` 发送和键鼠输入转发。
-
-安装版默认注册按需启动的服务，客户端启动时尝试启动它；未启用无人值守时，本机没有 CrossDesk 客户端进程后服务会自动退出。便携版可在提示窗口或“设置 → 锁屏控制服务”中安装服务，需要管理员权限。
-
-Windows 的“开机自启”在当前用户登录后启动客户端。安装版使用以最高权限运行的登录计划任务，后续登录无需再次确认 UAC；便携版和 Debug 构建使用当前用户的普通启动项。升级安装版或手动启动新版时，会自动迁移指向该程序的旧启动项。关闭自启会删除相应注册。登录前远控需要另外启用下面的无人值守模式。
-
-### 开机后尚未登录时远控
-
-安装版支持独立的无人值守被控端。在完整安装目录中打开**管理员 PowerShell**，一次性启用：
-
-```powershell
-.\CrossDesk.exe --unattended-enable
-# 等待联网注册后，查看独立设备 ID、密码和 online 状态
-.\CrossDesk.exe --unattended-status
-```
-
-使用返回的 `device_id` 和 `password` 从另一台设备连接。首次启用时复制当前客户端的服务器和编码设置，单独生成无人值守凭据；它与普通客户端的设备 ID 不同，重启、注销和重新启用时保留。后续执行启用命令会复用机器配置，不会覆盖它。自建服务器的根证书需要安装到本地计算机的信任存储中。
-
-启用后，`CrossDeskService` 改为系统启动时自动运行，无需 Windows 自动登录，也不需要保存 Windows 登录密码。服务以 SYSTEM 身份在当前控制台会话中启动无界面的被控进程，复用登录界面抓屏、键鼠及 `Ctrl+Alt+Del` 支持。用户登录、锁屏和关闭普通客户端不会停止它；注销、切换用户或进程崩溃后服务会重新拉起，期间连接可能中断，需要重新连接同一设备 ID。启动时网络尚未就绪会继续重试。
-
-无人值守模式提供画面、键鼠、多屏切换和安全桌面控制；不提供声音、文件传输、剪贴板或隐私遮罩。便携版和 Debug 构建不能启用此模式。设置和凭据位于 `%ProgramData%\CrossDeskUnattended`，只允许 SYSTEM 和管理员访问；日志位于其 `logs` 子目录。
-
-```powershell
-# 停止无人值守被控端，并恢复服务按需启动
-.\CrossDesk.exe --unattended-disable
-```
-
-关闭普通“开机自启”不会关闭无人值守模式。禁用或卸载服务会取消无人值守启动，但保留受保护的机器配置；若需彻底清除凭据，在服务停止后由管理员删除该目录。
-
-<details>
-<summary>手动部署与服务管理命令</summary>
-
-保留完整安装目录；自行部署构建产物时，将 `CrossDesk.exe`、`crossdesk_service.exe`、`crossdesk_session_helper.exe` 及同次构建输出的全部 `.dll` 放在同一目录。在该目录打开管理员 PowerShell，按需执行：
-
-```powershell
-.\CrossDesk.exe --service-install
-.\CrossDesk.exe --service-start
-.\CrossDesk.exe --service-status
-.\CrossDesk.exe --service-ping
-# 停止或卸载服务
-.\CrossDesk.exe --service-stop
-.\CrossDesk.exe --service-uninstall
-```
-
-</details>
-
-出现“远端 Windows 服务不可用”时，检查被控电脑的安装和服务状态；普通桌面连接仍可使用，受保护界面的控制能力会受限。
+- **Windows：** CrossDesk Service 支持锁屏、登录和安全桌面控制。安装版可额外启用登录前远控，使用独立设备 ID 和密码；普通“开机自启”仅在用户登录后启动客户端。功能限制及启停命令见 [Windows 无人值守指南](docs/USER_GUIDE.md#windows-service)。
+- **Linux：** 可复用现有桌面，也可创建独立 Xvfb / Xfce 会话，操作方法见 [Linux 无头运行](docs/HEADLESS.md)。
 
 <a id="self-hosting"></a>
 
-## 自托管服务器
+## 自托管
 
-可自行部署信令服务与 TURN 中继，并在桌面客户端 **☰ → 设置 → 常规 → 自托管配置** 中填写连接信息。控制端与被控端都需要启用同一套配置。
+可自行部署信令与 TURN 中继服务，并在客户端“设置 → 常规 → 自托管配置”中启用。控制端与被控端需要接入同一服务。
 
-- [自托管指南](docs/SELF_HOSTING.md)：当前 Compose 部署入口、客户端设置、证书信任与排查。
-- [CrossDesk Server](https://github.com/kunkundi/crossdesk-server)：服务端源码与发布配置。
-- [CrossDesk Web Client](https://github.com/kunkundi/crossdesk-web-client)：浏览器端源码与自托管说明。
+[部署指南](docs/SELF_HOSTING.md) · [客户端配置](docs/USER_GUIDE.md#self-hosting) · [服务端源码](https://github.com/kunkundi/crossdesk-server) · [Web 客户端部署](https://github.com/kunkundi/crossdesk-web-client)
 
-## 开发与反馈
+<a id="development"></a>
 
-- [源码构建](docs/BUILD.md)：Windows、macOS、Linux、可选编译参数与打包。
-- [iOS 开发说明](apps/ios/README.md)：原生端构建和真机验证。
-- [Android 开发说明](apps/android/README.md)：APK 构建、安装与模拟器验证。
-- [鸿蒙开发说明](apps/harmony/README.md)：PC 与手机 / 平板 HAP 构建、签名、权限及验证。
-- [GUI 架构](docs/gui-architecture.md)：桌面 UI、平台实现与工程结构。
-- [常见问题](docs/FAQ.md)：连接失败、黑屏、文件位置与编译问题。
-- [提交问题](https://github.com/kunkundi/crossdesk/issues)：请附上两端系统、客户端版本、连接方式和可复现步骤。
+## 构建与反馈
+
+- [源码构建](docs/BUILD.md)：桌面端依赖、编译参数与打包；移动端请使用上方各平台的构建指南。
+- [GUI 架构](docs/gui-architecture.md)：桌面界面、平台实现与工程结构。
+- [常见问题](docs/FAQ.md)：连接失败、黑屏、系统权限、文件位置与构建问题。
+- [提交问题或建议](https://github.com/kunkundi/crossdesk/issues)：请提供两端系统、客户端版本、连接方式和可复现步骤。
 
 <a id="sponsor"></a>
 
