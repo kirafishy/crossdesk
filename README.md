@@ -12,6 +12,7 @@
 [![Build](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml/badge.svg)](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/kunkundi/crossdesk?style=social)](https://github.com/kunkundi/crossdesk/stargazers)
+[![Sponsor](https://img.shields.io/badge/Sponsor-EA4AAA?logo=githubsponsors&logoColor=white)](#sponsor)
 
 </div>
 
@@ -333,6 +334,14 @@ Windows 的“开机自启”在当前用户登录后启动客户端。安装版
 - [GUI 架构](docs/gui-architecture.md)：桌面 UI、平台实现与工程结构。
 - [常见问题](docs/FAQ.md)：连接失败、黑屏、文件位置与编译问题。
 - [提交问题](https://github.com/kunkundi/crossdesk/issues)：请附上两端系统、客户端版本、连接方式和可复现步骤。
+
+<a id="sponsor"></a>
+
+## 支持 CrossDesk
+
+如果 CrossDesk 对你有帮助，欢迎通过以下平台赞助，支持项目的持续开发、跨平台测试与日常维护。感谢你的支持！
+
+[爱发电](https://afdian.com/a/kunkundi) · [Ko-fi](https://ko-fi.com/kunkundi) · [GitHub Sponsors](https://github.com/sponsors/kunkundi)
 
 ## 致谢与许可
 

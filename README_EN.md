@@ -12,6 +12,7 @@
 [![Build](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml/badge.svg)](https://github.com/kunkundi/crossdesk/actions/workflows/build.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/kunkundi/crossdesk?style=social)](https://github.com/kunkundi/crossdesk/stargazers)
+[![Sponsor](https://img.shields.io/badge/Sponsor-EA4AAA?logo=githubsponsors&logoColor=white)](#sponsor)
 
 </div>
 
@@ -325,6 +326,14 @@ Host your own signaling and TURN services, then enter their connection details u
 - [GUI architecture](docs/gui-architecture.md): desktop UI and platform organization.
 - [FAQ](docs/FAQ.md#english): connection failures, blank video, received files, and build issues.
 - [Report an issue](https://github.com/kunkundi/crossdesk/issues): include both operating systems, client versions, connection mode, and reproduction steps.
+
+<a id="sponsor"></a>
+
+## Support CrossDesk
+
+If CrossDesk is useful to you, consider sponsoring its continued development, cross-platform testing, and maintenance through one of the platforms below. Thank you for your support!
+
+[Ko-fi](https://ko-fi.com/kunkundi) · [GitHub Sponsors](https://github.com/sponsors/kunkundi) · [AFDIAN](https://afdian.com/a/kunkundi)
 
 ## Acknowledgements and license
 
