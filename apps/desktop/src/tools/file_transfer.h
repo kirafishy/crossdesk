@@ -18,6 +18,7 @@ namespace crossdesk {
 class FileReceiver {
  public:
   using OnSendAck = std::function<int(const FileTransferAck&)>;
+  using OnReceiveProgress = file_transfer::Session::ReceiveProgress;
   FileReceiver();
   explicit FileReceiver(const std::filesystem::path& output_dir);
   bool OnData(const char* data, size_t size) { return session_.Receive(data, size); }
@@ -25,6 +26,7 @@ class FileReceiver {
   void Cancel() { session_.Cancel(); }
   // Set once, before the receiver is published to transport callbacks.
   void SetOnSendAck(OnSendAck cb) { on_send_ack_ = std::move(cb); }
+  void SetOnReceiveProgress(OnReceiveProgress cb) { on_receive_progress_ = std::move(cb); }
   std::filesystem::path OutputDir() const {
     std::lock_guard lock(directory_mutex_);
     return output_dir_;
@@ -40,6 +42,7 @@ class FileReceiver {
   mutable std::mutex directory_mutex_;
   std::filesystem::path output_dir_;
   OnSendAck on_send_ack_;
+  OnReceiveProgress on_receive_progress_;
   file_transfer::Session session_;
 };
 

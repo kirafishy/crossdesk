@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 namespace crossdesk {
@@ -42,8 +43,20 @@ bool IsStreamWindowActive();
 bool SetStreamWindowFullscreen(bool fullscreen);
 bool IsStreamWindowFullscreen();
 
-// Opens an application-modal macOS file picker. The panel is made key before
-// entering its modal loop so it receives keyboard input immediately.
-std::string OpenNativeFileDialog(const std::string &title);
+// Shows a desktop transfer notification without replacing the current key
+// window, including while the stream is fullscreen.
+// |slint_view| must be the notification's existing AppKit NSView*.
+void ShowFileTransferNotification(void* slint_view,
+                                  const std::function<void()>& show);
+
+// Schedule hidden initialization after the main window's initial display.
+void PrepareNativeFileDialog();
+// Opens a macOS file picker asynchronously on the main thread, without a
+// nested modal loop. Completion receives an empty path on cancel or failure.
+void OpenNativeFileDialog(const std::string& title,
+                          std::function<void(std::string)> completion);
+// Cancels an open or pending picker, completes it once with an empty path, and
+// releases the cached panel and pending initialization during application exit.
+void CancelNativeFileDialog();
 
 } // namespace crossdesk

@@ -32,35 +32,42 @@ void FileTransferManager::Shutdown() {
 }
 
 FileTransferManager::FileTransferState& FileTransferManager::global_state() { return global_state_; }
+FileTransferManager::FileTransferState& FileTransferManager::received_state() { return received_state_; }
 FileTransferManager::FileTransferState& FileTransferManager::state_for(const std::shared_ptr<RemoteSession>& props) {
   return props ? props->file_transfer_ : global_state_;
 }
 
-void FileTransferManager::ProcessSelectedFile(const std::string& path,
+bool FileTransferManager::ProcessSelectedFile(const std::string& path,
     const std::shared_ptr<RemoteSession>& props, const std::string& file_label,
-    const std::string& remote_id) {
-  if (path.empty() || stopping_ || (props && props->closing_)) return;
+    const std::string& remote_id, uint32_t file_id) {
+  if (path.empty() || stopping_ || (props && props->closing_)) return false;
   const auto file_path = PathFromUtf8(path);
   std::error_code ec;
-  if (!std::filesystem::is_regular_file(file_path, ec)) return;
+  if (!std::filesystem::is_regular_file(file_path, ec)) return false;
   const auto size = std::filesystem::file_size(file_path, ec);
-  if (ec) return;
+  if (ec) return false;
   auto& state = state_for(props);
+  // Allocate once at enqueue time so queued and active notifications keep the
+  // same identity, including repeated sends of the same path.
+  const auto id = file_id ? file_id : file_transfer::Session::NextFileId();
   {
     std::lock_guard lock(state.file_transfer_list_mutex_);
     FileTransferState::FileTransferInfo info;
     const auto name = file_path.filename().u8string();
     info.file_name.assign(name.begin(), name.end());
+    info.remote_id = props ? props->remote_id_ : remote_id;
     info.file_path = file_path; info.file_size = size;
+    info.file_id = id;
     info.status = FileTransferState::FileTransferStatus::Queued;
     state.file_transfer_list_.push_back(std::move(info));
   }
   state.file_transfer_window_visible_ = true;
   {
     std::lock_guard lock(state.file_queue_mutex_);
-    state.file_send_queue_.push({file_path, file_label, props ? props->remote_id_ : remote_id});
+    state.file_send_queue_.push({file_path, file_label, props ? props->remote_id_ : remote_id, id});
   }
   ProcessQueue(props);
+  return true;
 }
 
 void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
@@ -79,7 +86,7 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
   });
   workers_.push_back(std::async(std::launch::async, [this, props, file] {
     auto& state = state_for(props);
-    const auto id = file_transfer::Session::NextFileId();
+    const auto id = file.file_id;
     PeerPtr* peer;
     std::shared_ptr<PeerEventHandler> events;
     {
@@ -97,15 +104,17 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
         }, file_transfer::Session::Progress{});
     state.file_sent_bytes_ = 0; state.file_total_bytes_ = 0; state.file_send_rate_bps_ = 0;
     state.current_file_id_ = id;
+    const auto started_at = std::chrono::steady_clock::now();
+    auto next_rate_update = started_at + std::chrono::seconds(1);
     {
       std::lock_guard lock(state.file_transfer_mutex_);
-      state.file_send_start_time_ = state.file_send_last_update_time_ = std::chrono::steady_clock::now();
+      state.file_send_start_time_ = state.file_send_last_update_time_ = started_at;
       state.file_send_last_bytes_ = 0;
     }
     {
       std::lock_guard lock(state.file_transfer_list_mutex_);
       for (auto& info : state.file_transfer_list_) {
-        if (info.file_path == file.file_path && info.status == FileTransferState::FileTransferStatus::Queued) {
+        if (info.file_id == id) {
           info.status = FileTransferState::FileTransferStatus::Sending;
           info.file_id = id; info.sent_bytes = 0;
           break;
@@ -133,8 +142,13 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
         if (stopping_ || !events->IsActive() || (props && props->closing_)) session->Cancel();
         const bool pumped = session->Pump();
         progress = session->Snapshot();
-        if (progress.acknowledged != previous || progress.status != file_transfer::Status::Sending) {
-          UpdateProgress(state, props, progress); previous = progress.acknowledged;
+        const auto now = std::chrono::steady_clock::now();
+        const bool rate_due = now >= next_rate_update;
+        if (progress.acknowledged != previous || rate_due ||
+            progress.status != file_transfer::Status::Sending) {
+          UpdateProgress(state, progress, now);
+          previous = progress.acknowledged;
+          if (rate_due) next_rate_update = now + std::chrono::seconds(1);
         }
         if (progress.status != file_transfer::Status::Sending) break;
         if (!pumped) {
@@ -168,29 +182,27 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
 }
 
 void FileTransferManager::UpdateProgress(FileTransferState& state,
-    const std::shared_ptr<RemoteSession>& props, const file_transfer::SendState& progress) {
+    const file_transfer::SendState& progress,
+    std::chrono::steady_clock::time_point now) {
   state.file_sent_bytes_ = progress.acknowledged; state.file_total_bytes_ = progress.total;
-  const auto now = std::chrono::steady_clock::now();
-  const uint32_t current = state.file_send_rate_bps_.load();
-  uint32_t rate = current;
+  uint32_t rate = state.file_send_rate_bps_.load();
   {
     std::lock_guard lock(state.file_transfer_mutex_);
-    if (props) {
-      const auto bitrate = props->net_traffic_stats_.DataOutboundBitrate();
-      if (bitrate) rate = current ? static_cast<uint32_t>(current * .7 + bitrate * .99 * .3)
-                                 : static_cast<uint32_t>(bitrate * .99);
-    } else {
-      const double seconds = std::chrono::duration<double>(now - state.file_send_last_update_time_).count();
-      if (seconds > 0 && progress.acknowledged > state.file_send_last_bytes_) {
-        const double measured = (progress.acknowledged - state.file_send_last_bytes_) * 8.0 / seconds;
-        const auto value = static_cast<uint32_t>((std::min)(measured,
-            static_cast<double>((std::numeric_limits<uint32_t>::max)())));
-        rate = current ? static_cast<uint32_t>(current * .7 + value * .3) : value;
-      }
+    const auto elapsed = now - state.file_send_last_update_time_;
+    // Progress follows every ACK; speed uses one full sample per second for
+    // this file. Sample even without new ACKs so a stalled transfer reads zero.
+    if (elapsed >= std::chrono::seconds(1)) {
+      const double seconds = std::chrono::duration<double>(elapsed).count();
+      const auto bytes = progress.acknowledged >= state.file_send_last_bytes_
+          ? progress.acknowledged - state.file_send_last_bytes_ : 0;
+      const double measured = bytes * 8.0 / seconds;
+      rate = static_cast<uint32_t>((std::min)(measured,
+          static_cast<double>((std::numeric_limits<uint32_t>::max)())));
+      state.file_send_rate_bps_ = rate;
+      state.file_send_last_bytes_ = progress.acknowledged;
+      state.file_send_last_update_time_ = now;
     }
-    state.file_send_last_bytes_ = progress.acknowledged; state.file_send_last_update_time_ = now;
   }
-  state.file_send_rate_bps_ = rate;
   std::lock_guard lock(state.file_transfer_list_mutex_);
   for (auto& info : state.file_transfer_list_) if (info.file_id == progress.id) {
     info.sent_bytes = progress.acknowledged; info.file_size = progress.total; info.rate_bps = rate;
@@ -211,6 +223,41 @@ void FileTransferManager::HandleAck(const char* data, size_t size,
   }
   session->Ack(data, size);
   wake_.notify_all();
+}
+
+void FileTransferManager::UpdateReceiveProgress(
+    const file_transfer::ReceiveState& progress,
+    std::unordered_map<uint32_t, size_t>& notifications,
+    const std::string& remote_id) {
+  using Status = FileTransferState::FileTransferStatus;
+  std::lock_guard lock(received_state_.file_transfer_list_mutex_);
+  auto& files = received_state_.file_transfer_list_;
+  auto found = notifications.find(progress.id);
+  if (found == notifications.end()) {
+    FileTransferState::FileTransferInfo info;
+    // Wire IDs can collide between peers or with outgoing transfers. Give each
+    // reception a local notification identity from the same allocator as sends.
+    info.file_id = file_transfer::Session::NextFileId();
+    info.remote_id = remote_id;
+    info.receiving = true;
+    receive_rate_samples_.emplace(info.file_id,
+        ReceiveRateSample{std::chrono::steady_clock::now(), 0});
+    found = notifications.emplace(progress.id, files.size()).first;
+    files.push_back(std::move(info));
+  }
+  auto& info = files[found->second];
+  info.file_name = progress.name;
+  info.file_size = progress.total;
+  info.sent_bytes = progress.received;
+  switch (progress.status) {
+    case file_transfer::ReceiveStatus::Receiving: info.status = Status::Receiving; break;
+    case file_transfer::ReceiveStatus::Completed: info.status = Status::Completed; break;
+    case file_transfer::ReceiveStatus::Failed: info.status = Status::Failed; break;
+  }
+  if (info.status != Status::Receiving) {
+    receive_rate_samples_.erase(info.file_id);
+    notifications.erase(found);
+  }
 }
 
 void FileTransferManager::Receive(const char* data, size_t size,
@@ -235,6 +282,12 @@ void FileTransferManager::Receive(const char* data, size_t size,
     if (!entry.session) {
       entry.session = std::make_shared<FileReceiver>(); entry.handler = events;
       entry.default_directory = entry.session->OutputDir();
+      // The transfer engine serializes progress callbacks for this receiver.
+      entry.session->SetOnReceiveProgress(
+          [this, remote, notifications = std::unordered_map<uint32_t, size_t>{}]
+          (const file_transfer::ReceiveState& progress) mutable {
+            UpdateReceiveProgress(progress, notifications, remote);
+          });
       entry.session->SetOnSendAck([peer, events, remote](const FileTransferAck& ack) {
         auto callback = events->EnterCallback();
         if (!callback) return -1;
@@ -285,6 +338,20 @@ void FileTransferManager::Poll() {
       for (const auto& [remote, receiver] : peers) receivers.push_back(receiver.session);
   }
   for (const auto& receiver : receivers) receiver->Poll();
+  const auto now = std::chrono::steady_clock::now();
+  std::lock_guard lock(received_state_.file_transfer_list_mutex_);
+  for (auto& info : received_state_.file_transfer_list_) {
+    const auto sample = receive_rate_samples_.find(info.file_id);
+    if (sample == receive_rate_samples_.end()) continue;
+    const auto elapsed = now - sample->second.updated;
+    if (elapsed < std::chrono::seconds(1)) continue;
+    const double seconds = std::chrono::duration<double>(elapsed).count();
+    const auto bytes = info.sent_bytes >= sample->second.bytes
+        ? info.sent_bytes - sample->second.bytes : 0;
+    info.rate_bps = static_cast<uint32_t>((std::min)(bytes * 8.0 / seconds,
+        static_cast<double>((std::numeric_limits<uint32_t>::max)())));
+    sample->second = {now, info.sent_bytes};
+  }
 }
 
 }  // namespace crossdesk

@@ -17,6 +17,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -34,10 +35,12 @@
 
 #include "crossdesk_ui.h"
 #include "fa_solid_900.h"
+#include "features/file_transfer/transfer_notification_layout.h"
 #include "features/gallery/gallery_fullscreen_transition.h"
 #include "features/gallery/gallery_window_state.h"
 #include "features/gallery/gallery_workspace.h"
 #include "features/gallery/preview_bandwidth.h"
+#include "filesystem_utf8.h"
 #include "localization.h"
 #include "platform.h"
 #ifndef __OHOS__
@@ -961,7 +964,7 @@ struct GuiApplication::SlintUi {
     bool remember_password = false;
     enum class State { Queued, Running, AwaitingPassword, Finished };
     State state = State::Queued;
-    size_t file_index = 0;
+    uint32_t file_id = 0;
     std::weak_ptr<RemoteSession> session;
     std::chrono::steady_clock::time_point started{};
   };
@@ -994,8 +997,13 @@ struct GuiApplication::SlintUi {
       std::make_shared<slint::VectorModel<ui::StreamTab>>();
   std::shared_ptr<slint::VectorModel<slint::SharedString>> display_model =
       std::make_shared<slint::VectorModel<slint::SharedString>>();
-  std::shared_ptr<slint::VectorModel<ui::FileTransferEntry>> transfer_model =
-      std::make_shared<slint::VectorModel<ui::FileTransferEntry>>();
+  struct TransferNotification {
+    std::optional<slint::ComponentHandle<ui::FileTransferNotification>> window;
+    RemoteSession::FileTransferInfo info;
+    bool dismissed = false;
+  };
+  std::map<uint32_t, TransferNotification> transfer_notifications;
+  SDL_DisplayID transfer_display = 0;
   std::shared_ptr<slint::VectorModel<ui::NetworkStatsRow>> stats_model =
       std::make_shared<slint::VectorModel<ui::NetworkStatsRow>>();
   std::shared_ptr<slint::VectorModel<ui::ControllerEntry>> controller_model =
@@ -1015,6 +1023,8 @@ struct GuiApplication::SlintUi {
   std::vector<std::string> recent_filter_groups;
   slint::Timer timer;
   slint::Timer server_file_dialog_timer;
+  std::shared_ptr<void> file_dialog_lifetime = std::make_shared<int>(0);
+  bool file_dialog_open = false;
   WindowDragState main_drag, gallery_drag;
   WindowDragState stream_drag;
   WindowDragState server_drag;
@@ -1141,6 +1151,7 @@ int GuiApplication::Run() {
   ConfigureWindowsWindowIcons(ui_->main->window().win32_hwnd());
 #elif defined(__APPLE__)
   ConfigureMainWindowChrome(ui_->main->window().appkit_view());
+  PrepareNativeFileDialog();
 #endif
   slint::run_event_loop(slint::EventLoopMode::RunUntilQuit);
   Cleanup();
@@ -2017,14 +2028,12 @@ void GuiApplication::BindStreamCallbacks() {
     if (!props) {
       return;
     }
-    transfers_.ProcessSelectedFile(
-        OpenFileDialog(localization::select_file[localization_language_index_]),
-        props, props->file_label_);
-  });
-  stream->on_close_file_transfer([this] {
-    if (auto props = SelectedSession()) {
-      props->file_transfer_.file_transfer_window_visible_ = false;
-    }
+    OpenFileDialog(localization::select_file[localization_language_index_],
+        [this, props](std::string path) {
+          if (!path.empty() && !props->closing_ &&
+              props->connection_status_ == ConnectionStatus::Connected)
+            transfers_.ProcessSelectedFile(path, props, props->file_label_);
+        });
   });
   stream->on_can_drop_file(
       [](const slint::DataTransfer& data) { return data.has_plain_text(); });
@@ -2140,32 +2149,37 @@ void GuiApplication::BindServerCallbacks() {
     if (selected_server_remote_id_.empty() || ui_->server_file_dialog_open) {
       return;
     }
-    // A native file picker runs a nested event loop. Keep the recipient stable
-    // if another controller connects or leaves while it is open.
+    // Keep the recipient stable if another controller connects or leaves while
+    // the asynchronous native picker is open.
     const std::string recipient = selected_server_remote_id_;
     ui_->server_file_dialog_open = true;
     (*ui_->server)->window().request_redraw();
-    // TouchArea clears pressed only after its clicked callback returns. Allow
-    // that release and a repaint before entering the blocking native picker.
-    ui_->server_file_dialog_timer.start(
-        slint::TimerMode::SingleShot, std::chrono::milliseconds(32),
-        [this, recipient] {
-          const auto connected = [this, &recipient] {
-            std::shared_lock lock(connection_status_mutex_);
-            const auto found = connection_status_.find(recipient);
-            return found != connection_status_.end() &&
-                   found->second == ConnectionStatus::Connected;
-          };
-          if (!connected()) {
+    const auto select_file = [this, recipient] {
+      const auto connected = [this, recipient] {
+        std::shared_lock lock(connection_status_mutex_);
+        const auto found = connection_status_.find(recipient);
+        return found != connection_status_.end() &&
+               found->second == ConnectionStatus::Connected;
+      };
+      if (!connected()) {
+        ui_->server_file_dialog_open = false;
+        return;
+      }
+      OpenFileDialog(localization::select_file[localization_language_index_],
+          [this, recipient, connected](std::string path) {
             ui_->server_file_dialog_open = false;
-            return;
-          }
-          const auto path = OpenFileDialog(
-              localization::select_file[localization_language_index_]);
-          ui_->server_file_dialog_open = false;
-          if (connected() && !path.empty())
-            transfers_.ProcessSelectedFile(path, nullptr, file_label_, recipient);
-        });
+            if (connected() && !path.empty())
+              transfers_.ProcessSelectedFile(path, nullptr, file_label_, recipient);
+          });
+    };
+#if defined(__APPLE__)
+    // The native picker is already dispatched outside the clicked callback.
+    select_file();
+#else
+    // Let TouchArea release and repaint before the blocking native picker.
+    ui_->server_file_dialog_timer.start(
+        slint::TimerMode::SingleShot, std::chrono::milliseconds(32), select_file);
+#endif
   });
   server->on_disconnect_controller([this](slint::SharedString id) {
     CloseServerController(std::string(id));
@@ -2287,6 +2301,7 @@ void GuiApplication::Tick() {
   SyncPlatformDialogs();
   SyncStreamWindow();
   SyncServerWindow();
+  SyncFileTransferNotifications();
 }
 
 void GuiApplication::PollUpdateCheck() {
@@ -3240,7 +3255,6 @@ void GuiApplication::SyncStreamWindow() {
     ui_->localized_language = -1;
     (*ui_->stream)->set_tabs(ui_->tab_model);
     (*ui_->stream)->set_displays(ui_->display_model);
-    (*ui_->stream)->set_file_transfers(ui_->transfer_model);
     (*ui_->stream)->set_stats_rows(ui_->stats_model);
     BindStreamCallbacks();
     (*ui_->stream)->show();
@@ -3535,60 +3549,6 @@ void GuiApplication::SyncStreamWindow() {
                      : localization::connection_mode_relay
                            [localization_language_index_]));
 
-  std::vector<RemoteSession::FileTransferInfo> file_list;
-  {
-    std::lock_guard lock(props->file_transfer_.file_transfer_list_mutex_);
-    file_list = props->file_transfer_.file_transfer_list_;
-  }
-  const auto transfer_priority = [](RemoteSession::FileTransferStatus status) {
-    switch (status) {
-      case RemoteSession::FileTransferStatus::Sending:
-        return 0;
-      case RemoteSession::FileTransferStatus::Completed:
-        return 1;
-      case RemoteSession::FileTransferStatus::Queued:
-        return 2;
-      case RemoteSession::FileTransferStatus::Failed:
-        return 3;
-    }
-    return 3;
-  };
-  std::stable_sort(file_list.begin(), file_list.end(),
-                   [&](const auto& left, const auto& right) {
-                     return transfer_priority(left.status) <
-                            transfer_priority(right.status);
-                   });
-
-  std::vector<ui::FileTransferEntry> transfers;
-  transfers.reserve(file_list.size());
-  for (const auto& info : file_list) {
-    ui::FileTransferEntry item;
-    item.name = UiText(info.file_name);
-    const auto status_index = static_cast<int>(info.status);
-    if (status_index == 0)
-      item.status = UiText(localization::queued[localization_language_index_]);
-    if (status_index == 1)
-      item.status = UiText(localization::sending[localization_language_index_]);
-    if (status_index == 2)
-      item.status =
-          UiText(localization::completed[localization_language_index_]);
-    if (status_index == 3)
-      item.status = UiText(localization::failed[localization_language_index_]);
-    item.progress = status_index == 2 ? 1.0f
-                    : info.file_size == 0
-                        ? 0.0f
-                        : std::clamp(static_cast<float>(info.sent_bytes) /
-                                         static_cast<float>(info.file_size),
-                                     0.0f, 1.0f);
-    item.speed = UiText(FormatTransferRate(info.rate_bps));
-    item.size = UiText(FormatFileSize(info.file_size));
-    transfers.push_back(std::move(item));
-  }
-  ui::UpdateModelRows(*ui_->transfer_model, std::move(transfers));
-  (*ui_->stream)
-      ->set_file_transfer_visible(
-          props->file_transfer_.file_transfer_window_visible_);
-
   const auto fps_now = std::chrono::steady_clock::now();
   bool refresh_stats = false;
   if (!props->net_traffic_stats_button_pressed_) {
@@ -3872,7 +3832,7 @@ void GuiApplication::SyncServerWindow() {
   if (!show_controller_window && ui_->server) {
     (*ui_->server)->hide();
     (*ui_->server_bar)->hide();
-    // Keep handles alive through a native file dialog's nested event loop.
+    // Keep handles alive until the pending native file dialog completes.
     if (ui_->server_file_dialog_open) {
       server_window_collapsed_ = true;
       (*ui_->server_bar)->set_expanded(false);
@@ -3940,37 +3900,177 @@ void GuiApplication::SyncServerWindow() {
       --ui_->server_native_window_attempts;
   }
 #endif
-  auto& transfer = transfers_.global_state();
-  const auto sent = transfer.file_sent_bytes_.load();
-  const auto total = transfer.file_total_bytes_.load();
-  (*ui_->server)
-      ->set_file_transfer_visible(transfer.file_transfer_window_visible_);
-  (*ui_->server)->set_sending_file(transfer.file_sending_.load());
-  (*ui_->server)
-      ->set_file_progress(total == 0 ? 0.0f
-                                     : std::clamp(static_cast<float>(sent) /
-                                                      static_cast<float>(total),
-                                                  0.0f, 1.0f));
-  (*ui_->server)
-      ->set_file_progress_text(
-          UiText(FormatTransferRate(transfer.file_send_rate_bps_.load())));
-  std::string current_file_name;
-  const uint32_t current_file_id = transfer.current_file_id_.load();
-  if (current_file_id != 0) {
-    std::lock_guard lock(transfer.file_transfer_list_mutex_);
-    for (const auto& info : transfer.file_transfer_list_) {
-      if (info.file_id == current_file_id) {
-        current_file_name = info.file_name;
-        break;
-      }
+  (*ui_->server)->set_sending_file(transfers_.global_state().file_sending_.load());
+  PositionServerWindows();
+}
+
+void GuiApplication::SyncFileTransferNotifications() {
+  using Status = RemoteSession::FileTransferStatus;
+  using namespace transfer_notification;
+  std::map<uint32_t, RemoteSession::FileTransferInfo> files;
+  const auto collect = [&](FileTransferState& state) {
+    std::lock_guard lock(state.file_transfer_list_mutex_);
+    for (const auto& info : state.file_transfer_list_) files.emplace(info.file_id, info);
+  };
+  collect(transfers_.global_state());
+  collect(transfers_.received_state());
+  {
+    std::shared_lock lock(remote_sessions_mutex_);
+    for (const auto& [_, props] : remote_sessions_) {
+      if (props) collect(props->file_transfer_);
     }
   }
-  (*ui_->server)->set_current_file_name(UiText(current_file_name));
-  (*ui_->server)
-      ->set_file_size_text(total == 0 ? slint::SharedString{}
-                                      : UiText(FormatFileSize(sent) + " / " +
-                                               FormatFileSize(total)));
-  PositionServerWindows();
+  // DeskHub reserves each recipient's notification before a transfer slot is
+  // available. Keep its queued window (and dismissal) alive until dispatched.
+  std::set<uint32_t> pending_files;
+  for (const auto& operation : ui_->batch_operations)
+    if (operation.file_id &&
+        operation.state != SlintUi::BatchOperation::State::Finished)
+      pending_files.insert(operation.file_id);
+  // Retain the last progress independently of session lifetime. Results stay
+  // visible until dismissed, including after the connection is closed.
+  for (const auto& [id, info] : files)
+    ui_->transfer_notifications[id].info = info;
+  std::erase_if(ui_->transfer_notifications, [&](auto& item) {
+    if (!item.second.dismissed || files.count(item.first) ||
+        pending_files.count(item.first)) return false;
+    if (item.second.window) (*item.second.window)->hide();
+    return true;
+  });
+  if (ui_->transfer_notifications.empty()) {
+    ui_->transfer_display = 0;
+    return;
+  }
+  if (!ui_->transfer_display) {
+    const auto& anchor = ui_->stream && (*ui_->stream)->window().is_visible()
+        ? (*ui_->stream)->window()
+        : ui_->gallery_shown ? ui_->wall->window() : ui_->main->window();
+    ui_->transfer_display = DisplayForSlintWindow(anchor);
+  }
+  SDL_Rect bounds{};
+  if (!SDL_GetDisplayUsableBounds(ui_->transfer_display, &bounds)) {
+    ui_->transfer_display = SDL_GetPrimaryDisplay();
+    if (!SDL_GetDisplayUsableBounds(ui_->transfer_display, &bounds)) return;
+  }
+#if defined(__APPLE__)
+  const float desktop_scale = 1;
+#else
+  const float desktop_scale = std::max(0.01f, SDL_GetDisplayContentScale(ui_->transfer_display));
+#endif
+  const float screen_x = bounds.x / desktop_scale;
+  const float screen_y = bounds.y / desktop_scale;
+  const float screen_width = bounds.w / desktop_scale;
+  const float screen_height = bounds.h / desktop_scale;
+  const auto layout = Fit(screen_width, screen_height);
+  size_t slot = 0;
+  for (auto& [id, notification] : ui_->transfer_notifications) {
+    auto& info = notification.info;
+    if (!files.count(id) && !pending_files.count(id) && info.status != Status::Completed &&
+        info.status != Status::Failed) {
+      info.status = Status::Failed;
+      info.rate_bps = 0;
+    }
+    const bool completed = info.status == Status::Completed;
+    const bool failed = info.status == Status::Failed;
+    if (notification.dismissed || slot >= layout.capacity()) {
+      if (notification.window) {
+        (*notification.window)->hide();
+        notification.window.reset();
+      }
+      continue;
+    }
+    const bool created = !notification.window;
+    if (created) {
+      notification.window.emplace(ui::FileTransferNotification::create());
+      RegisterFontAwesome((*notification.window)->window());
+      const auto dismiss = [this, id] {
+        const auto found = ui_->transfer_notifications.find(id);
+        if (found == ui_->transfer_notifications.end()) return;
+        found->second.dismissed = true;
+        if (found->second.window) (*found->second.window)->hide();
+      };
+      (*notification.window)->on_dismissed(dismiss);
+      (*notification.window)->window().on_close_requested([dismiss] {
+        dismiss();
+        return slint::CloseRequestResponse::KeepWindowShown;
+      });
+    }
+    auto& component = *notification.window;
+    ui::FileTransferEntry entry;
+    entry.name = UiText(info.file_name);
+    switch (info.status) {
+      case Status::Queued: entry.status = UiText(localization::queued[localization_language_index_]); break;
+      case Status::Sending: entry.status = UiText(localization::sending[localization_language_index_]); break;
+      case Status::Receiving: entry.status = UiText(localization::receiving[localization_language_index_]); break;
+      case Status::Completed: entry.status = UiText(localization::completed[localization_language_index_]); break;
+      case Status::Failed: entry.status = UiText(localization::failed[localization_language_index_]); break;
+    }
+    entry.progress = completed ? 1.0f : info.file_size == 0 ? 0.0f
+        : std::clamp(static_cast<float>(info.sent_bytes) / info.file_size, 0.0f, 1.0f);
+    entry.speed = UiText(FormatTransferRate(info.rate_bps));
+    entry.size = UiText(FormatFileSize(info.sent_bytes) + " / " + FormatFileSize(info.file_size));
+    component->set_entry(entry);
+    auto display_id = info.remote_id;
+    std::erase_if(display_id, [](unsigned char c) { return c < '0' || c > '9'; });
+    component->set_remote_id(UiText(display_id));
+    component->set_heading(UiText(info.receiving
+        ? localization::file_receiving_progress[localization_language_index_]
+        : localization::file_sending_progress[localization_language_index_]));
+    component->set_transferring(info.status == Status::Sending || info.status == Status::Receiving);
+    component->set_completed(completed);
+    component->set_failed(failed);
+    auto& window = component->window();
+    const auto size = window.size();
+    const float scale = std::max(window.scale_factor(), 0.01f);
+    if (created || std::abs(size.width / scale - layout.width) > 0.5f ||
+        std::abs(size.height / scale - layout.height) > 0.5f) {
+      window.set_size(slint::LogicalSize({layout.width, layout.height}));
+    }
+    const auto position = Place(layout, screen_x, screen_y, screen_width, screen_height, slot++);
+    if (CanUseGlobalPointerPosition()) {
+      const auto current = window.position();
+#if defined(__APPLE__)
+      if (created || std::abs(current.x / scale - position.x) > 0.5f ||
+          std::abs(current.y / scale - position.y) > 0.5f)
+        window.set_position(slint::LogicalPosition({position.x, position.y}));
+#else
+      const auto x = static_cast<int32_t>(std::lround(position.x * desktop_scale));
+      const auto y = static_cast<int32_t>(std::lround(position.y * desktop_scale));
+      if (created || current.x != x || current.y != y)
+        window.set_position(slint::PhysicalPosition({x, y}));
+#endif
+    }
+    if (!window.is_visible()) {
+#if defined(__APPLE__)
+      // Winit creates native windows on the next event-loop turn. Wait until
+      // it exists so show() and focus restoration happen synchronously.
+      if (!window.appkit_view()) continue;
+#elif _WIN32
+      if (!window.win32_hwnd()) continue;
+#endif
+#if _WIN32
+      // Tool windows stay out of Alt-Tab and must not interrupt remote input.
+      const auto configure = [&] {
+        const HWND hwnd = window.win32_hwnd();
+        if (!hwnd) return;
+        SetWindowLongPtr(hwnd, GWL_EXSTYLE,
+            (GetWindowLongPtr(hwnd, GWL_EXSTYLE) | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~WS_EX_APPWINDOW);
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED | SWP_NOACTIVATE);
+      };
+      configure();
+#endif
+#if defined(__APPLE__)
+      ShowFileTransferNotification(window.appkit_view(), [&window] { window.show(); });
+#else
+      component->show();
+#endif
+#if _WIN32
+      configure();
+#endif
+    }
+  }
+  if (slot == 0) ui_->transfer_display = 0;
 }
 
 bool GuiApplication::ValidateSelfHostedSettingsFromUi(bool gallery_window) {
@@ -4490,13 +4590,27 @@ void GuiApplication::SendKeyInput(const std::string& text, bool pressed,
   }
 }
 
-std::string GuiApplication::OpenFileDialog(const std::string& title) {
+void GuiApplication::OpenFileDialog(const std::string& title,
+                                   std::function<void(std::string)> completion) {
+  if (!ui_ || exit_) return;
+  if (ui_->file_dialog_open) {
+    completion({});
+    return;
+  }
+  ui_->file_dialog_open = true;
+  std::weak_ptr<void> lifetime = ui_->file_dialog_lifetime;
+  auto finished = [this, lifetime, completion = std::move(completion)](std::string path) {
+    // Native callbacks can arrive after cancellation during application exit.
+    if (lifetime.expired()) return;
+    ui_->file_dialog_open = false;
+    if (!exit_) completion(std::move(path));
+  };
 #if defined(__APPLE__)
-  return OpenNativeFileDialog(title);
+  OpenNativeFileDialog(title, std::move(finished));
 #else
   const char* path =
       tinyfd_openFileDialog(title.c_str(), "", 0, nullptr, nullptr, 0);
-  return path ? path : "";
+  finished(path ? path : "");
 #endif
 }
 
@@ -5080,36 +5194,66 @@ void GuiApplication::GalleryAction(const std::string& action,
       SyncGallery();
       return;
     }
-    // Retain IDs before the modal file picker can process another UI event.
-    std::string file;
-    if (action == "file") {
-      file = OpenFileDialog(
-          std::string(tr("选择分发文件", "Select a file", "Выберите файл")));
-      if (file.empty()) return;
-    }
-    for (const auto& id : ids) {
-      if (action == "connect" && !value.empty()) {
-        if (auto props = FindRemoteSession(id);
-            props && props->connection_auth_.Get().password_required) {
-          ui_->gallery_auth_id = id;
-          show_connection_status_window_ = true;
+    // Capture the selection before the asynchronous file picker opens.
+    const auto enqueue = [this, ids, action, value](const std::string& file) {
+      RemoteSession::FileTransferInfo queued_file;
+      if (action == "file") {
+        queued_file.file_path = PathFromUtf8(file);
+        const auto name = queued_file.file_path.filename().u8string();
+        queued_file.file_name.assign(name.begin(), name.end());
+        std::error_code ec;
+        if (std::filesystem::is_regular_file(queued_file.file_path, ec)) {
+          const auto size = std::filesystem::file_size(queued_file.file_path, ec);
+          if (!ec) queued_file.file_size = size;
+        } else {
+          queued_file.status = RemoteSession::FileTransferStatus::Failed;
         }
+        if (ec) queued_file.status = RemoteSession::FileTransferStatus::Failed;
       }
-      const bool pending =
-          std::any_of(ui_->batch_operations.begin(),
-                      ui_->batch_operations.end(), [&](const auto& t) {
-                        return t.id == id && t.action == action &&
-                               (t.state == OperationState::Queued ||
-                                t.state == OperationState::Running ||
-                                t.state == OperationState::AwaitingPassword);
-                      });
-      if (pending) continue;
-      SlintUi::BatchOperation operation;
-      operation.id = id;
-      operation.action = action;
-      operation.file = file;
-      ui_->batch_operations.push_back(std::move(operation));
+      for (const auto& id : ids) {
+        if (action == "connect" && !value.empty()) {
+          if (auto props = FindRemoteSession(id);
+              props && props->connection_auth_.Get().password_required) {
+            ui_->gallery_auth_id = id;
+            show_connection_status_window_ = true;
+          }
+        }
+        const bool pending =
+            std::any_of(ui_->batch_operations.begin(),
+                        ui_->batch_operations.end(), [&](const auto& t) {
+                          return t.id == id && t.action == action &&
+                                 (t.state == OperationState::Queued ||
+                                  t.state == OperationState::Running ||
+                                  t.state == OperationState::AwaitingPassword);
+                        });
+        // Repeated file selections are distinct transfers, even to a busy peer.
+        if (pending && action != "file") continue;
+        SlintUi::BatchOperation operation;
+        operation.id = id;
+        operation.action = action;
+        operation.file = file;
+        if (action == "file") {
+          operation.file_id = file_transfer::Session::NextFileId();
+          auto& notification = ui_->transfer_notifications[operation.file_id];
+          notification.info = queued_file;
+          notification.info.file_id = operation.file_id;
+          notification.info.remote_id = id;
+          if (queued_file.status == RemoteSession::FileTransferStatus::Failed)
+            operation.state = OperationState::Finished;
+        }
+        ui_->batch_operations.push_back(std::move(operation));
+      }
+      SyncGallery();
+    };
+    if (action == "file") {
+      OpenFileDialog(std::string(tr("选择分发文件", "Select a file", "Выберите файл")),
+          [enqueue](std::string file) {
+            if (!file.empty()) enqueue(file);
+          });
+    } else {
+      enqueue({});
     }
+    return;
   }
   SyncGallery();
 }
@@ -5525,19 +5669,9 @@ void GuiApplication::SyncGallery() {
                  props->connection_status_ != ConnectionStatus::Connected) {
         operation.state = OperationState::Finished;
       } else if (operation.action == "file") {
-        {
-          std::lock_guard lock(props->file_transfer_.file_transfer_list_mutex_);
-          operation.file_index =
-              props->file_transfer_.file_transfer_list_.size();
-        }
-        transfers_.ProcessSelectedFile(operation.file, props,
-                                       props->file_label_);
-        {
-          std::lock_guard lock(props->file_transfer_.file_transfer_list_mutex_);
-          if (operation.file_index >=
-              props->file_transfer_.file_transfer_list_.size())
-            operation.state = OperationState::Finished;
-        }
+        if (!transfers_.ProcessSelectedFile(operation.file, props,
+                                            props->file_label_, {}, operation.file_id))
+          operation.state = OperationState::Finished;
       }
       operation.session = props;
     }
@@ -5574,13 +5708,12 @@ void GuiApplication::SyncGallery() {
       else if (operation.action == "file") {
         std::lock_guard lock(props->file_transfer_.file_transfer_list_mutex_);
         const auto& files = props->file_transfer_.file_transfer_list_;
-        if (operation.file_index >= files.size())
-          operation.state = OperationState::Finished;
-        else if (files[operation.file_index].status ==
-                 gui_detail::FileTransferState::FileTransferStatus::Completed)
-          operation.state = OperationState::Finished;
-        else if (files[operation.file_index].status ==
-                 gui_detail::FileTransferState::FileTransferStatus::Failed)
+        const auto file = std::find_if(files.begin(), files.end(), [&](const auto& info) {
+          return info.file_id == operation.file_id;
+        });
+        if (file == files.end() ||
+            file->status == RemoteSession::FileTransferStatus::Completed ||
+            file->status == RemoteSession::FileTransferStatus::Failed)
           operation.state = OperationState::Finished;
       }
     }
@@ -5914,11 +6047,18 @@ void GuiApplication::Cleanup() {
     SDL_Quit();
     return;
   }
+  ui_->file_dialog_lifetime.reset();
+#if defined(__APPLE__)
+  CancelNativeFileDialog();
+#endif
   SaveGalleryWindowState();
 #if defined(__APPLE__)
   SetGalleryWindowFullscreen(false);
 #endif
   ui_->wall->hide();
+  for (auto& [_, notification] : ui_->transfer_notifications)
+    if (notification.window) (*notification.window)->hide();
+  ui_->transfer_notifications.clear();
   ui_->timer.stop();
   ui_->server_file_dialog_timer.stop();
   ui_->video_timer.stop();

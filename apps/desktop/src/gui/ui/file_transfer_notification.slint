@@ -1,0 +1,88 @@
+import { FileTransferEntry } from "stream_window.slint";
+import { DialogSurface, FontAwesomeIcons, IconButton, ImGuiFontStyle } from "common.slint";
+import { WorkbenchStyle } from "workbench_controls.slint";
+
+export component FileTransferNotification inherits Window {
+    title: "CrossDesk";
+    icon: @image-url("../../../resources/linux/crossdesk_256x256.png");
+    preferred-width: 360px;
+    preferred-height: 132px;
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    default-font-size: ImGuiFontStyle.base;
+    in property <FileTransferEntry> entry;
+    in property <string> heading;
+    in property <string> remote-id;
+    in property <bool> completed;
+    in property <bool> failed;
+    in property <bool> transferring;
+    callback dismissed;
+
+    DialogSurface {
+        width: parent.width; height: parent.height;
+        background: WorkbenchStyle.surface;
+        border-color: WorkbenchStyle.separator;
+        Text {
+            x: 16px; y: 8px;
+            width: parent.width - 64px - (root.remote-id == "" ? 0px : 108px);
+            height: 28px;
+            text: root.heading; color: WorkbenchStyle.text;
+            font-size: ImGuiFontStyle.prominent; font-weight: 600;
+            vertical-alignment: center; overflow: elide;
+        }
+        if root.remote-id != "": Text {
+            x: parent.width - 148px; y: 8px; width: 100px; height: 28px;
+            text: root.remote-id;
+            color: WorkbenchStyle.muted;
+            font-size: ImGuiFontStyle.body;
+            horizontal-alignment: right; vertical-alignment: center; overflow: elide;
+        }
+        IconButton {
+            x: parent.width - 40px; y: 8px; width: 28px; height: 28px;
+            icon: FontAwesomeIcons.xmark; icon-size: 14px;
+            icon-color: WorkbenchStyle.muted;
+            hover-background: WorkbenchStyle.hover-surface;
+            pressed-background: WorkbenchStyle.pressed-surface;
+            clicked => { root.dismissed(); }
+        }
+        Rectangle {
+            x: 16px; y: 40px; width: parent.width - 32px; height: 1px;
+            background: WorkbenchStyle.separator;
+        }
+        Text {
+            x: 16px; y: 47px; width: parent.width - 32px; height: 18px;
+            text: root.entry.name; color: WorkbenchStyle.text;
+            font-size: ImGuiFontStyle.base; vertical-alignment: center; overflow: elide;
+        }
+        HorizontalLayout {
+            x: 16px; y: 68px; width: parent.width - 32px; height: 16px; spacing: 8px;
+            Text {
+                text: root.entry.status;
+                color: root.failed ? #d92d20 : root.completed ? WorkbenchStyle.success
+                    : root.transferring ? WorkbenchStyle.accent : WorkbenchStyle.muted;
+                font-size: ImGuiFontStyle.body; vertical-alignment: center; overflow: elide;
+            }
+            Text {
+                text: root.transferring ? round(root.entry.progress * 100) + "%  " + root.entry.speed : root.completed ? "100%" : "";
+                color: WorkbenchStyle.muted; font-size: ImGuiFontStyle.body;
+                horizontal-alignment: right; vertical-alignment: center;
+            }
+        }
+        Rectangle {
+            x: 16px; y: 90px; width: parent.width - 32px; height: 6px;
+            background: WorkbenchStyle.separator; border-radius: 3px;
+            Rectangle {
+                x: 0px; y: 0px;
+                width: parent.width * max(0, min(1, root.entry.progress)); height: parent.height;
+                background: root.failed ? #d92d20 : root.completed ? WorkbenchStyle.success : WorkbenchStyle.accent;
+                border-radius: 3px;
+            }
+        }
+        Text {
+            x: 16px; y: 103px; width: parent.width - 32px; height: 17px;
+            text: root.entry.size; color: WorkbenchStyle.muted;
+            font-size: ImGuiFontStyle.body; vertical-alignment: center; overflow: elide;
+        }
+    }
+}

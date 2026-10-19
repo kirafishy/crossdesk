@@ -40,6 +40,14 @@ struct SendState {
   Status status = Status::Idle;
 };
 
+enum class ReceiveStatus { Receiving, Completed, Failed };
+struct ReceiveState {
+  uint32_t id = 0;
+  std::string name;
+  uint64_t total = 0, received = 0;
+  ReceiveStatus status = ReceiveStatus::Receiving;
+};
+
 class Session {
  public:
   using Clock = std::chrono::steady_clock;
@@ -48,8 +56,12 @@ class Session {
   // outside its mutex, allowing immediate/reentrant ACKs and concurrent peers.
   using Progress = std::function<void(const std::string&, double, bool,
                                       const std::string&)>;
-  Session(Send send, Progress progress, Options options = {})
-      : send_(std::move(send)), progress_(std::move(progress)), options_(options) {}
+  // Exact accepted bytes and terminal state, keyed by this peer's wire ID.
+  using ReceiveProgress = std::function<void(const ReceiveState&)>;
+  Session(Send send, Progress progress, Options options = {},
+          ReceiveProgress receive_progress = {})
+      : send_(std::move(send)), progress_(std::move(progress)),
+        receive_progress_(std::move(receive_progress)), options_(options) {}
   ~Session() { Clear(); }
 
   static uint32_t NextFileId() {
@@ -92,6 +104,7 @@ class Session {
       for (auto it = incoming_.begin(); it != incoming_.end();) {
         if (now - it->second.updated < timeout_) { ++it; continue; }
         expired.push_back({kFileAckMagic, it->first, it->second.received, it->second.total, 2});
+        NotifyReceive(it->first, it->second, ReceiveStatus::Failed);
         Notify(it->second.name, -1, false, "");
         Remove(it->second); it = incoming_.erase(it);
       }
@@ -169,6 +182,8 @@ class Session {
     std::lock_guard<std::mutex> lock(mutex_);
     closed_ = true;
     if (outgoing_) FinishSend(false);
+    for (const auto& [id, file] : incoming_)
+      NotifyReceive(id, file, ReceiveStatus::Failed);
     Clear();
   }
 
@@ -193,13 +208,23 @@ class Session {
     int percent = -1;
     Clock::time_point updated;
   };
+  void NotifyReceive(uint32_t id, const Incoming& file, ReceiveStatus status) {
+    if (receive_progress_)
+      receive_progress_({id, file.name, file.total, file.received, status});
+  }
   FileTransferAck ReceiveLocked(const FileChunkView& chunk, size_t size, Clock::time_point now) {
     const auto& h = chunk.header;
     auto it = incoming_.find(h.file_id);
     auto reject = [&]() {
       if (it != incoming_.end()) {
+        NotifyReceive(h.file_id, it->second, ReceiveStatus::Failed);
         Notify(it->second.name, -1, false, ""); Remove(it->second); incoming_.erase(it);
-      } else Notify(SafeName(chunk.file_name), -1, false, "");
+      } else {
+        if (receive_progress_)
+          receive_progress_({h.file_id, SafeName(chunk.file_name), h.total_size,
+                             0, ReceiveStatus::Failed});
+        Notify(SafeName(chunk.file_name), -1, false, "");
+      }
       return FileTransferAck{kFileAckMagic, h.file_id, h.offset, h.total_size, 2};
     };
     const bool first = h.flags & 1, last = h.flags & 2;
@@ -248,6 +273,7 @@ class Session {
     if (file.output.fail() || (complete && !Publish(file))) return reject();
     file.updated = now;
     const FileTransferAck ack{kFileAckMagic, h.file_id, file.received, file.total, complete ? 1u : 0u};
+    NotifyReceive(h.file_id, file, complete ? ReceiveStatus::Completed : ReceiveStatus::Receiving);
     if (complete) {
       const auto path = file.path.u8string();
       Notify(file.name, 1, false, std::string(path.begin(), path.end()));
@@ -375,6 +401,7 @@ class Session {
   mutable std::mutex mutex_;
   Send send_;
   Progress progress_;
+  ReceiveProgress receive_progress_;
   Options options_;
   bool closed_ = false;
   SendState state_;

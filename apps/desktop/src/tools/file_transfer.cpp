@@ -16,7 +16,9 @@ FileReceiver::FileReceiver(const std::filesystem::path& output_dir)
             FileTransferAck ack{};
             return on_send_ack_ && DecodeFileTransferAck(data, size, &ack)
                 ? on_send_ack_(ack) : 0;
-          }, {}) {
+          }, {}, {}, [this](const file_transfer::ReceiveState& progress) {
+            if (on_receive_progress_) on_receive_progress_(progress);
+          }) {
   session_.SetDirectory(output_dir);
 }
 

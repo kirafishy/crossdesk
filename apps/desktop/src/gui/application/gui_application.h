@@ -8,6 +8,7 @@
 #define _GUI_APPLICATION_H_
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -90,6 +91,7 @@ private:
   void SyncStreamKeyboardFocus();
   void SetStreamKeyboardFocus(bool focused);
   void SyncServerWindow();
+  void SyncFileTransferNotifications();
   void SetServerPanelExpanded(bool expanded);
   void PositionServerWindows();
 #if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
@@ -117,7 +119,8 @@ private:
   void Cleanup();
 
   std::shared_ptr<RemoteSession> SelectedSession();
-  std::string OpenFileDialog(const std::string &title);
+  void OpenFileDialog(const std::string& title,
+                      std::function<void(std::string)> completion);
   bool OpenUrl(const std::string &url);
 
   std::unique_ptr<SlintUi> ui_;

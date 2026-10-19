@@ -330,8 +330,13 @@ struct TranslationRow {
     u8"Выбрать файл для отправки")                                             \
   X(file_transfer_progress, u8"文件传输进度", "File Transfer Progress",        \
     u8"Прогресс передачи файлов")                                              \
+  X(file_sending_progress, u8"文件发送进度", "File Sending Progress",         \
+    u8"Отправка файла")                                                       \
+  X(file_receiving_progress, u8"文件接收进度", "File Receiving Progress",     \
+    u8"Получение файла")                                                      \
   X(queued, u8"队列中", "Queued", u8"В очереди")                               \
   X(sending, u8"正在传输", "Sending", u8"Передача")                            \
+  X(receiving, u8"正在接收", "Receiving", u8"Получение")                      \
   X(completed, u8"已完成", "Completed", u8"Завершено")                         \
   X(failed, u8"失败", "Failed", u8"Ошибка")                                    \
   X(controller, u8"控制端:", "Controller:", u8"Контроллер:")                   \

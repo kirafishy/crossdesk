@@ -51,20 +51,23 @@ struct FileTransferState {
     std::filesystem::path file_path;
     std::string file_label;
     std::string remote_id;
+    uint32_t file_id = 0;
   };
   std::queue<QueuedFile> file_send_queue_;
   std::mutex file_queue_mutex_;
 
-  enum class FileTransferStatus { Queued, Sending, Completed, Failed };
+  enum class FileTransferStatus { Queued, Sending, Completed, Failed, Receiving };
 
   struct FileTransferInfo {
     std::string file_name;
+    std::string remote_id;
     std::filesystem::path file_path;
     uint64_t file_size = 0;
     FileTransferStatus status = FileTransferStatus::Queued;
     uint64_t sent_bytes = 0;
     uint32_t file_id = 0;
     uint32_t rate_bps = 0;
+    bool receiving = false;
   };
   std::vector<FileTransferInfo> file_transfer_list_;
   std::mutex file_transfer_list_mutex_;

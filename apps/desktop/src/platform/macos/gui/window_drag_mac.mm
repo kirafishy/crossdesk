@@ -3,6 +3,9 @@
 #import <AppKit/AppKit.h>
 
 #include <cmath>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
 @interface CrossDeskStreamFullscreenTarget : NSObject
 - (void)toggleStreamFullscreen:(id)sender;
@@ -39,6 +42,24 @@ BOOL stream_restore_miniaturize_hidden = NO;
 BOOL stream_restore_zoom_hidden = NO;
 NSApplicationPresentationOptions stream_restore_presentation_options =
     NSApplicationPresentationDefault;
+
+struct FileDialogRequest {
+  std::string title;
+  std::function<void(std::string)> completion;
+};
+std::shared_ptr<FileDialogRequest> file_dialog_request;
+NSOpenPanel *file_dialog = nil;
+NSOpenPanel *prepared_file_dialog = nil;
+uint64_t file_dialog_prepare_generation = 0;
+
+NSOpenPanel *CreateFileDialog() {
+  NSOpenPanel *panel = [NSOpenPanel openPanel];
+  panel.canChooseFiles = YES;
+  panel.canChooseDirectories = NO;
+  panel.allowsMultipleSelection = NO;
+  panel.resolvesAliases = YES;
+  return panel;
+}
 
 void InstallStreamFullscreenButton(NSWindow *window) {
   if (window == nil) {
@@ -358,41 +379,109 @@ bool IsStreamWindowFullscreen() {
   return stream_fullscreen;
 }
 
-std::string OpenNativeFileDialog(const std::string &title) {
+void ShowFileTransferNotification(void* slint_view,
+                                  const std::function<void()>& show) {
   @autoreleasepool {
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.canChooseFiles = YES;
-    panel.canChooseDirectories = NO;
-    panel.allowsMultipleSelection = NO;
-    panel.resolvesAliases = YES;
+    NSWindow *previous_key = NSApp.keyWindow;
+    NSView *view = (__bridge NSView *)slint_view;
+    NSWindow *notification = view.window;
+    notification.excludedFromWindowsMenu = YES;
+    notification.hidesOnDeactivate = NO;
+    notification.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
+        NSWindowCollectionBehaviorFullScreenAuxiliary |
+        NSWindowCollectionBehaviorIgnoresCycle;
+    show();
+    // Winit's show path calls makeKeyAndOrderFront even for frameless windows.
+    // Restore the input owner synchronously before the next event-loop turn.
+    if (notification.isKeyWindow) {
+      if (previous_key && previous_key != notification) [previous_key makeKeyWindow];
+      else [notification resignKeyWindow];
+    }
+  }
+}
+
+void PrepareNativeFileDialog() {
+  const auto generation = ++file_dialog_prepare_generation;
+  // Creating NSOpenPanel initializes the system file browser and can take
+  // hundreds of milliseconds. Do that once after the main window is visible,
+  // without showing a panel, changing focus, or blocking the initial frame.
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC),
+      dispatch_get_main_queue(), ^{
+        if (generation != file_dialog_prepare_generation ||
+            file_dialog_request || prepared_file_dialog) return;
+        NSOpenPanel *panel = CreateFileDialog();
+        if (generation == file_dialog_prepare_generation &&
+            !file_dialog_request && !prepared_file_dialog)
+          prepared_file_dialog = panel;
+      });
+}
+
+void OpenNativeFileDialog(const std::string& title,
+                          std::function<void(std::string)> completion) {
+  if (file_dialog_request) {
+    completion({});
+    return;
+  }
+  const auto request = std::make_shared<FileDialogRequest>(
+      FileDialogRequest{title, std::move(completion)});
+  file_dialog_request = request;
+  // Leave the current Slint callback before AppKit creates or shows the panel.
+  // runModal would let display-link callbacks reenter Slint's timer dispatch.
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (file_dialog_request != request) return;
+    NSOpenPanel *panel = prepared_file_dialog ?: CreateFileDialog();
+    prepared_file_dialog = nil;
+    file_dialog = panel;
 
     NSString *prompt =
-        [[NSString alloc] initWithBytes:title.data()
-                                 length:title.size()
+        [[NSString alloc] initWithBytes:request->title.data()
+                                 length:request->title.size()
                                encoding:NSUTF8StringEncoding];
-    if (prompt != nil && prompt.length > 0) {
-      panel.title = prompt;
-      panel.message = prompt;
-    }
+    panel.title = prompt ?: @"";
+    panel.message = prompt ?: @"";
 
     // tinyfiledialogs uses an external osascript process on macOS, so its
     // chooser can appear without becoming the active window. Keep the picker
     // inside CrossDesk and explicitly activate both the app and panel.
     [NSApp activateIgnoringOtherApps:YES];
-    NSWindow *owner = stream_window ?: NSApp.keyWindow ?: NSApp.mainWindow;
+    NSWindow *owner = NSApp.keyWindow ?: NSApp.mainWindow;
     if (owner != nil) {
       [owner makeKeyAndOrderFront:nil];
     }
     NSScreen *target_screen = owner.screen ?: NSScreen.mainScreen;
     CenterWindowOnScreen(panel, target_screen);
-    [panel makeKeyAndOrderFront:nil];
+    __weak NSOpenPanel *weak_panel = panel;
+    [panel beginWithCompletionHandler:^(NSModalResponse result) {
+      // Cancellation can complete a request before AppKit calls this block.
+      if (file_dialog_request != request) return;
+      NSOpenPanel *finished_panel = weak_panel;
+      const char *selected = result == NSModalResponseOK
+          ? finished_panel.URL.fileSystemRepresentation : nullptr;
+      const std::string path = selected ? selected : "";
+      [finished_panel orderOut:nil];
+      file_dialog = nil;
+      // AppKit has returned the panel to its configuration phase. Keep the
+      // browser alive for the next selection instead of rebuilding it.
+      prepared_file_dialog = finished_panel;
+      file_dialog_request.reset();
+      auto finished = std::move(request->completion);
+      finished(path);
+    }];
+    if (file_dialog_request == request) [panel makeKeyAndOrderFront:nil];
+  });
+}
 
-    if ([panel runModal] != NSModalResponseOK || panel.URL == nil) {
-      return {};
-    }
-    const char *path = panel.URL.fileSystemRepresentation;
-    return path != nullptr ? std::string(path) : std::string{};
-  }
+void CancelNativeFileDialog() {
+  ++file_dialog_prepare_generation;
+  prepared_file_dialog = nil;
+  const auto request = std::move(file_dialog_request);
+  if (!request) return;
+  NSOpenPanel *panel = file_dialog;
+  file_dialog = nil;
+  [panel cancel:nil];
+  [panel orderOut:nil];
+  auto finished = std::move(request->completion);
+  finished({});
 }
 
 } // namespace crossdesk
