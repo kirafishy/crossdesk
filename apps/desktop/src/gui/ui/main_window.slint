@@ -2259,11 +2259,12 @@ export component MainWindow inherits Window {
         TouchArea { clicked => { focus-sink.focus(); } }
         SettingsDialog {
             x: (parent.width - self.width) / 2;
-            y: (root.height - self.height) / 2;
+            y: (parent.height - self.height) / 2;
             width: min(480px, parent.width - 40px);
-            min-height: 0px; max-height: root.height - 32px;
+            // The overlay excludes any custom titlebar on every platform.
+            min-height: 0px; max-height: parent.height - 32px;
             // Keep the dialog stable as update status and release details change.
-            height: min(488px, root.height - 32px);
+            height: min(488px, parent.height - 32px);
             title: UiStrings.about;
             close-label: MessageStrings.close;
             close => { root.about-open = false; }
@@ -2393,8 +2394,9 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: min(480px, parent.width - 40px);
-            min-height: 0px; max-height: root.height - 32px;
-            height: min(488px, root.height - 32px);
+            // Use the same content area for sizing and centering the dialog.
+            min-height: 0px; max-height: parent.height - 32px;
+            height: min(488px, parent.height - 32px);
             border-radius: UiRadius.surface;
             border-color: WorkbenchStyle.border;
             drop-shadow-color: #07142b24;
