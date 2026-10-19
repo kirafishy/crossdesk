@@ -247,7 +247,7 @@ export component ServerWindow inherits Window {
                     x: root.footer-height > 28px ? parent.width - self.width : disconnect-all.x - self.width - 6px;
                     y: 0px;
                     text: root.confirming-disconnect ? ServerStrings.cancel : ServerStrings.send-file;
-                    enabled: root.confirming-disconnect || !root.sending-file;
+                    // Additional files join the queue while the current transfer continues.
                     clicked => { if root.confirming-disconnect { root.confirming-disconnect = false; } else { root.select-file(); } }
                 }
                 disconnect-all := SessionButton {
