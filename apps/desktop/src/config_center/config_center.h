@@ -49,7 +49,7 @@ class ConfigCenter {
   int SetPrivacyScreen(bool enable_privacy_screen);
   int SetSaveRemotePreviews(bool enabled);
   int SetPortableServicePromptSuppressed(bool suppressed);
-  int SetSponsorshipPromptDismissed(bool dismissed);
+  int SetSponsorshipPromptDismissedVersion(const std::string& version);
   int SetFileTransferSavePath(const std::string& path);
 
   // read config
@@ -74,7 +74,7 @@ class ConfigCenter {
   bool IsEnablePrivacyScreen() const;
   bool IsSaveRemotePreviews() const;
   bool IsPortableServicePromptSuppressed() const;
-  bool IsSponsorshipPromptDismissed() const;
+  std::string GetSponsorshipPromptDismissedVersion() const;
   std::string GetFileTransferSavePath() const;
 
   int Load();
@@ -104,7 +104,7 @@ class ConfigCenter {
   std::atomic<bool> enable_privacy_screen_{true};
   std::atomic<bool> save_remote_previews_{true};
   bool portable_service_prompt_suppressed_ = false;
-  bool sponsorship_prompt_dismissed_ = false;
+  std::string sponsorship_prompt_dismissed_version_;
   std::string file_transfer_save_path_ = "";
 };
 }  // namespace crossdesk

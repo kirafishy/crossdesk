@@ -1267,7 +1267,7 @@ void GuiApplication::InitializeUi() {
 #endif
   ui_ = std::make_unique<SlintUi>();
   ui_->sponsorship_prompt_pending =
-      !config_center_->IsSponsorshipPromptDismissed();
+      config_center_->GetSponsorshipPromptDismissedVersion() != CROSSDESK_VERSION;
   ui_->video_presenter =
       std::make_unique<SlintVideoPresenter>(*video_renderer_);
 #if _WIN32
@@ -1752,7 +1752,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
   main->on_dismiss_sponsorship([this, main] {
     main->set_sponsorship_open(false);
     ui_->sponsorship_prompt_pending = false;
-    if (config_center_->SetSponsorshipPromptDismissed(true) != 0) {
+    if (config_center_->SetSponsorshipPromptDismissedVersion(CROSSDESK_VERSION) != 0) {
       LOG_WARN("Could not save sponsorship prompt dismissal");
     }
   });

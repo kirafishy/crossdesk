@@ -293,9 +293,9 @@ struct TranslationRow {
   X(sponsorship_message, u8"如果 CrossDesk 对你有帮助，欢迎赞助支持项目的持续开发、跨平台测试与日常维护。感谢你的支持！", \
     "If CrossDesk is useful to you, consider supporting its continued development, cross-platform testing, and maintenance. Thank you for your support!", \
     u8"Если CrossDesk вам полезен, поддержите его дальнейшую разработку, тестирование на разных платформах и сопровождение. Спасибо за вашу поддержку!") \
-  X(sponsorship_dismiss_hint, u8"关闭后不再自动弹出，你仍可在「关于」中找到赞助入口。", \
-    "This prompt will not appear again after you close it. Sponsorship links remain available in About.", \
-    u8"После закрытия это окно больше не появится автоматически. Ссылки для поддержки останутся в разделе «О программе».") \
+  X(sponsorship_dismiss_hint, u8"关闭后本版本不再提示，升级后再次显示。赞助入口仍在「关于」中。", \
+    "Once closed, this prompt stays hidden until the version changes. Sponsorship links remain available in About.", \
+    u8"После закрытия это окно появится только при смене версии. Ссылки для поддержки останутся в разделе «О программе».") \
   X(sponsor_via_afdian, u8"爱发电", "AFDIAN", "AFDIAN")                       \
   X(notification, u8"通知", "Notification", u8"Уведомление")                   \
   X(new_version, u8"新版本", "New version", u8"Новая версия")                 \

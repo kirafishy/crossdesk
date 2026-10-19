@@ -49,6 +49,7 @@ export component SettingsButton inherits Rectangle {
 export component SettingsDialog inherits DialogSurface {
     in property <string> title;
     in property <string> close-label;
+    in property <bool> show-close-button: true;
     in property <int> badge-count: 0;
     in property <string> badge-label;
     in property <string> header-status;
@@ -92,7 +93,7 @@ export component SettingsDialog inherits DialogSurface {
             clicked => { root.action(); }
             action-label-metrics := Text { visible: false; text: root.action-text; font-size: 12px; }
         }
-        IconButton {
+        if root.show-close-button: IconButton {
             width: 28px; height: 28px;
             icon: FontAwesomeIcons.xmark; icon-size: 14px;
             icon-color: WorkbenchStyle.muted;

@@ -52,6 +52,10 @@ int ConfigCenter::Load() {
       ini_->Delete(section_, "enable_desktop_quality_optimization");
   persist_config_migration |=
       ini_->Delete(section_, "enable_minimize_to_tray");
+  // The old global flag has no version information. Prompt once for the
+  // current release, then remember its version when the user dismisses it.
+  persist_config_migration |=
+      ini_->Delete(section_, "sponsorship_prompt_dismissed");
 
   const long language_value =
       ini_->GetLongValue(section_, "language", static_cast<long>(language_));
@@ -131,8 +135,8 @@ int ConfigCenter::Load() {
   portable_service_prompt_suppressed_ =
       ini_->GetBoolValue(section_, "portable_service_prompt_suppressed",
                         portable_service_prompt_suppressed_);
-  sponsorship_prompt_dismissed_ =
-      ini_->GetBoolValue(section_, "sponsorship_prompt_dismissed", false);
+  sponsorship_prompt_dismissed_version_ =
+      ini_->GetValue(section_, "sponsorship_prompt_dismissed_version", "");
 
   const char* file_transfer_save_path_value =
       ini_->GetValue(section_, "file_transfer_save_path", nullptr);
@@ -223,8 +227,8 @@ int ConfigCenter::Save() {
                     save_remote_previews_.load());
   ini_->SetBoolValue(section_, "portable_service_prompt_suppressed",
                     portable_service_prompt_suppressed_);
-  ini_->SetBoolValue(section_, "sponsorship_prompt_dismissed",
-                    sponsorship_prompt_dismissed_);
+  ini_->SetValue(section_, "sponsorship_prompt_dismissed_version",
+                sponsorship_prompt_dismissed_version_.c_str());
 
   ini_->SetValue(section_, "file_transfer_save_path",
                 file_transfer_save_path_.c_str());
@@ -399,12 +403,13 @@ int ConfigCenter::SetPortableServicePromptSuppressed(bool suppressed) {
   return 0;
 }
 
-int ConfigCenter::SetSponsorshipPromptDismissed(bool dismissed) {
-  if (StoreValues({{"sponsorship_prompt_dismissed",
-                    dismissed ? "true" : "false"}}) != 0) {
+int ConfigCenter::SetSponsorshipPromptDismissedVersion(
+    const std::string& version) {
+  if (version.empty() ||
+      StoreValues({{"sponsorship_prompt_dismissed_version", version}}) != 0) {
     return -1;
   }
-  sponsorship_prompt_dismissed_ = dismissed;
+  sponsorship_prompt_dismissed_version_ = version;
   return 0;
 }
 
@@ -476,8 +481,8 @@ bool ConfigCenter::IsPortableServicePromptSuppressed() const {
   return portable_service_prompt_suppressed_;
 }
 
-bool ConfigCenter::IsSponsorshipPromptDismissed() const {
-  return sponsorship_prompt_dismissed_;
+std::string ConfigCenter::GetSponsorshipPromptDismissedVersion() const {
+  return sponsorship_prompt_dismissed_version_;
 }
 
 int ConfigCenter::SetFileTransferSavePath(const std::string& path) {

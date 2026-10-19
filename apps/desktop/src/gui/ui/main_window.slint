@@ -2289,15 +2289,16 @@ export component MainWindow inherits Window {
             width: min(480px, parent.width - 40px);
             height: self.content-top + sponsorship-content.preferred-height + 24px;
             title: UiStrings.sponsorship-title;
-            close-label: MessageStrings.close;
-            close => { root.dismiss-sponsorship(); }
+            show-close-button: false;
             sponsorship-content := VerticalLayout {
                 x: 24px; y: parent.content-top;
                 width: parent.width - 48px; height: self.preferred-height;
-                padding: 0px; spacing: 18px;
+                padding: 0px; spacing: 20px;
                 Text {
                     text: UiStrings.sponsorship-message;
-                    color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
+                    color: WorkbenchStyle.text; font-size: 14px; wrap: word-wrap;
+                    // Match message bodies' 1.5em line height for wrapped text.
+                    font-family: "CrossDesk Message Spacing";
                 }
                 SponsorshipSection {
                     show-title: false;
@@ -2308,6 +2309,7 @@ export component MainWindow inherits Window {
                 Text {
                     text: UiStrings.sponsorship-dismiss-hint;
                     color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
+                    font-family: "CrossDesk Message Spacing";
                 }
                 Rectangle { height: 1px; background: WorkbenchStyle.separator; }
                 HorizontalLayout {
