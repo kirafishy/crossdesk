@@ -37,6 +37,7 @@ class FileTransferManager {
   void Receive(const char* data, size_t size, PeerEventHandler* handler, const std::string& remote);
   void Connected(PeerEventHandler* handler, const std::string& remote);
   void Cancel(PeerEventHandler* handler, const std::string& remote = "");
+  bool CancelSend(uint32_t file_id);
   void Poll();
   void Shutdown();
 

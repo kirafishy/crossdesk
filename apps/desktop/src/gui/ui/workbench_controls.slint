@@ -18,6 +18,9 @@ export global WorkbenchStyle {
 
 export component WorkbenchButton inherits Rectangle {
     in property <string> text;
+    in property <length> text-size: 13px;
+    in property <color> text-color: root.primary ? white : WorkbenchStyle.text;
+    in property <color> normal-border-color: WorkbenchStyle.control-border;
     in property <string> icon;
     in property <string> tooltip;
     in property <bool> tooltip-above: false;
@@ -45,7 +48,7 @@ export component WorkbenchButton inherits Rectangle {
     border-color: root.show-focus ? (root.primary ? #193da0 : WorkbenchStyle.accent)
         : root.primary ? WorkbenchStyle.accent
         : touch.has-hover ? WorkbenchStyle.hover-border
-        : root.quiet ? transparent : WorkbenchStyle.control-border;
+        : root.quiet ? transparent : root.normal-border-color;
     background: root.soft
         ? (root.primary
             ? (touch.pressed ? #254cc0 : touch.has-hover || root.show-focus ? WorkbenchStyle.accent : #edf2ff)
@@ -77,9 +80,9 @@ export component WorkbenchButton inherits Rectangle {
         }
         if root.text != "": Text {
             text: root.text;
-            font-size: 13px;
+            font-size: root.text-size;
             font-weight: root.primary ? 600 : 500;
-            color: root.primary ? white : WorkbenchStyle.text;
+            color: root.text-color;
             vertical-alignment: center;
             accessible-role: none;
         }

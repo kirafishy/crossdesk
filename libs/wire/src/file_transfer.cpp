@@ -39,6 +39,17 @@ std::vector<char> EncodeFileChunk(uint32_t file_id, uint64_t offset,
   return output;
 }
 
+std::vector<char> EncodeFileCancel(uint32_t file_id, uint64_t total_size) {
+  FileChunkHeader header{};
+  header.magic = kFileChunkMagic;
+  header.file_id = file_id;
+  header.total_size = total_size;
+  header.flags = kFileCancelFlag;
+  std::vector<char> output(sizeof(header));
+  std::memcpy(output.data(), &header, sizeof(header));
+  return output;
+}
+
 bool DecodeFileChunk(const char* data, std::size_t size,
                      FileChunkView* output) {
   if (!data || !output || size < sizeof(FileChunkHeader)) return false;

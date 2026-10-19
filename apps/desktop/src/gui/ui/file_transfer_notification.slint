@@ -1,6 +1,6 @@
 import { FileTransferEntry } from "stream_window.slint";
 import { DialogSurface, FontAwesomeIcons, IconButton, ImGuiFontStyle } from "common.slint";
-import { WorkbenchStyle } from "workbench_controls.slint";
+import { WorkbenchStyle, WorkbenchButton } from "workbench_controls.slint";
 
 export component FileTransferNotification inherits Window {
     title: "CrossDesk";
@@ -17,7 +17,11 @@ export component FileTransferNotification inherits Window {
     in property <bool> completed;
     in property <bool> failed;
     in property <bool> transferring;
+    in property <bool> cancelled;
+    in property <bool> can-cancel;
+    in property <string> cancel-text;
     callback dismissed;
+    callback cancel-requested;
 
     DialogSurface {
         width: parent.width; height: parent.height;
@@ -75,14 +79,26 @@ export component FileTransferNotification inherits Window {
             Rectangle {
                 x: 0px; y: 0px;
                 width: parent.width * max(0, min(1, root.entry.progress)); height: parent.height;
-                background: root.failed ? #d92d20 : root.completed ? WorkbenchStyle.success : WorkbenchStyle.accent;
+                background: root.failed ? #d92d20 : root.completed ? WorkbenchStyle.success
+                    : root.cancelled ? WorkbenchStyle.muted : WorkbenchStyle.accent;
                 border-radius: 3px;
             }
         }
-        Text {
-            x: 16px; y: 103px; width: parent.width - 32px; height: 17px;
-            text: root.entry.size; color: WorkbenchStyle.muted;
-            font-size: ImGuiFontStyle.body; vertical-alignment: center; overflow: elide;
+        HorizontalLayout {
+            x: 16px; y: 100px; width: parent.width - 32px; height: 24px; spacing: 12px;
+            Text {
+                text: root.entry.size; color: WorkbenchStyle.muted;
+                font-size: ImGuiFontStyle.body; vertical-alignment: center; overflow: elide;
+                horizontal-stretch: 1;
+            }
+            if root.can-cancel: WorkbenchButton {
+                width: 72px; height: 24px; horizontal-stretch: 0;
+                text: root.cancel-text;
+                text-size: ImGuiFontStyle.base;
+                text-color: WorkbenchStyle.muted;
+                normal-border-color: WorkbenchStyle.border;
+                clicked => { root.cancel-requested(); }
+            }
         }
     }
 }

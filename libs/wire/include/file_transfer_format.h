@@ -17,6 +17,7 @@ namespace crossdesk {
 
 inline constexpr uint32_t kFileChunkMagic = 0x4A4E544D;  // 'JNTM'
 inline constexpr uint32_t kFileAckMagic = 0x4A4E5443;    // 'JNTC'
+inline constexpr uint8_t kFileCancelFlag = 0x04;
 
 #pragma pack(push, 1)
 struct FileChunkHeader {
@@ -58,6 +59,9 @@ std::vector<char> EncodeFileChunk(uint32_t file_id, uint64_t offset,
 
 bool DecodeFileChunk(const char* data, std::size_t size,
                      FileChunkView* output);
+
+// A header-only cancellation travels on the same reliable stream as chunks.
+std::vector<char> EncodeFileCancel(uint32_t file_id, uint64_t total_size);
 
 std::array<char, sizeof(FileTransferAck)> EncodeFileTransferAck(
     const FileTransferAck& ack);

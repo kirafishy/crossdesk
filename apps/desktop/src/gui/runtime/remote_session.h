@@ -56,7 +56,7 @@ struct FileTransferState {
   std::queue<QueuedFile> file_send_queue_;
   std::mutex file_queue_mutex_;
 
-  enum class FileTransferStatus { Queued, Sending, Completed, Failed, Receiving };
+  enum class FileTransferStatus { Queued, Sending, Completed, Failed, Receiving, Cancelling, Cancelled };
 
   struct FileTransferInfo {
     std::string file_name;

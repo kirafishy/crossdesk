@@ -3904,6 +3904,29 @@ void GuiApplication::SyncServerWindow() {
   PositionServerWindows();
 }
 
+void GuiApplication::CancelFileTransfer(uint32_t file_id) {
+  using Status = RemoteSession::FileTransferStatus;
+  const auto found = ui_->transfer_notifications.find(file_id);
+  if (found == ui_->transfer_notifications.end()) return;
+  auto& info = found->second.info;
+  if (info.receiving || (info.status != Status::Queued && info.status != Status::Sending))
+    return;
+  // DeskHub tasks waiting for a concurrency slot have no sender yet.
+  for (auto& operation : ui_->batch_operations) {
+    if (operation.file_id == file_id &&
+        operation.state == SlintUi::BatchOperation::State::Queued) {
+      operation.state = SlintUi::BatchOperation::State::Finished;
+      info.status = Status::Cancelled;
+      info.rate_bps = 0;
+      return;
+    }
+  }
+  if (transfers_.CancelSend(file_id)) {
+    info.status = Status::Cancelling;
+    info.rate_bps = 0;
+  }
+}
+
 void GuiApplication::SyncFileTransferNotifications() {
   using Status = RemoteSession::FileTransferStatus;
   using namespace transfer_notification;
@@ -3966,7 +3989,7 @@ void GuiApplication::SyncFileTransferNotifications() {
   for (auto& [id, notification] : ui_->transfer_notifications) {
     auto& info = notification.info;
     if (!files.count(id) && !pending_files.count(id) && info.status != Status::Completed &&
-        info.status != Status::Failed) {
+        info.status != Status::Failed && info.status != Status::Cancelled) {
       info.status = Status::Failed;
       info.rate_bps = 0;
     }
@@ -3990,6 +4013,7 @@ void GuiApplication::SyncFileTransferNotifications() {
         if (found->second.window) (*found->second.window)->hide();
       };
       (*notification.window)->on_dismissed(dismiss);
+      (*notification.window)->on_cancel_requested([this, id] { CancelFileTransfer(id); });
       (*notification.window)->window().on_close_requested([dismiss] {
         dismiss();
         return slint::CloseRequestResponse::KeepWindowShown;
@@ -4004,6 +4028,8 @@ void GuiApplication::SyncFileTransferNotifications() {
       case Status::Receiving: entry.status = UiText(localization::receiving[localization_language_index_]); break;
       case Status::Completed: entry.status = UiText(localization::completed[localization_language_index_]); break;
       case Status::Failed: entry.status = UiText(localization::failed[localization_language_index_]); break;
+      case Status::Cancelling: entry.status = UiText(localization::cancelling[localization_language_index_]); break;
+      case Status::Cancelled: entry.status = UiText(localization::cancelled[localization_language_index_]); break;
     }
     entry.progress = completed ? 1.0f : info.file_size == 0 ? 0.0f
         : std::clamp(static_cast<float>(info.sent_bytes) / info.file_size, 0.0f, 1.0f);
@@ -4019,6 +4045,10 @@ void GuiApplication::SyncFileTransferNotifications() {
     component->set_transferring(info.status == Status::Sending || info.status == Status::Receiving);
     component->set_completed(completed);
     component->set_failed(failed);
+    component->set_cancelled(info.status == Status::Cancelled || info.status == Status::Cancelling);
+    component->set_can_cancel(!info.receiving &&
+        (info.status == Status::Queued || info.status == Status::Sending));
+    component->set_cancel_text(UiText(localization::cancel[localization_language_index_]));
     auto& window = component->window();
     const auto size = window.size();
     const float scale = std::max(window.scale_factor(), 0.01f);
@@ -5713,7 +5743,8 @@ void GuiApplication::SyncGallery() {
         });
         if (file == files.end() ||
             file->status == RemoteSession::FileTransferStatus::Completed ||
-            file->status == RemoteSession::FileTransferStatus::Failed)
+            file->status == RemoteSession::FileTransferStatus::Failed ||
+            file->status == RemoteSession::FileTransferStatus::Cancelled)
           operation.state = OperationState::Finished;
       }
     }

@@ -33,14 +33,14 @@ struct Options {
   size_t max_incoming = 0;
 };
 
-enum class Status { Idle, Sending, Completed, Failed };
+enum class Status { Idle, Sending, Completed, Failed, Cancelled };
 struct SendState {
   uint32_t id = 0;
   uint64_t total = 0, acknowledged = 0;
   Status status = Status::Idle;
 };
 
-enum class ReceiveStatus { Receiving, Completed, Failed };
+enum class ReceiveStatus { Receiving, Completed, Failed, Cancelled };
 struct ReceiveState {
   uint32_t id = 0;
   std::string name;
@@ -101,6 +101,10 @@ class Session {
     {
       std::lock_guard<std::mutex> lock(mutex_);
       if (closed_) return false;
+      for (auto it = cancelled_incoming_.begin(); it != cancelled_incoming_.end();) {
+        if (now - it->second >= timeout_) it = cancelled_incoming_.erase(it);
+        else ++it;
+      }
       for (auto it = incoming_.begin(); it != incoming_.end();) {
         if (now - it->second.updated < timeout_) { ++it; continue; }
         expired.push_back({kFileAckMagic, it->first, it->second.received, it->second.total, 2});
@@ -177,6 +181,20 @@ class Session {
     std::lock_guard<std::mutex> lock(mutex_);
     return state_;
   }
+  // Stop only the outgoing file. Keep the peer usable for subsequent sends.
+  // The adapter calls this between pumps; late/reordered chunks are discarded
+  // by the receiver's cancellation tombstone.
+  bool CancelSend() {
+    std::vector<char> packet;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (!outgoing_) return false;
+      packet = EncodeFileCancel(outgoing_->id, outgoing_->total);
+      FinishSend(false, true);
+    }
+    if (send_) send_(kFileStream, packet.data(), packet.size());
+    return true;
+  }
   // A cancelled connection cannot be restarted by a late data callback.
   void Cancel() {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -215,6 +233,25 @@ class Session {
   FileTransferAck ReceiveLocked(const FileChunkView& chunk, size_t size, Clock::time_point now) {
     const auto& h = chunk.header;
     auto it = incoming_.find(h.file_id);
+    if (h.flags == kFileCancelFlag) {
+      const FileTransferAck ack{kFileAckMagic, h.file_id, 0, h.total_size, 2};
+      if (size != sizeof(FileChunkHeader) || h.offset || h.name_len ||
+          h.chunk_size || h.total_size > INT64_MAX ||
+          (it != incoming_.end() && h.total_size != it->second.total))
+        return ack;
+      cancelled_incoming_[h.file_id] = now;
+      if (it != incoming_.end()) {
+        NotifyReceive(h.file_id, it->second, ReceiveStatus::Cancelled);
+        Notify(it->second.name, -1, false, "");
+        Remove(it->second);
+        incoming_.erase(it);
+      }
+      return ack;
+    }
+    // KCP receive callbacks can be reordered. Do not recreate a cancelled
+    // staging file or a second notification when an in-flight chunk arrives.
+    if (cancelled_incoming_.count(h.file_id))
+      return {kFileAckMagic, h.file_id, 0, h.total_size, 2};
     auto reject = [&]() {
       if (it != incoming_.end()) {
         NotifyReceive(h.file_id, it->second, ReceiveStatus::Failed);
@@ -387,8 +424,9 @@ class Session {
     }
     outgoing_.reset();
   }
-  void FinishSend(bool success) {
-    state_.status = success ? Status::Completed : Status::Failed;
+  void FinishSend(bool success, bool cancelled = false) {
+    state_.status = success ? Status::Completed
+        : cancelled ? Status::Cancelled : Status::Failed;
     Notify(outgoing_->name, success ? 1 : -1, true, "");
     RemoveSource();
   }
@@ -396,6 +434,7 @@ class Session {
     if (outgoing_) RemoveSource();
     for (auto& entry : incoming_) Remove(entry.second);
     incoming_.clear();
+    cancelled_incoming_.clear();
   }
   const std::chrono::seconds timeout_{30};
   mutable std::mutex mutex_;
@@ -408,6 +447,7 @@ class Session {
   std::filesystem::path directory_;
   std::optional<Outgoing> outgoing_;
   std::map<uint32_t, Incoming> incoming_;
+  std::map<uint32_t, Clock::time_point> cancelled_incoming_;
 };
 
 }  // namespace crossdesk::file_transfer

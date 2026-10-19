@@ -111,11 +111,13 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
       state.file_send_start_time_ = state.file_send_last_update_time_ = started_at;
       state.file_send_last_bytes_ = 0;
     }
+    bool cancelled = false;
     {
       std::lock_guard lock(state.file_transfer_list_mutex_);
       for (auto& info : state.file_transfer_list_) {
         if (info.file_id == id) {
-          info.status = FileTransferState::FileTransferStatus::Sending;
+          cancelled = info.status == FileTransferState::FileTransferStatus::Cancelled;
+          if (!cancelled) info.status = FileTransferState::FileTransferStatus::Sending;
           info.file_id = id; info.sent_bytes = 0;
           break;
         }
@@ -128,7 +130,7 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
       const auto closed = disconnected_.find(events.get());
       const bool disconnected = closed != disconnected_.end() &&
           (closed->second.count("") || closed->second.count(file.remote_id));
-      if (!stopping_ && peer && events && events->IsActive() && !disconnected &&
+      if (!cancelled && !stopping_ && peer && events && events->IsActive() && !disconnected &&
           (!props || !props->closing_) && !file.remote_id.empty()) {
         started = session->Start(file.file_path, std::string(name.begin(), name.end()),
                                  file_transfer::Session::Clock::now(), id);
@@ -136,10 +138,19 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
       }
     }
     uint64_t previous = UINT64_MAX;
-    auto progress = file_transfer::SendState{id, 0, 0, file_transfer::Status::Failed};
+    auto progress = file_transfer::SendState{id, 0, 0,
+        cancelled ? file_transfer::Status::Cancelled : file_transfer::Status::Failed};
     if (started) {
       do {
-        if (stopping_ || !events->IsActive() || (props && props->closing_)) session->Cancel();
+        {
+          std::lock_guard lock(state.file_transfer_list_mutex_);
+          for (const auto& info : state.file_transfer_list_) if (info.file_id == id) {
+            cancelled = info.status == FileTransferState::FileTransferStatus::Cancelling;
+            break;
+          }
+        }
+        if (cancelled) session->CancelSend();
+        else if (stopping_ || !events->IsActive() || (props && props->closing_)) session->Cancel();
         const bool pumped = session->Pump();
         progress = session->Snapshot();
         const auto now = std::chrono::steady_clock::now();
@@ -164,8 +175,14 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
     {
       std::lock_guard lock(state.file_transfer_list_mutex_);
       for (auto& info : state.file_transfer_list_) if (info.file_id == id) {
+        const bool cancelled = progress.status == file_transfer::Status::Cancelled ||
+            info.status == FileTransferState::FileTransferStatus::Cancelled ||
+            info.status == FileTransferState::FileTransferStatus::Cancelling;
         info.status = progress.status == file_transfer::Status::Completed
-            ? FileTransferState::FileTransferStatus::Completed : FileTransferState::FileTransferStatus::Failed;
+            ? FileTransferState::FileTransferStatus::Completed
+            : cancelled ? FileTransferState::FileTransferStatus::Cancelled
+                        : FileTransferState::FileTransferStatus::Failed;
+        info.rate_bps = 0;
         if (info.status == FileTransferState::FileTransferStatus::Completed) info.sent_bytes = info.file_size;
         break;
       }
@@ -208,6 +225,30 @@ void FileTransferManager::UpdateProgress(FileTransferState& state,
     info.sent_bytes = progress.acknowledged; info.file_size = progress.total; info.rate_bps = rate;
     break;
   }
+}
+
+bool FileTransferManager::CancelSend(uint32_t file_id) {
+  using Status = FileTransferState::FileTransferStatus;
+  const auto cancel = [file_id](FileTransferState& state) {
+    std::lock_guard lock(state.file_transfer_list_mutex_);
+    for (auto& info : state.file_transfer_list_) {
+      if (info.file_id != file_id || info.receiving) continue;
+      if (info.status != Status::Queued && info.status != Status::Sending) return false;
+      info.status = info.status == Status::Queued ? Status::Cancelled : Status::Cancelling;
+      info.rate_bps = 0;
+      return true;
+    }
+    return false;
+  };
+  bool cancelled = cancel(global_state_);
+  if (!cancelled) {
+    std::shared_lock lock(owner_.remote_sessions_mutex_);
+    for (const auto& [_, props] : owner_.remote_sessions_) {
+      if (props && cancel(props->file_transfer_)) { cancelled = true; break; }
+    }
+  }
+  if (cancelled) wake_.notify_all();
+  return cancelled;
 }
 
 void FileTransferManager::HandleAck(const char* data, size_t size,
@@ -253,8 +294,10 @@ void FileTransferManager::UpdateReceiveProgress(
     case file_transfer::ReceiveStatus::Receiving: info.status = Status::Receiving; break;
     case file_transfer::ReceiveStatus::Completed: info.status = Status::Completed; break;
     case file_transfer::ReceiveStatus::Failed: info.status = Status::Failed; break;
+    case file_transfer::ReceiveStatus::Cancelled: info.status = Status::Cancelled; break;
   }
   if (info.status != Status::Receiving) {
+    info.rate_bps = 0;
     receive_rate_samples_.erase(info.file_id);
     notifications.erase(found);
   }

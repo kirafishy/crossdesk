@@ -339,6 +339,8 @@ struct TranslationRow {
   X(receiving, u8"正在接收", "Receiving", u8"Получение")                      \
   X(completed, u8"已完成", "Completed", u8"Завершено")                         \
   X(failed, u8"失败", "Failed", u8"Ошибка")                                    \
+  X(cancelling, u8"正在取消", "Cancelling", u8"Отмена…")                       \
+  X(cancelled, u8"已取消", "Cancelled", u8"Отменено")                          \
   X(controller, u8"控制端:", "Controller:", u8"Контроллер:")                   \
   X(server_controlled, u8"被控中", "Controlled", u8"Под управлением") \
   X(server_heading, u8"此设备被控中", "This device is controlled", u8"Устройство под управлением") \
