@@ -2262,8 +2262,8 @@ export component MainWindow inherits Window {
             y: (root.height - self.height) / 2;
             width: min(480px, parent.width - 40px);
             min-height: 0px; max-height: root.height - 32px;
-            height: min(root.height - 32px, self.content-top + about-content.preferred-height
-                + 16px + about-footer.preferred-height + 24px);
+            // Keep the dialog stable as update status and release details change.
+            height: min(488px, root.height - 32px);
             title: UiStrings.about;
             close-label: MessageStrings.close;
             close => { root.about-open = false; }
@@ -2304,12 +2304,12 @@ export component MainWindow inherits Window {
                             }
                         }
                     }
-                    if root.update-available || root.update-status-text != "": Rectangle {
+                    if root.update-available: Rectangle {
                         height: update-summary.preferred-height + 24px;
-                        background: root.update-check-status == UpdateCheckStatus.failed ? #fef2f2 : WorkbenchStyle.field-surface;
+                        background: WorkbenchStyle.field-surface;
                         border-radius: UiRadius.control;
                         border-width: 1px;
-                        border-color: root.update-check-status == UpdateCheckStatus.failed ? #f3d4d1 : WorkbenchStyle.separator;
+                        border-color: WorkbenchStyle.separator;
                         update-summary := VerticalLayout {
                             x: 12px; y: 12px; width: parent.width - 24px;
                             height: self.preferred-height;
@@ -2341,12 +2341,6 @@ export component MainWindow inherits Window {
                                     release-notes-button-metrics := Text { visible: false; text: UiStrings.view-release-notes; font-size: 12px; }
                                 }
                             }
-                            if root.update-status-text != "": Text {
-                                text: root.update-status-text;
-                                color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
-                                    : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
-                                font-size: 12px; wrap: word-wrap;
-                            }
                         }
                     }
                     SponsorshipSection {
@@ -2368,6 +2362,15 @@ export component MainWindow inherits Window {
                 Rectangle { height: 1px; background: WorkbenchStyle.separator; }
                 HorizontalLayout {
                     alignment: end; spacing: 8px;
+                    // Status updates use the spare footer space without reflowing the content.
+                    Text {
+                        min-width: 0px; height: 32px; horizontal-stretch: 1;
+                        text: root.update-status-text;
+                        color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
+                            : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
+                        font-size: 12px; wrap: word-wrap; overflow: elide;
+                        vertical-alignment: center;
+                    }
                     SettingsButton {
                         width: max(116px, check-button-metrics.preferred-width + 24px);
                         text: UiStrings.check-for-updates;
