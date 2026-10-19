@@ -1740,6 +1740,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     OpenUrl(latest && !latest->download_url.empty() ? latest->download_url
                                                    : "https://crossdesk.cn");
   });
+  main->on_open_website([this] { OpenUrl("https://crossdesk.cn"); });
   main->on_open_afdian_sponsor([this] {
     OpenUrl("https://afdian.com/a/kunkundi");
   });

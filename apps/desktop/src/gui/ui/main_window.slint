@@ -492,6 +492,7 @@ export component MainWindow inherits Window {
     callback cancel-self-hosted-settings;
     callback browse-save-path;
     callback open-download;
+    callback open-website;
     callback open-afdian-sponsor;
     callback open-github-sponsor;
     callback open-kofi-sponsor;
@@ -2445,6 +2446,15 @@ export component MainWindow inherits Window {
                             : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
                         font-size: 12px; wrap: word-wrap; overflow: elide;
                         vertical-alignment: center;
+                    }
+                    if root.update-available: WorkbenchButton {
+                        width: max(80px, about-update-button-metrics.preferred-width + 24px);
+                        height: 32px;
+                        primary: true;
+                        text-size: 12px;
+                        text: UiStrings.download;
+                        clicked => { root.open-website(); }
+                        about-update-button-metrics := Text { visible: false; text: UiStrings.download; font-size: 12px; }
                     }
                     SettingsButton {
                         width: max(116px, check-button-metrics.preferred-width + 24px);
