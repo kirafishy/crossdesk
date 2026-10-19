@@ -1018,6 +1018,7 @@ struct GuiApplication::SlintUi {
   bool connection_password_initialized = false;
   bool connection_dialog_gallery = false;
   bool portable_service_dialog_initialized = false;
+  bool sponsorship_prompt_pending = false;
   std::string recent_model_signature;
   std::optional<std::string> recent_group_filter;
   std::vector<std::string> recent_filter_groups;
@@ -1265,6 +1266,8 @@ void GuiApplication::InitializeUi() {
   slint::set_xdg_app_id("crossdesk");
 #endif
   ui_ = std::make_unique<SlintUi>();
+  ui_->sponsorship_prompt_pending =
+      !config_center_->IsSponsorshipPromptDismissed();
   ui_->video_presenter =
       std::make_unique<SlintVideoPresenter>(*video_renderer_);
 #if _WIN32
@@ -1745,6 +1748,13 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
   });
   main->on_open_kofi_sponsor([this] {
     OpenUrl("https://ko-fi.com/kunkundi");
+  });
+  main->on_dismiss_sponsorship([this, main] {
+    main->set_sponsorship_open(false);
+    ui_->sponsorship_prompt_pending = false;
+    if (config_center_->SetSponsorshipPromptDismissed(true) != 0) {
+      LOG_WARN("Could not save sponsorship prompt dismissal");
+    }
   });
   main->on_check_for_updates([this] {
     update_checker_->RequestCheck();
@@ -2299,6 +2309,16 @@ void GuiApplication::Tick() {
   SyncGallery();
   SyncConnectionDialog();
   SyncPlatformDialogs();
+  // Wait for startup notices and user interactions to finish. Once shown,
+  // never reopen it during this run, even if saving the dismissal fails.
+  if (ui_->sponsorship_prompt_pending &&
+      ui_->main->window().is_visible() &&
+      !ui_->main->window().is_minimized() &&
+      ui_->main->get_can_show_sponsorship() &&
+      !ui_->file_dialog_open && !HasActiveSession()) {
+    ui_->sponsorship_prompt_pending = false;
+    ui_->main->set_sponsorship_open(true);
+  }
   SyncStreamWindow();
   SyncServerWindow();
   SyncFileTransferNotifications();

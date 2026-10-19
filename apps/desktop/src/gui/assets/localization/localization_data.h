@@ -1,8 +1,9 @@
 /*
  * @Author: DI JUNKUN
  * @Date: 2024-05-29
- * Copyright (c) 2024 by DI JUNKUN, All Rights Reserved.
+ * Copyright (c) 2026 by DI JUNKUN, All Rights Reserved.
  */
+
 #ifndef _LOCALIZATION_DATA_H_
 #define _LOCALIZATION_DATA_H_
 
@@ -289,6 +290,12 @@ struct TranslationRow {
   X(no_such_id, u8"无此ID", "No such ID", u8"ID не найден")                    \
   X(about, u8"关于", "About", u8"О программе")                                 \
   X(sponsorship_title, u8"赞助支持", "Sponsorship", u8"Поддержка проекта")    \
+  X(sponsorship_message, u8"如果 CrossDesk 对你有帮助，欢迎赞助支持项目的持续开发、跨平台测试与日常维护。感谢你的支持！", \
+    "If CrossDesk is useful to you, consider supporting its continued development, cross-platform testing, and maintenance. Thank you for your support!", \
+    u8"Если CrossDesk вам полезен, поддержите его дальнейшую разработку, тестирование на разных платформах и сопровождение. Спасибо за вашу поддержку!") \
+  X(sponsorship_dismiss_hint, u8"关闭后不再自动弹出，你仍可在「关于」中找到赞助入口。", \
+    "This prompt will not appear again after you close it. Sponsorship links remain available in About.", \
+    u8"После закрытия это окно больше не появится автоматически. Ссылки для поддержки останутся в разделе «О программе».") \
   X(sponsor_via_afdian, u8"爱发电", "AFDIAN", "AFDIAN")                       \
   X(notification, u8"通知", "Notification", u8"Уведомление")                   \
   X(new_version, u8"新版本", "New version", u8"Новая версия")                 \

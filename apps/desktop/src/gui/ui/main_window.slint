@@ -53,6 +53,8 @@ export global UiStrings {
     in-out property <string> settings: "Settings";
     in-out property <string> about: "About";
     in-out property <string> sponsorship-title: "Sponsorship";
+    in-out property <string> sponsorship-message;
+    in-out property <string> sponsorship-dismiss-hint;
     in-out property <string> sponsor-via-afdian: "AFDIAN";
     in-out property <string> ok: "OK";
     in-out property <string> cancel: "Cancel";
@@ -127,14 +129,15 @@ export global UiStrings {
     in-out property <string> release-date-label: "Release Date: ";
 }
 
-// Keep sponsor labels, order, and sizing consistent across both dialogs.
+// Keep sponsor labels, order, and sizing consistent across dialogs.
 component SponsorshipSection inherits VerticalLayout {
+    in property <bool> show-title: true;
     callback open-afdian;
     callback open-kofi;
     callback open-github;
     vertical-stretch: 0;
     spacing: 10px;
-    Text {
+    if root.show-title: Text {
         text: UiStrings.sponsorship-title;
         color: WorkbenchStyle.text; font-size: 12px; font-weight: 600;
         wrap: word-wrap;
@@ -492,6 +495,7 @@ export component MainWindow inherits Window {
     callback open-afdian-sponsor;
     callback open-github-sponsor;
     callback open-kofi-sponsor;
+    callback dismiss-sponsorship;
     callback check-for-updates;
     callback signal-reconnect-requested;
     callback connection-cancel;
@@ -517,6 +521,20 @@ export component MainWindow inherits Window {
         if !root.self-host-settings-open { root.self-host-settings-error = ""; }
     }
     in-out property <bool> about-open: false;
+    in-out property <bool> sponsorship-open: false;
+    // Automatic prompts must not interrupt another dialog or menu.
+    private property <bool> sponsorship-unobstructed: !root.gallery-mode
+        && !root.menu-open && !root.settings-open
+        && !root.self-host-settings-open && !root.about-open
+        && !(root.update-open && root.update-available) && !root.messages-open
+        && !root.reset-password-open && !root.alias-open && !root.delete-open
+        && !root.device-group-open && !root.connection-dialog-open
+        && !root.permission-dialog-open && !root.wayland-notice-open
+        && !root.portable-service-dialog-open
+        && !root.portable-service-suppressed-notice-open
+        && root.offline-warning == "";
+    out property <bool> can-show-sponsorship: !root.sponsorship-open
+        && root.sponsorship-unobstructed;
     // Follow the first available update. Dismissing the dialog replaces this
     // binding, so background checks do not reopen it during this launch.
     in-out property <bool> update-open: root.update-available;
@@ -572,6 +590,10 @@ export component MainWindow inherits Window {
 
     changed about-open => {
         if root.about-open { focus-sink.focus(); }
+    }
+
+    changed sponsorship-open => {
+        if root.sponsorship-open { focus-sink.focus(); }
     }
 
     reset-remote-id => {
@@ -797,6 +819,10 @@ export component MainWindow inherits Window {
                 }
                 if root.about-open && !root.update-open {
                     if event.text == Key.Escape { root.about-open = false; }
+                    return accept;
+                }
+                if root.sponsorship-open && root.sponsorship-unobstructed {
+                    if event.text == Key.Escape { root.dismiss-sponsorship(); }
                     return accept;
                 }
                 if root.messages-open {
@@ -2250,6 +2276,52 @@ export component MainWindow inherits Window {
             Rectangle { x: 18px; y: parent.height - 66px; width: parent.width - 36px; height: 1px; background: #e6ebf2; }
             SettingsButton { x: parent.width - 114px; y: parent.height - 50px; width: 92px; primary: true; text: UiStrings.ok; clicked => { if root.save-self-hosted-settings() { root.self-host-settings-open = false; } } }
             SettingsButton { x: parent.width - 204px; y: parent.height - 50px; width: 80px; text: UiStrings.cancel; clicked => { root.cancel-self-hosted-settings(); root.self-host-settings-open = false; } }
+        }
+    }
+
+    if root.sponsorship-open && root.sponsorship-unobstructed: Rectangle {
+        background: #15223850;
+        z: 38;
+        TouchArea { clicked => { focus-sink.focus(); } }
+        SettingsDialog {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: min(480px, parent.width - 40px);
+            height: self.content-top + sponsorship-content.preferred-height + 24px;
+            title: UiStrings.sponsorship-title;
+            close-label: MessageStrings.close;
+            close => { root.dismiss-sponsorship(); }
+            sponsorship-content := VerticalLayout {
+                x: 24px; y: parent.content-top;
+                width: parent.width - 48px; height: self.preferred-height;
+                padding: 0px; spacing: 18px;
+                Text {
+                    text: UiStrings.sponsorship-message;
+                    color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
+                }
+                SponsorshipSection {
+                    show-title: false;
+                    open-afdian => { root.open-afdian-sponsor(); }
+                    open-kofi => { root.open-kofi-sponsor(); }
+                    open-github => { root.open-github-sponsor(); }
+                }
+                Text {
+                    text: UiStrings.sponsorship-dismiss-hint;
+                    color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
+                }
+                Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                HorizontalLayout {
+                    alignment: end;
+                    SettingsButton {
+                        width: max(80px, sponsorship-close-metrics.preferred-width + 24px);
+                        primary: true; text: MessageStrings.close;
+                        clicked => { root.dismiss-sponsorship(); }
+                        sponsorship-close-metrics := Text {
+                            visible: false; text: MessageStrings.close; font-size: 12px;
+                        }
+                    }
+                }
+            }
         }
     }
 

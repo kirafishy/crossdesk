@@ -131,6 +131,8 @@ int ConfigCenter::Load() {
   portable_service_prompt_suppressed_ =
       ini_->GetBoolValue(section_, "portable_service_prompt_suppressed",
                         portable_service_prompt_suppressed_);
+  sponsorship_prompt_dismissed_ =
+      ini_->GetBoolValue(section_, "sponsorship_prompt_dismissed", false);
 
   const char* file_transfer_save_path_value =
       ini_->GetValue(section_, "file_transfer_save_path", nullptr);
@@ -221,6 +223,8 @@ int ConfigCenter::Save() {
                     save_remote_previews_.load());
   ini_->SetBoolValue(section_, "portable_service_prompt_suppressed",
                     portable_service_prompt_suppressed_);
+  ini_->SetBoolValue(section_, "sponsorship_prompt_dismissed",
+                    sponsorship_prompt_dismissed_);
 
   ini_->SetValue(section_, "file_transfer_save_path",
                 file_transfer_save_path_.c_str());
@@ -395,6 +399,15 @@ int ConfigCenter::SetPortableServicePromptSuppressed(bool suppressed) {
   return 0;
 }
 
+int ConfigCenter::SetSponsorshipPromptDismissed(bool dismissed) {
+  if (StoreValues({{"sponsorship_prompt_dismissed",
+                    dismissed ? "true" : "false"}}) != 0) {
+    return -1;
+  }
+  sponsorship_prompt_dismissed_ = dismissed;
+  return 0;
+}
+
 // getters
 
 ConfigCenter::LANGUAGE ConfigCenter::GetLanguage() const { return language_; }
@@ -461,6 +474,10 @@ bool ConfigCenter::IsEnablePrivacyScreen() const {
 
 bool ConfigCenter::IsPortableServicePromptSuppressed() const {
   return portable_service_prompt_suppressed_;
+}
+
+bool ConfigCenter::IsSponsorshipPromptDismissed() const {
+  return sponsorship_prompt_dismissed_;
 }
 
 int ConfigCenter::SetFileTransferSavePath(const std::string& path) {

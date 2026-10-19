@@ -1,7 +1,7 @@
 /*
  * @Author: DI JUNKUN
  * @Date: 2024-05-29
- * Copyright (c) 2024 by DI JUNKUN, All Rights Reserved.
+ * Copyright (c) 2026 by DI JUNKUN, All Rights Reserved.
  */
 
 #ifndef _CONFIG_CENTER_H_
@@ -49,6 +49,7 @@ class ConfigCenter {
   int SetPrivacyScreen(bool enable_privacy_screen);
   int SetSaveRemotePreviews(bool enabled);
   int SetPortableServicePromptSuppressed(bool suppressed);
+  int SetSponsorshipPromptDismissed(bool dismissed);
   int SetFileTransferSavePath(const std::string& path);
 
   // read config
@@ -73,6 +74,7 @@ class ConfigCenter {
   bool IsEnablePrivacyScreen() const;
   bool IsSaveRemotePreviews() const;
   bool IsPortableServicePromptSuppressed() const;
+  bool IsSponsorshipPromptDismissed() const;
   std::string GetFileTransferSavePath() const;
 
   int Load();
@@ -102,6 +104,7 @@ class ConfigCenter {
   std::atomic<bool> enable_privacy_screen_{true};
   std::atomic<bool> save_remote_previews_{true};
   bool portable_service_prompt_suppressed_ = false;
+  bool sponsorship_prompt_dismissed_ = false;
   std::string file_transfer_save_path_ = "";
 };
 }  // namespace crossdesk
