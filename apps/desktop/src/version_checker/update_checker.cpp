@@ -54,6 +54,15 @@ bool UpdateChecker::Poll(TimePoint now) {
     ScheduleRetry(now);
     return true;
   }
+  // Branch names followed by a date are not application versions. Comparing
+  // their first digit sequence would incorrectly treat the date as a major
+  // version and report "up to date" for every ordinary release.
+  if (!IsValidAppVersion(current_version_) || !IsValidAppVersion(result->version)) {
+    LOG_WARN("Cannot compare invalid application versions: current={}, latest={}",
+             current_version_, result->version);
+    ScheduleRetry(now);
+    return true;
+  }
   latest_ = std::move(result);
   update_available_ =
       IsNewerVersionWithMetadata(current_version_, latest_->version,

@@ -44,6 +44,17 @@ python3 -c "from pathlib import Path; p=Path('crossdesk-update-public.der').read
 桌面构建工作流将公钥传给 Xmake。只有发布清单生成步骤读取私钥。
 首次需要手动安装包含升级器、公钥及新安装元数据的版本。
 
+GitHub Actions 从分支手动打包时，在 `Build and Release` 的
+`Run workflow` 中填写 `desktop_version`（例如 `1.7.2`），`patch` 保持
+`0`。三个桌面平台会使用同一个数字版本并追加构建日期。空着不填的分支
+构建使用 `0.0.0-日期`；版本标签构建继续使用标签中的版本号。
+`desktop_version` 只影响桌面安装包，不改变移动端版本。
+
+不要使用 `vauto-update-20261020` 这类分支名作为版本号验证升级。
+新版本必须增加数字版本或 patch；只改变日期不视为升级。例如先手动安装
+`v1.7.2-20261020`，再验证到 `v1.7.3-20261020` 的升级。
+分支手动构建只上传 Actions 构建产物，不会自动发布版本清单。
+
 本地构建可以设置同名环境变量，或使用：
 
 ```sh
