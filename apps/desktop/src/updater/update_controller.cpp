@@ -20,6 +20,10 @@ Controller::Controller(fs::path cache) : cache_(std::move(cache)) {
       state_ = State::Failed;
       error_ = result.value("error", std::string("Update did not complete")) +
                "\n" + PathUtf8(previous);
+    } else if (fs::exists(previous / "started")) {
+      // Retire receipts confirmed by older clients too, before temporary
+      // storage is cleaned by the OS and a successful update looks interrupted.
+      fs::remove(cache_ / "last-update");
     }
   } catch (const std::exception&) {}
 }
@@ -33,7 +37,12 @@ void Controller::ConfirmStartup() {
                                          PlatformKey(ExecutablePath()), "0.0.0");
     auto built = BuildVersion();
     if (!built.empty() && built[0] == 'v') built.erase(0, 1);
-    if (artifact.version == built) WriteText(previous / "started", "started\n");
+    if (artifact.version == built) {
+      WriteText(previous / "started", "started\n");
+      // Acknowledge the coordinator first. Successful startup no longer needs
+      // a persistent pointer into a temporary job directory.
+      fs::remove(cache_ / "last-update");
+    }
   } catch (const std::exception&) {}
 }
 Controller::~Controller() {
