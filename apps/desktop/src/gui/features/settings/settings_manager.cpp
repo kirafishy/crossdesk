@@ -1,5 +1,6 @@
 #include "features/settings/settings_manager.h"
 
+#include <cerrno>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -11,6 +12,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <system_error>
 #include <thread>
 
 #if defined(_WIN32)
@@ -19,6 +21,9 @@
 #else
 #include <fcntl.h>
 #include <unistd.h>
+#endif
+#if defined(__linux__) && !defined(__OHOS__)
+#include <sys/stat.h>
 #endif
 
 #include "localization.h"
@@ -30,6 +35,92 @@ namespace {
 
 constexpr uint32_t kCacheV3Magic = 0x33444358;  // "XCD3"
 constexpr uint32_t kCacheV3Version = 3;
+
+#if defined(__linux__) && !defined(__OHOS__)
+constexpr const char *kCredentialCacheNames[] = {
+    "secure_cache_v3.enc", "secure_cache_v2.enc", "secure_cache.enc"};
+
+bool RestrictCachePermissions(const std::filesystem::path &path,
+                              bool directory = false) {
+  const int flags = O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK |
+                    (directory ? O_DIRECTORY : 0);
+  const int fd = open(path.c_str(), flags);
+  if (fd < 0 && errno == ENOENT) return true;
+  int error = fd < 0 ? errno : 0;
+  if (fd >= 0) {
+    struct stat info {};
+    if (fstat(fd, &info) != 0) {
+      error = errno;
+    } else if (info.st_uid != geteuid() ||
+               (directory ? !S_ISDIR(info.st_mode) : !S_ISREG(info.st_mode))) {
+      error = EPERM;
+    } else {
+      const mode_t mode = directory ? 0700 : 0600;
+      if ((info.st_mode & 07777) != mode && fchmod(fd, mode) != 0)
+        error = errno;
+    }
+    close(fd);
+  }
+  if (error) {
+    LOG_WARN("Cannot restrict credential cache permissions for {}: {}",
+             path.string(),
+             std::error_code(error, std::generic_category()).message());
+  }
+  return error == 0;
+}
+
+[[noreturn]] void CacheReadError(const std::filesystem::path &path, int error) {
+  const std::system_error failure(
+      error, std::generic_category(),
+      "Cannot read credential cache; existing data was kept: " + path.string());
+  LOG_ERROR("{}", failure.what());
+  throw failure;
+}
+
+bool ReadCredentialCache(const std::filesystem::path &path, void *data,
+                         size_t size) {
+  const int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+  if (fd < 0) {
+    if (errno == ENOENT) return false;
+    CacheReadError(path, errno);
+  }
+  struct stat info {};
+  if (fstat(fd, &info) != 0) {
+    const int error = errno;
+    close(fd);
+    CacheReadError(path, error);
+  }
+  if (!S_ISREG(info.st_mode)) {
+    close(fd);
+    CacheReadError(path, EINVAL);
+  }
+  size_t received = 0;
+  while (received < size) {
+    const auto count =
+        read(fd, static_cast<char *>(data) + received, size - received);
+    if (count < 0) {
+      if (errno == EINTR) continue;
+      const int error = errno;
+      close(fd);
+      CacheReadError(path, error);
+    }
+    if (count == 0) break;
+    received += static_cast<size_t>(count);
+  }
+  close(fd);
+  return received == size;
+}
+
+bool HasExistingCredentialCache(const std::filesystem::path &directory) {
+  for (const char *name : kCredentialCacheNames) {
+    const auto path = directory / name;
+    struct stat info {};
+    if (lstat(path.c_str(), &info) == 0) return true;
+    if (errno != ENOENT) CacheReadError(path, errno);
+  }
+  return false;
+}
+#endif
 
 template <size_t Size>
 void CopyString(char (&destination)[Size], const char *source) {
@@ -110,11 +201,41 @@ bool WriteFileAtomically(const std::filesystem::path &target,
     if (ec) {
       return false;
     }
+#if defined(__linux__) && !defined(__OHOS__)
+    if (!RestrictCachePermissions(parent, true)) return false;
+#endif
   }
+
+#if defined(__linux__) && !defined(__OHOS__)
+  // Never adopt another user's file or replace a link while saving credentials.
+  struct stat previous {};
+  if (lstat(target.c_str(), &previous) == 0) {
+    if (!S_ISREG(previous.st_mode) || previous.st_uid != geteuid()) return false;
+  } else if (errno != ENOENT) {
+    return false;
+  }
+#endif
 
   const std::filesystem::path temporary = TemporaryPathFor(target);
 #if defined(_WIN32)
   FILE *file = _wfopen(temporary.c_str(), L"wb");
+#elif defined(__linux__) && !defined(__OHOS__)
+  // Set permissions before writing any secret, including under umask(0000).
+  // Exclusive creation also prevents following/reusing a pre-existing temp file.
+  const int fd = open(temporary.c_str(),
+                      O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+  if (fd < 0) return false;
+  if (fchmod(fd, 0600) != 0) {
+    close(fd);
+    std::filesystem::remove(temporary, ec);
+    return false;
+  }
+  FILE *file = fdopen(fd, "wb");
+  if (!file) {
+    close(fd);
+    std::filesystem::remove(temporary, ec);
+    return false;
+  }
 #else
   FILE *file = std::fopen(temporary.c_str(), "wb");
 #endif
@@ -184,16 +305,26 @@ int SettingsManager::SaveLocked() {
 }
 
 bool SettingsManager::ReadV3Locked() {
+  CacheV3 loaded{};
+#if defined(__linux__) && !defined(__OHOS__)
+  if (!ReadCredentialCache(owner_.cache_path_ + "/secure_cache_v3.enc",
+                           &loaded, sizeof(loaded))) {
+    return false;
+  }
+#else
   std::ifstream cache_file(owner_.cache_path_ + "/secure_cache_v3.enc",
                            std::ios::binary);
   if (!cache_file) {
     return false;
   }
 
-  CacheV3 loaded{};
   cache_file.read(reinterpret_cast<char *>(&loaded), sizeof(loaded));
-  if (cache_file.gcount() != static_cast<std::streamsize>(sizeof(loaded)) ||
-      loaded.magic != kCacheV3Magic ||
+  if (cache_file.gcount() != static_cast<std::streamsize>(sizeof(loaded))) {
+    LOG_WARN("Ignore invalid v3 credential cache");
+    return false;
+  }
+#endif
+  if (loaded.magic != kCacheV3Magic ||
       loaded.version != kCacheV3Version ||
       loaded.checksum != CacheChecksum(&loaded, offsetof(CacheV3, checksum))) {
     LOG_WARN("Ignore invalid v3 credential cache");
@@ -212,6 +343,12 @@ bool SettingsManager::ReadV3Locked() {
 }
 
 bool SettingsManager::ReadV2Locked() {
+#if defined(__linux__) && !defined(__OHOS__)
+  if (!ReadCredentialCache(owner_.cache_path_ + "/secure_cache_v2.enc",
+                           &cache_v2_, sizeof(cache_v2_))) {
+    return false;
+  }
+#else
   std::ifstream cache_v2_file(owner_.cache_path_ + "/secure_cache_v2.enc",
                               std::ios::binary);
   if (!cache_v2_file) {
@@ -222,6 +359,7 @@ bool SettingsManager::ReadV2Locked() {
       static_cast<std::streamsize>(sizeof(cache_v2_))) {
     return false;
   }
+#endif
   cache_v2_
       .client_id_with_password[sizeof(cache_v2_.client_id_with_password) - 1] =
       '\0';
@@ -239,6 +377,14 @@ std::string SettingsManager::ActiveIdentity() const {
 int SettingsManager::Load() {
   std::unique_lock<std::mutex> lock(cache_mutex_);
 
+#if defined(__linux__) && !defined(__OHOS__)
+  // Migrate all generations in place, even when only v3 is used. A chmod
+  // failure must not turn a readable identity into a missing/invalid cache.
+  RestrictCachePermissions(owner_.cache_path_, true);
+  for (const char *name : kCredentialCacheNames)
+    RestrictCachePermissions(std::filesystem::path(owner_.cache_path_) / name);
+#endif
+
   const bool loaded_v3 = ReadV3Locked();
   if (loaded_v3 || ReadV2Locked()) {
     CopyString(owner_.client_id_with_password_,
@@ -254,9 +400,19 @@ int SettingsManager::Load() {
       LOG_INFO("Migrated settings from v2 to v3 cache file");
     }
   } else {
+#if defined(__linux__) && !defined(__OHOS__)
+    const bool loaded_v1 = ReadCredentialCache(
+        owner_.cache_path_ + "/secure_cache.enc", &cache_v1_, sizeof(cache_v1_));
+    if (!loaded_v1) {
+      // Permission/I/O errors throw above. Invalid existing files also must
+      // never trigger first-run identity generation or thumbnail deletion.
+      if (HasExistingCredentialCache(owner_.cache_path_))
+        CacheReadError(owner_.cache_path_, EINVAL);
+#else
     std::ifstream cache_v1_file(owner_.cache_path_ + "/secure_cache.enc",
                                 std::ios::binary);
     if (!cache_v1_file) {
+#endif
       lock.unlock();
 
       std::memset(owner_.password_saved_, 0, sizeof(owner_.password_saved_));
@@ -273,7 +429,9 @@ int SettingsManager::Load() {
       return -1;
     }
 
+#if !defined(__linux__) || defined(__OHOS__)
     cache_v1_file.read(reinterpret_cast<char *>(&cache_v1_), sizeof(cache_v1_));
+#endif
     cache_v1_
         .client_id_with_password[sizeof(cache_v1_.client_id_with_password) -
                                  1] = '\0';

@@ -28,6 +28,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -1113,7 +1114,17 @@ int GuiApplication::Run() {
                   "%d", signal_port);
   }
 
+#if defined(__linux__) && !defined(__OHOS__)
+  try {
+    InitializeSettings();
+  } catch (const std::system_error&) {
+    // Credential I/O errors are logged by SettingsManager. Exit cleanly rather
+    // than initializing a new identity or crashing with an uncaught exception.
+    return -1;
+  }
+#else
   InitializeSettings();
+#endif
 #if defined(__linux__) && !defined(__OHOS__)
   HeadlessConsole::Instance().BindSettings(
       config_center_.get(), [this] {

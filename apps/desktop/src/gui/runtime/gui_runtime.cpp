@@ -9,6 +9,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -96,7 +97,18 @@ int GuiRuntime::CreateConnectionPeer() {
     signal_server_port = config_center_->GetSignalServerPort();
 
     std::string current_self_hosted_ip = config_center_->GetSignalServerHost();
-    const bool use_cached_id = settings_.LoadCachedSelfHostedIdentity();
+    bool use_cached_id = false;
+#if defined(__linux__) && !defined(__OHOS__)
+    try {
+      use_cached_id = settings_.LoadCachedSelfHostedIdentity();
+    } catch (const std::system_error&) {
+      // Keep the cached identity and avoid requesting a replacement identity
+      // when its file is temporarily inaccessible. SettingsManager logs why.
+      return -1;
+    }
+#else
+    use_cached_id = settings_.LoadCachedSelfHostedIdentity();
+#endif
     if (!use_cached_id) {
       LOG_INFO(
           "secure_cache_v2.enc not found, will use empty id to get new id from "
