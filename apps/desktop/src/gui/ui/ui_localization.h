@@ -133,6 +133,8 @@ inline int ApplyMainWindowStrings(
   strings.set_view_release_notes(Text(localization::view_release_notes[language]));
   strings.set_download(Text(localization::manual_download[language]));
   strings.set_install_update(Text(localization::install_update[language]));
+  strings.set_install_update_confirm(
+      Text(localization::install_update_confirm[language]));
   strings.set_input_password(Text(localization::input_password[language]));
   strings.set_reinput_password(Text(localization::reinput_password[language]));
   strings.set_remember_password(

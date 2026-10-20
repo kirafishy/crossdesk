@@ -1746,21 +1746,33 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     if (updater_ && updater_->busy()) updater_->Cancel();
 #endif
   });
-  main->on_open_download([this] {
+  main->on_open_download([this, main] {
     const auto& latest = update_checker_->latest();
 #if CROSSDESK_HAS_UPDATER
     if (updater_ && updater_->busy()) return;
     if (updater_ && latest && updater_->Available(latest->update_envelope)) {
-      const int language = localization::detail::ClampLanguageIndex(localization_language_index_);
-      if (tinyfd_messageBox("CrossDesk", localization::install_update_confirm[language].c_str(),
-                           "okcancel", "question", 0)) {
-        updater_->Start(latest->update_envelope);
-      }
+      main->set_about_open(false);
+      main->set_update_open(true);
+      main->set_update_confirm_open(true);
       return;
     }
 #endif
     OpenUrl(latest && !latest->download_url.empty() ? latest->download_url
                                                    : "https://crossdesk.cn");
+  });
+  main->on_confirm_update([this, main] {
+    if (!main->get_update_confirm_open()) return;
+    for (const auto& window : {ui_->main, ui_->wall})
+      window->set_update_confirm_open(false);
+#if CROSSDESK_HAS_UPDATER
+    const auto& latest = update_checker_->latest();
+    if (!updater_ || updater_->busy() || !latest ||
+        !updater_->Available(latest->update_envelope)) return;
+    updater_->Start(latest->update_envelope);
+    // Disable both windows immediately, before the next polling tick.
+    for (const auto& window : {ui_->main, ui_->wall})
+      window->set_update_install_busy(updater_->busy());
+#endif
   });
   main->on_open_website([this] { OpenUrl("https://crossdesk.cn"); });
   main->on_open_afdian_sponsor([this] {

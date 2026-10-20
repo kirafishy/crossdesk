@@ -100,6 +100,7 @@ export global UiStrings {
     in-out property <string> later: "Later";
     in-out property <string> download: "Download";
     in-out property <string> install-update: "Install update";
+    in-out property <string> install-update-confirm;
     in-out property <string> input-password: "Input password";
     in-out property <string> reinput-password: "Incorrect password, please try again";
     in-out property <string> remember-password: "Remember password";
@@ -411,6 +412,12 @@ export component MainWindow inherits Window {
     in property <bool> update-available: false;
     in property <bool> update-install-available: false;
     in property <bool> update-install-busy: false;
+    changed update-install-available => {
+        if !root.update-install-available { root.update-confirm-open = false; }
+    }
+    changed update-install-busy => {
+        if root.update-install-busy { root.update-confirm-open = false; }
+    }
     in property <string> update-install-status: "";
     private property <string> update-action-text: root.update-install-available ? UiStrings.install-update : UiStrings.download;
     in property <UpdateCheckStatus> update-check-status: idle;
@@ -497,6 +504,7 @@ export component MainWindow inherits Window {
     callback cancel-self-hosted-settings;
     callback browse-save-path;
     callback open-download;
+    callback confirm-update;
     callback cancel-update;
     callback open-website;
     callback open-afdian-sponsor;
@@ -534,6 +542,7 @@ export component MainWindow inherits Window {
         && !root.menu-open && !root.settings-open
         && !root.self-host-settings-open && !root.about-open
         && !(root.update-open && root.update-available) && !root.messages-open
+        && !root.update-confirm-open
         && !root.reset-password-open && !root.alias-open && !root.delete-open
         && !root.device-group-open && !root.connection-dialog-open
         && !root.permission-dialog-open && !root.wayland-notice-open
@@ -545,6 +554,10 @@ export component MainWindow inherits Window {
     // Follow the first available update. Dismissing the dialog replaces this
     // binding, so background checks do not reopen it during this launch.
     in-out property <bool> update-open: root.update-available;
+    changed update-open => {
+        if !root.update-open { root.update-confirm-open = false; }
+    }
+    in-out property <bool> update-confirm-open: false;
     in-out property <bool> reset-password-open: false;
     in-out property <bool> reset-password-invalid: false;
     in-out property <string> new-password-input: "";
@@ -2637,6 +2650,89 @@ export component MainWindow inherits Window {
                             text: root.update-action-text;
                             clicked => { root.open-download(); }
                             update-action-metrics := Text { visible: false; text: root.update-action-text; font-size: 12px; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Keep confirmation inside the app instead of relying on external native
+    // dialogs and their platform-specific button labels.
+    if root.update-confirm-open: Rectangle {
+        background: #14233b66;
+        z: 48;
+        TouchArea {}
+        FocusScope {
+            width: parent.width;
+            height: parent.height;
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    root.update-confirm-open = false;
+                    return accept;
+                }
+                if event.text == Key.Tab {
+                    if update-confirm-cancel.has-focus {
+                        update-confirm-install.focus();
+                    } else {
+                        update-confirm-cancel.focus();
+                    }
+                    return accept;
+                }
+                return reject;
+            }
+            Timer {
+                interval: 1ms;
+                running: true;
+                triggered => {
+                    self.running = false;
+                    // Defer focus until after Slint's accessibility update.
+                    // Return defaults to cancelling this disruptive action.
+                    update-confirm-cancel.focus();
+                }
+            }
+            DialogSurface {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: min(440px, parent.width - 40px);
+                height: update-confirm-content.preferred-height;
+                border-radius: UiRadius.surface;
+                border-color: WorkbenchStyle.border;
+                TouchArea {}
+                update-confirm-content := VerticalLayout {
+                    padding: 24px;
+                    spacing: 20px;
+                    Text {
+                        text: UiStrings.install-update;
+                        color: WorkbenchStyle.text;
+                        font-size: 18px;
+                        font-weight: 600;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: UiStrings.install-update-confirm;
+                        color: WorkbenchStyle.text;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        spacing: 8px;
+                        update-confirm-cancel := WorkbenchButton {
+                            text: UiStrings.cancel;
+                            clicked => { root.update-confirm-open = false; }
+                        }
+                        update-confirm-install := WorkbenchButton {
+                            width: max(112px, confirm-label-metrics.preferred-width + 24px);
+                            text: UiStrings.install-update;
+                            primary: true;
+                            enabled: root.update-install-available && !root.update-install-busy;
+                            clicked => { root.confirm-update(); }
+                            confirm-label-metrics := Text {
+                                visible: false;
+                                text: UiStrings.install-update;
+                                font-size: 13px;
+                            }
                         }
                     }
                 }
