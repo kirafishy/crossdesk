@@ -27,6 +27,18 @@ Request ReadRequest(const fs::path& job) {
   return {application, artifact};
 }
 
+void WaitForCommit(const fs::path& job) {
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
+  while (true) {
+    if (fs::exists(job / "cancel"))
+      throw std::runtime_error("Update cancelled before application exit");
+    if (fs::exists(job / "commit")) return;
+    if (std::chrono::steady_clock::now() >= deadline)
+      throw std::runtime_error("Application did not confirm update installation");
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+}
+
 int Install(const fs::path& job) {
   if (!IsPrivileged()) return 2;
   fs::path stage;
@@ -41,7 +53,19 @@ int Install(const fs::path& job) {
           // Copy into private storage, then verify the exact copy being installed.
           CopyPackage(job / request.artifact.filename, package, request.artifact);
         },
-        [&] { WaitForApplicationExit(request.application); },
+        [&] {
+#ifndef _WIN32
+          // Authorization and staging finish while the GUI can still service
+          // the remote connection. An empty directory publishes readiness
+          // atomically without writing through a caller-controlled file.
+          if (fs::exists(job / "cancel"))
+            throw std::runtime_error("Update cancelled before application exit");
+          if (!fs::create_directory(job / "ready"))
+            throw std::runtime_error("Update readiness was already published");
+          WaitForCommit(job);
+#endif
+          WaitForApplicationExit(request.application);
+        },
         [&] { InstallPackage(package, request.application); }});
     result = 0;
   } catch (const std::exception& error) {
@@ -69,14 +93,20 @@ int Coordinate(const fs::path& job) {
     {
       maintenance = std::make_unique<MaintenanceLock>(application);
       VerifyPackage(job / request.artifact.filename, request.artifact);
+#ifdef _WIN32
       WriteText(job / "ready", "ready\n");
-      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(120);
-      while (!fs::exists(job / "commit")) {
-        if (fs::exists(job / "cancel") || std::chrono::steady_clock::now() >= deadline)
-          throw std::runtime_error("Update cancelled before application exit");
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      }
+      WaitForCommit(job);
       committed = true;
+#else
+      // The root-owned helper publishes ready only after authorization and
+      // verification of its private package copy, then waits for the GUI's
+      // commit before touching the installation.
+      const int code = RunElevated(HelperPath(application), job);
+      committed = fs::exists(job / "commit");
+      if (!committed)
+        throw std::runtime_error("Update preparation failed or authorization was cancelled (code " +
+                                 std::to_string(code) + ")");
+#endif
       platform::SingleInstanceGuard client;
       platform::SingleInstanceGuard launcher;
       const auto exit_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(45);
@@ -96,12 +126,8 @@ int Coordinate(const fs::path& job) {
       exited = true;
 #ifdef _WIN32
       // This relocated copy is held read-only across UAC and installation.
-      const auto installer_helper = ExecutablePath();
-#else
-      // Use the root-owned installed helper for privileged execution.
-      const auto installer_helper = HelperPath(application);
+      const int code = RunElevated(ExecutablePath(), job);
 #endif
-      const int code = RunElevated(installer_helper, job);
       if (code != 0) throw std::runtime_error("Installation failed or authorization was cancelled (code " +
                                               std::to_string(code) + ")");
       success = true;

@@ -99,7 +99,9 @@ bool Controller::Poll() {
     if (state_ == State::Downloading && pending_.valid() &&
         pending_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       job_ = pending_.get();
-      deadline_ = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+      // POSIX readiness includes the system authorization dialog and staging
+      // the verified package; keep the GUI available while the user approves.
+      deadline_ = std::chrono::steady_clock::now() + std::chrono::minutes(5);
       state_ = State::Preparing;
     }
     if (state_ != State::Preparing) return false;
