@@ -30,6 +30,9 @@
 #include "platform/single_instance.h"
 #include "rd_log.h"
 #include "render.h"
+#if CROSSDESK_HAS_UPDATER
+#include "updater/update_platform.h"
+#endif
 
 #ifdef __linux__
 #include "SimpleIni.h"
@@ -472,6 +475,17 @@ int main(int argc, char* argv[]) {
 #endif
 
   using crossdesk::platform::InstanceResult;
+#if CROSSDESK_HAS_UPDATER
+  // Installer CLI commands above stay available during maintenance. Ordinary
+  // launches (including daemon restarts) must not reopen the installation.
+  try {
+    if (crossdesk::updater::MaintenanceActive(crossdesk::updater::ExecutablePath()))
+      return 0;
+  } catch (const std::exception& error) {
+    std::cerr << "Cannot check update maintenance: " << error.what() << '\n';
+    return 1;
+  }
+#endif
   using crossdesk::platform::InstanceRole;
   crossdesk::platform::SingleInstanceGuard launcher_instance;
   crossdesk::platform::SingleInstanceGuard client_instance;

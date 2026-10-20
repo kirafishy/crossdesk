@@ -2,6 +2,10 @@ rule("slint")
     set_extensions(".slint")
 
     after_load(function(target)
+        -- Consumers inline generated C++ bindings. They must not check header
+        -- timestamps or compile until generation finishes, otherwise one build
+        -- can link the new UI layout with callers compiled against the old one.
+        target:set("policy", "build.fence", true)
         local outputdir = path.join(target:autogendir(), "rules", "slint")
         target:add("includedirs", outputdir, {public = true})
 

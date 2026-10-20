@@ -70,6 +70,9 @@ jobs:
 
       - name: Merge release version and download URLs
         shell: bash
+        env:
+          CROSSDESK_UPDATE_PUBLIC_KEY: ${{ vars.CROSSDESK_UPDATE_PUBLIC_KEY }}
+          CROSSDESK_UPDATE_PRIVATE_KEY: ${{ secrets.CROSSDESK_UPDATE_PRIVATE_KEY }}
         run: |
           python3 .github/scripts/update_version_manifest.py \
             --current current-version.json --output version.json --artifacts release \

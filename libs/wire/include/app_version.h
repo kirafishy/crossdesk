@@ -21,6 +21,8 @@ struct VersionInfo {
   int patch = -1;
   // Filled by the desktop updater for the installed package variant.
   std::string download_url;
+  // Opaque signed desktop artifact envelope; ignored by mobile controllers.
+  std::string update_envelope;
 };
 
 // Shared release parsing and comparison for desktop and mobile controllers.

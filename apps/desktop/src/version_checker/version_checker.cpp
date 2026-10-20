@@ -11,6 +11,10 @@
 
 #include "rd_log.h"
 #include "linux_update_download.h"
+#ifndef __OHOS__
+#include "updater/update_core.h"
+#include "updater/update_platform.h"
+#endif
 
 #include <cstdlib>
 #include <filesystem>
@@ -138,6 +142,22 @@ std::optional<VersionInfo> CheckUpdate() {
           info->download_url = LinuxUpdateDownloadUrl(
               manifest, *info, architecture,
               error ? std::filesystem::path{} : executable.parent_path());
+#endif
+#ifndef __OHOS__
+          const auto platform = updater::PlatformKey(updater::ExecutablePath(),
+#if CROSSDESK_PORTABLE
+                                                     true
+#else
+                                                     false
+#endif
+          );
+#if !defined(__linux__)
+          info->download_url = updater::DownloadUrl(manifest.dump(), platform, info->version);
+#endif
+#if !CROSSDESK_PORTABLE
+          if (updater::DownloadUrl(manifest.dump(), platform, info->version) != "https://crossdesk.cn")
+            info->update_envelope = updater::SignedDownload(manifest.dump(), platform);
+#endif
 #endif
           LOG_INFO("Fetched version.json: latest_version={}, releaseDate={}, patch={}",
                    info->version, info->release_date, info->patch);

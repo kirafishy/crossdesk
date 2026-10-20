@@ -111,6 +111,7 @@ DESKTOP_DIR="$DEB_DIR/usr/share/applications"
 
 install -d "$DEBIAN_DIR" "$BIN_DIR" "$PRIVATE_DIR" "$DESKTOP_DIR"
 install -m 0755 "$BUILD_BINARY" "$PRIVATE_DIR/crossdesk-bin"
+install -m 0755 "$(dirname "$BUILD_BINARY")/crossdesk_updater" "$PRIVATE_DIR/crossdesk_updater"
 
 # PipeWire is deliberately optional. The Wayland capturer resolves PipeWire
 # 0.3 with dlopen() so the same package can run on Ubuntu 20.04 without the
@@ -156,7 +157,7 @@ for size in 16 24 32 48 64 96 128 256; do
         "$ICON_BASE_DIR/${size}x${size}/apps/${PKG_NAME}.png"
 done
 
-RECOMMENDS="$PORTAL_RUNTIME_RECOMMENDS, $TRAY_RUNTIME_RECOMMENDS"
+RECOMMENDS="$PORTAL_RUNTIME_RECOMMENDS, $TRAY_RUNTIME_RECOMMENDS, policykit-1"
 if [[ -n "$EXTRA_RECOMMENDATION" ]]; then
     RECOMMENDS="$RECOMMENDS, $EXTRA_RECOMMENDATION"
 fi

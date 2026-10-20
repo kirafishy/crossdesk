@@ -262,7 +262,7 @@ function setup_targets()
         set_kind("binary")
         set_default(false)
         add_packages("cpp-httplib", "nlohmann_json")
-        add_deps("rd_log", "crossdesk_wire")
+        add_deps("rd_log", "crossdesk_wire", "updater_core")
         add_includedirs("apps/desktop/src/version_checker")
         add_files("apps/desktop/tests/version_checker_test.cpp",
             "apps/desktop/src/version_checker/version_checker.cpp",
@@ -489,11 +489,54 @@ function setup_targets()
         add_includedirs("apps/desktop/src/gui/assets/localization",
             "apps/desktop/src/gui/assets/fonts", {public = true})
 
+    target("updater_core")
+        set_kind("static")
+        add_packages("cpp-httplib", "openssl3", "nlohmann_json")
+        add_deps("crossdesk_wire")
+        add_includedirs("apps/desktop/src", {public = true})
+        local update_key = get_config("CROSSDESK_UPDATE_PUBLIC_KEY") or
+            os.getenv("CROSSDESK_UPDATE_PUBLIC_KEY") or ""
+        on_load(function ()
+            assert(update_key == "" or (#update_key == 64 and update_key:match("^[0-9a-f]+$")),
+                "CROSSDESK_UPDATE_PUBLIC_KEY must be a 32-byte lowercase hex Ed25519 public key")
+        end)
+        add_files("apps/desktop/src/updater/update_core.cpp",
+            {defines = {version_define, "CROSSDESK_UPDATE_PUBLIC_KEY=\"" .. update_key .. "\""}})
+        if is_os("windows") then
+            add_files("apps/desktop/src/platform/windows/updater/*.cpp")
+            add_syslinks("Advapi32", "Shell32", "Ole32", {public = true})
+        else
+            add_files("apps/desktop/src/platform/common/updater_posix.cpp")
+            if is_os("macosx") then
+                add_files("apps/desktop/src/platform/macos/updater/*.cpp")
+                add_syslinks("proc", {public = true})
+                add_defines("CPPHTTPLIB_USE_CERTS_FROM_MACOSX_KEYCHAIN")
+                add_frameworks("Security", "CoreFoundation", {public = true})
+            else
+                add_files("apps/desktop/src/platform/linux/updater/*.cpp")
+            end
+        end
+
+    if not is_config("CROSSDESK_PORTABLE", true) then
+        target("crossdesk_updater")
+            set_kind("binary")
+            add_deps("updater_core", "single_instance")
+            add_packages("nlohmann_json")
+            add_files("apps/desktop/src/updater/main.cpp")
+            if is_os("windows") then
+                add_files("apps/desktop/resources/windows/crossdesk_updater.rc",
+                    {defines = windows_resource_defines})
+            end
+    end
+
     target("version_checker")
         set_kind("object")
         add_packages("cpp-httplib")
         add_packages("nlohmann_json", {public = true})
-        add_deps("rd_log", "crossdesk_wire")
+        add_deps("rd_log", "crossdesk_wire", "updater_core")
+        if is_config("CROSSDESK_PORTABLE", true) then
+            add_defines("CROSSDESK_PORTABLE=1")
+        end
         add_files("apps/desktop/src/version_checker/*.cpp")
         add_includedirs("apps/desktop/src/version_checker", {public = true})
         if is_os("macosx") then
@@ -524,6 +567,11 @@ function setup_targets()
         add_defines("FMT_CONSTEVAL=")
         add_packages("slint", {public = true})
         add_packages("libyuv", "tinyfiledialogs", "openssl3", "libsdl3", "nlohmann_json")
+        if not is_config("CROSSDESK_PORTABLE", true) then
+            add_defines("CROSSDESK_HAS_UPDATER=1", {public = true})
+            add_deps("updater_core")
+            add_files("apps/desktop/src/updater/update_controller.cpp")
+        end
         if is_config("CROSSDESK_PORTABLE", true) then
             -- RuntimeState changes layout in portable builds. Consumers of GUI
             -- headers must see the same definition, without affecting its deps.
@@ -644,6 +692,9 @@ function setup_targets()
     target("crossdesk")
         set_kind("binary")
         add_deps("rd_log", "desktop_common", "gui", "single_instance")
+        if not is_config("CROSSDESK_PORTABLE", true) then
+            add_deps("crossdesk_updater", {inherit = false})
+        end
         add_files("apps/desktop/src/app/*.cpp")
         add_includedirs("apps/desktop/src", "apps/desktop/src/app", {public = true})
         if is_os("windows") then

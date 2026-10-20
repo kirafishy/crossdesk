@@ -71,6 +71,19 @@ verify_dependencies() {
 }
 
 verify_dependencies "$APP_EXECUTABLE"
+UPDATER="$APP_BUNDLE/Contents/MacOS/crossdesk_updater"
+if [[ ! -x "$UPDATER" ]] || ! lipo "$UPDATER" -verify_arch "$EXPECTED_ARCH" >/dev/null 2>&1; then
+    echo "Missing updater or incorrect updater architecture" >&2
+    exit 1
+fi
+# The updater runs outside the bundle during installation, so it must not rely
+# on private frameworks that are being replaced.
+while IFS= read -r dependency; do
+    case "$dependency" in
+        /System/Library/*|/usr/lib/*) ;;
+        *) echo "Updater has a non-system dynamic dependency: $dependency" >&2; exit 1 ;;
+    esac
+done < <(otool -L "$UPDATER" | tail -n +2 | awk '{ print $1 }')
 
 SLINT_LIBRARY="$(find "$FRAMEWORKS_DIR" -maxdepth 1 -type f -name 'libslint_cpp*.dylib' -print -quit 2>/dev/null || true)"
 if [[ -z "$SLINT_LIBRARY" ]]; then

@@ -317,6 +317,13 @@ struct TranslationRow {
   X(access_website, u8"访问官网: ",                                            \
     "Access Website: ", u8"Официальный сайт: ")                                \
   X(update, u8"更新", "Update", u8"Обновить")                                  \
+  X(install_update, u8"安装更新", "Install update", u8"Установить обновление") \
+  X(manual_download, u8"手动下载", "Download", u8"Скачать") \
+  X(install_update_confirm, u8"下载完成后将关闭 CrossDesk 并安装更新，当前连接和文件传输会中断。安装需要系统授权，完成后重新启动。是否继续？", \
+    "CrossDesk will close after downloading the update. Connections and file transfers will be interrupted. Installation requires system authorization, then CrossDesk will restart. Continue?", \
+    u8"После загрузки CrossDesk закроется для обновления. Соединения и передача файлов будут прерваны. Потребуется разрешение системы, затем приложение перезапустится. Продолжить?") \
+  X(update_preparing, u8"正在准备更新…", "Preparing update…", u8"Подготовка обновления…") \
+  X(update_install_failed, u8"更新未完成，可重试或手动安装。", "Update did not complete. Retry or install manually.", u8"Обновление не завершено. Повторите или установите вручную.") \
   X(connection_alias, u8"修改名称", "Edit Alias",                              \
     u8"Изменить имя подключения")                                              \
   X(delete_connection, u8"删除连接", "Delete Connection",                      \

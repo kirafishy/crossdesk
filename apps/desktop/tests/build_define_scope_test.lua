@@ -47,11 +47,12 @@ function main(plat, portable)
     }
     local seen = {}
     for _, file in ipairs(gui:sourcefiles()) do
-        assert(not seen[file], "duplicate GUI source: " .. file)
-        seen[file] = true
+        local normalized = file:gsub("\\", "/")
+        assert(not seen[normalized], "duplicate GUI source: " .. file)
+        seen[normalized] = true
         local defines = (gui:fileconfig(file) or {}).defines
         assert(contains(defines, 'CROSSDESK_VERSION="v1.5.3-2-20260913"') ==
-            (version_files[file] == true), "unexpected version scope: " .. file)
+            (version_files[normalized] == true), "unexpected version scope: " .. file)
     end
     for file in pairs(version_files) do
         assert(seen[file], "missing version consumer: " .. file)
@@ -70,8 +71,8 @@ function main(plat, portable)
             wgc_plugin = "wgc_plugin"
         }
         for name, resource in pairs(resources) do
-            local defines = targets[name]:fileconfig(
-                "apps/desktop/resources/windows/" .. resource .. ".rc").defines
+            local defines = targets[name]:fileconfig(path.translate(
+                "apps/desktop/resources/windows/" .. resource .. ".rc")).defines
             assert(contains(defines, 'CROSSDESK_VERSION_STRING="v1.5.3-2-20260913"'))
             assert(contains(defines, "CROSSDESK_VERSION_NUMERIC=1,5,3,0"))
             assert(contains(defines, "CROSSDESK_PORTABLE=1") ==

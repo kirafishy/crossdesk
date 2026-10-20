@@ -1,0 +1,5 @@
+1 24 "crossdesk_updater.manifest"
+IDI_ICON1 ICON "crossdesk.ico"
+#define CROSSDESK_FILE_DESCRIPTION "CrossDesk Updater"
+#define CROSSDESK_ORIGINAL_FILENAME "crossdesk_updater.exe"
+#include "version_info.rcinc"

@@ -51,6 +51,8 @@ mkdir -p build_pkg_temp
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
 cp "${EXECUTABLE_PATH}" "${MACOS_DIR}/${APP_NAME_UPPER}"
+cp "$(dirname "${EXECUTABLE_PATH}")/crossdesk_updater" "${MACOS_DIR}/crossdesk_updater"
+chmod +x "${MACOS_DIR}/crossdesk_updater"
 chmod +x "${MACOS_DIR}/${APP_NAME_UPPER}"
 
 if [ -f "${ICON_PATH}" ]; then

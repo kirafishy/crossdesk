@@ -99,6 +99,7 @@ export global UiStrings {
     in-out property <string> view-release-notes: "Release notes";
     in-out property <string> later: "Later";
     in-out property <string> download: "Download";
+    in-out property <string> install-update: "Install update";
     in-out property <string> input-password: "Input password";
     in-out property <string> reinput-password: "Incorrect password, please try again";
     in-out property <string> remember-password: "Remember password";
@@ -408,6 +409,10 @@ export component MainWindow inherits Window {
     callback read-all-announcements;
     callback load-more-announcements;
     in property <bool> update-available: false;
+    in property <bool> update-install-available: false;
+    in property <bool> update-install-busy: false;
+    in property <string> update-install-status: "";
+    private property <string> update-action-text: root.update-install-available ? UiStrings.install-update : UiStrings.download;
     in property <UpdateCheckStatus> update-check-status: idle;
     private property <string> update-status-text:
         root.update-check-status == UpdateCheckStatus.checking ? UiStrings.checking-for-updates :
@@ -460,7 +465,7 @@ export component MainWindow inherits Window {
         root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.tr("设备不支持", "Unsupported", "Не поддерживается") :
         GalleryStrings.tr("读取失败", "Read failed", "Ошибка чтения");
     in-out property <bool> autostart-guide-open: false;
-    changed autostart-guide-open => { if root.autostart-guide-open { focus-sink.focus(); } }
+    changed autostart-guide-open => { if root.autostart-guide-open { root.dialog-focus-pending = true; } }
     in-out property <bool> daemon-enabled: false;
     in-out property <bool> save-remote-previews: true;
     // Show the preference on every platform; only adapted hosts can change it.
@@ -492,6 +497,7 @@ export component MainWindow inherits Window {
     callback cancel-self-hosted-settings;
     callback browse-save-path;
     callback open-download;
+    callback cancel-update;
     callback open-website;
     callback open-afdian-sponsor;
     callback open-github-sponsor;
@@ -558,6 +564,23 @@ export component MainWindow inherits Window {
     private property <bool> recent-tooltip-online: false;
     private property <length> recent-tooltip-pointer-x: 0px;
     private property <length> recent-tooltip-pointer-y: 0px;
+    private property <bool> dialog-focus-pending: false;
+
+    // A changed handler can run lazily while winit's accessibility adapter
+    // borrows its tree. Switching focus there reenters that adapter and panics.
+    // Coalesce requests and move focus on the next event-loop turn instead.
+    Timer {
+        interval: 1ms;
+        running: root.dialog-focus-pending;
+        triggered => {
+            root.dialog-focus-pending = false;
+            if root.settings-open || root.autostart-guide-open
+                || root.wayland-notice-open || root.messages-open || root.about-open
+                || (root.sponsorship-open && root.sponsorship-unobstructed) {
+                focus-sink.focus();
+            }
+        }
+    }
 
     changed menu-open => {
         if root.menu-open { root.copy-feedback = CopyFeedback.idle; root.gallery-action("release", ""); }
@@ -575,26 +598,26 @@ export component MainWindow inherits Window {
             root.gallery-bandwidth-draft = root.gallery-bandwidth-index;
             root.gallery-action("settings-open", "");
             if root.autostart-system-managed { root.refresh-autostart-status(); }
-            focus-sink.focus();
+            root.dialog-focus-pending = true;
         } else {
             root.autostart-guide-open = false;
         }
     }
 
     changed wayland-notice-open => {
-        if root.wayland-notice-open { focus-sink.focus(); }
+        if root.wayland-notice-open { root.dialog-focus-pending = true; }
     }
 
     changed messages-open => {
-        if root.messages-open { focus-sink.focus(); }
+        if root.messages-open { root.dialog-focus-pending = true; }
     }
 
     changed about-open => {
-        if root.about-open { focus-sink.focus(); }
+        if root.about-open { root.dialog-focus-pending = true; }
     }
 
     changed sponsorship-open => {
-        if root.sponsorship-open { focus-sink.focus(); }
+        if root.sponsorship-open { root.dialog-focus-pending = true; }
     }
 
     reset-remote-id => {
@@ -2452,9 +2475,10 @@ export component MainWindow inherits Window {
                         height: 32px;
                         primary: true;
                         text-size: 12px;
-                        text: UiStrings.download;
-                        clicked => { root.open-website(); }
-                        about-update-button-metrics := Text { visible: false; text: UiStrings.download; font-size: 12px; }
+                        text: root.update-action-text;
+                        enabled: !root.update-install-busy;
+                        clicked => { root.open-download(); root.about-open = false; root.update-open = true; }
+                        about-update-button-metrics := Text { visible: false; text: root.update-action-text; font-size: 12px; }
                     }
                     SettingsButton {
                         width: max(116px, check-button-metrics.preferred-width + 24px);
@@ -2514,14 +2538,14 @@ export component MainWindow inherits Window {
                             width: update-website-label.preferred-width;
                             accessible-role: button;
                             accessible-label: update-website-label.text;
-                            accessible-action-default => { root.open-download(); }
+                            accessible-action-default => { root.open-website(); }
                             update-website-label := Text {
                                 text: UiStrings.access-website + "https://crossdesk.cn";
                                 color: website-touch.has-hover ? #254cc0 : WorkbenchStyle.accent;
                                 font-size: 13px;
                                 vertical-alignment: center;
                             }
-                            website-touch := TouchArea { mouse-cursor: pointer; clicked => { root.open-download(); } }
+                            website-touch := TouchArea { mouse-cursor: pointer; clicked => { root.open-website(); } }
                         }
                     }
                 }
@@ -2588,6 +2612,14 @@ export component MainWindow inherits Window {
                     vertical-stretch: 0;
                     spacing: 16px;
                     Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                    if root.update-install-status != "": Text {
+                        text: root.update-install-status;
+                        font-size: 12px;
+                        color: WorkbenchStyle.muted;
+                        wrap: word-wrap;
+                        max-height: 64px;
+                        overflow: elide;
+                    }
                     HorizontalLayout {
                         alignment: end;
                         spacing: 8px;
@@ -2595,14 +2627,16 @@ export component MainWindow inherits Window {
                             width: 88px;
                             height: 34px;
                             text: UiStrings.later;
-                            clicked => { root.update-open = false; }
+                            clicked => { root.cancel-update(); root.update-open = false; }
                         }
                         WorkbenchButton {
-                            width: 88px;
+                            width: max(110px, update-action-metrics.preferred-width + 24px);
                             height: 34px;
                             primary: true;
-                            text: UiStrings.download;
-                            clicked => { root.open-download(); root.update-open = false; }
+                            enabled: !root.update-install-busy;
+                            text: root.update-action-text;
+                            clicked => { root.open-download(); }
+                            update-action-metrics := Text { visible: false; text: root.update-action-text; font-size: 12px; }
                         }
                     }
                 }

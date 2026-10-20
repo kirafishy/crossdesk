@@ -1,4 +1,9 @@
 function setup_options_and_dependencies()
+    option("CROSSDESK_UPDATE_PUBLIC_KEY")
+        set_showmenu(true)
+        set_description("Ed25519 public key (64 lowercase hex characters); empty disables automatic installation")
+    option_end()
+
     option("CROSSDESK_VERSION")
         set_default("0.0.0")
         set_showmenu(true)

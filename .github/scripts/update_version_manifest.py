@@ -6,6 +6,10 @@ import datetime
 import json
 from pathlib import Path
 import re
+import hashlib
+import os
+import subprocess
+import tempfile
 
 
 DOWNLOAD_BASE = "https://downloads.crossdesk.cn/"
@@ -21,6 +25,29 @@ ARTIFACTS = {
     "ios-arm64": ("ios-arm64-unsigned", "zip"),
     "android-arm64": ("android-arm64(?:-unsigned)?", "apk"),
 }
+
+def sign_update(payload, private_key, expected_public_key):
+    """Sign exact UTF-8 JSON bytes using a PEM Ed25519 key, never shell text."""
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_public_key):
+        raise ValueError("CROSSDESK_UPDATE_PUBLIC_KEY must contain 64 lowercase hex characters")
+    with tempfile.TemporaryDirectory(prefix="crossdesk-sign-") as directory:
+        root = Path(directory)
+        key = root / "key.pem"
+        key.write_text(private_key, encoding="utf-8")
+        key.chmod(0o600)
+        public = subprocess.run(["openssl", "pkey", "-in", str(key), "-pubout", "-outform", "DER"],
+                                check=True, capture_output=True).stdout
+        # RFC 8410 SubjectPublicKeyInfo prefix for an Ed25519 public key.
+        if public != bytes.fromhex("302a300506032b6570032100" + expected_public_key):
+            raise ValueError("Update signing key does not match the public key built into clients")
+        data = root / "payload.json"
+        data.write_bytes(payload.encode("utf-8"))
+        signature = subprocess.run(
+            ["openssl", "pkeyutl", "-sign", "-rawin", "-inkey", str(key), "-in", str(data)],
+            check=True, capture_output=True).stdout
+        if len(signature) != 64:
+            raise ValueError("Expected an Ed25519 signature")
+        return {"payload": payload, "signature": signature.hex()}
 
 
 def version_info(version, fallback_date=None):
@@ -47,6 +74,8 @@ def version_info(version, fallback_date=None):
 
 def artifact_downloads(directory):
     downloads = {}
+    private_key = os.environ.get("CROSSDESK_UPDATE_PRIVATE_KEY", "")
+    public_key = os.environ.get("CROSSDESK_UPDATE_PUBLIC_KEY", "")
     for path in sorted(Path(directory).iterdir()):
         if not path.is_file():
             continue
@@ -65,6 +94,19 @@ def artifact_downloads(directory):
                     continue
             downloads[key] = {"url": DOWNLOAD_BASE + path.name, "filename": path.name,
                               "version": metadata["version"], "releaseDate": metadata["releaseDate"]}
+            with path.open("rb") as artifact:
+                hasher = hashlib.sha256()
+                for chunk in iter(lambda: artifact.read(65536), b""):
+                    hasher.update(chunk)
+                digest = hasher.hexdigest()
+            downloads[key].update(size=path.stat().st_size, sha256=digest)
+            if private_key and key.startswith(("windows-", "macos-", "linux-")) and "portable" not in key:
+                payload = json.dumps({
+                    "schema": 1, "platform": key, "version": metadata["version"],
+                    "url": DOWNLOAD_BASE + path.name, "filename": path.name,
+                    "size": path.stat().st_size, "sha256": digest,
+                }, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+                downloads[key]["update"] = sign_update(payload, private_key, public_key)
             break
     if not downloads:
         raise ValueError("No supported release artifacts found")

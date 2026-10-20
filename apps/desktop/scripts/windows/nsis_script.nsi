@@ -39,6 +39,18 @@ RequestExecutionLevel admin
 
 ; Include LogicLib for process handling
 !include "LogicLib.nsh"
+!include "FileFunc.nsh"
+Var UpdateMode
+
+Function .onInit
+    ${GetParameters} $0
+    ClearErrors
+    ${GetOptions} $0 "/CROSSDESK_UPDATE" $1
+    StrCpy $UpdateMode 0
+    ${IfNot} ${Errors}
+        StrCpy $UpdateMode 1
+    ${EndIf}
+FunctionEnd
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "crossdesk-win-x64-${PRODUCT_VERSION}.exe"
@@ -55,6 +67,11 @@ InstallDirRegKey HKCU "Software\${PRODUCT_NAME}" "InstallDir"
 ShowInstDetails show
 
 Section "MainSection"
+    ; The updater has already coordinated shutdown. Never kill unrelated
+    ; instances by name during an unattended upgrade.
+    ${If} $UpdateMode = 1
+        Goto installApp
+    ${EndIf}
     ; Check if CrossDesk is running
     StrCpy $1 "CrossDesk.exe"
     
@@ -81,10 +98,12 @@ installApp:
     Call StopInstalledService
 
     SetOutPath "$INSTDIR"
-    SetOverwrite ifnewer
+    ; The signed release determines file versions, not filesystem timestamps.
+    SetOverwrite on
 
     ; Main application executable path
     File /oname=CrossDesk.exe "..\..\..\..\build\windows\x64\release\crossdesk.exe"
+    File "..\..\..\..\build\windows\x64\release\crossdesk_updater.exe"
     ; Bundle service-side binaries required by the Windows service flow
     File "..\..\..\..\build\windows\x64\release\crossdesk_service.exe"
     File "..\..\..\..\build\windows\x64\release\crossdesk_session_helper.exe"
@@ -116,6 +135,7 @@ installApp:
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REG_KEY}" "DisplayName" "${PRODUCT_NAME}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REG_KEY}" "UninstallString" "$INSTDIR\uninstall.exe"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REG_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REG_KEY}" "InstallLocation" "$INSTDIR"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REG_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REG_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
     WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_REG_KEY}" "DisplayIcon" "$INSTDIR\CrossDesk.exe"
@@ -167,6 +187,7 @@ uninstallApp:
 
     ; Delete main executable and uninstaller
     Delete "$INSTDIR\CrossDesk.exe"
+    Delete "$INSTDIR\crossdesk_updater.exe"
     Delete "$INSTDIR\crossdesk_service.exe"
     Delete "$INSTDIR\crossdesk_session_helper.exe"
     Delete "$INSTDIR\crossdesk_privacy_cursor_helper.exe"
@@ -196,7 +217,14 @@ SectionEnd
 
 ; ------ Functions ------
 Function LaunchApp
+    ${If} $UpdateMode = 1
+        Return
+    ${EndIf}
     Exec "$INSTDIR\CrossDesk.exe"
+FunctionEnd
+
+Function .onInstFailed
+    SetErrorLevel 1
 FunctionEnd
 
 Function StopInstalledService

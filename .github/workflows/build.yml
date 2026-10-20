@@ -28,6 +28,7 @@ permissions:
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   XMAKE_MIN_VERSION: "3.1.1"
+  CROSSDESK_UPDATE_PUBLIC_KEY: ${{ vars.CROSSDESK_UPDATE_PUBLIC_KEY }}
 
 jobs:
   build-linux:
@@ -752,6 +753,7 @@ jobs:
       - name: Generate version.json for all platforms
         env:
           RELEASE_TAG: ${{ steps.version.outputs.VERSION_WITH_V }}
+          CROSSDESK_UPDATE_PRIVATE_KEY: ${{ secrets.CROSSDESK_UPDATE_PRIVATE_KEY }}
         run: |
           python3 .github/scripts/update_version_manifest.py \
             --current current-version.json --output version.json --artifacts release \

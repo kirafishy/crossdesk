@@ -86,6 +86,9 @@
 #include "ui/release_notes_text.h"
 #include "ui/ui_localization.h"
 #include "update_checker.h"
+#if CROSSDESK_HAS_UPDATER
+#include "updater/update_controller.h"
+#endif
 #include "window_geometry.h"
 
 namespace crossdesk {
@@ -1134,6 +1137,9 @@ int GuiApplication::Run() {
 #endif
   InitializeModules();
   update_checker_ = std::make_unique<UpdateChecker>(CROSSDESK_VERSION);
+#if CROSSDESK_HAS_UPDATER
+  updater_ = std::make_unique<updater::Controller>(path_manager_->GetCachePath());
+#endif
   InitializeUi();
 #ifndef __OHOS__
   ui_->activation_receiver = std::move(activation_receiver);
@@ -1735,8 +1741,24 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
                                    ? UiText(std::to_string(signal_port))
                                    : slint::SharedString{});
   });
+  main->on_cancel_update([this] {
+#if CROSSDESK_HAS_UPDATER
+    if (updater_ && updater_->busy()) updater_->Cancel();
+#endif
+  });
   main->on_open_download([this] {
     const auto& latest = update_checker_->latest();
+#if CROSSDESK_HAS_UPDATER
+    if (updater_ && updater_->busy()) return;
+    if (updater_ && latest && updater_->Available(latest->update_envelope)) {
+      const int language = localization::detail::ClampLanguageIndex(localization_language_index_);
+      if (tinyfd_messageBox("CrossDesk", localization::install_update_confirm[language].c_str(),
+                           "okcancel", "question", 0)) {
+        updater_->Start(latest->update_envelope);
+      }
+      return;
+    }
+#endif
     OpenUrl(latest && !latest->download_url.empty() ? latest->download_url
                                                    : "https://crossdesk.cn");
   });
@@ -2326,6 +2348,36 @@ void GuiApplication::Tick() {
 }
 
 void GuiApplication::PollUpdateCheck() {
+#if CROSSDESK_HAS_UPDATER
+  if (updater_) {
+    // The event loop is running and initialization has completed.
+    static bool startup_confirmed = false;
+    if (!startup_confirmed) {
+      updater_->ConfirmStartup();
+      startup_confirmed = true;
+    }
+    if (updater_->Poll()) {
+      exit_ = true;
+      return;
+    }
+    const auto& latest = update_checker_->latest();
+    const bool can_install = latest && updater_->Available(latest->update_envelope);
+    const int language = localization::detail::ClampLanguageIndex(localization_language_index_);
+    std::string status;
+    if (updater_->busy()) {
+      status = localization::update_preparing[language];
+      if (updater_->state() == updater::Controller::State::Downloading)
+        status += " " + std::to_string(updater_->progress()) + "%";
+    } else if (updater_->state() == updater::Controller::State::Failed) {
+      status = localization::update_install_failed[language] + "\n" + updater_->error();
+    }
+    for (const auto& main : {ui_->main, ui_->wall}) {
+      main->set_update_install_available(can_install);
+      main->set_update_install_busy(updater_->busy());
+      main->set_update_install_status(UiText(status));
+    }
+  }
+#endif
   // The first tick runs after show()/event-loop startup. Poll never waits for
   // networking and all application/model changes remain on this UI thread.
   if (!update_checker_->Poll() ||
@@ -6163,6 +6215,9 @@ void GuiApplication::Cleanup() {
   if (update_checker_) {
     update_checker_->Stop();
   }
+#if CROSSDESK_HAS_UPDATER
+  updater_.reset();
+#endif
   SDL_Quit();
 }
 

@@ -2,6 +2,9 @@
 
 [返回 README](../README.md) · [English](BUILD_EN.md)
 
+安装版的升级器随主程序构建。发布公钥、清单签名和验证方法见
+[桌面端应用内升级](UPDATER.md)；便携版不包含升级器。
+
 克隆仓库后，构建和打包命令均在仓库根目录执行。构建依赖与参数以 [Xmake 配置](../apps/desktop/xmake/options.lua) 和 [CI 工作流](../.github/workflows/build.yml) 为准。`1.4.3` 仅为本地构建示例版本号；调整时请同步修改配置命令与打包参数，避免程序内版本号与安装包不一致。
 
 ## 构建依赖
