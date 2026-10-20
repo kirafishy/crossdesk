@@ -102,6 +102,9 @@ xmake b crossdesk
 - Linux：支持 `/usr/lib/crossdesk/crossdesk-bin`，根据 `package-name`
   选择普通包或虚拟桌面包。使用 `pkexec` 授权和 `apt-get install`
   安装本地 DEB；禁止包管理器自动删除依赖。需要可用的授权代理。
+  重启时恢复原来的 `--headless`、`--no-headless`、`--headless-display`、
+  `--headless-size` 和 `--headless-session` 参数，包括安装失败后的重启；
+  内部运行模式参数不会重放。
   自定义 systemd/headless supervisor 必须由管理员先协调停止；
   检测到仍在运行的程序会中止升级，不猜测或停止其他服务。
 

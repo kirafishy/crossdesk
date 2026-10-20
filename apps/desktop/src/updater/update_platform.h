@@ -23,7 +23,8 @@ int Run(const fs::path& executable, const std::vector<std::string>& arguments,
 int RunElevated(const fs::path& executable, const fs::path& job);
 void WaitForApplicationExit(const fs::path& application);
 void InstallPackage(const fs::path& package, const fs::path& application);
-void Restart(const fs::path& application);
+std::vector<std::string> RestartArguments();
+void Restart(const fs::path& application, const std::vector<std::string>& arguments);
 void RestoreServices();
 // Pin relocated helper files against changes during elevation (Windows).
 std::shared_ptr<void> PinHelper(const fs::path& helper);

@@ -5,10 +5,32 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <thread>
 
 namespace crossdesk::updater {
+namespace {
+std::vector<std::string> HeadlessArguments(const std::vector<std::string>& arguments) {
+  std::vector<std::string> result;
+  for (std::size_t i = 0; i < arguments.size(); ++i) {
+    const auto& argument = arguments[i];
+    if (argument == "--headless" || argument == "--no-headless") {
+      result.push_back(argument);
+    } else if (argument == "--headless-display" || argument == "--headless-size" ||
+               argument == "--headless-session") {
+      if (i + 1 == arguments.size() || arguments[i + 1].empty() ||
+          arguments[i + 1].rfind("--", 0) == 0)
+        throw std::runtime_error("Missing headless restart argument");
+      result.push_back(argument);
+      result.push_back(arguments[++i]);
+    }
+    // Internal modes such as --child must never replace a normal restart.
+  }
+  return result;
+}
+}  // namespace
+
 fs::path ExecutablePath() { return fs::read_symlink("/proc/self/exe"); }
 bool SupportedInstallation(const fs::path& application) {
   return application == fs::path("/usr/lib/crossdesk/crossdesk-bin") &&
@@ -50,5 +72,17 @@ void InstallPackage(const fs::path& package, const fs::path&) {
                               "-o", "Dpkg::Options::=--force-confold", package.string()}) != 0)
     throw std::runtime_error("The package manager could not install the update");
 }
-void Restart(const fs::path&) { Launch("/usr/bin/crossdesk", {}); }
+std::vector<std::string> RestartArguments() {
+  // The built-in headless supervisor forks the GUI without exec, so procfs
+  // still contains its original display/session options in the GUI process.
+  std::istringstream command_line(ReadText("/proc/self/cmdline", 32768));
+  std::string argument;
+  std::getline(command_line, argument, '\0');  // Executable name.
+  std::vector<std::string> arguments;
+  while (std::getline(command_line, argument, '\0')) arguments.push_back(argument);
+  return HeadlessArguments(arguments);
+}
+void Restart(const fs::path&, const std::vector<std::string>& arguments) {
+  Launch("/usr/bin/crossdesk", HeadlessArguments(arguments));
+}
 }  // namespace crossdesk::updater

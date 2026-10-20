@@ -274,7 +274,10 @@ void RestoreServices() {
   CloseServiceHandle(manager);
 }
 
-void Restart(const fs::path& application) { Launch(application, {}); }
+std::vector<std::string> RestartArguments() { return {}; }
+void Restart(const fs::path& application, const std::vector<std::string>&) {
+  Launch(application, {});
+}
 
 std::shared_ptr<void> PinHelper(const fs::path& helper) {
   HANDLE handle = CreateFileW(helper.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,

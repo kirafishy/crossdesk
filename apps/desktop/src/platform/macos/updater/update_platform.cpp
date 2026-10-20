@@ -68,5 +68,8 @@ void InstallPackage(const fs::path& package, const fs::path&) {
   if (Run("/usr/sbin/installer", {"-pkg", package.string(), "-target", "/"}) != 0)
     throw std::runtime_error("The macOS installer could not install the update");
 }
-void Restart(const fs::path&) { Launch("/usr/bin/open", {"/Applications/CrossDesk.app"}); }
+std::vector<std::string> RestartArguments() { return {}; }
+void Restart(const fs::path&, const std::vector<std::string>&) {
+  Launch("/usr/bin/open", {"/Applications/CrossDesk.app"});
+}
 }  // namespace crossdesk::updater

@@ -72,7 +72,8 @@ void Controller::Start(const std::string& envelope) {
       const auto job = PrivateDirectory();
       try {
         WriteText(job / "request.json", nlohmann::json{
-            {"application", PathUtf8(application)}, {"envelope", envelope}}.dump());
+            {"application", PathUtf8(application)}, {"envelope", envelope},
+            {"restart_arguments", RestartArguments()}}.dump());
         DownloadPackage(artifact, job / artifact.filename, progress_, cancel_);
         if (cancel_) throw std::runtime_error("Update cancelled");
         // Relocate the coordinator so package installation can replace the

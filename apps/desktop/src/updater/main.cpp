@@ -17,6 +17,7 @@ namespace {
 struct Request {
   fs::path application;
   Artifact artifact;
+  std::vector<std::string> restart_arguments;
 };
 Request ReadRequest(const fs::path& job) {
   const auto request = nlohmann::json::parse(ReadText(job / "request.json"));
@@ -24,7 +25,8 @@ Request ReadRequest(const fs::path& job) {
   if (!SupportedInstallation(application)) throw std::runtime_error("Invalid installation destination");
   const auto artifact = VerifyEnvelope(request.at("envelope").get<std::string>(), PublicKey(),
                                        PlatformKey(application), BuildVersion());
-  return {application, artifact};
+  return {application, artifact,
+          request.value("restart_arguments", std::vector<std::string>{})};
 }
 
 void WaitForCommit(const fs::path& job) {
@@ -81,6 +83,7 @@ int Install(const fs::path& job) {
 
 int Coordinate(const fs::path& job) {
   fs::path application;
+  std::vector<std::string> restart_arguments;
   bool committed = false;
   bool success = false;
   bool exited = false;
@@ -89,6 +92,7 @@ int Coordinate(const fs::path& job) {
   try {
     const auto request = ReadRequest(job);
     application = request.application;
+    restart_arguments = request.restart_arguments;
     auto pinned = PinHelper(ExecutablePath());
     {
       maintenance = std::make_unique<MaintenanceLock>(application);
@@ -139,7 +143,7 @@ int Coordinate(const fs::path& job) {
   maintenance.reset();
   if (committed && exited) {
     try {
-      Restart(application);
+      Restart(application, restart_arguments);
       if (success) {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(90);
         while (!fs::exists(job / "started") && std::chrono::steady_clock::now() < deadline)
