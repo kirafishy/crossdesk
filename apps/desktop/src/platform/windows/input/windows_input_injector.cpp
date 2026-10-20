@@ -13,26 +13,32 @@
 namespace crossdesk {
 namespace {
 
-DWORD InjectOnUserDesktop(INPUT input) {
+struct InputResult {
+  UINT sent;
+  DWORD error;
+};
+
+InputResult InjectOnUserDesktop(INPUT* inputs, UINT count) {
   if (!IsCurrentSessionUnlocked()) {
-    return ERROR_REQUIRES_INTERACTIVE_WINDOWSTATION;
+    return {0, ERROR_REQUIRES_INTERACTIVE_WINDOWSTATION};
   }
   ScopedInteractiveDesktop desktop;
   if (!desktop.Bind(L"")) {
     const DWORD error = GetLastError();
-    return error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE;
+    return {0, error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE};
   }
   if (!desktop.IsReceivingInput()) {
-    return ERROR_REQUIRES_INTERACTIVE_WINDOWSTATION;
+    return {0, ERROR_REQUIRES_INTERACTIVE_WINDOWSTATION};
   }
   // Lock screens and UAC still require the session-checked service path.
   if (_wcsicmp(desktop.name().c_str(), L"Default") != 0) {
-    return ERROR_ACCESS_DENIED;
+    return {0, ERROR_ACCESS_DENIED};
   }
   SetLastError(ERROR_SUCCESS);
-  if (SendInput(1, &input, sizeof(INPUT)) == 1) return ERROR_SUCCESS;
+  const UINT sent = SendInput(count, inputs, sizeof(INPUT));
+  if (sent == count) return {sent, ERROR_SUCCESS};
   const DWORD error = GetLastError();
-  return error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE;
+  return {sent, error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE};
 }
 
 class UserDesktopInputWorker {
@@ -48,9 +54,9 @@ class UserDesktopInputWorker {
     thread_.join();
   }
 
-  DWORD Send(INPUT input) {
-    std::packaged_task<DWORD()> task(
-        [input] { return InjectOnUserDesktop(input); });
+  InputResult Send(INPUT* inputs, UINT count) {
+    std::packaged_task<InputResult()> task(
+        [inputs, count] { return InjectOnUserDesktop(inputs, count); });
     auto result = task.get_future();
     {
       std::lock_guard<std::mutex> lock(mutex_);
@@ -76,7 +82,7 @@ class UserDesktopInputWorker {
 
   std::mutex mutex_;
   std::condition_variable wake_;
-  std::queue<std::packaged_task<DWORD()>> pending_;
+  std::queue<std::packaged_task<InputResult()>> pending_;
   bool stopping_ = false;
   std::thread thread_;
 };
@@ -84,8 +90,18 @@ class UserDesktopInputWorker {
 }  // namespace
 
 UINT SendInputOnUserDesktop(const INPUT& input) {
+  INPUT copy = input;
+  return SendInputOnUserDesktop(&copy, 1);
+}
+
+UINT SendInputOnUserDesktop(INPUT* inputs, UINT count) {
+  if (!inputs || count == 0) {
+    SetLastError(ERROR_INVALID_PARAMETER);
+    return 0;
+  }
   static UserDesktopInputWorker worker;
-  const DWORD error = worker.Send(input);
+  const InputResult result = worker.Send(inputs, count);
+  const DWORD error = result.error;
   if (error != ERROR_SUCCESS) {
     // Include session identity even when Windows reports no useful SendInput
     // error (for example UIPI). Keep repeated mouse-move failures bounded.
@@ -102,7 +118,7 @@ UINT SendInputOnUserDesktop(const INPUT& input) {
     }
   }
   SetLastError(error);
-  return error == ERROR_SUCCESS ? 1 : 0;
+  return result.sent;
 }
 
 }  // namespace crossdesk

@@ -477,7 +477,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     private boolean sendTextEdit(int count,String value){
         if(session==null)return false;
         if(session.textEdit(count,value))return true;
-        toast("当前远端不支持此文本，中文或表情需更新 macOS 被控端，或通过剪贴板发送");return false;
+        toast("当前远端不支持直接输入此文本，请使用支持文本输入的被控端版本，或通过剪贴板发送");return false;
     }
     private void tapKey(int code){if(session!=null){session.key(code,true);session.key(code,false);}}
     private void shortcut(int code){if(session!=null){int modifier=hostPlatform.equals("macos")?0x5B:0x11;session.key(modifier,true);tapKey(code);session.key(modifier,false);}}

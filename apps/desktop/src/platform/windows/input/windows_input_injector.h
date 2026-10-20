@@ -16,6 +16,10 @@ namespace crossdesk {
 // worker's failure code in the calling thread's last-error value.
 UINT SendInputOnUserDesktop(const INPUT& input);
 
+// Synchronously injects one ordered batch. The caller owns the buffer until
+// this function returns, including while the worker is using it.
+UINT SendInputOnUserDesktop(INPUT* inputs, UINT count);
+
 }  // namespace crossdesk
 
 #endif
