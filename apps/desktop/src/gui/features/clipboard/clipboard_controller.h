@@ -41,6 +41,7 @@ public:
 
 private:
   int SendToPeers(const std::string &text);
+  void SendDeferredLocalText();
 
   GuiRuntime &owner_;
   uint32_t event_type_ = 0;
@@ -51,6 +52,9 @@ private:
   std::weak_ptr<gui_detail::RemoteSession> pending_session_;
   uint64_t pending_generation_ = 0;
   std::string last_text_;
+  // UI thread only. Retain the destination of a local copy while its stream
+  // window is unfocused; last_text_ holds the latest value to send on return.
+  std::weak_ptr<gui_detail::RemoteSession> deferred_local_session_;
 };
 
 } // namespace crossdesk

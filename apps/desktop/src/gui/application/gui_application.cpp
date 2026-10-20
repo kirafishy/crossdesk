@@ -4382,15 +4382,20 @@ void GuiApplication::SelectStreamTab(int index) {
     (*ui_->stream)->set_has_frame(false);
   }
   std::shared_ptr<RemoteSession> selected_session;
+  bool clipboard_resumed = false;
   {
     std::lock_guard delivery_lock(audio_delivery_mutex_);
     std::shared_lock lock(remote_sessions_mutex_);
     for (auto& [id, props] : remote_sessions_) {
       if (props) {
         props->tab_selected_ = id == focused_remote_id_;
-        props->clipboard_allowed_ = props->tab_selected_ &&
-                                    props->control_mouse_ &&
-                                    focus_on_stream_window_;
+        const bool clipboard_allowed = props->tab_selected_ &&
+                                       props->control_mouse_ &&
+                                       focus_on_stream_window_;
+        if (!props->clipboard_allowed_.exchange(clipboard_allowed) &&
+            clipboard_allowed) {
+          clipboard_resumed = true;
+        }
       }
     }
     const auto selected = remote_sessions_.find(selected_remote_id);
@@ -4401,6 +4406,11 @@ void GuiApplication::SelectStreamTab(int index) {
                                selected_session->control_mouse_ &&
                                selected_session->connection_status_.load() ==
                                    ConnectionStatus::Connected;
+  }
+  if (clipboard_resumed) {
+    // Flush a copy made in another local app before the next paste shortcut,
+    // instead of waiting for the periodic clipboard poll.
+    clipboard_.HandleLocalUpdate();
   }
   SyncAudioPlayback();
 }

@@ -30,6 +30,7 @@ uint32_t ClipboardController::event_type() const { return event_type_; }
 
 void ClipboardController::Initialize() {
   last_text_.clear();
+  deferred_local_session_.reset();
 
   char *clipboard_text = SDL_GetClipboardText();
   if (clipboard_text) {
@@ -42,6 +43,7 @@ void ClipboardController::Initialize() {
 
 void ClipboardController::Shutdown() {
   events_enabled_.store(false, std::memory_order_release);
+  deferred_local_session_.reset();
   std::lock_guard<std::mutex> lock(pending_mutex_);
   pending_remote_text_.reset();
 }
@@ -126,6 +128,7 @@ void ClipboardController::ApplyPendingRemoteText() {
   // SDL will normally emit SDL_EVENT_CLIPBOARD_UPDATE for this write. Update
   // the baseline first so that event cannot echo the text back to the sender.
   last_text_ = std::move(*pending_text);
+  deferred_local_session_.reset();
 }
 
 void ClipboardController::HandleLocalUpdate() {
@@ -134,6 +137,7 @@ void ClipboardController::HandleLocalUpdate() {
   }
   if (!SDL_HasClipboardText()) {
     last_text_.clear();
+    deferred_local_session_.reset();
     return;
   }
 
@@ -146,12 +150,14 @@ void ClipboardController::HandleLocalUpdate() {
   std::string text(clipboard_text);
   SDL_free(clipboard_text);
   if (text == last_text_) {
+    SendDeferredLocalText();
     return;
   }
 
   // Record the value before sending. Duplicate SDL notifications and a
   // remote write of the same value must not create a clipboard feedback loop.
   last_text_ = text;
+  deferred_local_session_.reset();
   if (text.empty()) {
     return;
   }
@@ -163,11 +169,50 @@ void ClipboardController::HandleLocalUpdate() {
   SendToPeers(text);
 }
 
+void ClipboardController::SendDeferredLocalText() {
+  const auto session = deferred_local_session_.lock();
+  if (!session) {
+    return;
+  }
+
+  std::shared_lock lock(owner_.remote_sessions_mutex_);
+  const auto current = owner_.remote_sessions_.find(session->remote_id_);
+  if (current == owner_.remote_sessions_.end() || current->second != session ||
+      session->closing_ || !session->peer_ || !session->connection_established_ ||
+      !session->tab_opened_ || !session->tab_selected_ ||
+      !session->control_mouse_) {
+    deferred_local_session_.reset();
+    return;
+  }
+  if (!session->clipboard_allowed_.load()) {
+    return;
+  }
+
+  const int ret = SendReliableDataFrame(
+      session->peer_, last_text_.data(), last_text_.size(),
+      session->clipboard_label_.c_str());
+  if (ret != 0) {
+    LOG_WARN("Failed to send deferred clipboard data to peer [{}], ret={}",
+             session->remote_id_, ret);
+    return;
+  }
+  deferred_local_session_.reset();
+}
+
 int ClipboardController::SendToPeers(const std::string &text) {
   std::shared_lock lock(owner_.remote_sessions_mutex_);
   for (const auto &[remote_id, props] : owner_.remote_sessions_) {
-    if (!props || !props->peer_ || !props->connection_established_ ||
-        !props->clipboard_allowed_.load()) {
+    if (!props || props->closing_ || !props->peer_ ||
+        !props->connection_established_) {
+      continue;
+    }
+    if (!props->clipboard_allowed_.load()) {
+      // Copying in another local app temporarily releases keyboard control.
+      // Keep this copy for the same selected stream, without sharing it with
+      // background tabs or DeskHub previews.
+      if (props->tab_opened_ && props->tab_selected_ && props->control_mouse_) {
+        deferred_local_session_ = props;
+      }
       continue;
     }
 
