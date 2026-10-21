@@ -50,7 +50,7 @@ def sign_update(payload, private_key, expected_public_key):
         return {"payload": payload, "signature": signature.hex()}
 
 
-def version_info(version, fallback_date=None):
+def version_fields(version):
     version = version.removeprefix("v")
     base = r"[0-9]+(?:\.[0-9]+){1,3}"
     for pattern in (
@@ -60,16 +60,39 @@ def version_info(version, fallback_date=None):
     ):
         match = re.fullmatch(pattern, version)
         if match:
-            fields = match.groupdict()
-            date = fields.get("date")
-            release_date = (datetime.datetime.strptime(date, "%Y%m%d").date().isoformat()
-                            if date else fallback_date)
-            if not release_date:
-                raise ValueError(f"Release date is missing for {version}")
-            datetime.date.fromisoformat(release_date)
-            return {"latest_version": version, "version": version,
-                    "releaseDate": release_date, "patch": int(fields.get("patch") or 0)}
+            return match.groupdict()
     raise ValueError(f"Invalid release version: {version}")
+
+
+def version_info(version, fallback_date=None):
+    fields = version_fields(version)
+    version = version.removeprefix("v")
+    date = fields.get("date")
+    release_date = (datetime.datetime.strptime(date, "%Y%m%d").date().isoformat()
+                    if date else fallback_date)
+    if not release_date:
+        raise ValueError(f"Release date is missing for {version}")
+    datetime.date.fromisoformat(release_date)
+    return {"latest_version": version, "version": version,
+            "releaseDate": release_date, "patch": int(fields.get("patch") or 0)}
+
+
+def release_order(metadata):
+    """Match client ordering: zero-padded numeric components, then patch, never date."""
+    version = metadata.get("latest_version") or metadata.get("version")
+    if not version:
+        return None
+    fields = version_fields(version)
+    numbers = tuple(int(part) for part in fields["base"].split("."))
+    inline_patch = fields.get("patch") or "0"
+    patch = int(inline_patch) if len(inline_patch) <= 4 else 0
+    # Legacy manifests may store the effective patch outside the version string.
+    explicit_patch = metadata.get("patch")
+    if isinstance(explicit_patch, str) and re.fullmatch(r"[0-9]+", explicit_patch):
+        explicit_patch = int(explicit_patch)
+    if type(explicit_patch) is int and 0 <= explicit_patch <= 2147483647:
+        patch = explicit_patch
+    return numbers + (0,) * (4 - len(numbers)) + (patch,)
 
 
 def artifact_downloads(directory):
@@ -129,10 +152,25 @@ def merge_release(current, tag, name, notes, downloads, published_date=None):
         if not tag.startswith("v"):
             raise ValueError(f"Expected a version tag, got {tag!r}")
         metadata = version_info(tag, published_date)
+        current_order = release_order(current)
+        if current_order is not None and release_order(metadata) < current_order:
+            current_version = current.get("latest_version") or current.get("version")
+            print(f"Skipping {tag}: older than current desktop release {current_version}")
+            return dict(current)
+
+    accepted_downloads = {}
+    for platform, download in downloads.items():
+        previous_order = release_order(current["downloads"].get(platform, {}))
+        if previous_order is not None and release_order(download) < previous_order:
+            print(f"Skipping {tag} download for {platform}: a newer version is already published")
+            continue
+        accepted_downloads[platform] = download
+    if mobile and not accepted_downloads:
+        return dict(current)
 
     result = dict(current)
     result.pop("platforms", None)
-    result["downloads"] = {**current["downloads"], **downloads}
+    result["downloads"] = {**current["downloads"], **accepted_downloads}
     if not mobile:
         result.update({**metadata, "releaseName": name, "releaseNotes": notes, "tagName": tag})
     return result
@@ -159,11 +197,16 @@ def main():
             parser.error("Supply --release-json or --tag, --name and --notes")
         tag, name, notes = args.tag, args.name, args.notes.read_text()
         published_date = None
-    current = json.loads(args.current.read_text())
+    current_text = args.current.read_text()
+    current = json.loads(current_text)
     downloads = artifact_downloads(args.artifacts)
     result = merge_release(current, tag, name, notes, downloads, published_date)
-    args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
-    print(f"Updated {tag}: {', '.join(downloads)}")
+    if result == current:
+        args.output.write_text(current_text)
+        print(f"No changes to version.json for {tag}")
+    else:
+        args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
+        print(f"Updated version.json for {tag}")
 
 
 if __name__ == "__main__":
