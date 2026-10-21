@@ -1486,25 +1486,24 @@ export component MainWindow inherits Window {
                 text: root.current-version;
                 font-size: 11px; color: WorkbenchStyle.muted; vertical-alignment: center;
             }
-            if !root.signal-connected && !root.signal-tls-error: Rectangle {
-                    x: parent.width - self.width - 20px;
-                    y: 0px;
-                    height: parent.height;
-                    width: reconnect-label.preferred-width;
-                    reconnect-label := Text {
-                            text: UiStrings.signal-reconnect;
-                            color: WorkbenchStyle.accent;
-                            font-size: 11px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                    }
-                    TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => {
-                                root.copy-feedback = CopyFeedback.idle;
-                                root.signal-reconnect-requested();
-                            }
-                    }
+            if !root.signal-connected && !root.signal-tls-error: WorkbenchButton {
+                x: parent.width - self.width - 20px;
+                y: (parent.height - self.height) / 2;
+                width: max(64px, reconnect-label-metrics.preferred-width + 22px);
+                height: 22px;
+                text: UiStrings.signal-reconnect;
+                text-size: 11px;
+                text-color: WorkbenchStyle.accent;
+                clicked => {
+                    root.copy-feedback = CopyFeedback.idle;
+                    root.signal-reconnect-requested();
+                }
+                reconnect-label-metrics := Text {
+                    visible: false;
+                    text: UiStrings.signal-reconnect;
+                    font-size: 11px;
+                    font-weight: 500;
+                }
             }
         }
     }
