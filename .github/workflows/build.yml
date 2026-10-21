@@ -36,9 +36,68 @@ env:
   CROSSDESK_DESKTOP_VERSION: ${{ inputs.desktop_version }}
 
 jobs:
+  prepare-version:
+    name: Resolve desktop version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    # Resolve the date once for every desktop build and the release job.
+    steps:
+      - name: Resolve desktop version
+        id: version
+        shell: bash
+        env:
+          PATCH_NUMBER: ${{ inputs.patch || '0' }}
+        run: |
+          VERSION_REF="${GITHUB_REF##*/}"
+          if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+            VERSION_REF="${CROSSDESK_DESKTOP_VERSION:-0.0.0}"
+            if [[ ! "${VERSION_REF}" =~ ^v?[0-9]+(\.[0-9]+){1,3}$ ]]; then
+              echo "::error::desktop_version must be a numeric version such as 1.7.2"
+              exit 1
+            fi
+          elif [[ -n "${CROSSDESK_DESKTOP_VERSION}" ]]; then
+            echo "::error::desktop_version is only supported for branch builds; tags determine release versions"
+            exit 1
+          fi
+          VERSION_BASE="${VERSION_REF#v}"
+          BUILD_DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
+
+          if [[ ! "${PATCH_NUMBER}" =~ ^[0-9]+$ ]]; then
+            PATCH_NUMBER=0
+          fi
+
+          if [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)-([0-9]{8})$ ]]; then
+            VERSION_BASE="${BASH_REMATCH[1]}"
+            PATCH_NUMBER="${BASH_REMATCH[3]}"
+            BUILD_DATE="${BASH_REMATCH[4]}"
+          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})-([0-9]+)$ ]]; then
+            VERSION_BASE="${BASH_REMATCH[1]}"
+            BUILD_DATE="${BASH_REMATCH[3]}"
+            PATCH_NUMBER="${BASH_REMATCH[4]}"
+          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})$ ]]; then
+            VERSION_BASE="${BASH_REMATCH[1]}"
+            BUILD_DATE="${BASH_REMATCH[3]}"
+          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)$ && "${PATCH_NUMBER}" == "0" ]]; then
+            VERSION_BASE="${BASH_REMATCH[1]}"
+            PATCH_NUMBER="${BASH_REMATCH[3]}"
+          fi
+
+          if [[ "${PATCH_NUMBER}" != "0" ]]; then
+            VERSION_NUM="v${VERSION_BASE}-${PATCH_NUMBER}-${BUILD_DATE}"
+          else
+            VERSION_NUM="v${VERSION_BASE}-${BUILD_DATE}"
+          fi
+
+          echo "version=${VERSION_NUM}" >> "$GITHUB_OUTPUT"
+          echo "Desktop version: ${VERSION_NUM}"
+
   build-linux:
     name: Build Linux (${{ matrix.arch }})
+    needs: prepare-version
     runs-on: ${{ matrix.runner }}
+    env:
+      LEGAL_VERSION: ${{ needs.prepare-version.outputs.version }}
     strategy:
       matrix:
         include:
@@ -58,69 +117,6 @@ jobs:
       options: --user root
 
     steps:
-      - name: Extract version number
-        shell: bash
-        run: |
-          VERSION_REF="${GITHUB_REF##*/}"
-          if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
-            VERSION_REF="${CROSSDESK_DESKTOP_VERSION:-0.0.0}"
-            if [[ ! "${VERSION_REF}" =~ ^v?[0-9]+(\.[0-9]+){1,3}$ ]]; then
-              echo "::error::desktop_version must be a numeric version such as 1.7.2"
-              exit 1
-            fi
-          elif [[ -n "${CROSSDESK_DESKTOP_VERSION}" ]]; then
-            echo "::error::desktop_version is only supported for branch builds; tags determine release versions"
-            exit 1
-          fi
-          VERSION_BASE="${VERSION_REF#v}"
-          PATCH_NUMBER="${{ github.event.inputs.patch }}"
-          BUILD_DATE_OVERRIDE=""
-
-          if [[ ! "${PATCH_NUMBER}" =~ ^[0-9]+$ ]]; then
-            PATCH_NUMBER=0
-          fi
-
-          if [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)-([0-9]{8})$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            PATCH_NUMBER="${BASH_REMATCH[3]}"
-            BUILD_DATE_OVERRIDE="${BASH_REMATCH[4]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})-([0-9]+)$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            BUILD_DATE_OVERRIDE="${BASH_REMATCH[3]}"
-            PATCH_NUMBER="${BASH_REMATCH[4]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            BUILD_DATE_OVERRIDE="${BASH_REMATCH[3]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)$ && "${PATCH_NUMBER}" == "0" ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            PATCH_NUMBER="${BASH_REMATCH[3]}"
-          fi
-
-          echo "VERSION_BASE=${VERSION_BASE}" >> $GITHUB_ENV
-          echo "PATCH_NUMBER=${PATCH_NUMBER}" >> $GITHUB_ENV
-          echo "BUILD_DATE_OVERRIDE=${BUILD_DATE_OVERRIDE}" >> $GITHUB_ENV
-
-      - name: Set legal Debian version
-        shell: bash
-        run: |
-          BUILD_DATE="${BUILD_DATE_OVERRIDE}"
-          if [[ -z "${BUILD_DATE}" ]]; then
-            BUILD_DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
-          fi
-
-          if [[ ! "${VERSION_BASE}" =~ ^[0-9] ]]; then
-            VERSION_BASE="0.0.0-${VERSION_BASE}"
-          fi
-
-          if [[ "${PATCH_NUMBER}" != "0" ]]; then
-            LEGAL_VERSION="v${VERSION_BASE}-${PATCH_NUMBER}-${BUILD_DATE}"
-          else
-            LEGAL_VERSION="v${VERSION_BASE}-${BUILD_DATE}"
-          fi
-
-          echo "LEGAL_VERSION=${LEGAL_VERSION}" >> $GITHUB_ENV
-          echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_ENV
-
       - name: Checkout code
         uses: actions/checkout@v5
         with:
@@ -218,8 +214,10 @@ jobs:
   # macOS
   build-macos:
     name: Build on macOS
+    needs: prepare-version
     runs-on: ${{ matrix.runner }}
     env:
+      VERSION_NUM: ${{ needs.prepare-version.outputs.version }}
       MACOSX_DEPLOYMENT_TARGET: "14.0"
       EXPECTED_MACOS_SDK: "26.5"
     strategy:
@@ -239,56 +237,6 @@ jobs:
             package_script: ./apps/desktop/scripts/macos/pkg_arm64.sh
 
     steps:
-      - name: Extract version number
-        id: version
-        shell: bash
-        run: |
-          VERSION_REF="${GITHUB_REF##*/}"
-          if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
-            VERSION_REF="${CROSSDESK_DESKTOP_VERSION:-0.0.0}"
-            if [[ ! "${VERSION_REF}" =~ ^v?[0-9]+(\.[0-9]+){1,3}$ ]]; then
-              echo "::error::desktop_version must be a numeric version such as 1.7.2"
-              exit 1
-            fi
-          elif [[ -n "${CROSSDESK_DESKTOP_VERSION}" ]]; then
-            echo "::error::desktop_version is only supported for branch builds; tags determine release versions"
-            exit 1
-          fi
-          VERSION_BASE="${VERSION_REF#v}"
-          BUILD_DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
-          PATCH_NUMBER="${{ github.event.inputs.patch }}"
-
-          if [[ ! "${PATCH_NUMBER}" =~ ^[0-9]+$ ]]; then
-            PATCH_NUMBER=0
-          fi
-
-          if [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)-([0-9]{8})$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            PATCH_NUMBER="${BASH_REMATCH[3]}"
-            BUILD_DATE="${BASH_REMATCH[4]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})-([0-9]+)$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            BUILD_DATE="${BASH_REMATCH[3]}"
-            PATCH_NUMBER="${BASH_REMATCH[4]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            BUILD_DATE="${BASH_REMATCH[3]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)$ && "${PATCH_NUMBER}" == "0" ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            PATCH_NUMBER="${BASH_REMATCH[3]}"
-          fi
-
-          if [[ "${PATCH_NUMBER}" != "0" ]]; then
-            VERSION_NUM="v${VERSION_BASE}-${PATCH_NUMBER}-${BUILD_DATE}"
-          else
-            VERSION_NUM="v${VERSION_BASE}-${BUILD_DATE}"
-          fi
-
-          echo "VERSION_NUM=${VERSION_NUM}" >> $GITHUB_ENV
-          echo "VERSION_NUM=${VERSION_NUM}"
-          echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_ENV
-          echo "PATCH_NUMBER=${PATCH_NUMBER}" >> $GITHUB_ENV
-
       - name: Select Xcode 26.6
         shell: bash
         run: |
@@ -380,62 +328,12 @@ jobs:
   # Windows
   build-windows-x64:
     name: Build on Windows x64
+    needs: prepare-version
     runs-on: windows-2022
     env:
+      VERSION_NUM: ${{ needs.prepare-version.outputs.version }}
       XMAKE_GLOBALDIR: D:\xmake_global
     steps:
-      - name: Extract version number
-        shell: pwsh
-        run: |
-          $ref = $env:GITHUB_REF
-          $version = $ref -replace '^refs/(tags|heads)/', ''
-          if ($ref.StartsWith("refs/heads/")) {
-            $version = if ([string]::IsNullOrEmpty($env:CROSSDESK_DESKTOP_VERSION)) {
-              "0.0.0"
-            } else {
-              $env:CROSSDESK_DESKTOP_VERSION
-            }
-            if ($version -notmatch '^v?[0-9]+(\.[0-9]+){1,3}\z') {
-              throw "desktop_version must be a numeric version such as 1.7.2"
-            }
-          } elseif (![string]::IsNullOrEmpty($env:CROSSDESK_DESKTOP_VERSION)) {
-            throw "desktop_version is only supported for branch builds; tags determine release versions"
-          }
-          $version = $version -replace '^v', ''
-          $version = $version -replace '/', '-'
-          $BUILD_DATE = ([System.TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), "China Standard Time")).ToString("yyyyMMdd")
-          $PATCH_NUMBER = "${{ github.event.inputs.patch }}"
-
-          if ($PATCH_NUMBER -notmatch '^[0-9]+$') {
-            $PATCH_NUMBER = "0"
-          }
-
-          if ($version -match '^([0-9]+(\.[0-9]+){1,3})-([0-9]+)-([0-9]{8})$') {
-            $version = $Matches[1]
-            $PATCH_NUMBER = $Matches[3]
-            $BUILD_DATE = $Matches[4]
-          } elseif ($version -match '^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})-([0-9]+)$') {
-            $version = $Matches[1]
-            $BUILD_DATE = $Matches[3]
-            $PATCH_NUMBER = $Matches[4]
-          } elseif ($version -match '^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})$') {
-            $version = $Matches[1]
-            $BUILD_DATE = $Matches[3]
-          } elseif ($version -match '^([0-9]+(\.[0-9]+){1,3})-([0-9]+)$' -and $PATCH_NUMBER -eq "0") {
-            $version = $Matches[1]
-            $PATCH_NUMBER = $Matches[3]
-          }
-
-          if ($PATCH_NUMBER -ne "0") {
-            $VERSION_NUM = "v$version-$PATCH_NUMBER-$BUILD_DATE"
-          } else {
-            $VERSION_NUM = "v$version-$BUILD_DATE"
-          }
-
-          echo "VERSION_NUM=$VERSION_NUM" >> $env:GITHUB_ENV
-          echo "BUILD_DATE=$BUILD_DATE" >> $env:GITHUB_ENV
-          echo "PATCH_NUMBER=$PATCH_NUMBER" >> $env:GITHUB_ENV
-
       - name: Cache xmake dependencies
         uses: actions/cache@v5
         with:
@@ -636,7 +534,7 @@ jobs:
   release:
     name: Publish Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-linux, build-macos, build-ios, build-android, sign-android, build-windows-x64]
+    needs: [prepare-version, build-linux, build-macos, build-ios, build-android, sign-android, build-windows-x64]
     runs-on: ubuntu-latest
     concurrency:
       group: publish-release-metadata
@@ -650,50 +548,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: artifacts
-
-      - name: Extract version number
-        id: version
-        shell: bash
-        run: |
-          VERSION_REF="${GITHUB_REF##*/}"
-          VERSION_BASE="${VERSION_REF#v}"
-          BUILD_DATE=$(TZ=Asia/Shanghai date +%Y%m%d)
-          PATCH_NUMBER="${{ github.event.inputs.patch }}"
-
-          if [[ ! "${PATCH_NUMBER}" =~ ^[0-9]+$ ]]; then
-            PATCH_NUMBER=0
-          fi
-
-          if [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)-([0-9]{8})$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            PATCH_NUMBER="${BASH_REMATCH[3]}"
-            BUILD_DATE="${BASH_REMATCH[4]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})-([0-9]+)$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            BUILD_DATE="${BASH_REMATCH[3]}"
-            PATCH_NUMBER="${BASH_REMATCH[4]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]{8})$ ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            BUILD_DATE="${BASH_REMATCH[3]}"
-          elif [[ "${VERSION_BASE}" =~ ^([0-9]+(\.[0-9]+){1,3})-([0-9]+)$ && "${PATCH_NUMBER}" == "0" ]]; then
-            VERSION_BASE="${BASH_REMATCH[1]}"
-            PATCH_NUMBER="${BASH_REMATCH[3]}"
-          fi
-
-          BUILD_DATE_ISO="${BUILD_DATE:0:4}-${BUILD_DATE:4:2}-${BUILD_DATE:6:2}"
-          if [[ "${PATCH_NUMBER}" != "0" ]]; then
-            VERSION_NUM="${VERSION_BASE}-${PATCH_NUMBER}-${BUILD_DATE}"
-          else
-            VERSION_NUM="${VERSION_BASE}-${BUILD_DATE}"
-          fi
-
-          VERSION_WITH_V="v${VERSION_NUM}"
-          echo "VERSION_NUM=${VERSION_NUM}" >> $GITHUB_OUTPUT
-          echo "VERSION_WITH_V=${VERSION_WITH_V}" >> $GITHUB_OUTPUT
-          echo "VERSION_BASE=${VERSION_BASE}" >> $GITHUB_OUTPUT
-          echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_OUTPUT
-          echo "BUILD_DATE_ISO=${BUILD_DATE_ISO}" >> $GITHUB_OUTPUT
-          echo "PATCH_NUMBER=${PATCH_NUMBER}" >> $GITHUB_OUTPUT
 
       - name: Prepare release notes
         run: |
@@ -724,18 +578,18 @@ jobs:
       - name: Rename artifacts
         run: |
           mkdir -p release
-          cp artifacts/crossdesk-macos-x64-${{ steps.version.outputs.VERSION_WITH_V }}/* release/crossdesk-macos-x64-${{ steps.version.outputs.VERSION_WITH_V }}.pkg
-          cp artifacts/crossdesk-macos-arm64-${{ steps.version.outputs.VERSION_WITH_V }}/* release/crossdesk-macos-arm64-${{ steps.version.outputs.VERSION_WITH_V }}.pkg
+          cp artifacts/crossdesk-macos-x64-${{ needs.prepare-version.outputs.version }}/* release/crossdesk-macos-x64-${{ needs.prepare-version.outputs.version }}.pkg
+          cp artifacts/crossdesk-macos-arm64-${{ needs.prepare-version.outputs.version }}/* release/crossdesk-macos-arm64-${{ needs.prepare-version.outputs.version }}.pkg
           for ARCH in amd64 arm64; do
             for PACKAGE in crossdesk crossdesk-virtual-desktop-xfce; do
-              FILE="${PACKAGE}-linux-${ARCH}-${{ steps.version.outputs.VERSION_WITH_V }}.deb"
-              cp "artifacts/crossdesk-linux-${ARCH}-${{ steps.version.outputs.VERSION_WITH_V }}/${FILE}" "release/${FILE}"
+              FILE="${PACKAGE}-linux-${ARCH}-${{ needs.prepare-version.outputs.version }}.deb"
+              cp "artifacts/crossdesk-linux-${ARCH}-${{ needs.prepare-version.outputs.version }}/${FILE}" "release/${FILE}"
             done
           done
           cp artifacts/crossdesk-ios-arm64-unsigned-${{ needs.build-ios.outputs.version }}/* release/crossdesk-ios-arm64-unsigned-${{ needs.build-ios.outputs.version }}.zip
           cp artifacts/crossdesk-android-arm64-${{ needs.build-android.outputs.version }}/*.apk release/crossdesk-android-arm64-${{ needs.build-android.outputs.version }}.apk
-          cp artifacts/crossdesk-win-x64-${{ steps.version.outputs.VERSION_WITH_V }}/* release/crossdesk-win-x64-${{ steps.version.outputs.VERSION_WITH_V }}.exe
-          cp artifacts/crossdesk-win-x64-portable-${{ steps.version.outputs.VERSION_WITH_V }}/* release/crossdesk-win-x64-portable-${{ steps.version.outputs.VERSION_WITH_V }}.zip
+          cp artifacts/crossdesk-win-x64-${{ needs.prepare-version.outputs.version }}/* release/crossdesk-win-x64-${{ needs.prepare-version.outputs.version }}.exe
+          cp artifacts/crossdesk-win-x64-portable-${{ needs.prepare-version.outputs.version }}/* release/crossdesk-win-x64-portable-${{ needs.prepare-version.outputs.version }}.zip
 
       - name: List release files
         run: ls -lh release/
@@ -743,10 +597,10 @@ jobs:
       - name: Upload to Versioned GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.VERSION_WITH_V }}
+          tag_name: ${{ needs.prepare-version.outputs.version }}
           # The pushed tag already determines the release source commit.
           target_commitish: ${{ github.event.repository.default_branch }}
-          name: Release ${{ steps.version.outputs.VERSION_WITH_V }}
+          name: Release ${{ needs.prepare-version.outputs.version }}
           draft: false
           prerelease: false
           files: release/*
@@ -789,7 +643,7 @@ jobs:
 
       - name: Generate version.json for all platforms
         env:
-          RELEASE_TAG: ${{ steps.version.outputs.VERSION_WITH_V }}
+          RELEASE_TAG: ${{ needs.prepare-version.outputs.version }}
           CROSSDESK_UPDATE_PRIVATE_KEY: ${{ secrets.CROSSDESK_UPDATE_PRIVATE_KEY }}
         run: |
           python3 .github/scripts/update_version_manifest.py \
