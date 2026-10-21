@@ -426,9 +426,8 @@ ConfigCenter::VIDEO_ENCODE_FORMAT ConfigCenter::GetVideoEncodeFormat() const {
 }
 
 bool ConfigCenter::IsHardwareVideoCodecAvailable() {
-#if (((defined(_WIN32) || defined(__linux__)) && !defined(__aarch64__) && \
-      !defined(__arm__) && USE_CUDA) ||                                   \
-     defined(__APPLE__))
+#if defined(_WIN32) || defined(__APPLE__) ||                              \
+    (defined(__linux__) && !defined(__aarch64__) && !defined(__arm__) && USE_CUDA)
   return true;
 #else
   return false;
