@@ -49,6 +49,9 @@ function setup_options_and_dependencies()
     end
 
     add_requireconfs("**.python", {version = "3.12", override = true, configs = {pgo = false}})
+    -- Keep application and build-tool dependencies on the same OpenSSL release.
+    add_requireconfs("**.openssl", "**.openssl3",
+        {version = "3.3.2", system = false, override = true})
     add_requires("spdlog 1.14.1", {system = false})
     add_requires("slint 1.17.1", {configs = {shared = true}})
     add_requires("libsdl3 3.2.26", {configs = {shared = false}})

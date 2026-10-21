@@ -1,1 +1,1 @@
-includes("cpp-httplib", "rust", "slint")
+includes("cpp-httplib", "openssl", "rust", "slint")
