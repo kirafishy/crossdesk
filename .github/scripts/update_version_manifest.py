@@ -152,6 +152,15 @@ def merge_release(current, tag, name, notes, downloads, published_date=None):
         if not tag.startswith("v"):
             raise ValueError(f"Expected a version tag, got {tag!r}")
         metadata = version_info(tag, published_date)
+        # Clients require the full artifact version to match the advertised
+        # desktop version, including its date and patch spelling.
+        for platform, download in downloads.items():
+            if (platform.startswith(("windows-", "macos-", "linux-"))
+                    and download["version"] != metadata["version"]):
+                raise ValueError(
+                    f"Desktop release {tag} expects version {metadata['version']}, "
+                    f"but {platform} artifact {download['filename']} "
+                    f"has version {download['version']}")
         current_order = release_order(current)
         if current_order is not None and release_order(metadata) < current_order:
             current_version = current.get("latest_version") or current.get("version")
