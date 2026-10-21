@@ -1,3 +1,4 @@
+import { AboutPanel, AboutPage, AboutComponent, AboutStrings, AboutNavigationRow, AboutNavigationGroup, AboutRowSeparator } from "about_panel.slint";
 import { UiRadius } from "ui_radius.slint";
 import { WorkbenchStyle, WorkbenchButton, WorkbenchCard, WorkbenchNotice } from "workbench_controls.slint";
 import { GalleryStrings } from "device_strings.slint";
@@ -536,6 +537,20 @@ export component MainWindow inherits Window {
         if !root.self-host-settings-open { root.self-host-settings-error = ""; }
     }
     in-out property <bool> about-open: false;
+    in-out property <AboutPage> about-page: overview;
+    private property <length> about-scroll-y: 0px;
+    in-out property <int> about-component-index: 0;
+    in property <[AboutComponent]> about-components;
+    in property <int> about-openfec-index: -1;
+    in property <string> about-revision;
+    in property <string> about-source-url;
+    in property <string> about-build-url;
+    callback open-about-link(string);
+    function about-back() {
+        if root.about-page == AboutPage.document { root.about-page = AboutPage.component; }
+        else if root.about-page == AboutPage.component && root.about-component-index != 0 { root.about-page = AboutPage.components; }
+        else { root.about-page = AboutPage.overview; }
+    }
     in-out property <bool> sponsorship-open: false;
     // Automatic prompts must not interrupt another dialog or menu.
     private property <bool> sponsorship-unobstructed: !root.gallery-mode
@@ -626,6 +641,15 @@ export component MainWindow inherits Window {
     }
 
     changed about-open => {
+        if root.about-open { root.dialog-focus-pending = true; }
+        else {
+            root.about-page = AboutPage.overview;
+            root.about-component-index = 0;
+            root.about-scroll-y = 0px;
+        }
+    }
+    changed about-page => {
+        // Restore dialog shortcuts after leaving the selectable license text.
         if root.about-open { root.dialog-focus-pending = true; }
     }
 
@@ -855,7 +879,10 @@ export component MainWindow inherits Window {
                     return accept;
                 }
                 if root.about-open && !root.update-open {
-                    if event.text == Key.Escape { root.about-open = false; }
+                    if event.text == Key.Escape {
+                        if root.about-page != AboutPage.overview { root.about-back(); }
+                        else { root.about-open = false; }
+                    }
                     return accept;
                 }
                 if root.sponsorship-open && root.sponsorship-unobstructed {
@@ -2365,17 +2392,36 @@ export component MainWindow inherits Window {
     }
 
     if root.about-open: Rectangle {
+        // Use the same bounds throughout the About navigation stack.
+        private property <length> dialog-width: min(480px, self.width - 40px);
+        private property <length> dialog-height: min(520px, self.height - 32px);
         background: #15223850;
         z: 46;
         TouchArea { clicked => { focus-sink.focus(); } }
-        SettingsDialog {
+        if root.about-page != AboutPage.overview: AboutPanel {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: min(480px, parent.width - 40px);
+            width: parent.dialog-width;
+            min-height: 0px; max-height: parent.height - 32px;
+            height: parent.dialog-height;
+            page <=> root.about-page;
+            component-index <=> root.about-component-index;
+            components: root.about-components;
+            openfec-index: root.about-openfec-index;
+            revision: root.about-revision;
+            source-url: root.about-source-url;
+            build-url: root.about-build-url;
+            back => { root.about-back(); }
+            open-link(url) => { root.open-about-link(url); }
+        }
+        if root.about-page == AboutPage.overview: SettingsDialog {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: parent.dialog-width;
             // The overlay excludes any custom titlebar on every platform.
             min-height: 0px; max-height: parent.height - 32px;
             // Keep the dialog stable as update status and release details change.
-            height: min(488px, parent.height - 32px);
+            height: parent.dialog-height;
             title: UiStrings.about;
             close-label: MessageStrings.close;
             close => { root.about-open = false; }
@@ -2388,6 +2434,8 @@ export component MainWindow inherits Window {
                 height: about-footer.y - self.y - 16px;
                 viewport-width: self.visible-width;
                 viewport-height: about-content.preferred-height;
+                // Keep the position when navigation recreates the overview.
+                viewport-y <=> root.about-scroll-y;
                 horizontal-scrollbar-policy: always-off;
                 vertical-scrollbar-policy: as-needed;
                 about-content := VerticalLayout {
@@ -2465,6 +2513,26 @@ export component MainWindow inherits Window {
                         Text { text: UiStrings.copyright; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
                         Text { text: UiStrings.license; color: WorkbenchStyle.muted; font-size: 11px; wrap: word-wrap; }
                     }
+                    AboutNavigationGroup {
+                        AboutNavigationRow {
+                            grouped: true; icon: FontAwesomeIcons.file-lines;
+                            title: AboutStrings.software-license;
+                            detail: "GPL v3";
+                            clicked => { root.about-component-index = 0; root.about-page = AboutPage.component; }
+                        }
+                        AboutRowSeparator { }
+                        AboutNavigationRow {
+                            grouped: true; icon: FontAwesomeIcons.layer-group;
+                            title: AboutStrings.components;
+                            clicked => { root.about-page = AboutPage.components; }
+                        }
+                        AboutRowSeparator { }
+                        AboutNavigationRow {
+                            grouped: true; icon: FontAwesomeIcons.code;
+                            title: AboutStrings.source;
+                            clicked => { root.about-page = AboutPage.source; }
+                        }
+                    }
                 }
             }
             about-footer := VerticalLayout {
@@ -2472,17 +2540,14 @@ export component MainWindow inherits Window {
                 width: parent.width - 48px; height: self.preferred-height;
                 spacing: 16px;
                 Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                if root.update-status-text != "": Text {
+                    text: root.update-status-text;
+                    color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
+                        : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
+                    font-size: 12px; wrap: word-wrap;
+                }
                 HorizontalLayout {
                     alignment: end; spacing: 8px;
-                    // Status updates use the spare footer space without reflowing the content.
-                    Text {
-                        min-width: 0px; height: 32px; horizontal-stretch: 1;
-                        text: root.update-status-text;
-                        color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
-                            : root.update-check-status == UpdateCheckStatus.up-to-date ? WorkbenchStyle.success : WorkbenchStyle.muted;
-                        font-size: 12px; wrap: word-wrap; overflow: elide;
-                        vertical-alignment: center;
-                    }
                     if root.update-available: WorkbenchButton {
                         width: max(80px, about-update-button-metrics.preferred-width + 24px);
                         height: 32px;

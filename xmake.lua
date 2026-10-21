@@ -15,6 +15,7 @@ if desktop_platform then
     includes(path.join(source_dir, "apps/desktop/xmake/options.lua"))
     includes(path.join(source_dir, "apps/desktop/xmake/platform.lua"))
     includes(path.join(source_dir, "apps/desktop/xmake/rules/slint.lua"))
+    includes(path.join(source_dir, "apps/desktop/xmake/rules/about_resources.lua"))
     includes(path.join(source_dir, "apps/desktop/xmake/targets.lua"))
 
     setup_options_and_dependencies()

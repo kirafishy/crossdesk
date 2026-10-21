@@ -36,6 +36,7 @@
 
 #include "crossdesk_ui.h"
 #include "fa_solid_900.h"
+#include "features/about/about_catalog.h"
 #include "features/file_transfer/transfer_notification_layout.h"
 #include "features/gallery/gallery_fullscreen_transition.h"
 #include "features/gallery/gallery_window_state.h"
@@ -1784,6 +1785,11 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     for (const auto& window : {ui_->main, ui_->wall})
       window->set_update_install_busy(updater_->busy());
 #endif
+  });
+  about::Populate(ui_->Window(gallery_window));
+  main->on_open_about_link([this](slint::SharedString url) {
+    const std::string link(url);
+    if (link.starts_with("https://")) OpenUrl(link);
   });
   main->on_open_website([this] { OpenUrl("https://crossdesk.cn"); });
   main->on_open_afdian_sponsor([this] {
