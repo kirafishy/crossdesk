@@ -56,6 +56,7 @@
 #include <windows.h>
 
 #include "platform/windows/gui/slint_backend.h"
+#include "platform/windows/gui/shutdown_session_guard.h"
 #include "platform/windows/gui/tray/win_tray.h"
 #include "platform/windows/gui/window_icons.h"
 #elif defined(__APPLE__)
@@ -923,6 +924,10 @@ void DragWindow(WindowHandle& component, int phase, float mouse_x,
 }  // namespace
 
 struct GuiApplication::SlintUi {
+#if _WIN32
+  std::unique_ptr<ShutdownSessionGuard> shutdown_guard;
+  std::wstring_view shutdown_reason;
+#endif
   gallery::Workspace gallery;
   std::filesystem::path gallery_path;
   std::vector<std::string> gallery_ids;
@@ -1284,6 +1289,10 @@ void GuiApplication::InitializeUi() {
   slint::set_xdg_app_id("crossdesk");
 #endif
   ui_ = std::make_unique<SlintUi>();
+#if _WIN32
+  ui_->shutdown_guard =
+      std::make_unique<ShutdownSessionGuard>(windows_rdp_handoff_connected_);
+#endif
   ui_->sponsorship_prompt_pending =
       config_center_->GetSponsorshipPromptDismissedVersion() != CROSSDESK_VERSION;
   ui_->video_presenter =
@@ -2258,6 +2267,11 @@ void GuiApplication::Tick() {
     slint::quit_event_loop();
     return;
   }
+#if _WIN32
+  if (ui_->shutdown_guard) {
+    ui_->shutdown_guard->Update(ui_->shutdown_reason);
+  }
+#endif
   PollUpdateCheck();
   HandleSessionCleanup();
   HandlePasswordChangeResult();
@@ -2815,6 +2829,15 @@ void GuiApplication::UpdateLocalization() {
   if (!ui_ || ui_->localized_language == language) {
     return;
   }
+#if _WIN32
+  // All views refer to static literals; selecting the text needs no allocation
+  // and only runs when the language changes. Tick still checks connection state.
+  ui_->shutdown_reason = language == 0
+      ? L"远程控制连接中，保留连接以确认或取消关机。"
+      : language == 2
+          ? L"Удалённый сеанс активен. Соединение сохранено для подтверждения или отмены выключения."
+          : L"Remote session active. Keeping the connection available to confirm or cancel shutdown.";
+#endif
   ui_localization::ApplyMainWindowStrings(ui_->main, language);
   ui_localization::ApplyStreamWindowStrings(ui_->main, language);
   ui_localization::ApplyMainWindowStrings(ui_->wall, language);
@@ -6191,6 +6214,9 @@ void GuiApplication::Cleanup() {
     return;
   }
   ui_->file_dialog_lifetime.reset();
+#if _WIN32
+  ui_->shutdown_guard.reset();
+#endif
 #if defined(__APPLE__)
   CancelNativeFileDialog();
 #endif

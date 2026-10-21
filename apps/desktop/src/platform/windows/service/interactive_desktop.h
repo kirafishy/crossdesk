@@ -1,6 +1,6 @@
 /*
  * @Author: DI JUNKUN
- * @Date: 2026-09-07
+ * @Date: 2026-10-22
  * Copyright (c) 2026 by DI JUNKUN, All Rights Reserved.
  */
 
@@ -17,6 +17,15 @@ namespace crossdesk {
 inline bool IsDesktopTransitionInputError(DWORD error) {
   return error == ERROR_ACCESS_DENIED ||
          error == ERROR_REQUIRES_INTERACTIVE_WINDOWSTATION;
+}
+
+// Only call with an observation from the interactive session, never Session 0.
+// Process presence (including LogonUI) cannot prove that Default is accessible:
+// shutdown blocking UI may be active while WTS still reports an unlocked user.
+inline bool IsSecureInputDesktop(bool available, const std::string& name,
+                                 DWORD error) {
+  if (!available) return error == ERROR_ACCESS_DENIED;
+  return !name.empty() && _stricmp(name.c_str(), "Default") != 0;
 }
 
 inline std::wstring GetDesktopNameW(HDESK desktop) {

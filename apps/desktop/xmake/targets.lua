@@ -20,10 +20,6 @@ function setup_targets()
     end
     table.insert(windows_resource_defines,
         "CROSSDESK_VERSION_NUMERIC=" .. table.concat(version_parts, ","))
-    local windows_helper_resource_defines = table.join(windows_resource_defines)
-    if is_config("CROSSDESK_PORTABLE", true) then
-        table.insert(windows_helper_resource_defines, "CROSSDESK_PORTABLE=1")
-    end
 
     local function copy_slint_runtime(target)
         if not target:is_plat("windows") then
@@ -607,6 +603,7 @@ function setup_targets()
             add_files("apps/desktop/src/platform/windows/gui/tray/win_tray.cpp",
                 "apps/desktop/src/platform/windows/gui/slint_backend.cpp",
                 "apps/desktop/src/platform/windows/gui/window_icons.cpp",
+                "apps/desktop/src/platform/windows/gui/shutdown_session_guard.cpp",
                 "apps/desktop/src/platform/windows/gui/slint_renderer_probe.cpp",
                 "apps/desktop/src/platform/common/gui/opengl_video_renderer.cpp",
                 "apps/desktop/src/platform/common/gui/cuda_driver.cpp",
@@ -681,7 +678,7 @@ function setup_targets()
             add_files("apps/desktop/src/platform/windows/service/session_helper_main.cpp")
             add_files("apps/desktop/src/platform/windows/virtual_display/usbmmidd_virtual_display.cpp")
             add_files("apps/desktop/resources/windows/crossdesk_session_helper.rc",
-                {defines = windows_helper_resource_defines})
+                {defines = windows_resource_defines})
             add_includedirs("apps/desktop/src/common",
                 "apps/desktop/src/platform/windows/service",
                 "apps/desktop/src/platform/windows/screen_capturer",

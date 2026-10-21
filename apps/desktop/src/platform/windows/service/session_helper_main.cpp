@@ -32,6 +32,7 @@
 #include "secure_desktop_frame_pacer.h"
 #include "secure_desktop_nv12_cache.h"
 #include "service_lifetime.h"
+#include "shutdown_order.h"
 #include "shared_capture_lifecycle.h"
 #include "shared_capture_configuration.h"
 #include "usbmmidd_policy.h"
@@ -398,13 +399,8 @@ void UpdateHelperState(HelperState* helper_state) {
   // Process enumeration can straddle an unlock. Observe the input desktop
   // afterwards, and expose the sample's start time for service-side rejection.
   InputDesktopInfo desktop_info = GetInputDesktopInfo();
-  const bool input_desktop_is_winlogon =
-      _stricmp(desktop_info.name.c_str(), "Winlogon") == 0;
-  const bool inaccessible_secure_input_desktop =
-      !desktop_info.available &&
-      desktop_info.error_code == ERROR_ACCESS_DENIED && !logon_ui_visible;
-  const bool secure_desktop_active = input_desktop_is_winlogon ||
-                                     inaccessible_secure_input_desktop;
+  const bool secure_desktop_active = crossdesk::IsSecureInputDesktop(
+      desktop_info.available, desktop_info.name, desktop_info.error_code);
   bool session_locked = false;
   if (!QuerySessionLockState(helper_state->session_id, &session_locked)) {
     session_locked =
@@ -2043,9 +2039,15 @@ void PrintUsage() {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+  const DWORD shutdown_error = crossdesk::ConfigureWindowsShutdownOrder(
+      crossdesk::WindowsShutdownRole::helper);
   EnablePerMonitorDpiAwareness();
 
   InitializeHelperLogger();
+  if (shutdown_error != ERROR_SUCCESS) {
+    LOG_WARN("Could not configure Windows helper shutdown order, error={}",
+             shutdown_error);
+  }
 
   bool run_helper = false;
   bool run_secure_input_helper = false;
@@ -2158,6 +2160,8 @@ int main(int argc, char* argv[]) {
   bool last_consent_ui = false;
   bool last_secure_desktop = false;
   bool last_session_locked = false;
+  bool last_input_desktop_available = false;
+  DWORD last_input_desktop_error = ERROR_SUCCESS;
   std::string last_stage;
   while (true) {
     UpdateHelperState(&helper_state);
@@ -2165,6 +2169,7 @@ int main(int argc, char* argv[]) {
     std::string desktop_name;
     bool session_locked = false;
     bool input_desktop_available = false;
+    DWORD input_desktop_error = ERROR_SUCCESS;
     bool lock_app_visible = false;
     bool logon_ui_running = false;
     bool consent_ui_visible = false;
@@ -2174,6 +2179,7 @@ int main(int argc, char* argv[]) {
       desktop_name = helper_state.input_desktop_name;
       session_locked = helper_state.session_locked;
       input_desktop_available = helper_state.input_desktop_available;
+      input_desktop_error = helper_state.input_desktop_error_code;
       lock_app_visible = helper_state.lock_app_visible;
       logon_ui_running = helper_state.logon_ui_visible;
       consent_ui_visible = helper_state.consent_ui_visible;
@@ -2188,6 +2194,8 @@ int main(int argc, char* argv[]) {
         lock_app_visible, credential_ui_visible, secure_desktop_active);
 
     if (desktop_name != last_desktop_name ||
+        input_desktop_available != last_input_desktop_available ||
+        input_desktop_error != last_input_desktop_error ||
         session_locked != last_session_locked ||
         lock_app_visible != last_lock_app ||
         logon_ui_running != last_logon_ui ||
@@ -2195,11 +2203,15 @@ int main(int argc, char* argv[]) {
         secure_desktop_active != last_secure_desktop || stage != last_stage) {
       LOG_INFO(
           "Session helper state: session_id={}, input_desktop='{}', "
+          "input_desktop_available={}, input_desktop_error={}, "
           "session_locked={}, lock_app_visible={}, logon_ui_running={}, "
           "consent_ui_visible={}, secure_desktop_active={}, stage={}",
-          current_session_id, desktop_name, session_locked, lock_app_visible,
+          current_session_id, desktop_name, input_desktop_available,
+          input_desktop_error, session_locked, lock_app_visible,
           logon_ui_running, consent_ui_visible, secure_desktop_active, stage);
       last_desktop_name = desktop_name;
+      last_input_desktop_available = input_desktop_available;
+      last_input_desktop_error = input_desktop_error;
       last_session_locked = session_locked;
       last_lock_app = lock_app_visible;
       last_logon_ui = logon_ui_running;

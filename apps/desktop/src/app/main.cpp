@@ -20,6 +20,7 @@
 #include "platform/windows/gui/slint_backend.h"
 #include "service_host.h"
 #include "service_lifetime.h"
+#include "shutdown_order.h"
 #include "unattended_config.h"
 #endif
 
@@ -406,6 +407,16 @@ static int RunApplication(
 }
 
 int main(int argc, char* argv[]) {
+#ifdef _WIN32
+  // Apply in every process, including the daemon and --child. Windows does
+  // not inherit shutdown priority from a parent process.
+  const DWORD shutdown_error = crossdesk::ConfigureWindowsShutdownOrder(
+      crossdesk::WindowsShutdownRole::host);
+  if (shutdown_error != ERROR_SUCCESS) {
+    std::cerr << "Could not configure Windows host shutdown order, error="
+              << shutdown_error << '\n';
+  }
+#endif
 #ifdef __linux__
   // Run before GUI, configuration, logging or display initialization.
   if (argc == 2 &&
