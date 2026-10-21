@@ -2515,20 +2515,20 @@ export component MainWindow inherits Window {
                     }
                     AboutNavigationGroup {
                         AboutNavigationRow {
-                            grouped: true; icon: FontAwesomeIcons.file-lines;
+                            grouped: true;
                             title: AboutStrings.software-license;
                             detail: "GPL v3";
                             clicked => { root.about-component-index = 0; root.about-page = AboutPage.component; }
                         }
                         AboutRowSeparator { }
                         AboutNavigationRow {
-                            grouped: true; icon: FontAwesomeIcons.layer-group;
+                            grouped: true;
                             title: AboutStrings.components;
                             clicked => { root.about-page = AboutPage.components; }
                         }
                         AboutRowSeparator { }
                         AboutNavigationRow {
-                            grouped: true; icon: FontAwesomeIcons.code;
+                            grouped: true;
                             title: AboutStrings.source;
                             clicked => { root.about-page = AboutPage.source; }
                         }
