@@ -39,6 +39,7 @@ GuiRuntime::~GuiRuntime() {
 
 void GuiRuntime::SendRemoteInput(const RemoteAction& action) {
   const bool mouse = action.type == ControlType::mouse;
+  const bool mouse_move = mouse && action.m.flag == MouseFlag::move;
   if (!mouse && action.type != ControlType::keyboard &&
       action.type != ControlType::keyboard_state)
     return;
@@ -72,9 +73,15 @@ void GuiRuntime::SendRemoteInput(const RemoteAction& action) {
     }
     // Reuse exactly the leader's mapped coordinates and key metadata. Neither
     // gallery filters nor the follower's preview dimensions affect input.
-    const int result = SendReliableDataFrame(
-        props->peer_, message.data(), message.size(),
-        mouse ? props->mouse_label_.c_str() : props->keyboard_label_.c_str());
+    // Move updates supersede old positions and must not wait for KCP retries.
+    // Use the negotiated unreliable stream; clicks and wheel events remain
+    // on the reliable mouse stream, with their own absolute coordinates.
+    const int result = mouse_move
+        ? SendDataFrame(props->peer_, message.data(), message.size(),
+                        props->data_label_.c_str())
+        : SendReliableDataFrame(
+              props->peer_, message.data(), message.size(),
+              mouse ? props->mouse_label_.c_str() : props->keyboard_label_.c_str());
     if (result != 0)
       LOG_WARN("Send remote input failed, remote_id={}, ret={}", id, result);
   }
