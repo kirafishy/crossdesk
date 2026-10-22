@@ -209,6 +209,16 @@ void PeerEventHandler::OnReceiveDataBuffer(
     return;
   }
 
+  if (remote_action.type == ControlType::video_codec_status) {
+    if (auto props = runtime->FindRemoteSession(remote_id);
+        props && source_id == props->control_data_label_ &&
+        !props->closing_ &&
+        props->connection_status_ == ConnectionStatus::Connected) {
+      props->net_traffic_stats_.StoreRemoteVideoEncoder(remote_action.vcs.encoder);
+    }
+    return;
+  }
+
   if (remote_action.type == ControlType::video_settings_status) {
     if (auto props = runtime->FindRemoteSession(remote_id)) {
       if (source_id != props->control_data_label_) return;
@@ -426,6 +436,12 @@ void PeerEventHandler::OnReceiveDataBuffer(
       {
         std::unique_lock lock(runtime->connection_status_mutex_);
         runtime->connection_host_names_[remote_id] = host_name;
+        if (source_id == runtime->control_data_label_) {
+          if (remote_action.i.supports_video_codec_status)
+            runtime->codec_status_controllers_.insert(remote_id);
+          else
+            runtime->codec_status_controllers_.erase(remote_id);
+        }
       }
       LOG_INFO("Remote hostname: [{}]", host_name);
       if (source_id == runtime->control_data_label_) {

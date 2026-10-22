@@ -15,6 +15,8 @@ export struct GalleryNetworkDevice {
     loss: string,
     resolution: string,
     fps: string,
+    encoder: string,
+    decoder: string,
 }
 
 component NetworkRow inherits Rectangle {
@@ -145,6 +147,26 @@ component NetworkRow inherits Rectangle {
             vertical-alignment: center; overflow: elide;
         }
     }
+    if !root.heading: HorizontalLayout {
+        x: 12px; y: 52px; width: parent.width - 24px; height: 20px;
+        spacing: 12px;
+        Rectangle {
+            width: (parent.width - 12px) / 2;
+            Text {
+                width: parent.width; height: parent.height;
+                text: GalleryStrings.tr("被控端编码器  ", "Remote encoder  ", "Удалённый кодер  ") + root.device.encoder;
+                font-size: 10px; color: #586f87; vertical-alignment: center; overflow: elide;
+            }
+        }
+        Rectangle {
+            width: (parent.width - 12px) / 2;
+            Text {
+                width: parent.width; height: parent.height;
+                text: GalleryStrings.tr("控制端解码器  ", "Local decoder  ", "Локальный декодер  ") + root.device.decoder;
+                font-size: 10px; color: #586f87; vertical-alignment: center; overflow: elide;
+            }
+        }
+    }
 }
 
 component NetworkEmptyState inherits Rectangle {
@@ -163,7 +185,7 @@ component NetworkEmptyState inherits Rectangle {
 
 export component GalleryNetworkDialog inherits Rectangle {
     in property <[GalleryNetworkDevice]> devices;
-    private property <length> row-height: 56px;
+    private property <length> row-height: 78px;
     private property <length> list-height: max(2, min(root.devices.length, 6)) * root.row-height;
     callback close();
     background: #00000042;

@@ -32,6 +32,7 @@ enum ControlType {
   video_settings = 11,
   video_settings_status = 12,
   text_input = 13,
+  video_codec_status = 14,
 };
 
 enum MouseFlag {
@@ -138,6 +139,7 @@ struct HostInfo {
   // Optional capability; absent in legacy desktop and web host information.
   bool supports_privacy_screen;
   bool supports_video_settings;
+  bool supports_video_codec_status;
   bool supports_text_input;
   bool supports_deskhub_preview;
   bool supports_deskhub_resolution;
@@ -179,6 +181,10 @@ struct VideoSettings {
   bool accepted;  // Only meaningful in video_settings_status.
 };
 
+struct VideoCodecStatus {
+  char encoder[128];
+};
+
 inline bool ValidVideoSettings(const VideoSettings& settings) {
   return settings.quality >= 0 && settings.quality <= 2 &&
          (settings.frame_rate == 30 || settings.frame_rate == 60) &&
@@ -202,6 +208,7 @@ struct RemoteAction {
     PrivacyCommand pc;
     PrivacyStatus ps;
     VideoSettings vs;
+    VideoCodecStatus vcs;
   };
 
   // Committed UTF-8 text. Kept outside the POD union for automatic ownership.

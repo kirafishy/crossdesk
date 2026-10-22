@@ -26,6 +26,7 @@ void ResetHostInfo(HostInfo& info) {
   info.bottom = nullptr;
   info.supports_privacy_screen = false;
   info.supports_video_settings = false;
+  info.supports_video_codec_status = false;
   info.supports_text_input = false;
   info.supports_deskhub_preview = false;
   info.supports_deskhub_resolution = false;
@@ -177,6 +178,9 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
            {"render_mode", static_cast<int>(action.cs.render_mode)},
            {"hidden_reason", static_cast<int>(action.cs.hidden_reason)}};
       break;
+    case ControlType::video_codec_status:
+      object["video_codec"] = {{"encoder", action.vcs.encoder}};
+      break;
     case ControlType::video_settings:
     case ControlType::video_settings_status:
       if (!ValidVideoSettings(action.vs)) return {};
@@ -232,6 +236,7 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
           {"displays", displays},
           {"supports_privacy_screen", action.i.supports_privacy_screen},
           {"supports_video_settings", action.i.supports_video_settings},
+          {"supports_video_codec_status", action.i.supports_video_codec_status},
           {"supports_text_input", action.i.supports_text_input},
           {"supports_deskhub_preview", action.i.supports_deskhub_preview},
           {"supports_deskhub_resolution", action.i.supports_deskhub_resolution},
@@ -342,6 +347,15 @@ bool RemoteAction::FromJson(const std::string& json_string,
             std::clamp(output.cs.visual_offset_y, -1.0f, 1.0f);
         break;
       }
+      case ControlType::video_codec_status: {
+        const auto encoder = object.at("video_codec").at("encoder").get<std::string>();
+        if (encoder.size() >= sizeof(output.vcs.encoder) ||
+            std::any_of(encoder.begin(), encoder.end(), [](unsigned char c) {
+              return c < 32 || c > 126;
+            })) return false;
+        std::memcpy(output.vcs.encoder, encoder.c_str(), encoder.size() + 1);
+        break;
+      }
       case ControlType::video_settings:
       case ControlType::video_settings_status: {
         const auto& settings = object.at("video_settings");
@@ -436,6 +450,8 @@ bool RemoteAction::FromJson(const std::string& json_string,
             host_info_object.value("supports_text_input", false);
         output.i.supports_video_settings =
             host_info_object.value("supports_video_settings", false);
+        output.i.supports_video_codec_status =
+            host_info_object.value("supports_video_codec_status", false);
         output.i.supports_deskhub_preview =
             host_info_object.value("supports_deskhub_preview", false);
         output.i.supports_deskhub_resolution =

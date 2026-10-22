@@ -199,6 +199,7 @@ void GuiRuntime::HandleServerControllerDisconnected(
     remote_input_.Disconnect(remote_id);
     devices_.OnControllerConnectionsChanged();
     connection_host_names_.erase(remote_id);
+    codec_status_controllers_.erase(remote_id);
     privacy_sessions_.Disconnected(remote_id);
     for (const auto& [id, status] : connection_status_) {
       if (status != ConnectionStatus::Connected) {

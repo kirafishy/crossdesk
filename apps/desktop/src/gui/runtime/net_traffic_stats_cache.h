@@ -8,6 +8,9 @@
 #define _NET_TRAFFIC_STATS_CACHE_H_
 
 #include <atomic>
+#include <cstring>
+#include <mutex>
+#include <string>
 
 #include "minirtc.h"
 #include "runtime/connection_latency.h"
@@ -15,7 +18,8 @@
 namespace crossdesk::gui_detail {
 
 // Fields are independent observations and may come from different reports.
-// Relaxed accesses keep each field safe without publishing any other state.
+// Relaxed accesses keep scalar fields safe without publishing other state;
+// codec names are copied under their own mutex.
 class NetTrafficStatsCache {
   static_assert(std::atomic<uint32_t>::is_always_lock_free &&
                     std::atomic<float>::is_always_lock_free &&
@@ -26,7 +30,31 @@ class NetTrafficStatsCache {
  public:
   using Clock = std::chrono::steady_clock;
 
+  struct VideoCodecNames {
+    std::string remote_encoder;
+    std::string local_decoder;
+  };
+
+  void StoreRemoteVideoEncoder(const std::string& encoder) {
+    std::lock_guard lock(codec_mutex_);
+    codecs_.remote_encoder = encoder;
+  }
+
+  VideoCodecNames LoadVideoCodecs() const {
+    std::lock_guard lock(codec_mutex_);
+    return codecs_;
+  }
+
   void Store(const MiniRtcNetTrafficStats& stats) {
+    {
+      std::lock_guard lock(codec_mutex_);
+      local_encoder_.assign(
+          stats.video_encoder,
+          strnlen(stats.video_encoder, sizeof(stats.video_encoder)));
+      codecs_.local_decoder.assign(
+          stats.video_decoder,
+          strnlen(stats.video_decoder, sizeof(stats.video_decoder)));
+    }
     video_inbound_stats_.Store(stats.video_inbound_stats);
     video_outbound_stats_.Store(stats.video_outbound_stats);
     audio_inbound_stats_.Store(stats.audio_inbound_stats);
@@ -46,6 +74,11 @@ class NetTrafficStatsCache {
 
   MiniRtcNetTrafficStats Load() const {
     MiniRtcNetTrafficStats stats{};
+    {
+      std::lock_guard lock(codec_mutex_);
+      local_encoder_.copy(stats.video_encoder, sizeof(stats.video_encoder) - 1);
+      codecs_.local_decoder.copy(stats.video_decoder, sizeof(stats.video_decoder) - 1);
+    }
     stats.video_inbound_stats = video_inbound_stats_.Load();
     stats.video_outbound_stats = video_outbound_stats_.Load();
     stats.audio_inbound_stats = audio_inbound_stats_.Load();
@@ -80,6 +113,10 @@ class NetTrafficStatsCache {
 
   void Reset() {
     Store(MiniRtcNetTrafficStats{});
+    {
+      std::lock_guard lock(codec_mutex_);
+      codecs_ = {};
+    }
     ResetLatency();
     last_report_ms_.store(0, std::memory_order_relaxed);
   }
@@ -130,6 +167,9 @@ class NetTrafficStatsCache {
   std::atomic<double> rtt_ms_{-1};
   std::atomic<int64_t> last_report_ms_{0};
   ConnectionLatencyStats connection_latency_;
+  mutable std::mutex codec_mutex_;
+  std::string local_encoder_;
+  VideoCodecNames codecs_;
 };
 
 }  // namespace crossdesk::gui_detail

@@ -64,6 +64,8 @@ export global StreamStrings {
     in-out property <string> stats-video-latency: "Video delay";
     in-out property <string> stats-connection-latency: "Connection RTT";
     in-out property <string> stats-connection-mode: "Mode";
+    in-out property <string> stats-encoder: "Remote encoder";
+    in-out property <string> stats-decoder: "Local decoder";
     in-out property <string> stats-encryption: "Encryption";
     in-out property <string> stats-encryption-enabled: "Enabled";
     in-out property <string> stats-encryption-disabled: "Disabled";
@@ -230,6 +232,8 @@ export component StreamWindow inherits Window {
     in property <string> stats-video-latency: "—";
     in property <string> stats-connection-latency: "—";
     in property <string> stats-connection-mode: "";
+    in property <string> stats-encoder: "—";
+    in property <string> stats-decoder: "—";
     in property <bool> stats-encryption-enabled: false;
     in property <bool> file-transfer-visible: false;
     in property <[FileTransferEntry]> file-transfers;
@@ -269,7 +273,7 @@ export component StreamWindow inherits Window {
     private property <length> stats-row-height: 18px;
     private property <length> stats-header-height: 18px;
     private property <length> stats-content-height:
-        root.stats-header-height + root.stats-rows.length * root.stats-row-height + 65px;
+        root.stats-header-height + root.stats-rows.length * root.stats-row-height + 114px;
     private property <length> file-panel-x: 18px;
     private property <length> file-panel-y: video.height - min(210px, video.height * 0.35);
     private property <length> file-panel-width: min(430px, video.width * 0.6);
@@ -929,18 +933,17 @@ export component StreamWindow inherits Window {
                     private property <length> row-height: root.stats-row-height;
                     private property <length> label-column-width: 50px;
                     private property <length> loss-column-width:
-                        max((self.width - self.label-column-width) / 3,
-                            stats-loss-label.preferred-width + 8px);
+                        max(56px, stats-loss-label.preferred-width + 12px);
                     private property <length> value-column-width:
                         (self.width - self.label-column-width - self.loss-column-width) / 2;
                     private property <length> details-right-width:
                         right-label-width-probe.preferred-width + 6px
                             + max(resolution-width-probe.preferred-width,
                                 connection-latency-width-probe.preferred-width,
-                                encryption-width-probe.preferred-width
+                                encryption-width-probe.preferred-width + 12px
                                     + (root.stats-encryption-enabled ? 14px : 0px));
                     private property <length> details-right-x:
-                        min(self.width / 2, self.width - self.details-right-width - 6px);
+                        min(self.width / 2 + 4px, self.width - self.details-right-width - 8px);
 
                     left-label-width-probe := Text {
                         visible: false;
@@ -970,7 +973,7 @@ export component StreamWindow inherits Window {
                         visible: false;
                         text: root.stats-encryption-enabled
                             ? StreamStrings.stats-encryption-enabled : StreamStrings.stats-encryption-disabled;
-                        font-size: ImGuiFontStyle.body;
+                        font-size: ImGuiFontStyle.small;
                         font-weight: 600;
                     }
 
@@ -979,7 +982,7 @@ export component StreamWindow inherits Window {
                         y: 0px;
                         width: parent.width;
                         height: root.stats-header-height;
-                        background: #f3f5f8;
+                        background: #f5f7fa;
                         border-radius: UiRadius.control;
                         Text {
                             x: stats-table.label-column-width + 4px;
@@ -1016,13 +1019,13 @@ export component StreamWindow inherits Window {
                         y: root.stats-header-height + index * stats-table.row-height;
                         width: parent.width;
                         height: stats-table.row-height;
-                        background: index == root.stats-rows.length - 1 ? #edf3fc : transparent;
+                        background: index == root.stats-rows.length - 1 ? #edf4ff : transparent;
                         border-radius: UiRadius.control;
                         Text {
                             x: 4px;
                             width: stats-table.label-column-width - 8px;
                             text: row.label;
-                            color: #475467;
+                            color: index == root.stats-rows.length - 1 ? #275188 : #667085;
                             font-size: ImGuiFontStyle.body;
                             font-weight: index == root.stats-rows.length - 1 ? 600 : 400;
                             vertical-alignment: center;
@@ -1031,7 +1034,7 @@ export component StreamWindow inherits Window {
                             x: stats-table.label-column-width + 4px;
                             width: stats-table.value-column-width - 8px;
                             text: row.inbound;
-                            color: #253247;
+                            color: index == root.stats-rows.length - 1 ? #275188 : #344054;
                             font-size: ImGuiFontStyle.body;
                             font-weight: index == root.stats-rows.length - 1 ? 600 : 400;
                             horizontal-alignment: right;
@@ -1042,7 +1045,7 @@ export component StreamWindow inherits Window {
                             x: stats-table.label-column-width + stats-table.value-column-width + 4px;
                             width: stats-table.value-column-width - 8px;
                             text: row.outbound;
-                            color: #253247;
+                            color: index == root.stats-rows.length - 1 ? #275188 : #344054;
                             font-size: ImGuiFontStyle.body;
                             font-weight: index == root.stats-rows.length - 1 ? 600 : 400;
                             horizontal-alignment: right;
@@ -1053,7 +1056,7 @@ export component StreamWindow inherits Window {
                             x: stats-table.label-column-width + stats-table.value-column-width * 2 + 4px;
                             width: stats-table.loss-column-width - 8px;
                             text: row.loss-rate;
-                            color: #475467;
+                            color: index == root.stats-rows.length - 1 ? #275188 : #667085;
                             font-size: ImGuiFontStyle.body;
                             font-weight: index == root.stats-rows.length - 1 ? 600 : 400;
                             horizontal-alignment: right;
@@ -1069,6 +1072,46 @@ export component StreamWindow inherits Window {
                         }
                     }
 
+                    codec-label-width-probe := Text {
+                        visible: false;
+                        text: StreamStrings.stats-encoder + "\n" + StreamStrings.stats-decoder;
+                        font-size: ImGuiFontStyle.small;
+                    }
+                    Rectangle {
+                        x: 0px;
+                        y: root.stats-header-height + root.stats-rows.length * stats-table.row-height
+                            + 70px;
+                        width: parent.width; height: 44px;
+                        background: #f7f9fc; border-radius: UiRadius.control;
+                        border-width: 1px; border-color: #e8edf4;
+                        Rectangle {
+                            x: 8px; y: 22px; width: parent.width - 16px; height: 1px;
+                            background: #e8edf4;
+                        }
+                        for codec[index] in [
+                            { label: StreamStrings.stats-encoder, value: root.stats-encoder },
+                            { label: StreamStrings.stats-decoder, value: root.stats-decoder },
+                        ]: Rectangle {
+                            x: 8px; y: 2px + index * 21px;
+                            width: parent.width - 16px; height: 19px;
+                            Text {
+                                x: 0px; y: 0px;
+                                width: codec-label-width-probe.preferred-width;
+                                height: parent.height; text: codec.label;
+                                color: #667085; font-size: ImGuiFontStyle.small;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                x: codec-label-width-probe.preferred-width + 8px; y: 0px;
+                                width: parent.width - self.x; height: parent.height;
+                                text: codec.value; color: #344054;
+                                font-size: ImGuiFontStyle.body; font-weight: 500;
+                                horizontal-alignment: right;
+                                vertical-alignment: center; overflow: elide;
+                            }
+                        }
+                    }
+
                     for metric[index] in [
                         { label: "FPS", value: root.stats-fps },
                         { label: StreamStrings.stats-resolution, value: root.stats-resolution },
@@ -1080,12 +1123,12 @@ export component StreamWindow inherits Window {
                     ]: Rectangle {
                         private property <length> encryption-icon-width:
                             index == 5 && root.stats-encryption-enabled ? 14px : 0px;
-                        x: mod(index, 2) == 1 ? stats-table.details-right-x : 6px;
+                        x: mod(index, 2) == 1 ? stats-table.details-right-x : 8px;
                         y: root.stats-header-height + root.stats-rows.length * stats-table.row-height
-                            + 2px + floor(index / 2) * 21px;
-                        width: mod(index, 2) == 1 ? stats-table.details-right-width
-                            : stats-table.details-right-x - 14px;
-                        height: 21px;
+                            + 4px + floor(index / 2) * 20px;
+                        width: mod(index, 2) == 1 ? stats-table.width - stats-table.details-right-x - 8px
+                            : stats-table.details-right-x - 18px;
+                        height: 20px;
                         metric-label := Text {
                             x: 0px;
                             y: 0px;
@@ -1097,31 +1140,40 @@ export component StreamWindow inherits Window {
                             font-size: ImGuiFontStyle.small;
                             vertical-alignment: center;
                         }
-                        metric-value := Text {
-                            x: metric-label.width + 6px;
-                            y: 0px;
-                            height: parent.height;
-                            width: parent.width - self.x - parent.encryption-icon-width;
-                            text: metric.value;
-                            color: index == 5 && root.stats-encryption-enabled ? #18794e : #253247;
-                            font-size: ImGuiFontStyle.body;
+                        value-width-probe := Text {
+                            visible: false; text: metric.value;
+                            font-size: index >= 4 ? ImGuiFontStyle.small : ImGuiFontStyle.body;
                             font-weight: 600;
-                            horizontal-alignment: left;
-                            vertical-alignment: center;
-                            overflow: elide;
                         }
-                        if index == 5 && root.stats-encryption-enabled: Text {
-                            x: metric-value.x + min(metric-value.preferred-width, metric-value.width) + 4px;
-                            y: metric-value.y + (metric-value.height - self.height) / 2;
-                            width: 10px;
-                            height: 12px;
-                            text: FontAwesomeIcons.shield-halved;
-                            font-family: "Font Awesome 6 Free";
-                            font-weight: 900;
-                            font-size: 10px;
-                            color: #238653;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                        metric-value := Rectangle {
+                            private property <length> badge-padding: index >= 4 ? 6px : 0px;
+                            private property <length> icon-width: parent.encryption-icon-width;
+                            width: index >= 4
+                                ? min(max(0px, parent.width - metric-label.width - 6px),
+                                    value-width-probe.preferred-width + self.badge-padding * 2 + self.icon-width)
+                                : max(0px, parent.width - metric-label.width - 6px);
+                            x: parent.width - self.width; y: 2px; height: 16px;
+                            border-radius: 4px;
+                            background: index == 4 ? #edf3fc : index == 5
+                                ? (root.stats-encryption-enabled ? #eaf6ee : #fff3e3) : transparent;
+                            Text {
+                                x: parent.badge-padding; y: 0px; height: parent.height;
+                                width: max(0px, parent.width - parent.badge-padding * 2 - parent.icon-width);
+                                text: metric.value;
+                                color: index == 4 ? #275188 : index == 5
+                                    ? (root.stats-encryption-enabled ? #18794e : #946015) : #253247;
+                                font-size: index >= 4 ? ImGuiFontStyle.small : ImGuiFontStyle.body;
+                                font-weight: 600; horizontal-alignment: right;
+                                vertical-alignment: center; overflow: elide;
+                            }
+                            if index == 5 && root.stats-encryption-enabled: Text {
+                                x: parent.width - parent.badge-padding - 10px; y: 2px;
+                                width: 10px; height: 12px;
+                                text: FontAwesomeIcons.shield-halved;
+                                font-family: "Font Awesome 6 Free"; font-weight: 900;
+                                font-size: 10px; color: #238653;
+                                horizontal-alignment: center; vertical-alignment: center;
+                            }
                         }
                     }
                 }

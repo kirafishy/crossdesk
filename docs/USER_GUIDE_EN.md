@@ -95,12 +95,14 @@ Switch devices using session tabs. Expand the control bar if it is collapsed, an
 | Speaker | Play / mute remote audio |
 | Folder | Select a file to send and view transfer progress |
 | Video settings | Adjust video quality, capture frame rate, and video preference during the current session |
-| Network statistics | Inspect traffic, packet loss, frame rate, resolution, direct / relay mode, and encryption status |
+| Network statistics | Inspect traffic, packet loss, frame rate, resolution, direct / relay mode, encryption status, the remote encoder, and the local decoder |
 | Privacy screen | Enable or disable the host's privacy screen; hover to see its status and available actions |
 | Fullscreen | Enter / exit fullscreen |
 | Disconnect | End the current remote session |
 
 Desktop clients synchronize text clipboard contents. Configure the receiving directory under **Settings → General → File Save Path**. Closing the main window hides it and keeps the app running; use the system tray or menu-bar exit command to quit completely.
+
+Network statistics in both ordinary sessions and DeskHub show the video codecs actually in use, including software fallback. Names use “Implementation (Format)” with an initial capital and uppercase technical abbreviations, such as `VideoToolbox (H.264)`, `NVENC (H.264)`, `NVDEC (H.264)`, `SVT-AV1 (AV1)`, `Dav1d (AV1)`, and `LibAOM (AV1)`; Media Foundation also includes `HW` (hardware) or `SW` (software). The host must support encoder status reporting; older versions and information not yet available display “—”.
 
 ### Adjust video during a session
 

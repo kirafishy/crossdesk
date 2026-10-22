@@ -18,6 +18,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -206,6 +207,7 @@ struct ConnectionState {
   std::shared_mutex connection_status_mutex_;
   std::unordered_map<std::string, ConnectionStatus> connection_status_;
   std::unordered_map<std::string, std::string> connection_host_names_;
+  std::unordered_set<std::string> codec_status_controllers_;
   // Cursor position is sampled asynchronously after remote mouse input has
   // been injected. Remember the input source so the sampled position is not
   // immediately echoed back to that same controller as stale feedback.

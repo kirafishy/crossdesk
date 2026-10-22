@@ -473,7 +473,7 @@ std::string FormatBitrate(uint32_t bits_per_second) {
   } else if (bits_per_second < 1000000) {
     std::snprintf(text, sizeof(text), "%u kbps", bits_per_second / 1000);
   } else {
-    std::snprintf(text, sizeof(text), "%.1f mbps", bits_per_second / 1000000.0);
+    std::snprintf(text, sizeof(text), "%.1f Mbps", bits_per_second / 1000000.0);
   }
   return text;
 }
@@ -3636,6 +3636,13 @@ void GuiApplication::SyncStreamWindow() {
   (*ui_->stream)->set_selected_display(props->selected_display_);
 
   const auto net = props->net_traffic_stats_.Load();
+  const auto codecs = props->net_traffic_stats_.LoadVideoCodecs();
+  (*ui_->stream)->set_stats_encoder(UiText(
+      status == ConnectionStatus::Connected && !codecs.remote_encoder.empty()
+          ? codecs.remote_encoder : "—"));
+  (*ui_->stream)->set_stats_decoder(UiText(
+      status == ConnectionStatus::Connected && !codecs.local_decoder.empty()
+          ? codecs.local_decoder : "—"));
   (*ui_->stream)->set_stats_encryption_enabled(
       status == ConnectionStatus::Connected && net.srtp_active);
   std::vector<ui::NetworkStatsRow> stats_rows;
@@ -3659,7 +3666,7 @@ void GuiApplication::SyncStreamWindow() {
                    net.total_inbound_stats, net.total_outbound_stats);
   ui::UpdateModelRows(*ui_->stats_model, std::move(stats_rows));
   (*ui_->stream)
-      ->set_stats_resolution(UiText(std::to_string(props->video_width_) + "x" +
+      ->set_stats_resolution(UiText(std::to_string(props->video_width_) + " × " +
                                     std::to_string(props->video_height_)));
   (*ui_->stream)
       ->set_stats_connection_mode(
@@ -5738,6 +5745,9 @@ void GuiApplication::SyncGallery() {
           ? UiText(std::to_string(video.width) + " × " + std::to_string(video.height))
           : UiText("—");
       device.fps = video.fps ? UiText(std::to_string(*video.fps) + " FPS") : UiText("—");
+      const auto codecs = props->net_traffic_stats_.LoadVideoCodecs();
+      device.encoder = UiText(codecs.remote_encoder.empty() ? "—" : codecs.remote_encoder);
+      device.decoder = UiText(codecs.local_decoder.empty() ? "—" : codecs.local_decoder);
       const bool has_report = props->net_traffic_stats_.HasRecentReport(now);
       const auto stats = props->net_traffic_stats_.Load();
       // Use negotiated transport state, never the local encryption preference.

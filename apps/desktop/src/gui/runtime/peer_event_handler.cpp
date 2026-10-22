@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <memory>
@@ -295,6 +296,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               /*supports_privacy_screen=*/!runtime->unattended_host_,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
+          remote_action.i.supports_video_codec_status = true;
           remote_action.i.supports_text_input = runtime->devices_.SupportsTextInput();
           remote_action.i.supports_deskhub_preview = true;
           remote_action.i.supports_deskhub_resolution = true;
@@ -460,6 +462,7 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
               /*supports_privacy_screen=*/!runtime->unattended_host_,
               CROSSDESK_VERSION, kClientPlatform);
           remote_action.i.supports_video_settings = true;
+          remote_action.i.supports_video_codec_status = true;
           remote_action.i.supports_text_input = runtime->devices_.SupportsTextInput();
           remote_action.i.supports_deskhub_preview = true;
           remote_action.i.supports_deskhub_resolution = true;
@@ -577,7 +580,29 @@ void PeerEventHandler::OnNetStatusReport(
 
   std::string remote_id(user_id, user_id_size);
   auto props = runtime->FindRemoteSession(remote_id);
-  if (!props) return;
+  if (!props) {
+    bool report_codecs = false;
+    {
+      std::shared_lock lock(runtime->connection_status_mutex_);
+      const auto status = runtime->connection_status_.find(remote_id);
+      report_codecs = runtime->codec_status_controllers_.count(remote_id) != 0 &&
+          status != runtime->connection_status_.end() &&
+          status->second == ConnectionStatus::Connected;
+    }
+    if (net_traffic_stats && report_codecs) {
+      RemoteAction action{};
+      action.type = ControlType::video_codec_status;
+      std::snprintf(action.vcs.encoder, sizeof(action.vcs.encoder), "%.*s",
+                    static_cast<int>(sizeof(net_traffic_stats->video_encoder)),
+                    net_traffic_stats->video_encoder);
+      const auto message = action.to_json();
+      // Report only to this controller, after releasing the status lock.
+      SendReliableDataFrameToPeer(runtime->peer_, message.data(), message.size(),
+                                  runtime->control_data_label_.c_str(),
+                                  remote_id.data(), remote_id.size());
+    }
+    return;
+  }
   if (props->traversal_mode_ != mode) {
     props->net_traffic_stats_.ResetLatency();
     props->traversal_mode_ = mode;

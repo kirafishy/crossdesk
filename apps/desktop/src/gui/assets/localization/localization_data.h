@@ -372,6 +372,8 @@ struct TranslationRow {
   X(connection_mode_direct, u8"直连", "Direct", u8"Прямой")                    \
   X(connection_mode_relay, u8"中继", "Relay", u8"Релейный")                    \
   X(transport_encryption, u8"加密传输", "Encryption", u8"Шифрование")         \
+  X(remote_video_encoder, u8"被控端编码器", "Remote encoder", u8"Кодер удалённой стороны") \
+  X(local_video_decoder, u8"控制端解码器", "Local decoder", u8"Локальный декодер") \
   X(transport_encryption_enabled, u8"已开启", "Enabled", u8"Включено")         \
   X(transport_encryption_disabled, u8"未开启", "Disabled", u8"Выключено")       \
   X(online, u8"在线", "Online", u8"Онлайн")                                    \
