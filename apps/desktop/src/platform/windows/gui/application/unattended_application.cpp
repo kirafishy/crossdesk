@@ -64,6 +64,7 @@ int GuiApplication::RunUnattended(void* stop_event) {
   }
 
   // Quiesce network callbacks before destroying the controllers they use.
+  remote_input_.Stop();
   CloseAllRemoteSessions();
   WaitForSessionCleanup();
   keyboard_.ReleaseAllRemotePressedKeys("unattended_host_exit");

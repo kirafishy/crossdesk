@@ -16,6 +16,7 @@ namespace {
 struct InputResult {
   UINT sent;
   DWORD error;
+  bool requires_worker = false;
 };
 
 InputResult InjectOnUserDesktop(INPUT* inputs, UINT count) {
@@ -25,7 +26,10 @@ InputResult InjectOnUserDesktop(INPUT* inputs, UINT count) {
   ScopedInteractiveDesktop desktop;
   if (!desktop.Bind(L"")) {
     const DWORD error = GetLastError();
-    return {0, error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE};
+    // A library may have created a window/hook on an opted-in thread. This
+    // failure occurs before SendInput, so retrying on the worker is safe.
+    return {0, error != ERROR_SUCCESS ? error : ERROR_GEN_FAILURE,
+            error == ERROR_BUSY};
   }
   if (!desktop.IsReceivingInput()) {
     return {0, ERROR_REQUIRES_INTERACTIVE_WINDOWSTATION};
@@ -99,8 +103,13 @@ UINT SendInputOnUserDesktop(INPUT* inputs, UINT count) {
     SetLastError(ERROR_INVALID_PARAMETER);
     return 0;
   }
-  static UserDesktopInputWorker worker;
-  const InputResult result = worker.Send(inputs, count);
+  InputResult result{0, ERROR_SUCCESS, true};
+  if (ScopedUserDesktopInputThread::IsCurrent())
+    result = InjectOnUserDesktop(inputs, count);
+  if (result.requires_worker) {
+    static UserDesktopInputWorker worker;
+    result = worker.Send(inputs, count);
+  }
   const DWORD error = result.error;
   if (error != ERROR_SUCCESS) {
     // Include session identity even when Windows reports no useful SendInput

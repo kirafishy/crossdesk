@@ -21,7 +21,6 @@
 #ifdef _WIN32
 #include <nlohmann/json.hpp>
 #include "platform/windows/screen_capturer/screen_capturer_win.h"
-#include "platform/windows/input/mouse/mouse_controller.h"
 #include "service_host.h"
 #endif
 
@@ -333,26 +332,44 @@ int SessionDeviceManager::StopScreenCapturer() {
   return 0;
 }
 
+bool SessionDeviceManager::ReleaseRemoteMouseButtons() {
+  return remote_mouse_buttons_.ReleaseAll(
+      [this](unsigned mask) { return ReleaseMouseButtonMask(mask); });
+}
+
+bool SessionDeviceManager::ReleaseRemoteMouseButtons(const std::string& remote_id,
+                                                     unsigned mask) {
+  return remote_mouse_buttons_.ReleaseController(
+      remote_id, [this](unsigned buttons) { return ReleaseMouseButtonMask(buttons); }, mask);
+}
+
+unsigned SessionDeviceManager::ReleaseMouseButtonMask(unsigned mask) {
+  unsigned released = mask;
+  {
+    std::lock_guard lock(mouse_controller_mutex_);
+    if (mouse_controller_) released &= mouse_controller_->ReleasePressedButtons(mask);
+  }
 #ifdef _WIN32
-void SessionDeviceManager::ReleaseRemoteMouseButtons() {
-  if (auto mouse = dynamic_cast<PlatformMouseController*>(mouse_controller_))
-    mouse->ReleasePressedButtons();
   std::lock_guard lock(service_mouse_mutex_);
   for (int button = 0; button < 3; ++button) {
     const unsigned bit = 1u << button;
-    if (!(service_mouse_buttons_ & bit)) continue;
+    if (!(service_mouse_buttons_ & mask & bit)) continue;
     const auto response = SendCrossDeskSecureDesktopMouseInput(
         service_mouse_x_, service_mouse_y_, 0, (button + 1) * 2, 1000);
     const auto json = nlohmann::json::parse(response, nullptr, false);
     if (json.is_object() && json.value("ok", false)) {
       service_mouse_buttons_ &= ~bit;
     } else {
+      released &= ~bit;
       LOG_WARN("Service mouse button release failed: button={}, response={}",
                button, response);
     }
   }
+#endif
+  return released;
 }
 
+#ifdef _WIN32
 std::string SessionDeviceManager::SendServiceMouseCommand(int x, int y,
                                                          int wheel, int flag) {
   std::lock_guard lock(service_mouse_mutex_);
@@ -398,7 +415,10 @@ bool SessionDeviceManager::SyncDisplayInfo() {
         });
     if (changed) display_info_list_ = displays;
   }
-  if (changed && mouse_controller_) mouse_controller_->UpdateDisplayInfoList(displays);
+  if (changed) {
+    std::lock_guard lock(mouse_controller_mutex_);
+    if (mouse_controller_) mouse_controller_->UpdateDisplayInfoList(displays);
+  }
   return true;
 }
 
@@ -434,6 +454,7 @@ int SessionDeviceManager::StartMouseController() {
 #endif
 
   SyncDisplayInfo();
+  std::lock_guard lock(mouse_controller_mutex_);
   mouse_controller_ =
       static_cast<MouseController *>(device_controller_factory_->Create(
           DeviceControllerFactory::Device::Mouse));
@@ -452,10 +473,16 @@ int SessionDeviceManager::StartMouseController() {
   return init_ret;
 }
 
-int SessionDeviceManager::StopMouseController() {
-#ifdef _WIN32
+int SessionDeviceManager::StopMouseController(bool force) {
+  // Retain the native button state across transient cleanup failures. The UI
+  // can keep pumping while the input worker retries, including with no peers.
+  if (!force && owner_.remote_input_.HasPendingReleases()) return 1;
+  // A disconnect has revoked queued input. Finish its running injection and
+  // release callback before destroying the native controller.
+  owner_.remote_input_.WaitIdle();
+  if (!force && owner_.remote_input_.HasPendingReleases()) return 1;
   ReleaseRemoteMouseButtons();
-#endif
+  std::lock_guard lock(mouse_controller_mutex_);
   if (mouse_controller_) {
     mouse_controller_->Destroy();
     delete mouse_controller_;
@@ -636,9 +663,9 @@ void SessionDeviceManager::UpdateInteractions() {
       owner_.screen_capturer_is_started_ && !owner_.start_mouse_controller_ &&
       owner_.mouse_controller_is_started_;
   if (stop_wayland_mouse_before_screen) {
-    LOG_INFO("Stopping Wayland mouse controller before screen capturer to "
+    if (StopMouseController() != 0) return;
+    LOG_INFO("Stopped Wayland mouse controller before screen capturer to "
              "cleanly release the shared portal session");
-    StopMouseController();
     owner_.mouse_controller_is_started_ = false;
   }
 #endif
@@ -659,8 +686,7 @@ void SessionDeviceManager::UpdateInteractions() {
     }
   } else if (!owner_.start_mouse_controller_ &&
              owner_.mouse_controller_is_started_) {
-    StopMouseController();
-    owner_.mouse_controller_is_started_ = false;
+    if (StopMouseController() == 0) owner_.mouse_controller_is_started_ = false;
   }
 
   if (owner_.screen_capturer_is_started_ && mouse_controller_ && SyncDisplayInfo()) {
@@ -750,6 +776,7 @@ bool SessionDeviceManager::SendKeyboardCommand(int key_code, bool is_down,
 
 bool SessionDeviceManager::SendMouseCommand(const RemoteAction &action,
                                             int selected_display) {
+  std::lock_guard lock(mouse_controller_mutex_);
   if (mouse_controller_) {
     return mouse_controller_->SendMouseCommand(action, selected_display) == 0;
   }
@@ -763,19 +790,20 @@ int SessionDeviceManager::SwitchDisplay(int display_id) {
   return ret;
 }
 
-void SessionDeviceManager::ResetToInitialDisplay() {
+InputOutcome SessionDeviceManager::ResetToInitialDisplay() {
   if (!screen_capturer_) {
-    return;
+    return InputOutcome::ignored;
   }
   const int ret = screen_capturer_->ResetToInitialMonitor();
   if (ret != 0) {
     LOG_WARN("Reset to initial display failed, ret={}", ret);
-    return;
+    return InputOutcome::failed;
   }
   // Capture backends start at display 0. Reset the input mapping as well so
   // the next connection cannot show that display while controlling another.
   owner_.selected_display_ = 0;
   SyncDisplayInfo();
+  return InputOutcome::applied;
 }
 
 std::vector<DisplayInfo> SessionDeviceManager::display_info_list() const {
@@ -796,7 +824,7 @@ std::vector<HostDisplay> SessionDeviceManager::host_display_list() const {
 
 void SessionDeviceManager::DestroyDevices() {
   speaker_capture_.Shutdown();
-  StopMouseController();
+  StopMouseController(true);
   if (screen_capturer_) {
     screen_capturer_->Destroy();
     delete screen_capturer_;

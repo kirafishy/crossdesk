@@ -280,57 +280,28 @@ void PeerEventHandler::OnReceiveDataBuffer(
       runtime->QueuePrivacyCommand(remote_id, remote_action.pc);
     return;
   }
-  if (remote_action.type == ControlType::text_input) {
-    // Share the ordered keyboard stream with delete/return and shortcuts.
-    if (source_id == runtime->keyboard_label_ &&
-        runtime->IsAuthorizedController(remote_id))
-      runtime->keyboard_.ApplyRemoteText(remote_id, remote_action.text);
+  if (RemoteInputDispatcher::Accepts(remote_action)) {
+    if (!runtime->IsAuthorizedController(remote_id)) return;
+    if (remote_action.type == ControlType::text_input &&
+        source_id != runtime->keyboard_label_) return;
+    if (runtime->remote_input_.Push(remote_id, remote_action) ==
+        RemoteInputDispatcher::Result::overflow)
+      LOG_WARN("Remote input queue overflow: peer={}, clearing stale input and "
+               "releasing keys/buttons",
+               remote_id);
     return;
   }
-  const bool operates_host = remote_action.type == ControlType::mouse ||
-      remote_action.type == ControlType::keyboard || remote_action.type == ControlType::keyboard_state ||
-      remote_action.type == ControlType::service_command || remote_action.type == ControlType::display_id ||
-      remote_action.type == ControlType::audio_capture;
-  if (operates_host) {
+  if (remote_action.type == ControlType::audio_capture) {
     if (!runtime->IsAuthorizedController(remote_id)) return;
 #ifdef _WIN32
-    // KeyboardController checks the desktop immediately before each native
-    // key injection, including state reconciliation and cleanup. Avoid a
-    // second synchronous session query for every received keyboard packet.
-    const bool keyboard_input = remote_action.type == ControlType::keyboard ||
-                                remote_action.type == ControlType::keyboard_state;
-    if (!keyboard_input && runtime->privacy_.Engaged() &&
-        !IsWindowsPrivacyDesktopAvailable()) {
+    if (runtime->privacy_.Engaged() && !IsWindowsPrivacyDesktopAvailable())
       runtime->privacy_.SuspendForDesktop();
-    }
 #endif
   }
   if (remote_action.type == ControlType::service_status) {
     if (auto props = runtime->FindRemoteSession(remote_id)) {
       runtime->ApplyRemoteServiceStatus(*props, remote_action.ss);
     }
-    return;
-  }
-
-  if (remote_action.type == ControlType::service_command) {
-    if (runtime->privacy_.Engaged()) {
-      runtime->privacy_.Fail("Security shortcut requested; privacy screen will turn off");
-    }
-#if _WIN32
-    if (remote_action.c.flag == ServiceCommandFlag::send_sas) {
-      runtime->pending_windows_service_sas_.store(true,
-                                                 std::memory_order_relaxed);
-    } else if (remote_action.c.flag == ServiceCommandFlag::lock_workstation) {
-      if (!LockWorkStation()) {
-        LOG_WARN("Remote lock workstation request failed, error={}",
-                 GetLastError());
-      }
-    }
-#elif defined(__OHOS__)
-    if (!SendHarmonySystemShortcut(remote_action.c.flag))
-      LOG_WARN("Harmony system shortcut unsupported or unauthorized, command={}",
-               static_cast<int>(remote_action.c.flag));
-#endif
     return;
   }
 
@@ -464,75 +435,7 @@ void PeerEventHandler::OnReceiveDataBuffer(
       FreeRemoteAction(remote_action);
     }
   } else {
-    // remote
-    if (runtime->is_server_mode_ &&
-        remote_action.type == ControlType::mouse) {
-      std::lock_guard lock(runtime->remote_pointer_input_mutex_);
-      runtime->last_remote_pointer_input_time_[remote_id] =
-          std::chrono::steady_clock::now();
-    }
-#if _WIN32
-    if (runtime->is_server_mode_ && remote_action.type == ControlType::mouse) {
-      static const bool process_elevated = IsAdministratorProcess();
-      std::string response;
-      const bool delivered = DispatchDesktopInput(
-          [&] {
-            return PreferUserDesktopInput(
-                IsCurrentSessionUserDesktopActive(),
-                runtime->windows_consent_ui_.load(),
-                runtime->local_service_available_.load(), process_elevated);
-          },
-          [&] {
-            SetLastError(ERROR_SUCCESS);
-            const bool sent = runtime->devices_.SendMouseCommand(
-                remote_action, runtime->selected_display_);
-            const DWORD error = GetLastError();
-            const bool blocked =
-                error == ERROR_ACCESS_DENIED || error == ERROR_GEN_FAILURE;
-            return DesktopInputResult{
-                sent, IsDesktopTransitionInputError(error) || blocked, blocked};
-          },
-          [&]() -> DesktopInputResult {
-            int absolute_x = 0;
-            int absolute_y = 0;
-            if (!BuildAbsoluteMousePosition(
-                    runtime->devices_.display_info_list(),
-                    runtime->selected_display_, remote_action.m.x,
-                    remote_action.m.y, &absolute_x, &absolute_y)) {
-              LOG_WARN(
-                  "Secure desktop mouse injection skipped, invalid display "
-                  "mapping: display_index={}, x={}, y={}",
-                  runtime->selected_display_, remote_action.m.x,
-                  remote_action.m.y);
-              return {};
-            }
-
-            response = runtime->devices_.SendServiceMouseCommand(
-                absolute_x, absolute_y, remote_action.m.s,
-                static_cast<int>(remote_action.m.flag));
-            auto json = nlohmann::json::parse(response, nullptr, false);
-            const bool sent = json.is_object() && json.value("ok", false);
-            const std::string error =
-                json.is_object() ? json.value("error", "") : "";
-            return {sent, IsDesktopInputSetupPending(error)};
-          });
-      if (!delivered && !response.empty()) {
-        LogSecureDesktopInputBlocked(
-            &runtime->last_local_secure_input_block_log_tick_, "local",
-            runtime->WindowsInputStage().c_str());
-        LOG_WARN(
-            "Secure desktop mouse injection failed, x={}, y={}, wheel={}, "
-            "flag={}, response={}",
-            remote_action.m.x, remote_action.m.y, remote_action.m.s,
-            static_cast<int>(remote_action.m.flag), response);
-      }
-      return;
-    }
-#endif
-    if (remote_action.type == ControlType::mouse) {
-      runtime->devices_.SendMouseCommand(remote_action,
-                                         runtime->selected_display_);
-    } else if (remote_action.type == ControlType::audio_capture) {
+    if (remote_action.type == ControlType::audio_capture) {
       // A negotiated subscription remains authoritative if a legacy capture
       // command arrives after it (e.g. when unmuting an inactive window).
       const auto subscription = runtime->preview_subscriptions_.Get(remote_id);
@@ -544,20 +447,139 @@ void PeerEventHandler::OnReceiveDataBuffer(
       else if (ret != 0)
         // Legacy/web transports without the per-peer API retain their fallback.
         runtime->devices_.StopSpeakerCapturer();
-    } else if (remote_action.type == ControlType::keyboard) {
-      runtime->keyboard_.ApplyRemoteEvent(remote_id, remote_action);
-    } else if (remote_action.type == ControlType::keyboard_state) {
-      runtime->keyboard_.ApplyRemoteState(remote_id, remote_action);
-    } else if (remote_action.type == ControlType::display_id) {
-      const int ret = runtime->devices_.SwitchDisplay(remote_action.d);
-      if (ret == 0) {
-        runtime->selected_display_ = remote_action.d;
-      } else {
-        LOG_WARN("Display switch skipped, invalid display_id={}",
-                 remote_action.d);
-      }
     }
   }
 }
 
-} // namespace crossdesk
+InputOutcome GuiRuntime::ApplyRemoteInput(const std::string& remote_id,
+                                  const RemoteAction& remote_action) {
+  if (!IsAuthorizedController(remote_id)) return InputOutcome::ignored;
+  if (remote_action.type == ControlType::text_input) {
+    return keyboard_.ApplyRemoteText(remote_id, remote_action.text);
+  }
+#ifdef _WIN32
+  const bool keyboard_input = remote_action.type == ControlType::keyboard ||
+                              remote_action.type == ControlType::keyboard_state;
+  if (!keyboard_input && privacy_.Engaged() &&
+      !IsWindowsPrivacyDesktopAvailable())
+    privacy_.SuspendForDesktop();
+#endif
+  if (remote_action.type == ControlType::service_command) {
+    if (privacy_.Engaged()) {
+      privacy_.Fail(
+          "Security shortcut requested; privacy screen will turn off");
+    }
+#if _WIN32
+    if (remote_action.c.flag == ServiceCommandFlag::send_sas) {
+      pending_windows_service_sas_.store(true, std::memory_order_relaxed);
+      return InputOutcome::applied;
+    } else if (remote_action.c.flag == ServiceCommandFlag::lock_workstation) {
+      if (!LockWorkStation()) {
+        LOG_WARN("Remote lock workstation request failed, error={}",
+                 GetLastError());
+        return InputOutcome::failed;
+      }
+      return InputOutcome::applied;
+    }
+#elif defined(__OHOS__)
+    if (!SendHarmonySystemShortcut(remote_action.c.flag)) {
+      LOG_WARN(
+          "Harmony system shortcut unsupported or unauthorized, command={}",
+          static_cast<int>(remote_action.c.flag));
+      return InputOutcome::failed;
+    }
+    return InputOutcome::applied;
+#endif
+    return InputOutcome::ignored;
+  }
+
+  const int display = selected_display_.load();
+  if (is_server_mode_ && remote_action.type == ControlType::mouse) {
+    std::lock_guard lock(remote_pointer_input_mutex_);
+    last_remote_pointer_input_time_[remote_id] =
+        std::chrono::steady_clock::now();
+  }
+
+  if (remote_action.type == ControlType::mouse) {
+    return devices_.ApplyRemoteMouse(remote_id, remote_action.m.flag,
+        [this, &remote_action, display] {
+          return InjectRemoteMouse(remote_action, display);
+        });
+  } else if (remote_action.type == ControlType::keyboard) {
+    return keyboard_.ApplyRemoteEvent(remote_id, remote_action);
+  } else if (remote_action.type == ControlType::keyboard_state) {
+    return keyboard_.ApplyRemoteState(remote_id, remote_action);
+  } else if (remote_action.type == ControlType::display_id) {
+    const int ret = devices_.SwitchDisplay(remote_action.d);
+    if (ret == 0) {
+      selected_display_ = remote_action.d;
+      return InputOutcome::applied;
+    } else {
+      LOG_WARN("Display switch skipped, invalid display_id={}",
+               remote_action.d);
+      return InputOutcome::failed;
+    }
+  }
+  return InputOutcome::ignored;
+}
+
+InputOutcome GuiRuntime::InjectRemoteMouse(const RemoteAction& remote_action,
+                                          int display) {
+#if _WIN32
+  if (is_server_mode_) {
+    static const bool process_elevated = IsAdministratorProcess();
+    std::string response;
+    const bool delivered = DispatchDesktopInput(
+        [&] {
+          return PreferUserDesktopInput(
+              IsCurrentSessionUserDesktopActive(), windows_consent_ui_.load(),
+              local_service_available_.load(), process_elevated);
+        },
+        [&] {
+          SetLastError(ERROR_SUCCESS);
+          const bool sent = devices_.SendMouseCommand(remote_action, display);
+          const DWORD error = GetLastError();
+          const bool blocked =
+              error == ERROR_ACCESS_DENIED || error == ERROR_GEN_FAILURE;
+          return DesktopInputResult{
+              sent, IsDesktopTransitionInputError(error) || blocked, blocked};
+        },
+        [&]() -> DesktopInputResult {
+          int absolute_x = 0;
+          int absolute_y = 0;
+          if (!BuildAbsoluteMousePosition(devices_.display_info_list(), display,
+                                          remote_action.m.x, remote_action.m.y,
+                                          &absolute_x, &absolute_y)) {
+            LOG_WARN(
+                "Secure desktop mouse injection skipped, invalid display "
+                "mapping: display_index={}, x={}, y={}",
+                display, remote_action.m.x, remote_action.m.y);
+            return {};
+          }
+
+          response = devices_.SendServiceMouseCommand(
+              absolute_x, absolute_y, remote_action.m.s,
+              static_cast<int>(remote_action.m.flag));
+          auto json = nlohmann::json::parse(response, nullptr, false);
+          const bool sent = json.is_object() && json.value("ok", false);
+          const std::string error =
+              json.is_object() ? json.value("error", "") : "";
+          return {sent, IsDesktopInputSetupPending(error)};
+        });
+    if (!delivered && !response.empty()) {
+      LogSecureDesktopInputBlocked(&last_local_secure_input_block_log_tick_,
+                                   "local", WindowsInputStage().c_str());
+      LOG_WARN(
+          "Secure desktop mouse injection failed, x={}, y={}, wheel={}, "
+          "flag={}, response={}",
+          remote_action.m.x, remote_action.m.y, remote_action.m.s,
+          static_cast<int>(remote_action.m.flag), response);
+    }
+    return delivered ? InputOutcome::applied : InputOutcome::failed;
+  }
+#endif
+  return devices_.SendMouseCommand(remote_action, display)
+      ? InputOutcome::applied : InputOutcome::failed;
+}
+
+}  // namespace crossdesk

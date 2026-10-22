@@ -190,20 +190,13 @@ void GuiRuntime::HandleServerControllerDisconnected(
     const std::string& remote_id, const char* reason) {
   transfers_.Cancel(peer_events_.get(), remote_id);
   preview_subscriptions_.Remove(remote_id);
-  keyboard_.ReleaseRemotePressedKeys(remote_id, reason);
-#ifdef _WIN32
-  devices_.ReleaseRemoteMouseButtons();
-#endif
-  {
-    std::lock_guard lock(remote_pointer_input_mutex_);
-    last_remote_pointer_input_time_.erase(remote_id);
-  }
 
   bool has_connected_controller = false;
   std::string remaining_controller_id;
   {
     std::unique_lock lock(connection_status_mutex_);
     connection_status_.erase(remote_id);
+    remote_input_.Disconnect(remote_id);
     devices_.OnControllerConnectionsChanged();
     connection_host_names_.erase(remote_id);
     privacy_sessions_.Disconnected(remote_id);
@@ -252,7 +245,6 @@ void GuiRuntime::HandleServerControllerDisconnected(
   start_keyboard_capturer_ = false;
   remote_client_id_.clear();
   audio_capture_ = false;
-  devices_.ResetToInitialDisplay();
 }
 
 int GuiRuntime::RequestSingleDevicePresence(const std::string& remote_id,

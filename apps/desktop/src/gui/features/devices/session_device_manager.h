@@ -14,6 +14,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <remote_action.h>
@@ -21,6 +22,7 @@
 #include "device_controller.h"
 #include "display_info.h"
 #include "features/input/captured_keyboard_queue.h"
+#include "features/input/remote_mouse_buttons.h"
 #include "speaker_capture_controller.h"
 
 struct SDL_AudioStream;
@@ -53,8 +55,15 @@ public:
   int InitializeScreenCapturer();
   int StartScreenCapturer();
   int StopScreenCapturer();
+  bool ReleaseRemoteMouseButtons();
+  bool ReleaseRemoteMouseButtons(const std::string& remote_id,
+                                 unsigned mask = 7);
+  template <typename Send>
+  InputOutcome ApplyRemoteMouse(const std::string& remote_id, MouseFlag flag,
+                                 Send send) {
+    return remote_mouse_buttons_.Apply(remote_id, flag, std::move(send));
+  }
 #ifdef _WIN32
-  void ReleaseRemoteMouseButtons();
   std::string SendServiceMouseCommand(int x, int y, int wheel, int flag);
 #endif
   // Requests are asynchronous; Stop drains/revokes audio delivery before
@@ -62,7 +71,9 @@ public:
   void StartSpeakerCapturer();
   void StopSpeakerCapturer();
   int StartMouseController();
-  int StopMouseController();
+  // Returns 1 while background releases are pending. force is only used
+  // during final destruction after the input dispatcher has been stopped.
+  int StopMouseController(bool force = false);
   int StartKeyboardCapturer();
   int StopKeyboardCapturer();
 
@@ -79,7 +90,7 @@ public:
                            bool extended);
   bool SendMouseCommand(const RemoteAction &action, int selected_display);
   int SwitchDisplay(int display_id);
-  void ResetToInitialDisplay();
+  InputOutcome ResetToInitialDisplay();
 
   // Snapshot of the capture displays. The UI thread refreshes the list every
   // tick while transport threads build host information and map mouse input
@@ -89,6 +100,7 @@ public:
   std::vector<HostDisplay> host_display_list() const;
 
 private:
+  unsigned ReleaseMouseButtonMask(unsigned mask);
   void DrainCapturedKeyboardInput();
   bool ShouldSendCapturedFrame(std::chrono::steady_clock::time_point now,
                                int fps);
@@ -107,6 +119,9 @@ private:
   SpeakerCaptureController speaker_capture_;
   DeviceControllerFactory *device_controller_factory_ = nullptr;
   MouseController *mouse_controller_ = nullptr;
+  RemoteMouseButtons remote_mouse_buttons_;
+  // Input is executed on a worker while the UI starts/stops this controller.
+  std::mutex mouse_controller_mutex_;
   KeyboardCapturer *keyboard_capturer_ = nullptr;
   // Guards display_info_list_ (UI thread writes, transport threads read).
   mutable std::mutex display_info_mutex_;

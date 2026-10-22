@@ -11,9 +11,23 @@
 
 namespace crossdesk {
 
-// Executes on a worker without windows or hooks, attached to this process's
-// current user input desktop. Returns a SendInput count and preserves the
-// worker's failure code in the calling thread's last-error value.
+// Opt in only on the remote input worker. UI/hook callers keep using the
+// fallback worker. Desktop attachment is still checked for each injection.
+class ScopedUserDesktopInputThread {
+ public:
+  ScopedUserDesktopInputThread() { ++depth_; }
+  ~ScopedUserDesktopInputThread() { --depth_; }
+  ScopedUserDesktopInputThread(const ScopedUserDesktopInputThread&) = delete;
+  ScopedUserDesktopInputThread& operator=(const ScopedUserDesktopInputThread&) =
+      delete;
+  static bool IsCurrent() { return depth_ != 0; }
+ private:
+  inline static thread_local unsigned depth_ = 0;
+};
+
+// Executes directly on an opted-in worker, or on the fallback input worker,
+// attached to this process's current user input desktop. Returns a SendInput
+// count and preserves the failure code in the calling thread's last-error value.
 UINT SendInputOnUserDesktop(const INPUT& input);
 
 // Synchronously injects one ordered batch. The caller owns the buffer until

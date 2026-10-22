@@ -6201,6 +6201,7 @@ void GuiApplication::SyncGallery() {
 }
 
 void GuiApplication::Cleanup() {
+  remote_input_.Stop();
 #if _WIN32
   windows_rdp_handoff_allowed_->store(false, std::memory_order_relaxed);
   windows_rdp_handoff_connected_->store(false, std::memory_order_relaxed);

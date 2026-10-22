@@ -17,6 +17,9 @@
 #include "localization.h"
 #include "platform/video_renderer.h"
 #include "rd_log.h"
+#ifdef _WIN32
+#include "platform/windows/input/windows_input_injector.h"
+#endif
 #if defined(__linux__) && !defined(__OHOS__)
 #include "platform/linux/headless/headless_console.h"
 #endif
@@ -25,9 +28,43 @@ namespace crossdesk {
 
 GuiRuntime::GuiRuntime()
     : clipboard_(*this), devices_(*this), transfers_(*this), settings_(*this),
-      keyboard_(*this) {}
+      keyboard_(*this),
+      remote_input_(
+          [this](const std::string& id, const RemoteAction& action) {
+#ifdef _WIN32
+            ScopedUserDesktopInputThread input_thread;
+#endif
+            return ApplyRemoteInput(id, action);
+          },
+          [this](const std::string& id) {
+#ifdef _WIN32
+            ScopedUserDesktopInputThread input_thread;
+#endif
+            const bool keys_released =
+                keyboard_.ReleaseRemotePressedKeys(id, "input_queue_reset");
+            const bool mouse_released = devices_.ReleaseRemoteMouseButtons(id);
+            std::lock_guard lock(remote_pointer_input_mutex_);
+            last_remote_pointer_input_time_.erase(id);
+            return keys_released && mouse_released ? InputOutcome::applied
+                                                   : InputOutcome::failed;
+          },
+          [](const std::string& id, int64_t queued_ms, int64_t execution_ms,
+             InputOutcome outcome) {
+            LOG_WARN("Remote input result: peer={} queue_ms={} execution_ms={} "
+                     "result={}",
+                     id, queued_ms, execution_ms, InputOutcomeName(outcome));
+          },
+          [this] { return devices_.ResetToInitialDisplay(); },
+          [this](const std::string& id, unsigned mask) {
+#ifdef _WIN32
+            ScopedUserDesktopInputThread input_thread;
+#endif
+            return devices_.ReleaseRemoteMouseButtons(id, mask)
+                       ? InputOutcome::applied : InputOutcome::failed;
+          }) {}
 
 GuiRuntime::~GuiRuntime() {
+  remote_input_.Stop();
 #if _WIN32
   windows_rdp_handoff_allowed_->store(false, std::memory_order_relaxed);
   windows_rdp_handoff_connected_->store(false, std::memory_order_relaxed);

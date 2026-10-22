@@ -17,6 +17,7 @@
 #include "features/devices/session_device_manager.h"
 #include "features/file_transfer/file_transfer_manager.h"
 #include "features/input/keyboard_controller.h"
+#include "features/input/remote_input_dispatcher.h"
 #include "features/settings/settings_manager.h"
 #include "privacy_controller.h"
 #include "runtime/gui_state.h"
@@ -90,6 +91,8 @@ class GuiRuntime : protected gui_detail::GuiState {
   // UI thread: send mapped mouse/keyboard input to the current control target,
   // or every connected session while that target leads DeskHub group control.
   void SendRemoteInput(const RemoteAction& action);
+  InputOutcome ApplyRemoteInput(const std::string& remote_id, const RemoteAction& action);
+  InputOutcome InjectRemoteMouse(const RemoteAction& action, int display);
   std::string gallery_group_control_id_;
 
   void ResetRemoteServiceStatus(RemoteSession& props);
@@ -133,6 +136,7 @@ class GuiRuntime : protected gui_detail::GuiState {
   FileTransferManager transfers_;
   SettingsManager settings_;
   KeyboardController keyboard_;
+  RemoteInputDispatcher remote_input_;
   std::shared_ptr<PeerEventHandler> peer_events_;
   std::atomic<bool> video_frame_dirty_{false};
   std::unique_ptr<VideoRenderer> video_renderer_;

@@ -32,7 +32,7 @@ struct InteractionState {
   bool audio_capture_ = false;
   int screen_width_ = 1280;
   int screen_height_ = 720;
-  int selected_display_ = 0;
+  std::atomic<int> selected_display_{0};
   char remote_id_display_[12] = "";
   unsigned char audio_buffer_[720]{};
   int audio_len_ = 0;
@@ -77,7 +77,7 @@ struct UiState {
   bool show_connection_status_window_ = false;
   bool fullscreen_button_pressed_ = false;
   bool is_client_mode_ = false;
-  bool is_server_mode_ = false;
+  std::atomic<bool> is_server_mode_{false};
   bool reload_recent_connections_ = true;
   bool show_offline_warning_window_ = false;
   std::string offline_warning_text_;

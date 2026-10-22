@@ -437,6 +437,8 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
         runtime->ApplyPrivacyAdmission(automatic_enable);
       }
       runtime->connection_status_[remote_id] = status;
+      if (status == ConnectionStatus::Connected)
+        runtime->remote_input_.Connect(remote_id);
 #if _WIN32
       runtime->windows_rdp_handoff_connected_->store(std::any_of(
           runtime->connection_status_.begin(), runtime->connection_status_.end(),
