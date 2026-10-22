@@ -32,6 +32,9 @@ class MouseController : public DeviceController {
   virtual int Destroy() = 0;
   virtual int SendMouseCommand(RemoteAction remote_action,
                                int display_index) = 0;
+  // Bits 0/1/2 are left/right/middle. Return the subset confirmed released,
+  // including buttons already up. Must not require valid display geometry.
+  virtual unsigned ReleasePressedButtons(unsigned mask = 7) = 0;
   virtual void UpdateDisplayInfoList(
       const std::vector<DisplayInfo>&) {}
 };

@@ -67,6 +67,7 @@ void PlatformMouseController::UpdateDisplayInfoList(
 }
 
 int PlatformMouseController::Destroy() {
+  ReleasePressedButtons();
   CleanupWaylandPortal();
 
   if (display_) {
@@ -77,6 +78,28 @@ int PlatformMouseController::Destroy() {
   return 0;
 }
 
+unsigned PlatformMouseController::ReleasePressedButtons(unsigned mask) {
+  mask &= 7;
+  const unsigned pressed = pressed_buttons_ & mask;
+  for (unsigned i = 0; i < 3; ++i) {
+    const unsigned bit = 1u << i;
+    if (!(pressed & bit)) continue;
+    bool released = false;
+    if (use_wayland_portal_) {
+      RemoteAction up{};
+      up.type = ControlType::mouse;
+      up.m.flag = static_cast<MouseFlag>(2 + i * 2);
+      released = SendWaylandMouseCommand(up, 0) == 0;
+    } else if (display_) {
+      const unsigned buttons[] = {1, 3, 2};
+      released = XTestFakeButtonEvent(display_, buttons[i], False, CurrentTime) != 0;
+      XFlush(display_);
+    }
+    if (released) pressed_buttons_ &= ~bit;
+  }
+  return mask & ~pressed_buttons_;
+}
+
 int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
                                       int display_index) {
   if (remote_action.type != ControlType::mouse) {
@@ -84,7 +107,16 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
   }
 
   if (use_wayland_portal_) {
-    return SendWaylandMouseCommand(remote_action, display_index);
+    const int ret = SendWaylandMouseCommand(remote_action, display_index);
+    if (ret == 0) {
+      const int flag = static_cast<int>(remote_action.m.flag);
+      if (flag >= 1 && flag <= 6) {
+        const unsigned bit = 1u << ((flag - 1) / 2);
+        if (flag & 1) pressed_buttons_ |= bit;
+        else pressed_buttons_ &= ~bit;
+      }
+    }
+    return ret;
   }
 
   if (!display_) {
@@ -112,27 +144,27 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
           break;
         }
         case MouseFlag::left_down:
-          XTestFakeButtonEvent(display_, 1, True, CurrentTime);
+          if (!XTestFakeButtonEvent(display_, 1, True, CurrentTime)) return -1;
           XFlush(display_);
           break;
         case MouseFlag::left_up:
-          XTestFakeButtonEvent(display_, 1, False, CurrentTime);
+          if (!XTestFakeButtonEvent(display_, 1, False, CurrentTime)) return -1;
           XFlush(display_);
           break;
         case MouseFlag::right_down:
-          XTestFakeButtonEvent(display_, 3, True, CurrentTime);
+          if (!XTestFakeButtonEvent(display_, 3, True, CurrentTime)) return -1;
           XFlush(display_);
           break;
         case MouseFlag::right_up:
-          XTestFakeButtonEvent(display_, 3, False, CurrentTime);
+          if (!XTestFakeButtonEvent(display_, 3, False, CurrentTime)) return -1;
           XFlush(display_);
           break;
         case MouseFlag::middle_down:
-          XTestFakeButtonEvent(display_, 2, True, CurrentTime);
+          if (!XTestFakeButtonEvent(display_, 2, True, CurrentTime)) return -1;
           XFlush(display_);
           break;
         case MouseFlag::middle_up:
-          XTestFakeButtonEvent(display_, 2, False, CurrentTime);
+          if (!XTestFakeButtonEvent(display_, 2, False, CurrentTime)) return -1;
           XFlush(display_);
           break;
         case MouseFlag::wheel_vertical: {
@@ -157,6 +189,12 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
       break;
   }
 
+  const int flag = static_cast<int>(remote_action.m.flag);
+  if (flag >= 1 && flag <= 6) {
+    const unsigned bit = 1u << ((flag - 1) / 2);
+    if (flag & 1) pressed_buttons_ |= bit;
+    else pressed_buttons_ &= ~bit;
+  }
   return 0;
 }
 

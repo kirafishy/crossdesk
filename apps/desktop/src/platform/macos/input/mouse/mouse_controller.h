@@ -26,6 +26,7 @@ class PlatformMouseController final : public MouseController {
   virtual int Init(std::vector<DisplayInfo> display_info_list);
   virtual int Destroy();
   virtual int SendMouseCommand(RemoteAction remote_action, int display_index);
+  unsigned ReleasePressedButtons(unsigned mask = 7) override;
   void UpdateDisplayInfoList(
       const std::vector<DisplayInfo>& display_info_list);
 
@@ -45,6 +46,7 @@ class PlatformMouseController final : public MouseController {
   std::vector<DisplayInfo> display_info_list_;
   bool left_dragging_ = false;
   bool right_dragging_ = false;
+  unsigned pressed_buttons_ = 0;
   ClickTracker left_click_tracker_;
   ClickTracker right_click_tracker_;
   ClickTracker middle_click_tracker_;

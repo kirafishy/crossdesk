@@ -29,7 +29,7 @@ class PlatformMouseController final : public MouseController {
   virtual int SendMouseCommand(RemoteAction remote_action, int display_index);
   void UpdateDisplayInfoList(
       const std::vector<DisplayInfo>& display_info_list) override;
-  int ReleasePressedButtons();
+  unsigned ReleasePressedButtons(unsigned mask = 7) override;
 
  private:
   std::vector<DisplayInfo> display_info_list_;

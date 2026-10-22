@@ -16,6 +16,7 @@ class Input {
   bool Configure(int width, int height, int display);
   bool Apply(const RemoteAction& action);
   bool Release();
+  unsigned ReleaseMouseButtons(unsigned mask);
   bool LockWorkstation();
  private:
   bool Key(const KeyboardKey& key, bool down);

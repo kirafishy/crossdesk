@@ -244,6 +244,10 @@ class HarmonyMouse final : public MouseController {
     return true;
   }
  public:
+  unsigned ReleasePressedButtons(unsigned mask = 7) override {
+    std::lock_guard lock(input_mutex);
+    return input.ReleaseMouseButtons(mask);
+  }
   int Init(std::vector<DisplayInfo> displays) override {
     if (displays.empty()) return -1;
     std::lock_guard lock(input_mutex);

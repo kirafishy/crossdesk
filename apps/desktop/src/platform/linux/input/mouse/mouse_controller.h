@@ -32,6 +32,7 @@ class PlatformMouseController final : public MouseController {
   virtual int Init(std::vector<DisplayInfo> display_info_list);
   virtual int Destroy();
   virtual int SendMouseCommand(RemoteAction remote_action, int display_index);
+  unsigned ReleasePressedButtons(unsigned mask = 7) override;
   void UpdateDisplayInfoList(const std::vector<DisplayInfo>& display_info_list);
 
  private:
@@ -58,6 +59,7 @@ class PlatformMouseController final : public MouseController {
   int screen_width_ = 0;
   int screen_height_ = 0;
   bool use_wayland_portal_ = false;
+  unsigned pressed_buttons_ = 0;
 
   DBusConnection* dbus_connection_ = nullptr;
   std::string wayland_session_handle_;

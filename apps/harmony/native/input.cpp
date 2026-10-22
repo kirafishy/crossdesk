@@ -111,11 +111,16 @@ bool Input::Apply(const RemoteAction& action) {
 bool Input::Release() {
   for (const auto& change : ReconcileKeyboardState(keys_, {}))
     Key({change.key_code, change.scan_code, change.extended}, false);
-  for (int button = 0; button < 3; ++button)
-    if (buttons_ & (1u << button)) Pointer(2 + button * 2, x_, y_, 0);
+  ReleaseMouseButtons(7);
   // Failed releases remain pending so a later cleanup can retry them.
   have_key_sequence_ = false;
   return keys_.empty() && buttons_ == 0;
+}
+unsigned Input::ReleaseMouseButtons(unsigned mask) {
+  mask &= 7;
+  for (int button = 0; button < 3; ++button)
+    if (buttons_ & mask & (1u << button)) Pointer(2 + button * 2, x_, y_, 0);
+  return mask & ~buttons_;
 }
 bool Input::LockWorkstation() {
   // The public Harmony shortcut is Meta+L. Never carry a prior remote drag or

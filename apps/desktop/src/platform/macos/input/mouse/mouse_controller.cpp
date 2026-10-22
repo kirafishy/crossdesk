@@ -46,7 +46,37 @@ int PlatformMouseController::Init(std::vector<DisplayInfo> display_info_list) {
   return 0;
 }
 
-int PlatformMouseController::Destroy() { return 0; }
+int PlatformMouseController::Destroy() {
+  return ReleasePressedButtons() == 7 ? 0 : -1;
+}
+
+unsigned PlatformMouseController::ReleasePressedButtons(unsigned mask) {
+  mask &= 7;
+  const unsigned pressed = pressed_buttons_ & mask;
+  if (!pressed) return mask;
+  const auto cursor = CGEventCreate(nullptr);
+  if (!cursor) return mask & ~pressed;
+  const auto point = CGEventGetLocation(cursor);
+  CFRelease(cursor);
+  const CGEventType types[] = {kCGEventLeftMouseUp, kCGEventRightMouseUp,
+                               kCGEventOtherMouseUp};
+  const CGMouseButton buttons[] = {kCGMouseButtonLeft, kCGMouseButtonRight,
+                                   kCGMouseButtonCenter};
+  for (unsigned i = 0; i < 3; ++i) {
+    const unsigned bit = 1u << i;
+    if (!(pressed & bit)) continue;
+    const auto event = CGEventCreateMouseEvent(nullptr, types[i], point, buttons[i]);
+    if (!event) continue;
+    CGEventSetIntegerValueField(event, kCGEventSourceUserData, kCrossDeskInjectedEvent);
+    CGEventPost(kCGHIDEventTap, event);
+    CFRelease(event);
+    pressed_buttons_ &= ~bit;
+    if (i == 0) { left_dragging_ = false; left_click_tracker_ = {}; }
+    if (i == 1) { right_dragging_ = false; right_click_tracker_ = {}; }
+    if (i == 2) middle_click_tracker_ = {};
+  }
+  return mask & ~pressed_buttons_;
+}
 
 void PlatformMouseController::UpdateDisplayInfoList(
     const std::vector<DisplayInfo>& display_info_list) {
@@ -135,7 +165,6 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
   switch (remote_action.m.flag) {
     case MouseFlag::left_down:
       mouse_type = kCGEventLeftMouseDown;
-      left_dragging_ = true;
       click_state = BeginClick(left_click_tracker_, tracked_mouse_pos_x,
                                tracked_mouse_pos_y);
       mouse_event = CGEventCreateMouseEvent(NULL, mouse_type, mouse_point,
@@ -144,7 +173,6 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
       break;
     case MouseFlag::left_up:
       mouse_type = kCGEventLeftMouseUp;
-      left_dragging_ = false;
       click_state = EndClick(left_click_tracker_, tracked_mouse_pos_x,
                              tracked_mouse_pos_y);
       mouse_event = CGEventCreateMouseEvent(NULL, mouse_type, mouse_point,
@@ -153,7 +181,6 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
       break;
     case MouseFlag::right_down:
       mouse_type = kCGEventRightMouseDown;
-      right_dragging_ = true;
       click_state = BeginClick(right_click_tracker_, tracked_mouse_pos_x,
                                tracked_mouse_pos_y);
       mouse_event = CGEventCreateMouseEvent(NULL, mouse_type, mouse_point,
@@ -162,7 +189,6 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
       break;
     case MouseFlag::right_up:
       mouse_type = kCGEventRightMouseUp;
-      right_dragging_ = false;
       click_state = EndClick(right_click_tracker_, tracked_mouse_pos_x,
                              tracked_mouse_pos_y);
       mouse_event = CGEventCreateMouseEvent(NULL, mouse_type, mouse_point,
@@ -215,6 +241,16 @@ int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
                                 kCrossDeskInjectedEvent);
     CGEventPost(kCGHIDEventTap, mouse_event);
     CFRelease(mouse_event);
+    const int flag = static_cast<int>(remote_action.m.flag);
+    if (flag >= 1 && flag <= 6) {
+      const unsigned bit = 1u << ((flag - 1) / 2);
+      if (flag & 1) pressed_buttons_ |= bit;
+      else pressed_buttons_ &= ~bit;
+      left_dragging_ = (pressed_buttons_ & 1) != 0;
+      right_dragging_ = (pressed_buttons_ & 2) != 0;
+    }
+  } else {
+    return -1;
   }
 
   return 0;

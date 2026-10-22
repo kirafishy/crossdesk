@@ -40,11 +40,14 @@ void PlatformMouseController::UpdateDisplayInfoList(
            display_info_list_.size());
 }
 
-int PlatformMouseController::Destroy() { return ReleasePressedButtons(); }
+int PlatformMouseController::Destroy() {
+  return ReleasePressedButtons() == 7 ? 0 : -1;
+}
 
-int PlatformMouseController::ReleasePressedButtons() {
-  const unsigned pressed = pressed_buttons_.load();
-  if (!pressed) return 0;
+unsigned PlatformMouseController::ReleasePressedButtons(unsigned mask) {
+  mask &= 7;
+  const unsigned pressed = pressed_buttons_.load() & mask;
+  if (!pressed) return mask;
   INPUT input{};
   input.type = INPUT_MOUSE;
   input.mi.dwExtraInfo = kInjectedMouseInputMarker;
@@ -53,10 +56,10 @@ int PlatformMouseController::ReleasePressedButtons() {
   if (pressed & 4) input.mi.dwFlags |= MOUSEEVENTF_MIDDLEUP;
   if (SendInputOnUserDesktop(input) != 1) {
     LOG_WARN("Release remote mouse buttons failed, error={}", GetLastError());
-    return -1;
+    return mask & ~pressed;
   }
   pressed_buttons_.fetch_and(~pressed);
-  return 0;
+  return mask;
 }
 
 int PlatformMouseController::SendMouseCommand(RemoteAction remote_action,
