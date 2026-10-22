@@ -466,6 +466,10 @@ std::string ConnectionStatusText(ConnectionStatus status, int language) {
   }
 }
 
+std::string FormatResolution(int width, int height) {
+  return std::to_string(width) + " × " + std::to_string(height);
+}
+
 std::string FormatBitrate(uint32_t bits_per_second) {
   char text[48];
   if (bits_per_second < 1000) {
@@ -3666,8 +3670,8 @@ void GuiApplication::SyncStreamWindow() {
                    net.total_inbound_stats, net.total_outbound_stats);
   ui::UpdateModelRows(*ui_->stats_model, std::move(stats_rows));
   (*ui_->stream)
-      ->set_stats_resolution(UiText(std::to_string(props->video_width_) + " × " +
-                                    std::to_string(props->video_height_)));
+      ->set_stats_resolution(UiText(FormatResolution(props->video_width_,
+                                                     props->video_height_)));
   (*ui_->stream)
       ->set_stats_connection_mode(
           UiText(props->traversal_mode_ == TraversalMode::P2P
@@ -3755,8 +3759,7 @@ void GuiApplication::SyncStreamVideoFrame() {
   const auto result = ui_->video_presenter->Present(frame);
   if (result.width > 0 && result.height > 0) {
     (*ui_->stream)
-        ->set_stats_resolution(UiText(std::to_string(result.width) + "x" +
-                                      std::to_string(result.height)));
+        ->set_stats_resolution(UiText(FormatResolution(result.width, result.height)));
   }
   if (result.new_frame) {
     ++props->frame_count_;
@@ -5742,7 +5745,7 @@ void GuiApplication::SyncGallery() {
       }
       const auto video = props->received_video_stats_.Get(now);
       device.resolution = video.width > 0 && video.height > 0
-          ? UiText(std::to_string(video.width) + " × " + std::to_string(video.height))
+          ? UiText(FormatResolution(video.width, video.height))
           : UiText("—");
       device.fps = video.fps ? UiText(std::to_string(*video.fps) + " FPS") : UiText("—");
       const auto codecs = props->net_traffic_stats_.LoadVideoCodecs();
