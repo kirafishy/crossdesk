@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -249,14 +250,14 @@ bool KeyboardController::InjectRemoteKey(int key_code, bool is_down,
                                              extended);
 }
 
-void KeyboardController::ApplyRemoteEvent(const std::string& remote_id,
+InputOutcome KeyboardController::ApplyRemoteEvent(const std::string& remote_id,
                                           const RemoteAction& action) {
   std::lock_guard input_lock(remote_input_mutex_);
   const int key_code = static_cast<int>(action.k.key_value);
   const bool is_down = action.k.flag == KeyFlag::key_down;
   const bool injected =
       InjectRemoteKey(key_code, is_down, action.k.scan_code, action.k.extended);
-  if (injected) pending_key_releases_.erase(key_code);
+  if (injected) pending_key_releases_.Supersede(key_code);
 
   auto& state = remote_states_[remote_id];
   state.last_seen_tick = static_cast<uint32_t>(SDL_GetTicks());
@@ -266,24 +267,28 @@ void KeyboardController::ApplyRemoteEvent(const std::string& remote_id,
   } else if (!is_down && injected) {
     state.pressed_keys.erase(key_code);
   }
+  return injected ? InputOutcome::applied : InputOutcome::failed;
 }
 
-void KeyboardController::ApplyRemoteText(const std::string& remote_id,
+InputOutcome KeyboardController::ApplyRemoteText(const std::string& remote_id,
                                          const std::string& text) {
   std::lock_guard input_lock(remote_input_mutex_);
-  if (!owner_.IsAuthorizedController(remote_id) ||
-      !owner_.devices_.SupportsTextInput()) return;
-  if (!owner_.devices_.SendTextCommand(text))
+  if (!owner_.IsAuthorizedController(remote_id)) return InputOutcome::ignored;
+  if (!owner_.devices_.SupportsTextInput()) return InputOutcome::failed;
+  if (!owner_.devices_.SendTextCommand(text)) {
     LOG_WARN("Failed to inject committed remote text");
+    return InputOutcome::failed;
+  }
+  return InputOutcome::applied;
 }
 
-void KeyboardController::ApplyRemoteState(const std::string& remote_id,
+InputOutcome KeyboardController::ApplyRemoteState(const std::string& remote_id,
                                           const RemoteAction& action) {
   std::lock_guard input_lock(remote_input_mutex_);
   auto& state = remote_states_[remote_id];
   if (action.ks.seq != 0 && state.last_seq != 0 &&
       static_cast<int32_t>(action.ks.seq - state.last_seq) <= 0) {
-    return;
+    return InputOutcome::ignored;
   }
 
   state.last_seq = action.ks.seq;
@@ -300,56 +305,60 @@ void KeyboardController::ApplyRemoteState(const std::string& remote_id,
   }
   const auto changes = ReconcileKeyboardState(state.pressed_keys, desired_keys);
   bool can_press = true;
+  bool applied = true;
   for (const auto& key : changes) {
     if (key.is_down && !can_press) continue;
     if (!InjectRemoteKey(key.key_code, key.is_down, key.scan_code, key.extended)) {
       // Do not replay a shortcut with a stale/missing modifier. The next
       // heartbeat will retry from the state that was actually injected.
       can_press = false;
+      applied = false;
       continue;
     }
-    pending_key_releases_.erase(key.key_code);
+    pending_key_releases_.Supersede(key.key_code);
     if (key.is_down)
       state.pressed_keys[key.key_code] =
           {key.key_code, key.scan_code, key.extended};
     else
       state.pressed_keys.erase(key.key_code);
   }
+  return applied ? InputOutcome::applied : InputOutcome::failed;
 }
 
-void KeyboardController::ReleaseRemotePressedKeys(const std::string& remote_id,
+bool KeyboardController::ReleaseRemotePressedKeys(const std::string& remote_id,
                                                   const char* reason) {
   std::lock_guard input_lock(remote_input_mutex_);
-  ReleaseRemotePressedKeysLocked(remote_id, reason);
+  return ReleaseRemotePressedKeysLocked(remote_id, reason);
 }
 
-void KeyboardController::ReleaseRemotePressedKeysLocked(
+bool KeyboardController::ReleaseRemotePressedKeysLocked(
     std::string remote_id, const char* reason) {
   const auto state_it = remote_states_.find(remote_id);
-  if (state_it == remote_states_.end()) return;
-  auto keys_to_release = std::move(state_it->second.pressed_keys);
-  remote_states_.erase(state_it);
-
-  if (!keys_to_release.empty()) {
-    LOG_WARN("Releasing {} remote keyboard keys for remote_id={}, reason={}",
-             keys_to_release.size(), remote_id, reason ? reason : "unknown");
-  }
-  for (const auto& [code, key] : keys_to_release) {
-    if (!InjectRemoteKey(key.key_code, false, key.scan_code, key.extended)) {
-      pending_key_releases_[code] = key;
-    } else {
-      pending_key_releases_.erase(code);
+  if (state_it != remote_states_.end()) {
+    const auto& keys = state_it->second.pressed_keys;
+    if (!keys.empty()) {
+      LOG_WARN("Releasing {} remote keyboard keys for remote_id={}, reason={}",
+               keys.size(), remote_id, reason ? reason : "unknown");
     }
+    // Stage before erasing: subsequent dispatcher retries must still see the
+    // keys if injection fails, even though active/heartbeat state is gone.
+    pending_key_releases_.Queue(remote_id, keys);
+    remote_states_.erase(state_it);
   }
+  return pending_key_releases_.ReleaseController(
+      remote_id, [this](const KeyboardKey& key) {
+        return InjectRemoteKey(key.key_code, false, key.scan_code, key.extended);
+      });
 }
 
 void KeyboardController::ReleaseAllRemotePressedKeys(const char* reason) {
-  {
-    std::lock_guard input_lock(remote_input_mutex_);
-    while (!remote_states_.empty())
-      ReleaseRemotePressedKeysLocked(remote_states_.begin()->first, reason);
-  }
-  CheckRemoteTimeouts();
+  std::lock_guard input_lock(remote_input_mutex_);
+  auto ids = pending_key_releases_.ControllerIds();
+  for (const auto& [id, _] : remote_states_) ids.push_back(id);
+  std::sort(ids.begin(), ids.end());
+  ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+  // A failure remains pending; shutdown must never spin until it succeeds.
+  for (const auto& id : ids) ReleaseRemotePressedKeysLocked(id, reason);
 }
 
 void KeyboardController::CheckRemoteTimeouts() {
@@ -359,7 +368,7 @@ void KeyboardController::CheckRemoteTimeouts() {
   const uint32_t now = static_cast<uint32_t>(SDL_GetTicks());
   // Retain failed releases in ordinary mode as well as privacy mode. Retry
   // only on the ordinary desktop, never through the security UI helper.
-  if (!pending_key_releases_.empty() &&
+  if (!pending_key_releases_.Empty() &&
       (last_release_retry_tick_ == 0 ||
        now - last_release_retry_tick_ >= kReleaseRetryIntervalMs)
 #ifdef _WIN32
@@ -367,15 +376,10 @@ void KeyboardController::CheckRemoteTimeouts() {
 #endif
   ) {
     last_release_retry_tick_ = now;
-    for (auto it = pending_key_releases_.begin();
-         it != pending_key_releases_.end();) {
-      const auto& key = it->second;
-      if (owner_.devices_.SendKeyboardCommand(
-              key.key_code, false, key.scan_code, key.extended))
-        it = pending_key_releases_.erase(it);
-      else
-        ++it;
-    }
+    pending_key_releases_.RetryAll([this](const KeyboardKey& key) {
+      return owner_.devices_.SendKeyboardCommand(
+          key.key_code, false, key.scan_code, key.extended);
+    });
   }
 
   // Keep the timeout decision and release under the same lock, so a fresh

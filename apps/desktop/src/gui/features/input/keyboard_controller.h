@@ -9,6 +9,8 @@
 #include <remote_action.h>
 
 #include "keyboard_state.h"
+#include "input_outcome.h"
+#include "pending_key_releases.h"
 
 namespace crossdesk {
 
@@ -25,12 +27,12 @@ public:
   void ForceReleasePressedKeys();
   void RecoverCapturedState(const PressedKeys& pressed);
   void SendHeartbeat(bool force);
-  void ApplyRemoteEvent(const std::string &remote_id,
+  InputOutcome ApplyRemoteEvent(const std::string &remote_id,
                         const RemoteAction &remote_action);
-  void ApplyRemoteText(const std::string& remote_id, const std::string& text);
-  void ApplyRemoteState(const std::string &remote_id,
+  InputOutcome ApplyRemoteText(const std::string& remote_id, const std::string& text);
+  InputOutcome ApplyRemoteState(const std::string &remote_id,
                         const RemoteAction &remote_action);
-  void ReleaseRemotePressedKeys(const std::string &remote_id,
+  bool ReleaseRemotePressedKeys(const std::string &remote_id,
                                 const char *reason);
   void ReleaseAllRemotePressedKeys(const char* reason);
   void CheckRemoteTimeouts();
@@ -48,7 +50,7 @@ private:
   bool InjectRemoteKey(int key_code, bool is_down, uint32_t scan_code,
                        bool extended);
   // Caller holds remote_input_mutex_. Copy the id because this erases state.
-  void ReleaseRemotePressedKeysLocked(std::string remote_id, const char* reason);
+  bool ReleaseRemotePressedKeysLocked(std::string remote_id, const char* reason);
 
   GuiRuntime &owner_;
   PressedKeys pressed_keys_;
@@ -59,7 +61,7 @@ private:
   // Guards all remote key state and serializes injection, cleanup and retries.
   std::mutex remote_input_mutex_;
   // Successful new input supersedes cleanup of an older press of that key.
-  PressedKeys pending_key_releases_;
+  PendingKeyReleases pending_key_releases_;
   uint32_t last_release_retry_tick_ = 0;
 };
 
