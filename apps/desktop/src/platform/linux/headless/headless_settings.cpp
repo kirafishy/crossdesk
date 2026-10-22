@@ -35,7 +35,6 @@ std::vector<ConsoleSetting> GetConsoleSettings(const ConfigCenter& config) {
   return {
       {"language", "console_setting_language", languages[language], "zh-CN / en-US / ru-RU"},
       {"codec", "console_setting_codec", config.GetVideoEncodeFormat() == ConfigCenter::VIDEO_ENCODE_FORMAT::AV1 ? "av1" : "h264", "h264 / av1"},
-      {"hardware", "console_setting_hardware", OnOff(config.IsHardwareVideoCodec()), "on / off"},
       {"turn", "console_setting_turn", turn_modes[turn], "off / auto / udp / tcp"},
       {"self_hosted", "console_setting_self_hosted", OnOff(config.IsSelfHosted()), "on / off"},
       {"server_host", "console_setting_host", config.GetSignalServerHost(), "example.com"},
@@ -54,7 +53,7 @@ SettingResult ApplyConsoleSetting(ConfigCenter& config, const std::string& key,
     result.message = "console_settings_readonly";
     return result;
   }
-  const bool network = key == "codec" || key == "hardware" || key == "turn" ||
+  const bool network = key == "codec" || key == "turn" ||
                        key == "self_hosted" || key == "server_host" || key == "server_port";
   if (network && connection_busy) {
     result.message = "console_settings_busy";
@@ -111,13 +110,7 @@ SettingResult ApplyConsoleSetting(ConfigCenter& config, const std::string& key,
     if (!boolean) return result;
     const bool enabled = *boolean;
     canonical = OnOff(enabled);
-    if (key == "hardware") {
-      if (enabled && !ConfigCenter::IsHardwareVideoCodecAvailable()) {
-        result.message = "console_settings_hardware_unavailable";
-        return result;
-      }
-      save = [&config, enabled] { return config.SetHardwareVideoCodec(enabled); };
-    } else if (key == "self_hosted") {
+    if (key == "self_hosted") {
       if (enabled && (config.GetSignalServerHost().empty() || config.GetSignalServerPort() <= 0 || config.GetSignalServerPort() > 65535)) {
         result.message = "console_settings_server_required";
         return result;
@@ -138,7 +131,7 @@ SettingResult ApplyConsoleSetting(ConfigCenter& config, const std::string& key,
     } else return result;
   }
   for (const auto& setting : GetConsoleSettings(config)) {
-    if (key != "autostart" && key != "hardware" && setting.key == key && setting.value == canonical) {
+    if (key != "autostart" && setting.key == key && setting.value == canonical) {
       return {true, SettingEffect::none, "console_settings_unchanged"};
     }
   }
@@ -148,7 +141,7 @@ SettingResult ApplyConsoleSetting(ConfigCenter& config, const std::string& key,
   if (previous_server != GetSignalServerSettings(config)) {
     effect = SettingEffect::reconnect;
     message = "console_settings_reconnect";
-  } else if (key == "codec" || key == "hardware" || key == "turn") {
+  } else if (key == "codec" || key == "turn") {
     effect = SettingEffect::next_connection;
     message = "console_settings_next_connection";
   }

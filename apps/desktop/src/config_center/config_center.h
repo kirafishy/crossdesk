@@ -37,7 +37,6 @@ class ConfigCenter {
   int SetLanguage(LANGUAGE language);
   int SetScreenCaptureMethod(ScreenCaptureMethod method);
   int SetVideoEncodeFormat(VIDEO_ENCODE_FORMAT video_encode_format);
-  int SetHardwareVideoCodec(bool hardware_video_codec);
   int SetTurnMode(TURN_MODE turn_mode);
   int SetTurn(bool enable_turn, bool force_relay);
   int SetServerHost(const std::string& signal_server_host);
@@ -57,9 +56,6 @@ class ConfigCenter {
   LANGUAGE GetLanguage() const;
   ScreenCaptureMethod GetScreenCaptureMethod() const;
   VIDEO_ENCODE_FORMAT GetVideoEncodeFormat() const;
-  // Whether this build includes a hardware video codec backend.
-  static bool IsHardwareVideoCodecAvailable();
-  bool IsHardwareVideoCodec() const;
   TURN_MODE GetTurnMode() const;
   bool IsEnableTurn() const;
   bool IsForceRelay() const;
@@ -92,7 +88,6 @@ class ConfigCenter {
   LANGUAGE language_ = LANGUAGE::CHINESE;
   ScreenCaptureMethod screen_capture_method_ = ScreenCaptureMethod::Auto;
   VIDEO_ENCODE_FORMAT video_encode_format_ = VIDEO_ENCODE_FORMAT::H264;
-  bool hardware_video_codec_ = false;
   TURN_MODE turn_mode_ = TURN_MODE::AUTO_UDP_TCP;
   std::string signal_server_host_ = "";
   std::string signal_server_host_default_ = "api.crossdesk.cn";

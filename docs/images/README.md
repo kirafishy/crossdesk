@@ -4,6 +4,7 @@
 
 ## 来源 / Sources
 
+- 两张常规设置截图（`desktop-settings-zh.png` / `desktop-settings-en.png`）于 **2026-10-22** 从 `f8f4aa3c` 加当前工作区修改重新渲染，移除硬件编解码开关；使用现有 `slint_ui_smoke_test`、macOS arm64 和 2× 软件渲染，PPM 中间文件存放在工程外临时目录。
 - 16 张中英文桌面截图更新于 **2026-10-19**，UI 源代码为 `1ef372d2`，使用 Slint 1.17.1、macOS arm64 和软件渲染器。图片直接渲染仓库中的 Slint 组件。
 - 捕获程序来自现有 [`slint_ui_smoke_test`](../../apps/desktop/tests/slint_ui_smoke_test.cpp)，在**工程外的临时目录**中复制源文件，仅为桌面墙调整演示设备数量、单元格宽度和网格窗口高度。Slint 组件没有改动，工程内没有新增或修改测试文件。
 - 主窗口展示桌面墙入口、连接区、近期设备卡片与分组筛选；设置展示“常规 / 桌面墙”选项卡，关于窗口展示三个赞助入口。桌面墙网格展示六台演示设备；放大图展示只读预览、群控和接管入口，没有建立真实连接。
@@ -12,7 +13,9 @@
 - 缩略图沿用既有公开页面截图：`fixtures/source.png` 来自 [CrossDesk Xmake 源码页](https://github.com/kunkundi/crossdesk/blob/ios-support/xmake.lua)，`fixtures/website.png` 来自 [CrossDesk 官网](https://www.crossdesk.cn/)，两者采集于 2026-09-07。它们只用于展示预览效果，不代表这些页面正在对应设备上运行，页面中的版本信息也不代表最新发布。
 - `web-client.png` 保留 **2026-09-25** 从 [Web 客户端](https://web.crossdesk.cn/) 采集的 1280 × 720 连接首页，页面版本为 `2026.09.24.2`，ID 与密码为空。本次未重新采集 Web 页面；桌面设备预览继续复用这张图片。
 
-All 16 desktop images were refreshed on **2026-10-19** from UI source `1ef372d2`, using Slint 1.17.1 on macOS arm64. They render the actual components with demonstration data. The capture program is an external temporary copy of the existing source, adjusted only for DeskHub's six sample devices, 300 logical-pixel cells, and shorter grid window; no UI components or repository tests were changed. The About view includes all three sponsorship links. IDs, credentials, connection states, versions, and update results are illustrative. No remote sessions were opened. Public-page fixtures remain from 2026-09-07, and the Web screenshot remains from 2026-09-25. This refresh does not include native mobile screenshots.
+The two General settings images were refreshed again on **2026-10-22** from `f8f4aa3c` plus the current working-tree changes to remove the hardware codec switch, using the existing `slint_ui_smoke_test` on macOS arm64 at 2× software rendering scale. Intermediate PPM files were kept outside the repository.
+
+All 16 desktop images were previously refreshed on **2026-10-19** from UI source `1ef372d2`, using Slint 1.17.1 on macOS arm64. They render the actual components with demonstration data. The capture program is an external temporary copy of the existing source, adjusted only for DeskHub's six sample devices, 300 logical-pixel cells, and shorter grid window; no UI components or repository tests were changed in that refresh. The About view includes all three sponsorship links. IDs, credentials, connection states, versions, and update results are illustrative. No remote sessions were opened. Public-page fixtures remain from 2026-09-07, and the Web screenshot remains from 2026-09-25. This refresh does not include native mobile screenshots.
 
 ## 文件 / Files
 

@@ -63,7 +63,7 @@ private:
     int legacy_video_quality;
     int legacy_video_frame_rate;
     int video_encode_format;
-    bool enable_hardware_video_codec;
+    bool legacy_enable_hardware_video_codec;
     bool enable_turn;
     bool enable_srtp;
     unsigned char key[16];
@@ -77,7 +77,7 @@ private:
     int legacy_video_quality;
     int legacy_video_frame_rate;
     int video_encode_format;
-    bool enable_hardware_video_codec;
+    bool legacy_enable_hardware_video_codec;
     bool enable_turn;
     bool enable_srtp;
     unsigned char key[16];

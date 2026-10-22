@@ -41,6 +41,8 @@ int ConfigCenter::Load() {
   }
 
   bool persist_config_migration = false;
+  // Hardware codecs are always preferred, with software fallback in MiniRTC.
+  persist_config_migration |= ini_->Delete(section_, "hardware_video_codec");
   // These options now belong only to the active remote connection. Discard
   // legacy local defaults so they cannot affect this host or new connections.
   persist_config_migration |= ini_->Delete(section_, "video_quality");
@@ -78,8 +80,6 @@ int ConfigCenter::Load() {
       ini_->GetLongValue(section_, "video_encode_format",
                         static_cast<long>(video_encode_format_)));
 
-  hardware_video_codec_ = ini_->GetBoolValue(section_, "hardware_video_codec",
-                                            hardware_video_codec_);
   const char* turn_mode_value = ini_->GetValue(section_, "turn_mode", nullptr);
   if (turn_mode_value != nullptr && strlen(turn_mode_value) > 0) {
     const long parsed_turn_mode = ini_->GetLongValue(
@@ -205,7 +205,6 @@ int ConfigCenter::Save() {
                     static_cast<long>(screen_capture_method_));
   ini_->SetLongValue(section_, "video_encode_format",
                     static_cast<long>(video_encode_format_));
-  ini_->SetBoolValue(section_, "hardware_video_codec", hardware_video_codec_);
   ini_->SetLongValue(section_, "turn_mode", static_cast<long>(turn_mode_));
   ini_->SetBoolValue(section_, "enable_turn",
                     turn_mode_ != TURN_MODE::DISABLED);
@@ -268,13 +267,6 @@ int ConfigCenter::SetVideoEncodeFormat(VIDEO_ENCODE_FORMAT format) {
   if (format != VIDEO_ENCODE_FORMAT::H264 && format != VIDEO_ENCODE_FORMAT::AV1) return -1;
   if (StoreValues({{"video_encode_format", std::to_string(static_cast<int>(format))}}) != 0) return -1;
   video_encode_format_ = format;
-  return 0;
-}
-
-int ConfigCenter::SetHardwareVideoCodec(bool enabled) {
-  if (enabled && !IsHardwareVideoCodecAvailable()) return -1;
-  if (StoreValues({{"hardware_video_codec", enabled ? "true" : "false"}}) != 0) return -1;
-  hardware_video_codec_ = enabled;
   return 0;
 }
 
@@ -423,19 +415,6 @@ ScreenCaptureMethod ConfigCenter::GetScreenCaptureMethod() const {
 
 ConfigCenter::VIDEO_ENCODE_FORMAT ConfigCenter::GetVideoEncodeFormat() const {
   return video_encode_format_;
-}
-
-bool ConfigCenter::IsHardwareVideoCodecAvailable() {
-#if defined(_WIN32) || defined(__APPLE__) ||                              \
-    (defined(__linux__) && !defined(__aarch64__) && !defined(__arm__) && USE_CUDA)
-  return true;
-#else
-  return false;
-#endif
-}
-
-bool ConfigCenter::IsHardwareVideoCodec() const {
-  return IsHardwareVideoCodecAvailable() && hardware_video_codec_;
 }
 
 ConfigCenter::TURN_MODE ConfigCenter::GetTurnMode() const {

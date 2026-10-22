@@ -117,14 +117,14 @@ After connecting, open **Video settings** (the sliders icon) in the toolbar. Cho
 Open **☰ → Settings** in the top-right corner, choose **General / DeskHub**, and click **Save** to apply changes. Switching tabs preserves pending changes; **Cancel** discards them. General settings are grouped into interface, video, networking, and further sections available by scrolling. Configure codecs and connections before connecting; some settings are disabled during an active session. Adjust ordinary session quality, frame rate, and video preference from its toolbar.
 
 <p align="center">
-  <img src="images/desktop-settings-en.png" width="720" alt="Updated General settings with General and DeskHub tabs, language, video codec, hardware codecs, and networking options" />
+  <img src="images/desktop-settings-en.png" width="720" alt="Updated General settings with General and DeskHub tabs, language, video codec, and networking options" />
 </p>
 
 | Setting | Purpose |
 | --- | --- |
 | Language | 中文, English, Русский |
 | Capture Method (Windows) | Auto / DXGI / WGC / GDI; choose Auto for automatic headless adaptation |
-| Video Encode Format | H.264 / AV1; hardware codec availability depends on the platform, device, and build options |
+| Video Encode Format | H.264 / AV1; H.264 automatically prefers hardware codecs, with software fallback when unavailable or initialization fails; desktop AV1 uses software codecs |
 | Enable TURN Service | Allow relay-assisted connections; check this setting if P2P fails |
 | Force Relay | Require relay connections when TURN is enabled; turning TURN off also disables this option |
 | Save remote screen previews | On by default. When disabled, the thumbnail area shows the remote device’s platform and existing previews are cleared; connection records and passwords are preserved |

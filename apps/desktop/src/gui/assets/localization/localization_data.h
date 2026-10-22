@@ -78,13 +78,11 @@ struct TranslationRow {
   X(console_settings_next_file, u8"已保存，将用于后续接收的文件。", "Saved; applies to subsequently received files.", u8"Сохранено. Будет применено к следующим получаемым файлам.") \
   X(console_settings_autostart, u8"已保存，在下次图形桌面登录时生效。", "Saved; applies at the next graphical desktop login.", u8"Сохранено. Будет применено при следующем входе в графический сеанс.") \
   X(console_settings_daemon, u8"已保存，普通模式重启后生效；无头控制台仍保持前台运行。", "Saved for the next normal-mode start; the headless console stays in the foreground.", u8"Сохранено для следующего запуска в обычном режиме. Консоль остаётся на переднем плане.") \
-  X(console_settings_hardware_unavailable, u8"当前构建不支持硬件编解码，未保存。", "Hardware codecs are unavailable in this build; not saved.", u8"Аппаратные кодеки недоступны в этой сборке. Не сохранено.") \
   X(console_settings_server_required, u8"请先设置有效的服务器地址和端口，再启用自托管。", "Set a valid server host and port before enabling self-hosting.", u8"Укажите адрес и порт сервера перед включением собственного сервера.") \
   X(console_settings_path_invalid, u8"请选择已存在且可写的绝对目录路径；default 使用默认目录。", "Use an existing writable absolute directory, or default for the default location.", u8"Укажите существующий доступный для записи абсолютный путь к каталогу или default.") \
   X(console_settings_readonly, u8"该选项由系统或控制端管理，不可在此修改。", "This option is managed by the system or controller and is read-only here.", u8"Этот параметр управляется системой или клиентом и здесь недоступен для изменения.") \
   X(console_setting_language, u8"语言", "Language", u8"Язык") \
   X(console_setting_codec, u8"视频编码", "Video codec", u8"Видеокодек") \
-  X(console_setting_hardware, u8"硬件编解码", "Hardware codecs", u8"Аппаратные кодеки") \
   X(console_setting_turn, u8"中继模式", "TURN relay mode", u8"Режим ретрансляции TURN") \
   X(console_setting_self_hosted, u8"自托管", "Self-hosted server", u8"Собственный сервер") \
   X(console_setting_host, u8"服务器地址", "Server host", u8"Адрес сервера") \
@@ -234,8 +232,6 @@ struct TranslationRow {
     "Video Encode Format:", u8"Формат кодека видео:")                          \
   X(av1, u8"AV1", "AV1", "AV1")                                                \
   X(h264, u8"H.264", "H.264", "H.264")                                         \
-  X(enable_hardware_video_codec, u8"启用硬件编解码器:",                        \
-    "Enable Hardware Video Codec:", u8"Использовать аппаратный кодек:")        \
   X(enable_turn, u8"启用中继服务:",                                            \
     "Enable TURN Service:", u8"Включить TURN-сервис:")                         \
   X(force_relay, u8"强制中继连接:", "Force Relay:", u8"Только через реле:")   \

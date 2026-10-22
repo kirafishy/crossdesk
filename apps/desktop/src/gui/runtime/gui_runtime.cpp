@@ -237,7 +237,8 @@ int GuiRuntime::CreateConnectionPeer() {
   strncpy(params_.log_path, dll_log_path_.c_str(),
           sizeof(params_.log_path) - 1);
   params_.log_path[sizeof(params_.log_path) - 1] = '\0';
-  params_.hardware_acceleration = config_center_->IsHardwareVideoCodec();
+  // MiniRTC selects the available hardware backend and falls back to software.
+  params_.hardware_acceleration = true;
 #if defined(_WIN32) || (defined(__linux__) && !defined(__OHOS__)) || defined(__APPLE__)
   // Windows and Linux retain pooled CPU NV12 frames or CUDA device frames;
   // macOS retains VideoToolbox CVPixelBuffers for direct Metal sampling. All

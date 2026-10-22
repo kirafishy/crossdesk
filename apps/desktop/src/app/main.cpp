@@ -208,8 +208,6 @@ int HandleServiceCliCommand(const std::string& command) {
           destination.SetTurnMode(source.GetTurnMode()) == 0 &&
           destination.SetVideoEncodeFormat(source.GetVideoEncodeFormat()) ==
               0 &&
-          destination.SetHardwareVideoCodec(source.IsHardwareVideoCodec()) ==
-              0 &&
           destination.SetScreenCaptureMethod(
               crossdesk::ScreenCaptureMethod::Auto) == 0 &&
           destination.SetPrivacyScreen(false) == 0 &&

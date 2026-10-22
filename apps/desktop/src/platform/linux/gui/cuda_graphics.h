@@ -11,7 +11,7 @@ namespace crossdesk {
 
 // Call before SDL or Slint initializes EGL/GLX. Hybrid laptops otherwise
 // create the GUI context on the integrated GPU while NVDEC uses NVIDIA.
-void ConfigureLinuxCudaGraphics(bool hardware_acceleration);
+void ConfigureLinuxCudaGraphics();
 
 }  // namespace crossdesk
 

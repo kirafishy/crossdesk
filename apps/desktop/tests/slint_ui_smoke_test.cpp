@@ -160,7 +160,6 @@ bool ConfigureDocumentationDemo(
       std::make_shared<slint::VectorModel<crossdesk::ui::RecentConnection>>(
           std::move(connections)));
   window->set_signal_connected(true);
-  window->set_hardware_codec_available(true);
 #if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
   window->set_privacy_setting_available(true);
 #endif
@@ -937,7 +936,6 @@ int main() {
   window->set_custom_titlebar(true);
   window->set_wayland_titlebar(true);
   window->set_settings_session_active(true);
-  window->set_hardware_codec_available(false);
   window->set_portable_service_settings_visible(true);
   assert(std::string(window->get_local_id()) == "123 456 789");
   assert(window->get_connection_dialog_open());
@@ -945,7 +943,6 @@ int main() {
   assert(window->get_custom_titlebar());
   assert(window->get_wayland_titlebar());
   assert(window->get_settings_session_active());
-  assert(!window->get_hardware_codec_available());
   assert(window->get_portable_service_settings_visible());
   if (const char *snapshot_path =
           std::getenv("CROSSDESK_MAIN_UI_SNAPSHOT")) {

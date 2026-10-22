@@ -69,7 +69,6 @@ export global UiStrings {
     in-out property <string> capture-method: "Capture method";
     in-out property <string> capture-method-auto: "Auto";
     in-out property <string> codec: "Video codec";
-    in-out property <string> hardware-codec: "Hardware video codec";
     in-out property <string> turn-relay: "TURN relay";
     in-out property <string> force-relay: "Force relay";
     in-out property <string> self-hosted: "Self-hosted server";
@@ -456,7 +455,6 @@ export component MainWindow inherits Window {
     in property <bool> capture-method-visible: false;
     in-out property <int> capture-method-index: 0;
     in-out property <int> codec-index: 0;
-    in-out property <bool> hardware-codec-enabled: true;
     in-out property <bool> turn-enabled: true;
     in-out property <bool> force-relay-enabled: false;
     changed turn-enabled => {
@@ -484,9 +482,6 @@ export component MainWindow inherits Window {
     in-out property <string> server-port: "";
     in-out property <string> self-host-settings-error: "";
     in property <bool> settings-session-active: false;
-    // Keep the setting visible on every platform. Unsupported builds expose it
-    // as disabled so the fixed settings layout never turns into a blank row.
-    in property <bool> hardware-codec-available: true;
 
     callback copy-local-id() -> bool;
     callback toggle-password-visibility;
@@ -2175,16 +2170,15 @@ export component MainWindow inherits Window {
                         }
                         SettingsGroup {
                             title: GalleryStrings.tr("视频", "Video", "Видео");
-                            rows: root.capture-method-visible ? 3 : 2;
+                            rows: root.capture-method-visible ? 2 : 1;
                             if root.capture-method-visible: SettingsRow {
                                 label: UiStrings.capture-method; enabled: !root.settings-session-active;
                                 SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; enabled: !root.settings-session-active; model: [UiStrings.capture-method-auto, "DXGI", "WGC", "GDI"]; current-index <=> root.capture-method-index; }
                             }
                             SettingsRow {
-                                label: UiStrings.codec; enabled: !root.settings-session-active;
+                                label: UiStrings.codec; enabled: !root.settings-session-active; divider: false;
                                 SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; enabled: !root.settings-session-active; model: [UiStrings.codec-h264, UiStrings.codec-av1]; current-index <=> root.codec-index; }
                             }
-                            SettingsToggleRow { label: UiStrings.hardware-codec; checked <=> root.hardware-codec-enabled; enabled: root.hardware-codec-available && !root.settings-session-active; divider: false; }
                         }
                         SettingsGroup {
                             title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 3;

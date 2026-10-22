@@ -1201,7 +1201,7 @@ void GuiApplication::InitializeSettings() {
 
 bool GuiApplication::InitializeSDL() {
 #if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
-  ConfigureLinuxCudaGraphics(config_center_->IsHardwareVideoCodec());
+  ConfigureLinuxCudaGraphics();
   // Standard Wayland top-level windows cannot choose an absolute screen
   // position. Use the session's XWayland compatibility server for the GUI so
   // auxiliary windows such as the controlled-side status window can be
@@ -1477,11 +1477,6 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   auto& main = ui_->Window(gallery_window);
   main->set_language_index(language_button_value_);
   main->set_codec_index(video_encode_format_button_value_);
-  const bool hardware_codec_available =
-      ConfigCenter::IsHardwareVideoCodecAvailable();
-  main->set_hardware_codec_available(hardware_codec_available);
-  main->set_hardware_codec_enabled(hardware_codec_available &&
-                                   enable_hardware_video_codec_);
   main->set_turn_enabled(enable_turn_);
   main->set_force_relay_enabled(config_center_->IsForceRelay());
   main->set_self_hosted_enabled(enable_self_hosted_);
@@ -4293,8 +4288,6 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   language_button_value_ =
       localization::detail::ClampLanguageIndex(main->get_language_index());
   video_encode_format_button_value_ = std::clamp(main->get_codec_index(), 0, 1);
-  enable_hardware_video_codec_ = ConfigCenter::IsHardwareVideoCodecAvailable() &&
-                                  main->get_hardware_codec_enabled();
   enable_turn_ = main->get_turn_enabled();
   enable_self_hosted_ = main->get_self_hosted_enabled();
 #if !defined(__OHOS__)
@@ -4311,7 +4304,6 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   config_center_->SetVideoEncodeFormat(
       static_cast<ConfigCenter::VIDEO_ENCODE_FORMAT>(
           video_encode_format_button_value_));
-  config_center_->SetHardwareVideoCodec(enable_hardware_video_codec_);
   config_center_->SetTurn(enable_turn_, main->get_force_relay_enabled());
   main->set_force_relay_enabled(config_center_->IsForceRelay());
 #if !defined(__OHOS__)
@@ -4378,7 +4370,6 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
   localization_language_index_ = localization::detail::ClampLanguageIndex(language_button_value_);
   localization_language_ = config_center_->GetLanguage();
   video_encode_format_button_value_ = static_cast<int>(config_center_->GetVideoEncodeFormat());
-  enable_hardware_video_codec_ = config_center_->IsHardwareVideoCodec();
   enable_turn_ = config_center_->IsEnableTurn();
   enable_self_hosted_ = config_center_->IsSelfHosted();
   enable_autostart_ = config_center_->IsEnableAutostart();
@@ -4393,7 +4384,6 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
   std::snprintf(signal_server_port_self_, sizeof(signal_server_port_self_), "%s", port_text.c_str());
   language_button_value_last_ = language_button_value_;
   video_encode_format_button_value_last_ = video_encode_format_button_value_;
-  enable_hardware_video_codec_last_ = enable_hardware_video_codec_;
   enable_turn_last_ = enable_turn_;
   enable_self_hosted_last_ = enable_self_hosted_;
   enable_autostart_last_ = enable_autostart_;
@@ -4412,17 +4402,14 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
     // configuration. Keep the application and its console running throughout.
     CloseAllRemoteSessions();
   } else {
-    const bool hardware = config_center_->IsHardwareVideoCodec();
     const bool av1 = config_center_->GetVideoEncodeFormat() ==
                      ConfigCenter::VIDEO_ENCODE_FORMAT::AV1;
     const auto turn = static_cast<TurnMode>(config_center_->GetTurnMode());
-    if (hardware != params_.hardware_acceleration || av1 != params_.av1_encoding ||
-        turn != params_.turn_mode) {
+    if (av1 != params_.av1_encoding || turn != params_.turn_mode) {
       // Update the listening peer for incoming connections and the template
       // copied by ConnectTo for outgoing connections. Existing sessions retain
       // the codec/ICE snapshot with which they negotiated.
-      if (!peer_ || UpdateConnectionSettings(peer_, hardware, av1, turn) == 0) {
-        params_.hardware_acceleration = hardware;
+      if (!peer_ || UpdateConnectionSettings(peer_, true, av1, turn) == 0) {
         params_.av1_encoding = av1;
         params_.turn_mode = turn;
       } else {

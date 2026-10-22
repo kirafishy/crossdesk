@@ -465,8 +465,6 @@ int SettingsManager::Load() {
       static_cast<int>(owner_.config_center_->GetLanguage()));
   owner_.video_encode_format_button_value_ =
       static_cast<int>(owner_.config_center_->GetVideoEncodeFormat());
-  owner_.enable_hardware_video_codec_ =
-      owner_.config_center_->IsHardwareVideoCodec();
   owner_.enable_turn_ = owner_.config_center_->IsEnableTurn();
   owner_.enable_self_hosted_ = owner_.config_center_->IsSelfHosted();
   owner_.enable_autostart_ = owner_.config_center_->IsEnableAutostart();
@@ -486,8 +484,6 @@ int SettingsManager::Load() {
   owner_.language_button_value_last_ = owner_.language_button_value_;
   owner_.video_encode_format_button_value_last_ =
       owner_.video_encode_format_button_value_;
-  owner_.enable_hardware_video_codec_last_ =
-      owner_.enable_hardware_video_codec_;
   owner_.enable_turn_last_ = owner_.enable_turn_;
   owner_.enable_self_hosted_last_ = owner_.enable_self_hosted_;
   owner_.enable_autostart_last_ = owner_.enable_autostart_;

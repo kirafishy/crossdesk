@@ -9,12 +9,8 @@
 
 namespace crossdesk {
 
-void ConfigureLinuxCudaGraphics(bool hardware_acceleration) {
+void ConfigureLinuxCudaGraphics() {
 #if USE_CUDA && (defined(__x86_64__) || defined(__amd64__))
-  if (!hardware_acceleration) {
-    return;
-  }
-
   // Respect explicit GPU/driver selection, including a request to use Mesa
   // or software rendering. Native frames can still use the CPU fallback.
   for (const char* name : {"__NV_PRIME_RENDER_OFFLOAD",
@@ -45,8 +41,6 @@ void ConfigureLinuxCudaGraphics(bool hardware_acceleration) {
     return;
   }
   LOG_INFO("Selected NVIDIA PRIME rendering for CUDA/OpenGL video interop");
-#else
-  (void)hardware_acceleration;
 #endif
 }
 

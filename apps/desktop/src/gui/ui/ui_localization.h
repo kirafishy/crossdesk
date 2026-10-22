@@ -93,8 +93,6 @@ inline int ApplyMainWindowStrings(
   strings.set_capture_method_auto(
       Text(localization::screen_capture_method_auto[language]));
   strings.set_codec(Text(localization::video_encode_format[language]));
-  strings.set_hardware_codec(
-      Text(localization::enable_hardware_video_codec[language]));
   strings.set_turn_relay(Text(localization::enable_turn[language]));
   strings.set_force_relay(Text(localization::force_relay[language]));
   strings.set_self_hosted(
