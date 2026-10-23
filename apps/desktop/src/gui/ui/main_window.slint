@@ -554,6 +554,7 @@ export component MainWindow inherits Window {
         && !(root.update-open && root.update-available) && !root.messages-open
         && !root.update-confirm-open
         && !root.reset-password-open && !root.alias-open && !root.delete-open
+        && !root.disconnect-open
         && !root.device-group-open && !root.connection-dialog-open
         && !root.permission-dialog-open && !root.wayland-notice-open
         && !root.portable-service-dialog-open
@@ -577,6 +578,15 @@ export component MainWindow inherits Window {
     in-out property <bool> delete-open: false;
     private property <string> delete-remote-id: "";
     private property <bool> delete-from-gallery: false;
+    in-out property <bool> disconnect-open: false;
+    private property <string> disconnect-remote-id: "";
+    private property <string> disconnect-device-name: "";
+    function dismiss-disconnect() {
+        root.disconnect-open = false;
+        root.disconnect-remote-id = "";
+        root.disconnect-device-name = "";
+        focus-sink.focus();
+    }
     private property <CopyFeedback> copy-feedback: idle;
     private property <bool> compact-language: root.language-index == 0;
     private property <bool> recent-tooltip-visible: false;
@@ -1383,13 +1393,18 @@ export component MainWindow inherits Window {
                                 width: 28px; height: 28px;
                                 soft: true;
                                 primary: !connection.connected;
+                                destructive: connection.connected;
                                 icon: connection.connected ? FontAwesomeIcons.xmark : FontAwesomeIcons.arrow-right-long;
                                 tooltip: connection.connected ? GalleryStrings.tr("断开连接", "Disconnect", "Отключить") : UiStrings.connect;
                                 tooltip-above: true;
                                 clicked => {
                                     root.copy-feedback = CopyFeedback.idle;
                                     root.recent-tooltip-visible = false;
-                                    if connection.connected { root.recent-disconnect(connection.remote-id); }
+                                    if connection.connected {
+                                        root.disconnect-remote-id = connection.remote-id;
+                                        root.disconnect-device-name = connection.display-name;
+                                        root.disconnect-open = true;
+                                    }
                                     else { root.recent-connect(connection.remote-id); }
                                 }
                             }
@@ -1919,6 +1934,98 @@ export component MainWindow inherits Window {
                     alignment: center; spacing: 8px;
                     PrimaryButton { text: UiStrings.ok; clicked => { if root.delete-from-gallery { root.gallery-action("remove", root.delete-remote-id); } else { root.recent-delete(root.delete-remote-id); } root.delete-open = false; } }
                     SecondaryButton { text: UiStrings.cancel; clicked => { root.delete-open = false; } }
+                }
+            }
+        }
+    }
+
+    // Confirm the selected recent session before disconnecting it.
+    if root.disconnect-open: Rectangle {
+        background: #14233b66;
+        z: 48;
+        TouchArea { scroll-event(event) => { accept } }
+        FocusScope {
+            width: parent.width;
+            height: parent.height;
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    root.dismiss-disconnect();
+                    return accept;
+                }
+                if event.text == Key.Tab {
+                    if disconnect-cancel.has-focus {
+                        disconnect-confirm.focus();
+                    } else {
+                        disconnect-cancel.focus();
+                    }
+                    return accept;
+                }
+                return reject;
+            }
+            Timer {
+                interval: 1ms;
+                running: true;
+                triggered => {
+                    self.running = false;
+                    // Defer focus until after Slint's accessibility update.
+                    disconnect-cancel.focus();
+                }
+            }
+            DialogSurface {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: min(420px, parent.width - 40px);
+                height: disconnect-content.preferred-height;
+                border-color: WorkbenchStyle.border;
+                TouchArea { scroll-event(event) => { accept } }
+                disconnect-content := VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+                    Text {
+                        text: GalleryStrings.tr("确认断开连接？", "Disconnect this session?", "Отключить этот сеанс?");
+                        color: WorkbenchStyle.text;
+                        font-size: 18px;
+                        font-weight: 600;
+                        wrap: word-wrap;
+                    }
+                    VerticalLayout {
+                        spacing: 6px;
+                        Text {
+                            text: root.disconnect-device-name;
+                            color: WorkbenchStyle.text;
+                            font-size: 14px;
+                            font-weight: 600;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: root.disconnect-remote-id;
+                            color: WorkbenchStyle.muted;
+                            font-size: 12px;
+                        }
+                    }
+                    Text {
+                        text: GalleryStrings.tr("当前远程控制会话将结束。", "The current remote session will end.", "Текущий сеанс удалённого управления завершится.");
+                        color: WorkbenchStyle.muted;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        spacing: 8px;
+                        disconnect-cancel := WorkbenchButton {
+                            text: UiStrings.cancel;
+                            clicked => { root.dismiss-disconnect(); }
+                        }
+                        disconnect-confirm := WorkbenchButton {
+                            text: GalleryStrings.tr("断开连接", "Disconnect", "Отключить");
+                            destructive: true;
+                            clicked => {
+                                let remote-id = root.disconnect-remote-id;
+                                root.dismiss-disconnect();
+                                root.recent-disconnect(remote-id);
+                            }
+                        }
+                    }
                 }
             }
         }
