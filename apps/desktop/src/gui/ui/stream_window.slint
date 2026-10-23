@@ -142,6 +142,8 @@ component ControlBarButton inherits Rectangle {
     }
 
     touch := TouchArea {
+        mouse-cursor: root.action-enabled ? pointer : default;
+        scroll-event(event) => { accept }
         // Keep disabled controls hit-testable so clicks cannot reach the peer.
         clicked => { if root.action-enabled { root.clicked(); } }
     }
@@ -153,7 +155,6 @@ component VideoSettingRow inherits VerticalLayout {
     in property <int> selected;
     in property <bool> enabled;
     callback choose(int);
-    callback pressed;
     spacing: 4px;
     Text { text: root.label; color: #5c626c; font-size: 11px; height: 18px; }
     HorizontalLayout {
@@ -168,7 +169,7 @@ component VideoSettingRow inherits VerticalLayout {
             Text { text: option; color: root.enabled ? #30343b : #8b8f95;
                 font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
             option-touch := TouchArea {
-                pointer-event(event) => { if event.kind == PointerEventKind.down { root.pressed(); } }
+                mouse-cursor: root.enabled ? pointer : default;
                 clicked => { if root.enabled { root.choose(index); } }
                 scroll-event(event) => { accept }
             }
@@ -288,14 +289,29 @@ export component StreamWindow inherits Window {
     private property <length> video-menu-x: min(max(4px, control.x + video-button.x), video.width - root.video-menu-width - 4px);
     private property <length> video-menu-y: control.y + root.control-toolbar-height + root.video-menu-height <= video.height
         ? control.y + root.control-toolbar-height - 1px : max(0px, control.y - root.video-menu-height);
-    changed selected-tab => { root.video-menu-open = false; }
-    changed control-expanded => { if !root.control-expanded { root.video-menu-open = false; } }
-    changed window-active => { if !root.window-active { root.video-menu-open = false; } }
+    private property <bool> control-menu-open:
+        root.display-menu-open || root.shortcut-menu-open || root.video-menu-open;
+    changed selected-tab => {
+        root.close-control-menus();
+        root.cancel-remote-pointer();
+    }
+    changed control-expanded => { if !root.control-expanded { root.close-control-menus(); } }
+    changed window-active => {
+        if !root.window-active {
+            root.close-control-menus();
+            root.cancel-remote-pointer();
+            root.control-drag-pending = false;
+            root.end-control-drag();
+        }
+    }
+    changed mouse-control-enabled => {
+        if !root.mouse-control-enabled { root.cancel-remote-pointer(); }
+    }
     changed remote-update-visible => {
         if root.remote-update-visible {
-            root.video-menu-open = false;
-            root.display-menu-open = false;
-            root.shortcut-menu-open = false;
+            root.close-control-menus();
+            root.control-drag-pending = false;
+            root.end-control-drag();
         }
         // Changed handlers may run while Winit/AccessKit is building the
         // accessibility tree. Changing focus there re-enters its borrowed
@@ -332,10 +348,16 @@ export component StreamWindow inherits Window {
         }
         return { text: "", anchor-x: 0px };
     }
-    // A popup can remove itself from the scene in its clicked callback before
-    // the video input layer observes the same pointer release. Remember that
-    // the press belonged to local UI so that release cannot reach the peer.
-    private property <bool> suppress-next-remote-pointer-release: false;
+    // Own each remote button from down through up/cancel, independent of the
+    // pointer's current position or local overlays appearing during a drag.
+    private property <bool> remote-left-down: false;
+    private property <bool> remote-right-down: false;
+    private property <bool> remote-middle-down: false;
+    private property <bool> remote-pointer-active:
+        root.remote-left-down || root.remote-right-down || root.remote-middle-down;
+    private property <bool> control-drag-pending: false;
+    private property <length> control-drag-start-x: 0px;
+    private property <length> control-drag-start-y: 0px;
     private property <bool> control-docked-left: true;
     private property <bool> control-dragging: false;
     private property <length> control-drag-x: 0px;
@@ -352,6 +374,94 @@ export component StreamWindow inherits Window {
     callback move-control-drag(length, length);
     callback end-control-drag;
     pure callback is-local-control-area(length, length) -> bool;
+
+    function close-control-menus() {
+        display-menu-open-timer.running = false;
+        root.display-menu-animation-enabled = false;
+        root.display-menu-progress = 0.0;
+        root.display-menu-open = false;
+        root.shortcut-menu-open = false;
+        root.video-menu-open = false;
+    }
+
+    // Native focus/session changes release input in C++; clear the matching UI
+    // ownership too, including when replacing the only tab (same tab index).
+    public function reset-input-state() {
+        root.remote-left-down = false;
+        root.remote-right-down = false;
+        root.remote-middle-down = false;
+        root.close-control-menus();
+        root.control-drag-pending = false;
+        root.end-control-drag();
+    }
+
+    function cancel-remote-pointer() {
+        if root.remote-pointer-active {
+            root.reset-input-state();
+            root.pointer-input(PointerEventButton.other, PointerEventKind.cancel,
+                pointer.mouse-x, pointer.mouse-y);
+        }
+    }
+
+    pure function remote-button-down(button: PointerEventButton) -> bool {
+        return button == PointerEventButton.left ? root.remote-left-down
+            : button == PointerEventButton.right ? root.remote-right-down
+            : button == PointerEventButton.middle ? root.remote-middle-down : false;
+    }
+
+    function set-remote-button(button: PointerEventButton, down: bool) {
+        if button == PointerEventButton.left { root.remote-left-down = down; }
+        if button == PointerEventButton.right { root.remote-right-down = down; }
+        if button == PointerEventButton.middle { root.remote-middle-down = down; }
+    }
+
+    function route-remote-pointer(button: PointerEventButton, kind: PointerEventKind,
+        x: length, y: length) {
+        // Releases and cancellation must not be gated on hit testing. A local
+        // popup removing itself on click cannot manufacture a remote release.
+        if kind == PointerEventKind.cancel {
+            root.cancel-remote-pointer();
+        } else if kind == PointerEventKind.up {
+            if root.remote-button-down(button) {
+                root.set-remote-button(button, false);
+                root.pointer-input(button, kind, x, y);
+            }
+        } else if root.window-active && root.mouse-control-enabled && !root.remote-update-visible {
+            let remote-target = root.remote-pointer-active
+                || (!root.control-menu-open && !root.is-local-control-area(x, y));
+            if kind == PointerEventKind.down && remote-target
+                && button != PointerEventButton.other {
+                input-focus.focus();
+                root.set-remote-button(button, true);
+                root.pointer-input(button, kind, x, y);
+            } else if kind == PointerEventKind.move && remote-target {
+                root.pointer-input(button, kind, x, y);
+            }
+        }
+    }
+
+    function route-remote-scroll(dx: length, dy: length, x: length, y: length) {
+        if root.window-active && root.mouse-control-enabled && !root.control-menu-open
+            && !root.is-local-control-area(x, y) {
+            root.scroll-input(dx, dy, x, y);
+        }
+    }
+
+    function update-control-drag(button: PointerEventButton, kind: PointerEventKind,
+        x: length, y: length) {
+        if kind == PointerEventKind.cancel
+            || (kind == PointerEventKind.up && button == PointerEventButton.left) {
+            root.control-drag-pending = false;
+            root.end-control-drag();
+        } else if kind == PointerEventKind.move && root.control-drag-pending {
+            if !root.control-dragging
+                && (abs(x - root.control-drag-start-x) >= 5px
+                    || abs(y - root.control-drag-start-y) >= 5px) {
+                root.begin-control-drag(root.control-drag-start-x, root.control-drag-start-y);
+            }
+            root.move-control-drag(x, y);
+        }
+    }
 
     animate display-menu-progress {
         duration: 120ms;
@@ -426,12 +536,7 @@ export component StreamWindow inherits Window {
         // pointer positions remain relative to the stationary video surface.
         root.control-press-x = press-x - current-x;
         root.control-press-y = press-y - current-y;
-        display-menu-open-timer.running = false;
-        root.display-menu-animation-enabled = false;
-        root.display-menu-progress = 0.0;
-        root.display-menu-open = false;
-        root.shortcut-menu-open = false;
-        root.video-menu-open = false;
+        root.close-control-menus();
         root.control-dragging = true;
     }
     move-control-drag(pointer-x, pointer-y) => {
@@ -735,57 +840,35 @@ export component StreamWindow inherits Window {
                     mouse-cursor: root.remote-cursor-active
                         ? RemoteCursor.shape(root.remote-cursor-shape) : MouseCursor.default;
                     pointer-event(event) => {
-                        let over-control = self.mouse-x >= control.x
-                            && self.mouse-x <= control.x + control.width
-                            && self.mouse-y >= control.y
-                            && self.mouse-y <= control.y + control.height;
-                        let over-local-ui = root.is-local-control-area(
-                            self.mouse-x, self.mouse-y);
-                        let suppress-remote-release =
-                            root.suppress-next-remote-pointer-release
-                            && (event.kind == PointerEventKind.up
-                                || event.kind == PointerEventKind.cancel);
-                        if event.kind == PointerEventKind.down && !over-local-ui {
-                            // Discard a stale marker if a popup consumed the
-                            // whole previous gesture, including its release.
-                            root.suppress-next-remote-pointer-release = false;
-                            input-focus.focus();
-                        }
-                        // A gesture started before the modal appeared keeps
-                        // pointer capture. Let its release reach the peer.
-                        if root.remote-update-visible && !root.control-dragging
-                            && event.kind == PointerEventKind.up {
-                            root.pointer-input(event.button, event.kind, self.mouse-x, self.mouse-y);
-                        } else if event.kind == PointerEventKind.down
-                            && event.button == PointerEventButton.left
-                            && over-control {
-                            root.begin-control-drag(self.mouse-x, self.mouse-y);
-                        } else if root.control-dragging
-                            && (event.kind == PointerEventKind.up
-                                || event.kind == PointerEventKind.cancel) {
-                            root.end-control-drag();
-                        // The control bar overlays the remote video. Events in
-                        // it and its attached menus (including padding and gaps)
-                        // are local UI input and must never reach the peer.
-                        } else if !root.control-dragging && !over-local-ui
-                            && !suppress-remote-release {
-                            root.pointer-input(event.button, event.kind, self.mouse-x, self.mouse-y);
-                        }
-                        if suppress-remote-release {
-                            root.suppress-next-remote-pointer-release = false;
-                        }
-                    }
-                    moved => {
-                        if root.control-dragging {
-                            root.move-control-drag(self.mouse-x, self.mouse-y);
-                        }
+                        root.route-remote-pointer(event.button, event.kind, self.mouse-x, self.mouse-y);
                     }
                     scroll-event(event) => {
-                        if !root.is-local-control-area(self.mouse-x, self.mouse-y) {
-                            root.scroll-input(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y);
-                        }
+                        root.route-remote-scroll(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y);
                         accept
                     }
+                }
+            }
+
+            // Slint drops its implicit grab on any button-up. Keep the same
+            // owner above local UI until every remote button has been released.
+            // The handle also retains a stable owner if another button is used.
+            if root.remote-pointer-active || root.control-drag-pending: TouchArea {
+                z: 15;
+                mouse-cursor: root.control-drag-pending ? MouseCursor.grabbing
+                    : root.remote-cursor-active ? RemoteCursor.shape(root.remote-cursor-shape)
+                    : MouseCursor.default;
+                pointer-event(event) => {
+                    if root.control-drag-pending {
+                        root.update-control-drag(event.button, event.kind, self.mouse-x, self.mouse-y);
+                    } else {
+                        root.route-remote-pointer(event.button, event.kind, self.mouse-x, self.mouse-y);
+                    }
+                }
+                scroll-event(event) => {
+                    if !root.control-drag-pending {
+                        root.route-remote-scroll(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y);
+                    }
+                    accept
                 }
             }
 
@@ -801,16 +884,18 @@ export component StreamWindow inherits Window {
                 border-width: 1px;
                 border-color: ImGuiLineStyle.border;
                 border-radius: FloatingBarStyle.corner-radius;
-                z: 8;
+                z: 10;
                 clip: true;
                 // Keep width changes atomic. When docked right, animating both
                 // x and the clip width can leave newly revealed buttons outside
                 // Slint's damage region until they receive a hover repaint.
                 animate height { duration: 60ms; easing: ease-out; }
 
-                if root.control-expanded && !root.control-docked-left: Rectangle {
-                    x: 31px; y: 12px; width: 2px; height: 15px;
-                    background: ImGuiLineStyle.control-separator;
+                // All padding and statistics are local, non-draggable content.
+                TouchArea {
+                    mouse-cursor: default;
+                    clicked => { root.close-control-menus(); }
+                    scroll-event(event) => { accept }
                 }
 
                 display-button := ControlBarButton {
@@ -849,20 +934,20 @@ export component StreamWindow inherits Window {
                     x: (root.control-docked-left ? 9px : 42px) + 2 * root.control-button-step; y: 7px;
                     icon: FontAwesomeIcons.computer-mouse; slashed: !root.mouse-control-enabled;
                     tooltip: root.mouse-control-enabled ? StreamStrings.release-mouse : StreamStrings.control-mouse;
-                    clicked => { root.toggle-mouse-control(); }
+                    clicked => { root.close-control-menus(); root.toggle-mouse-control(); }
                 }
                 audio-button := ControlBarButton {
                     visible: root.control-expanded;
                     x: (root.control-docked-left ? 9px : 42px) + 4 * root.control-button-step; y: 7px;
                     icon: FontAwesomeIcons.volume-high; slashed: !root.audio-enabled;
                     tooltip: root.audio-enabled ? StreamStrings.mute : StreamStrings.audio;
-                    clicked => { root.toggle-audio(); }
+                    clicked => { root.close-control-menus(); root.toggle-audio(); }
                 }
                 file-button := ControlBarButton {
                     visible: root.control-expanded;
                     x: (root.control-docked-left ? 9px : 42px) + 5 * root.control-button-step; y: 7px;
                     icon: FontAwesomeIcons.folder-open; tooltip: StreamStrings.select-file;
-                    clicked => { root.select-file(); }
+                    clicked => { root.close-control-menus(); root.select-file(); }
                 }
                 video-button := ControlBarButton {
                     visible: root.control-expanded;
@@ -880,25 +965,51 @@ export component StreamWindow inherits Window {
                     x: (root.control-docked-left ? 9px : 42px) + 7 * root.control-button-step; y: 7px;
                     icon: FontAwesomeIcons.signal; selected: root.stats-visible;
                     tooltip: root.stats-visible ? StreamStrings.hide-stats : StreamStrings.show-stats;
-                    clicked => { root.toggle-stats(); }
+                    clicked => { root.close-control-menus(); root.toggle-stats(); }
                 }
                 fullscreen-button := ControlBarButton {
                     visible: root.control-expanded;
                     x: (root.control-docked-left ? 9px : 42px) + 8 * root.control-button-step; y: 7px;
                     icon: root.fullscreen-enabled ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
                     tooltip: root.fullscreen-enabled ? StreamStrings.exit-fullscreen : StreamStrings.fullscreen;
-                    clicked => { root.toggle-fullscreen(); }
+                    clicked => { root.close-control-menus(); root.toggle-fullscreen(); }
                 }
                 close-button := ControlBarButton {
                     visible: root.control-expanded;
                     x: (root.control-docked-left ? 9px : 42px) + 9 * root.control-button-step; y: 7px;
                     icon: FontAwesomeIcons.xmark; tooltip: StreamStrings.disconnect;
-                    clicked => { root.disconnect(); }
+                    clicked => { root.close-control-menus(); root.disconnect(); }
                 }
 
-                if root.control-expanded && root.control-docked-left: Rectangle {
-                    x: parent.width - 33px; y: 12px; width: 2px; height: 15px;
-                    background: ImGuiLineStyle.control-separator;
+                // Reuse the separator gap as a visible grip; statistics and
+                // button gaps no longer move the bar accidentally.
+                if root.control-expanded: drag-handle := Rectangle {
+                    x: root.control-docked-left ? parent.width - 40px : 27px;
+                    y: 7px; width: 12px; height: 24px;
+                    background: drag-touch.has-hover ? #eaf3ff : transparent;
+                    border-radius: UiRadius.control;
+                    for dot in 6: Rectangle {
+                        x: 3px + mod(dot, 2) * 4px;
+                        y: 6px + floor(dot / 2) * 5px;
+                        width: 2px; height: 2px; border-radius: 1px;
+                        background: #8b95a3;
+                    }
+                    drag-touch := TouchArea {
+                        mouse-cursor: root.control-drag-pending ? grabbing : grab;
+                        pointer-event(event) => {
+                            let x = control.x + drag-handle.x + self.mouse-x;
+                            let y = control.y + drag-handle.y + self.mouse-y;
+                            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                                root.close-control-menus();
+                                root.control-drag-start-x = x;
+                                root.control-drag-start-y = y;
+                                root.control-drag-pending = true;
+                            } else {
+                                root.update-control-drag(event.button, event.kind, x, y);
+                            }
+                        }
+                        scroll-event(event) => { accept }
+                    }
                 }
                 collapse-button := ControlBarButton {
                     x: root.control-expanded ? (root.control-docked-left ? parent.width - 25px : 10px) : 2px;
@@ -908,7 +1019,7 @@ export component StreamWindow inherits Window {
                           ? (root.control-docked-left ? FontAwesomeIcons.angle-left : FontAwesomeIcons.angle-right)
                           : (root.control-docked-left ? FontAwesomeIcons.angle-right : FontAwesomeIcons.angle-left);
                     tooltip: root.control-expanded ? StreamStrings.collapse-control : StreamStrings.expand-control;
-                    clicked => { root.control-expanded = !root.control-expanded; }
+                    clicked => { root.close-control-menus(); root.control-expanded = !root.control-expanded; }
                 }
 
                 privacy-button := ControlBarButton {
@@ -921,7 +1032,7 @@ export component StreamWindow inherits Window {
                     tooltip: root.privacy-status-text
                         + (root.privacy-can-toggle ? "\n" + (root.privacy-active
                             ? StreamStrings.privacy-disable : StreamStrings.privacy-enable) : "");
-                    clicked => { root.toggle-privacy(); }
+                    clicked => { root.close-control-menus(); root.toggle-privacy(); }
                 }
 
                 if root.stats-visible && root.control-expanded: stats-table := Rectangle {
@@ -1179,18 +1290,15 @@ export component StreamWindow inherits Window {
                 }
             }
 
-            // While the menu is open, outside gestures dismiss it locally.
-            // Keep the backdrop through pointer-up; otherwise Slint's implicit
-            // pointer move or release can reach the remote input surface.
-            if root.video-menu-open: Rectangle {
+            // Dismiss outside gestures on release, keeping the entire click
+            // local. Toolbar controls remain above this shared menu backdrop.
+            if root.control-menu-open: Rectangle {
                 width: parent.width; height: parent.height; z: 9;
                 TouchArea {
+                    mouse-cursor: default;
                     pointer-event(event) => {
-                        if event.kind == PointerEventKind.down {
-                            root.suppress-next-remote-pointer-release = true;
-                        }
+                        if event.kind == PointerEventKind.up { root.close-control-menus(); }
                     }
-                    clicked => { root.video-menu-open = false; }
                     scroll-event(event) => { accept }
                 }
             }
@@ -1200,7 +1308,7 @@ export component StreamWindow inherits Window {
                 background: white; border-width: 1px; border-color: ImGuiLineStyle.border;
                 border-radius: UiRadius.menu; z: 11;
                 TouchArea {
-                    pointer-event(event) => { if event.kind == PointerEventKind.down { root.suppress-next-remote-pointer-release = true; } }
+                    mouse-cursor: default;
                     scroll-event(event) => { accept }
                 }
                 VerticalLayout {
@@ -1209,20 +1317,17 @@ export component StreamWindow inherits Window {
                         label: StreamStrings.video-quality;
                         options: [StreamStrings.quality-low, StreamStrings.quality-medium, StreamStrings.quality-high];
                         selected: root.video-quality-index; enabled: root.video-settings-enabled;
-                        pressed => { root.suppress-next-remote-pointer-release = true; }
                         choose(index) => { root.change-video-settings(index, root.frame-rate-index, root.adaptation-policy-index); }
                     }
                     VideoSettingRow {
                         label: StreamStrings.frame-rate; options: ["30 fps", "60 fps"];
                         selected: root.frame-rate-index; enabled: root.video-settings-enabled;
-                        pressed => { root.suppress-next-remote-pointer-release = true; }
                         choose(index) => { root.change-video-settings(root.video-quality-index, index, root.adaptation-policy-index); }
                     }
                     VideoSettingRow {
                         label: StreamStrings.adaptation-policy;
                         options: [StreamStrings.priority-frame-rate, StreamStrings.priority-quality, StreamStrings.priority-balanced];
                         selected: root.adaptation-policy-index; enabled: root.video-settings-enabled;
-                        pressed => { root.suppress-next-remote-pointer-release = true; }
                         choose(index) => { root.change-video-settings(root.video-quality-index, root.frame-rate-index, index); }
                     }
                     if !root.video-settings-enabled || root.video-settings-feedback != "": Text {
@@ -1287,11 +1392,7 @@ export component StreamWindow inherits Window {
                 // hover stable while still consuming padding, gaps and scroll
                 // events locally instead of forwarding them to the peer.
                 display-touch := TouchArea {
-                    pointer-event(event) => {
-                        if event.kind == PointerEventKind.down {
-                            root.suppress-next-remote-pointer-release = true;
-                        }
-                    }
+                    mouse-cursor: default;
                     clicked => {
                         let index = floor((self.mouse-y - 4px) / 30px);
                         let row-y = self.mouse-y - 4px - index * 30px;
@@ -1312,17 +1413,15 @@ export component StreamWindow inherits Window {
             if root.shortcut-menu-open: Rectangle {
                 x: control.x + shortcut-button.x; y: control.y + 40px; width: 180px; height: root.shortcut-menu-height;
                 background: white; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.menu; z: 11;
+                TouchArea { mouse-cursor: default; scroll-event(event) => { accept } }
                 VerticalLayout {
                     padding: 4px; spacing: 1px;
                     for shortcut in root.shortcut-items: Rectangle {
                         height: 29px; background: shortcut-touch.has-hover ? #e8eef9 : transparent;
                         Text { x: 8px; text: shortcut; color: #30343b; font-size: ImGuiFontStyle.body; vertical-alignment: center; }
                         shortcut-touch := TouchArea {
-                            pointer-event(event) => {
-                                if event.kind == PointerEventKind.down {
-                                    root.suppress-next-remote-pointer-release = true;
-                                }
-                            }
+                            mouse-cursor: MouseCursor.pointer;
+                            scroll-event(event) => { accept }
                             clicked => { root.send-shortcut(shortcut); root.shortcut-menu-open = false; }
                         }
                     }
@@ -1376,11 +1475,6 @@ export component StreamWindow inherits Window {
                 z: 14;
                 TouchArea {
                     mouse-cursor: default;
-                    pointer-event(event) => {
-                        if event.kind == PointerEventKind.down {
-                            root.suppress-next-remote-pointer-release = true;
-                        }
-                    }
                     scroll-event(event) => { accept }
                 }
                 remote-update-title := Text {
@@ -1423,15 +1517,13 @@ export component StreamWindow inherits Window {
                 background: #fffffff0; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.surface; z: 7;
                 // Header/padding and drags leaving the panel belong to local UI.
                 TouchArea {
-                    pointer-event(event) => {
-                        if event.kind == PointerEventKind.down { root.suppress-next-remote-pointer-release = true; }
-                    }
+                    mouse-cursor: default;
                     scroll-event(event) => { accept }
                 }
                 Text { x: 12px; y: 8px; text: StreamStrings.file-transfer; color: #2d3138; font-weight: 600; }
                 IconButton {
                     x: parent.width - 32px; y: 1px; icon: FontAwesomeIcons.xmark; icon-size: 13px;
-                    clicked => { root.suppress-next-remote-pointer-release = true; root.close-file-transfer(); }
+                    clicked => { root.close-file-transfer(); }
                 }
                 ScrollView {
                     x: 10px; y: 32px; width: parent.width - 20px; height: parent.height - 42px;

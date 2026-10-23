@@ -4813,6 +4813,7 @@ void GuiApplication::ReleasePressedInput() {
     SendRemoteInput(action);
   }
   ui_->pressed_mouse_buttons.clear();
+  if (ui_->stream) (*ui_->stream)->invoke_reset_input_state();
 }
 
 void GuiApplication::ReleaseControl() {
