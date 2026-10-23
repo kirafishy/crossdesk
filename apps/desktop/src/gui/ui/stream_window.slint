@@ -1,7 +1,7 @@
 import { UiRadius } from "ui_radius.slint";
 import { ComboBox, ScrollView } from "std-widgets.slint";
 import { RemoteCursor } from "remote_cursor.slint";
-import { FontAwesomeIcons, IconButton, PrimaryButton, DialogSurface, ImGuiLineStyle, ImGuiFontStyle, FloatingBarStyle } from "common.slint";
+import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
 
 export struct StreamTab {
     remote-id: string,
@@ -54,6 +54,9 @@ export global StreamStrings {
     in-out property <string> fullscreen: "Fullscreen";
     in-out property <string> exit-fullscreen: "Exit fullscreen";
     in-out property <string> disconnect: "Disconnect";
+    in-out property <string> confirm-disconnect: "Disconnect this session?";
+    in-out property <string> disconnect-description: "The current remote session will end.";
+    in-out property <string> cancel: "Cancel";
     in-out property <string> file-transfer: "File Transfer Progress";
     in-out property <string> expand-control: "Expand Control Bar";
     in-out property <string> collapse-control: "Collapse Control Bar";
@@ -76,14 +79,29 @@ struct ControlBarTooltip {
     anchor-x: length,
 }
 
-// The legacy ImGui control bar uses 24px buttons with Font Awesome rendered
-// at half of the 32px atlas size.  Keep this local to the stream window: the
-// shared IconButton is intentionally larger and is used by the other windows.
+// Shared surface treatment for the capsule and its detached detail cards.
+component StreamControlSurface inherits Rectangle {
+    background: white;
+    border-width: 1px;
+    border-color: #dbe5f1;
+    border-radius: 16px;
+    drop-shadow-color: #1d35571a;
+    drop-shadow-blur: 10px;
+    drop-shadow-offset-y: 2px;
+}
+
+// Keep the compact 16px icons inside roomier circular targets. This remains
+// local to the stream window; other windows use the larger shared IconButton.
 component ControlBarButton inherits Rectangle {
     in property <string> icon;
+    in property <bool> show-logo: false;
+    in property <bool> logo-pressed: false;
+    in property <bool> logo-dragging: false;
+    in property <float> reveal-progress: 1;
     in property <string> badge: "";
     in property <string> tooltip: "";
     in property <bool> selected: false;
+    in property <bool> danger: false;
     in property <bool> slashed: false;
     in property <bool> action-enabled: true;
     // Capability and temporary command availability have different visuals.
@@ -91,26 +109,84 @@ component ControlBarButton inherits Rectangle {
     in property <length> icon-size: 16px;
     out property <bool> has-hover: touch.has-hover;
     out property <ControlBarTooltip> tooltip-info: {
-        text: root.visible && touch.has-hover && !touch.pressed ? root.tooltip : "",
+        text: root.visible && touch.has-hover && !touch.pressed && !root.logo-pressed ? root.tooltip : "",
         anchor-x: root.x + root.width / 2,
     };
     callback clicked;
+    callback pointer-input(PointerEventButton, PointerEventKind, length, length);
 
-    width: 24px;
-    height: 24px;
-    background: root.muted ? #eef0f3 : touch.pressed && root.action-enabled ? #0f87fa
-                              : touch.has-hover ? #4296fa
-                                                : root.selected ? #4296fa : #4296fa66;
-    border-radius: UiRadius.control;
+    private property <bool> button-hovered:
+        !root.show-logo && root.action-enabled && !root.muted && touch.has-hover;
+    private property <bool> button-pressed:
+        !root.show-logo && root.action-enabled && !root.muted && touch.pressed;
+    // Share the fill with the slash cutout so every icon stays legible while
+    // transitioning between idle, hover and pressed states.
+    private property <color> button-fill: root.muted ? #eef0f3
+        : root.button-pressed ? (root.danger ? #7a271a : #65a5f2)
+        : root.button-hovered ? (root.danger ? (root.selected ? #912018 : #b42318)
+            : root.selected ? #86baff : #a7ceff)
+        : root.danger ? (root.selected ? #b42318 : #d92d20)
+        : root.selected ? #b3d5fd : #deecff;
+    private property <color> button-foreground: root.muted ? #8a8f96
+        : root.danger ? white : #24272d;
+    animate button-fill, button-foreground {
+        duration: 90ms;
+        easing: ease-out;
+        enabled: !root.show-logo;
+    }
+
+    // Animate the artwork, never its hit area. Use the owning gesture state
+    // so feedback survives pointer capture and clears on cancellation.
+    private property <float> logo-scale: !root.show-logo || root.logo-dragging ? 1
+        : root.logo-pressed ? 0.94 : touch.has-hover ? 1.06 : 1;
+    animate logo-scale {
+        duration: root.logo-pressed && !root.logo-dragging ? 70ms : 140ms;
+        easing: ease-out;
+        enabled: root.show-logo;
+    }
+
+    width: 30px;
+    height: 30px;
+    opacity: root.show-logo ? 1 : root.reveal-progress;
+    background: root.show-logo ? transparent : root.button-fill;
+    border-radius: min(self.width, self.height) / 2;
 
     Text {
+        visible: !root.show-logo;
         text: root.icon;
-        color: root.muted ? #8a8f96 : #24272d;
+        color: root.button-foreground;
         font-family: "Font Awesome 6 Free";
         font-weight: 900;
         font-size: root.icon-size;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    // Scale the antialiased SVG plate and mark together for subtle feedback.
+    if root.show-logo: Rectangle {
+        width: (min(parent.width, parent.height) - 2px) * root.logo-scale;
+        height: self.width;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        Image {
+            width: parent.width; height: parent.height;
+            source: @image-url("icons/circle-white.svg");
+            image-fit: contain;
+        }
+        // Keep the mark inside the circular plate without rounded clipping,
+        // which is unsupported by the software renderer. The source app icon
+        // includes a square white plate around this 104 x 76 px mark area.
+        Image {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            // Keep the mark at 24px while giving the white plate more room.
+            width: 24px * root.logo-scale;
+            height: self.width * 76 / 104;
+            source: @image-url("../../../resources/linux/crossdesk_128x128.png");
+            source-clip-x: 12; source-clip-y: 26;
+            source-clip-width: 104; source-clip-height: 76;
+            image-fit: contain;
+        }
     }
 
     // Draw the selected display number over the center of the monitor glyph.
@@ -120,7 +196,7 @@ component ControlBarButton inherits Rectangle {
         x: (parent.width - self.preferred-width) / 2 + 0.5px;
         y: (parent.height - self.preferred-height) / 2 - 0.5px;
         text: root.badge;
-        color: black;
+        color: root.button-foreground;
         font-size: 11px;
     }
 
@@ -128,22 +204,29 @@ component ControlBarButton inherits Rectangle {
     // stay vertical in the software renderer used for fallback and UI capture.
     if root.slashed: Path {
         width: 24px; height: 24px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         viewbox-width: 24; viewbox-height: 24;
         commands: "M 3.5 3.5 L 20.5 20.5";
-        stroke: black;
+        stroke: root.button-foreground;
         stroke-width: 2px;
     }
     if root.slashed: Path {
         width: 24px; height: 24px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         viewbox-width: 24; viewbox-height: 24;
         commands: "M 2 5 L 19 22";
-        stroke: touch.has-hover ? #4296fa : #b3d5fd;
+        stroke: root.button-fill;
         stroke-width: 2px;
     }
 
     touch := TouchArea {
-        mouse-cursor: root.action-enabled ? pointer : default;
+        mouse-cursor: !root.action-enabled ? default : root.show-logo ? (root.logo-pressed ? grabbing : grab) : pointer;
         scroll-event(event) => { accept }
+        pointer-event(event) => {
+            root.pointer-input(event.button, event.kind, self.mouse-x, self.mouse-y);
+        }
         // Keep disabled controls hit-testable so clicks cannot reach the peer.
         clicked => { if root.action-enabled { root.clicked(); } }
     }
@@ -247,7 +330,7 @@ export component StreamWindow inherits Window {
     private property <[string]> secure-shortcut-items: ["Ctrl+Alt+Del", "Win+L"];
     private property <[string]> ordinary-shortcut-items: ["Win+L"];
     private property <[string]> shortcut-items: root.secure-attention-supported ? root.secure-shortcut-items : root.ordinary-shortcut-items;
-    private property <length> shortcut-menu-height: root.shortcut-items.length * 30px + 8px;
+    private property <length> shortcut-menu-height: root.shortcut-items.length * 30px + 16px;
     callback send-shortcut(string);
     callback toggle-mouse-control;
     callback toggle-privacy;
@@ -268,13 +351,31 @@ export component StreamWindow inherits Window {
     callback key-input(string, bool, bool, bool, bool, bool);
     callback keyboard-focus-changed(bool);
 
-    private property <bool> control-expanded: true;
+    private property <bool> control-expanded: false;
+    private property <bool> control-visual-expanded: false;
     private property <length> control-toolbar-height: 38px;
     private property <length> control-button-step: 32px;
+    private property <length> control-disconnect-gap: 8px;
+    private property <length> control-buttons-x: root.control-docked-left ? 43px : 7px;
+    private property <length> control-panel-gap: 8px;
+    private property <float> control-reveal-progress: 0;
+    private property <float> control-surface-progress: min(1, root.control-reveal-progress / 0.65);
+    private property <float> control-content-progress: max(0, (root.control-reveal-progress - 0.65) / 0.35);
+    private property <bool> control-content-visible:
+        root.control-visual-expanded && root.control-content-progress > 0;
+    private property <length> control-surface-width: root.control-toolbar-height
+        + (control.width - root.control-toolbar-height) * root.control-surface-progress;
+    private property <length> control-surface-x: control.x
+        + (root.control-docked-left ? 0px : control.width - root.control-surface-width);
+    private property <duration> control-collapse-duration: 180ms;
+    private property <bool> control-animation-enabled: false;
     private property <length> stats-row-height: 18px;
     private property <length> stats-header-height: 18px;
     private property <length> stats-content-height:
         root.stats-header-height + root.stats-rows.length * root.stats-row-height + 114px;
+    private property <length> stats-panel-height:
+        min(root.stats-content-height + 16px, max(0px, video.height - root.control-toolbar-height - root.control-panel-gap));
+    private property <length> stats-panel-y: root.control-panel-y(root.stats-panel-height);
     private property <length> file-panel-x: 18px;
     private property <length> file-panel-y: video.height - min(210px, video.height * 0.35);
     private property <length> file-panel-width: min(430px, video.width * 0.6);
@@ -282,20 +383,91 @@ export component StreamWindow inherits Window {
     private property <bool> display-menu-open: false;
     private property <bool> display-menu-animation-enabled: false;
     private property <float> display-menu-progress: 0.0;
+    private property <length> display-menu-height: min(180px, root.displays.length * 30px + 16px);
+    private property <length> display-menu-y: root.control-panel-y(root.display-menu-height);
     private property <bool> shortcut-menu-open: false;
+    private property <length> shortcut-menu-y: root.control-panel-y(root.shortcut-menu-height);
     in-out property <bool> video-menu-open: false;
     private property <length> video-menu-width: min(320px, video.width - 8px);
     private property <length> video-menu-height: root.video-settings-enabled && root.video-settings-feedback == "" ? 182px : 220px;
     private property <length> video-menu-x: min(max(4px, control.x + video-button.x), video.width - root.video-menu-width - 4px);
-    private property <length> video-menu-y: control.y + root.control-toolbar-height + root.video-menu-height <= video.height
-        ? control.y + root.control-toolbar-height - 1px : max(0px, control.y - root.video-menu-height);
+    private property <length> video-menu-y: root.control-panel-y(root.video-menu-height);
+    private property <bool> disconnect-menu-open: false;
+    private property <length> disconnect-menu-width: min(220px, video.width - 8px);
+    private property <length> disconnect-menu-height:
+        disconnect-actions.y + disconnect-actions.height + 12px;
+    private property <length> disconnect-menu-x: min(max(4px,
+        control.x + close-button.x + close-button.width - root.disconnect-menu-width),
+        video.width - root.disconnect-menu-width - 4px);
+    private property <length> disconnect-menu-y: root.control-panel-y(root.disconnect-menu-height);
     private property <bool> control-menu-open:
-        root.display-menu-open || root.shortcut-menu-open || root.video-menu-open;
+        root.display-menu-open || root.shortcut-menu-open || root.video-menu-open || root.disconnect-menu-open;
     changed selected-tab => {
         root.close-control-menus();
         root.cancel-remote-pointer();
     }
-    changed control-expanded => { if !root.control-expanded { root.close-control-menus(); } }
+    changed control-expanded => {
+        control-reveal-timer.running = false;
+        control-collapse-timer.running = false;
+        if root.control-expanded {
+            if !root.control-visual-expanded {
+                root.control-animation-enabled = false;
+                root.control-reveal-progress = 0;
+                root.control-visual-expanded = true;
+                control-reveal-timer.running = true;
+            } else {
+                // Reverse an unfinished collapse from its current frame.
+                root.control-animation-enabled = true;
+                root.control-reveal-progress = 1;
+            }
+        } else {
+            root.close-control-menus();
+            if root.control-reveal-progress > 0 {
+                root.control-animation-enabled = true;
+                root.control-reveal-progress = 0;
+                control-collapse-timer.running = true;
+            } else {
+                root.finish-control-collapse();
+            }
+        }
+    }
+    animate control-reveal-progress {
+        duration: root.control-expanded ? 160ms : root.control-collapse-duration;
+        easing: root.control-expanded ? ease-out : ease-in-out;
+        enabled: root.control-animation-enabled;
+    }
+    control-reveal-timer := Timer {
+        interval: 16ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if root.control-expanded {
+                root.control-animation-enabled = true;
+                root.control-reveal-progress = 1;
+            }
+        }
+    }
+    control-collapse-timer := Timer {
+        // Retain the layout through the final animation frame.
+        interval: root.control-collapse-duration + 16ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            if !root.control-expanded { root.finish-control-collapse(); }
+        }
+    }
+    function finish-control-collapse() {
+        if root.control-dragging {
+            // A drag can begin while the capsule is shrinking. Preserve the
+            // logo's position and pointer offset when its container contracts.
+            let logo-offset = logo-button.x;
+            root.control-drag-x = control.x + logo-offset;
+            root.control-press-x = root.control-press-x - logo-offset;
+        }
+        root.control-animation-enabled = false;
+        root.control-reveal-progress = 0;
+        root.control-visual-expanded = false;
+    }
     changed window-active => {
         if !root.window-active {
             root.close-control-menus();
@@ -331,9 +503,9 @@ export component StreamWindow inherits Window {
     private property <bool> control-tooltip-visible: false;
     private property <ControlBarTooltip> hovered-control: {
         if root.window-active && !root.control-dragging
-            && !root.display-menu-open && !root.shortcut-menu-open && !root.video-menu-open {
-            if collapse-button.has-hover { return collapse-button.tooltip-info; }
-            if root.control-expanded {
+            && !root.control-menu-open {
+            if logo-button.has-hover { return logo-button.tooltip-info; }
+            if root.control-expanded && root.control-content-visible {
                 if display-button.has-hover { return display-button.tooltip-info; }
                 if shortcut-button.has-hover { return shortcut-button.tooltip-info; }
                 if mouse-button.has-hover { return mouse-button.tooltip-info; }
@@ -375,6 +547,12 @@ export component StreamWindow inherits Window {
     callback end-control-drag;
     pure callback is-local-control-area(length, length) -> bool;
 
+    pure function control-panel-y(panel-height: length) -> length {
+        let below = control.y + root.control-toolbar-height + root.control-panel-gap;
+        return below + panel-height <= video.height ? below
+            : max(0px, control.y - root.control-panel-gap - panel-height);
+    }
+
     function close-control-menus() {
         display-menu-open-timer.running = false;
         root.display-menu-animation-enabled = false;
@@ -382,6 +560,7 @@ export component StreamWindow inherits Window {
         root.display-menu-open = false;
         root.shortcut-menu-open = false;
         root.video-menu-open = false;
+        root.disconnect-menu-open = false;
     }
 
     // Native focus/session changes release input in C++; clear the matching UI
@@ -447,12 +626,27 @@ export component StreamWindow inherits Window {
         }
     }
 
+    function arm-control-drag(x: length, y: length) {
+        root.close-control-menus();
+        root.control-drag-start-x = x;
+        root.control-drag-start-y = y;
+        root.control-drag-pending = true;
+    }
+
     function update-control-drag(button: PointerEventButton, kind: PointerEventKind,
         x: length, y: length) {
         if kind == PointerEventKind.cancel
             || (kind == PointerEventKind.up && button == PointerEventButton.left) {
+            // Slint emits clicked before pointer-up. Resolve logo clicks here
+            // so a captured drag can never also toggle the toolbar.
+            let toggle-expanded = kind == PointerEventKind.up && root.control-drag-pending
+                && !root.control-dragging
+                && root.window-active && !root.remote-update-visible
+                && x >= control.x + logo-button.x && x < control.x + logo-button.x + logo-button.width
+                && y >= control.y + logo-button.y && y < control.y + logo-button.y + logo-button.height;
             root.control-drag-pending = false;
             root.end-control-drag();
+            if toggle-expanded { root.control-expanded = !root.control-expanded; }
         } else if kind == PointerEventKind.move && root.control-drag-pending {
             if !root.control-dragging
                 && (abs(x - root.control-drag-start-x) >= 5px
@@ -497,32 +691,36 @@ export component StreamWindow inherits Window {
 
     is-local-control-area(pointer-x, pointer-y) => {
         if root.remote-update-visible { return true; }
-        let over-control = pointer-x >= control.x
-            && pointer-x <= control.x + control.width
+        let over-control = pointer-x >= root.control-surface-x
+            && pointer-x <= root.control-surface-x + root.control-surface-width
             && pointer-y >= control.y
             && pointer-y <= control.y + control.height;
-        let display-menu-x = control.x + (root.control-docked-left ? 9px : 42px);
-        let display-menu-y = control.y + root.control-toolbar-height - 1px;
-        let display-menu-height = min(180px, root.displays.length * 30px + 8px);
+        let over-stats = root.stats-visible && root.control-content-visible
+            && pointer-x >= control.x && pointer-x <= control.x + control.width
+            && pointer-y >= root.stats-panel-y && pointer-y <= root.stats-panel-y + root.stats-panel-height;
+        let display-menu-x = control.x + display-button.x;
         let over-display-menu = root.display-menu-open
             && pointer-x >= display-menu-x
             && pointer-x <= display-menu-x + 180px
-            && pointer-y >= display-menu-y
-            && pointer-y <= display-menu-y + display-menu-height;
+            && pointer-y >= root.display-menu-y
+            && pointer-y <= root.display-menu-y + root.display-menu-height;
         let shortcut-menu-x = control.x + shortcut-button.x;
-        let shortcut-menu-y = control.y + 40px;
         let over-shortcut-menu = root.shortcut-menu-open
             && pointer-x >= shortcut-menu-x
             && pointer-x <= shortcut-menu-x + 180px
-            && pointer-y >= shortcut-menu-y
-            && pointer-y <= shortcut-menu-y + root.shortcut-menu-height;
+            && pointer-y >= root.shortcut-menu-y
+            && pointer-y <= root.shortcut-menu-y + root.shortcut-menu-height;
         let over-video-menu = root.video-menu-open
             && pointer-x >= root.video-menu-x && pointer-x <= root.video-menu-x + root.video-menu-width
             && pointer-y >= root.video-menu-y && pointer-y <= root.video-menu-y + root.video-menu-height;
+        let over-disconnect-menu = root.disconnect-menu-open
+            && pointer-x >= root.disconnect-menu-x && pointer-x <= root.disconnect-menu-x + root.disconnect-menu-width
+            && pointer-y >= root.disconnect-menu-y && pointer-y <= root.disconnect-menu-y + root.disconnect-menu-height;
         let over-file-panel = root.file-transfer-visible
             && pointer-x >= root.file-panel-x && pointer-x <= root.file-panel-x + root.file-panel-width
             && pointer-y >= root.file-panel-y && pointer-y <= root.file-panel-y + root.file-panel-height;
-        return over-control || over-display-menu || over-shortcut-menu || over-video-menu || over-file-panel;
+        return over-control || over-stats || over-display-menu || over-shortcut-menu
+            || over-video-menu || over-disconnect-menu || over-file-panel;
     }
 
     begin-control-drag(press-x, press-y) => {
@@ -851,7 +1049,7 @@ export component StreamWindow inherits Window {
 
             // Slint drops its implicit grab on any button-up. Keep the same
             // owner above local UI until every remote button has been released.
-            // The handle also retains a stable owner if another button is used.
+            // The logo also retains a stable owner if another button is used.
             if root.remote-pointer-active || root.control-drag-pending: TouchArea {
                 z: 15;
                 mouse-cursor: root.control-drag-pending ? MouseCursor.grabbing
@@ -872,35 +1070,38 @@ export component StreamWindow inherits Window {
                 }
             }
 
-            // Floating control bar, matching the original top-left overlay.
+            // Keep the toolbar anchor and hit area stable while the visual
+            // capsule grows from the logo's docked edge.
             control := Rectangle {
                 x: root.control-dragging ? root.control-drag-x : root.control-docked-left ? 0px : parent.width - self.width;
                 y: min(max(0px, root.control-pos-y), parent.height - self.height);
-                width: root.control-expanded ? min(76px + 9 * root.control-button-step, parent.width) : 20px;
-                height: root.stats-visible && root.control-expanded
-                    ? min(root.control-toolbar-height + root.stats-content-height + 8px, parent.height)
-                    : root.control-toolbar-height;
-                background: white;
-                border-width: 1px;
-                border-color: ImGuiLineStyle.border;
-                border-radius: FloatingBarStyle.corner-radius;
+                width: root.control-visual-expanded ? min(80px + 9 * root.control-button-step + root.control-disconnect-gap, parent.width) : root.control-toolbar-height;
+                height: root.control-toolbar-height;
                 z: 10;
-                clip: true;
-                // Keep width changes atomic. When docked right, animating both
-                // x and the clip width can leave newly revealed buttons outside
-                // Slint's damage region until they receive a hover repaint.
-                animate height { duration: 60ms; easing: ease-out; }
 
-                // All padding and statistics are local, non-draggable content.
+                if root.control-visual-expanded: StreamControlSurface {
+                    width: root.control-surface-width;
+                    height: root.control-toolbar-height;
+                    x: root.control-docked-left ? 0px : parent.width - self.width;
+                    border-radius: root.control-toolbar-height / 2;
+                    opacity: min(1, root.control-reveal-progress / 0.15);
+                }
+
+                // Padding stays local; only the logo starts dragging.
                 TouchArea {
+                    x: root.control-surface-x - control.x;
+                    width: root.control-surface-width;
                     mouse-cursor: default;
                     clicked => { root.close-control-menus(); }
                     scroll-event(event) => { accept }
                 }
 
                 display-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: root.control-docked-left ? 9px : 42px; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.display;
                     badge: root.selected-display + 1;
                     tooltip: StreamStrings.select-display;
@@ -911,14 +1112,18 @@ export component StreamWindow inherits Window {
                         root.display-menu-open = !root.display-menu-open;
                         root.shortcut-menu-open = false;
                         root.video-menu-open = false;
+                        root.disconnect-menu-open = false;
                         if root.display-menu-open {
                             display-menu-open-timer.running = true;
                         }
                     }
                 }
                 shortcut-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.keyboard; tooltip: StreamStrings.send-shortcut;
                     clicked => {
                         display-menu-open-timer.running = false;
@@ -927,117 +1132,146 @@ export component StreamWindow inherits Window {
                         root.shortcut-menu-open = !root.shortcut-menu-open;
                         root.display-menu-open = false;
                         root.video-menu-open = false;
+                        root.disconnect-menu-open = false;
                     }
                 }
                 mouse-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 2 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + 2 * root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.computer-mouse; slashed: !root.mouse-control-enabled;
                     tooltip: root.mouse-control-enabled ? StreamStrings.release-mouse : StreamStrings.control-mouse;
                     clicked => { root.close-control-menus(); root.toggle-mouse-control(); }
                 }
                 audio-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 4 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + 4 * root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.volume-high; slashed: !root.audio-enabled;
                     tooltip: root.audio-enabled ? StreamStrings.mute : StreamStrings.audio;
                     clicked => { root.close-control-menus(); root.toggle-audio(); }
                 }
                 file-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 5 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + 5 * root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.folder-open; tooltip: StreamStrings.select-file;
                     clicked => { root.close-control-menus(); root.select-file(); }
                 }
                 video-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 6 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + 6 * root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: "\u{f1de}"; selected: root.video-menu-open;
                     tooltip: StreamStrings.video-settings;
                     clicked => {
                         root.video-menu-open = !root.video-menu-open;
                         root.display-menu-open = false;
                         root.shortcut-menu-open = false;
+                        root.disconnect-menu-open = false;
                     }
                 }
                 stats-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 7 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + 7 * root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.signal; selected: root.stats-visible;
                     tooltip: root.stats-visible ? StreamStrings.hide-stats : StreamStrings.show-stats;
                     clicked => { root.close-control-menus(); root.toggle-stats(); }
                 }
                 fullscreen-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 8 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + 8 * root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: root.fullscreen-enabled ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
                     tooltip: root.fullscreen-enabled ? StreamStrings.exit-fullscreen : StreamStrings.fullscreen;
                     clicked => { root.close-control-menus(); root.toggle-fullscreen(); }
                 }
+                if root.control-content-visible: Rectangle {
+                    opacity: root.control-content-progress;
+                    x: close-button.x - 6px; y: 12px;
+                    width: 1px; height: 14px;
+                    background: #dbe5f1;
+                }
                 close-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 9 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    action-enabled: root.control-expanded;
+                    x: root.control-buttons-x + 9 * root.control-button-step + root.control-disconnect-gap;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.xmark; tooltip: StreamStrings.disconnect;
-                    clicked => { root.close-control-menus(); root.disconnect(); }
+                    danger: true;
+                    selected: root.disconnect-menu-open;
+                    clicked => {
+                        let open = !root.disconnect-menu-open;
+                        root.close-control-menus();
+                        root.disconnect-menu-open = open;
+                    }
                 }
 
-                // Reuse the separator gap as a visible grip; statistics and
-                // button gaps no longer move the bar accidentally.
-                if root.control-expanded: drag-handle := Rectangle {
-                    x: root.control-docked-left ? parent.width - 40px : 27px;
-                    y: 7px; width: 12px; height: 24px;
-                    background: drag-touch.has-hover ? #eaf3ff : transparent;
-                    border-radius: UiRadius.control;
-                    for dot in 6: Rectangle {
-                        x: 3px + mod(dot, 2) * 4px;
-                        y: 6px + floor(dot / 2) * 5px;
-                        width: 2px; height: 2px; border-radius: 1px;
-                        background: #8b95a3;
-                    }
-                    drag-touch := TouchArea {
-                        mouse-cursor: root.control-drag-pending ? grabbing : grab;
-                        pointer-event(event) => {
-                            let x = control.x + drag-handle.x + self.mouse-x;
-                            let y = control.y + drag-handle.y + self.mouse-y;
-                            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
-                                root.close-control-menus();
-                                root.control-drag-start-x = x;
-                                root.control-drag-start-y = y;
-                                root.control-drag-pending = true;
-                            } else {
-                                root.update-control-drag(event.button, event.kind, x, y);
-                            }
-                        }
-                        scroll-event(event) => { accept }
-                    }
-                }
-                collapse-button := ControlBarButton {
-                    x: root.control-expanded ? (root.control-docked-left ? parent.width - 25px : 10px) : 2px;
-                    y: 7px;
-                    width: 15px;
-                    icon: root.control-expanded
-                          ? (root.control-docked-left ? FontAwesomeIcons.angle-left : FontAwesomeIcons.angle-right)
-                          : (root.control-docked-left ? FontAwesomeIcons.angle-right : FontAwesomeIcons.angle-left);
+                logo-button := ControlBarButton {
+                    // Stay under the pointer across expansion and collapse.
+                    x: root.control-docked-left ? 0px : parent.width - self.width;
+                    y: 0px;
+                    width: root.control-toolbar-height;
+                    height: root.control-toolbar-height;
+                    show-logo: true;
+                    logo-pressed: root.control-drag-pending;
+                    logo-dragging: self.logo-pressed && root.control-dragging;
                     tooltip: root.control-expanded ? StreamStrings.collapse-control : StreamStrings.expand-control;
-                    clicked => { root.close-control-menus(); root.control-expanded = !root.control-expanded; }
+                    pointer-input(button, kind, pointer-x, pointer-y) => {
+                        let x = control.x + logo-button.x + pointer-x;
+                        let y = control.y + logo-button.y + pointer-y;
+                        if kind == PointerEventKind.down && button == PointerEventButton.left {
+                            root.arm-control-drag(x, y);
+                        } else {
+                            root.update-control-drag(button, kind, x, y);
+                        }
+                    }
                 }
 
                 privacy-button := ControlBarButton {
-                    visible: root.control-expanded;
-                    x: (root.control-docked-left ? 9px : 42px) + 3 * root.control-button-step; y: 7px;
+                    reveal-progress: root.control-content-progress;
+                    visible: root.control-content-visible;
+                    x: root.control-buttons-x + 3 * root.control-button-step;
+                    y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.user-secret;
                     slashed: root.privacy-off && !root.privacy-unsupported;
                     muted: root.privacy-unsupported;
-                    action-enabled: root.privacy-can-toggle;
+                    action-enabled: root.control-expanded && root.privacy-can-toggle;
                     tooltip: root.privacy-status-text
                         + (root.privacy-can-toggle ? "\n" + (root.privacy-active
                             ? StreamStrings.privacy-disable : StreamStrings.privacy-enable) : "");
                     clicked => { root.close-control-menus(); root.toggle-privacy(); }
                 }
+            }
 
-                if root.stats-visible && root.control-expanded: stats-table := Rectangle {
+            if root.stats-visible && root.control-content-visible: stats-panel := StreamControlSurface {
+                x: control.x; y: root.stats-panel-y;
+                width: control.width; height: root.stats-panel-height;
+                opacity: root.control-content-progress;
+                z: 10;
+                clip: true;
+                TouchArea {
+                    mouse-cursor: default;
+                    clicked => { root.close-control-menus(); }
+                    scroll-event(event) => { accept }
+                }
+                stats-table := Rectangle {
                     x: 8px;
-                    y: root.control-toolbar-height + 2px;
+                    y: 8px;
                     width: parent.width - 16px;
                     height: root.stats-content-height;
                     background: transparent;
@@ -1302,11 +1536,61 @@ export component StreamWindow inherits Window {
                     scroll-event(event) => { accept }
                 }
             }
-            if root.video-menu-open: Rectangle {
+            disconnect-panel := StreamControlSurface {
+                visible: root.disconnect-menu-open;
+                x: root.disconnect-menu-x; y: root.disconnect-menu-y;
+                width: root.disconnect-menu-width; height: root.disconnect-menu-height;
+                z: 11;
+                TouchArea { mouse-cursor: default; scroll-event(event) => { accept } }
+                disconnect-title := Text {
+                    x: 12px; y: 12px; width: parent.width - 24px;
+                    height: max(20px, self.preferred-height);
+                    text: StreamStrings.confirm-disconnect;
+                    color: #30343b; font-size: 14px; font-weight: 600;
+                    vertical-alignment: center; wrap: word-wrap;
+                }
+                disconnect-message := Text {
+                    x: 12px; y: disconnect-title.y + disconnect-title.height + 4px;
+                    width: parent.width - 24px; height: max(18px, self.preferred-height);
+                    text: StreamStrings.disconnect-description;
+                    color: #667085; font-size: 12px; wrap: word-wrap;
+                }
+                disconnect-actions := HorizontalLayout {
+                    x: parent.width - self.width - 12px;
+                    y: disconnect-message.y + disconnect-message.height + 12px;
+                    width: 168px; height: 28px;
+                    spacing: 8px;
+                    SecondaryButton {
+                        width: 72px;
+                        height: 28px;
+                        text: StreamStrings.cancel;
+                        clicked => { root.close-control-menus(); }
+                    }
+                    Rectangle {
+                        width: 88px;
+                        background: confirm-disconnect-touch.pressed ? #912018
+                            : confirm-disconnect-touch.has-hover ? #b42318 : #d92d20;
+                        border-radius: UiRadius.control;
+                        Text {
+                            text: StreamStrings.disconnect;
+                            color: white; font-size: ImGuiFontStyle.body;
+                            horizontal-alignment: center; vertical-alignment: center;
+                        }
+                        confirm-disconnect-touch := TouchArea {
+                            mouse-cursor: MouseCursor.pointer;
+                            scroll-event(event) => { accept }
+                            clicked => {
+                                root.close-control-menus();
+                                root.disconnect();
+                            }
+                        }
+                    }
+                }
+            }
+            if root.video-menu-open: StreamControlSurface {
                 x: root.video-menu-x; y: root.video-menu-y;
                 width: root.video-menu-width; height: root.video-menu-height;
-                background: white; border-width: 1px; border-color: ImGuiLineStyle.border;
-                border-radius: UiRadius.menu; z: 11;
+                z: 11;
                 TouchArea {
                     mouse-cursor: default;
                     scroll-event(event) => { accept }
@@ -1337,28 +1621,22 @@ export component StreamWindow inherits Window {
                 }
             }
 
-            if root.display-menu-open: display-menu := Rectangle {
-                private property <length> expanded-height: min(180px, root.displays.length * 30px + 8px);
+            if root.display-menu-open: display-menu := StreamControlSurface {
+                private property <length> expanded-height: root.display-menu-height;
                 private property <int> hovered-index:
-                    display-touch.has-hover && display-touch.mouse-y >= 4px
-                        && floor((display-touch.mouse-y - 4px) / 30px) < root.displays.length
-                    ? floor((display-touch.mouse-y - 4px) / 30px) : -1;
-                x: control.x + (root.control-docked-left ? 9px : 42px);
-                // Anchor to the button row, independent of the expanded stats.
-                // Overlap its bottom edge by one pixel to keep the menu attached.
-                y: control.y + root.control-toolbar-height - 1px;
+                    display-touch.has-hover && display-touch.mouse-y >= 8px
+                        && floor((display-touch.mouse-y - 8px) / 30px) < root.displays.length
+                    ? floor((display-touch.mouse-y - 8px) / 30px) : -1;
+                x: control.x + display-button.x;
+                y: root.display-menu-y;
                 width: 180px;
                 height: self.expanded-height * root.display-menu-progress;
                 opacity: root.display-menu-progress;
-                background: white;
-                border-width: 1px;
-                border-color: ImGuiLineStyle.border;
-                border-radius: UiRadius.menu;
                 clip: true;
                 z: 11;
 
                 VerticalLayout {
-                    padding: 4px; spacing: 1px;
+                    padding: 8px; spacing: 1px;
                     for display[index] in root.displays: Rectangle {
                         height: 29px;
                         background: index == display-menu.hovered-index && display-touch.pressed ? #bfd4f2
@@ -1394,9 +1672,9 @@ export component StreamWindow inherits Window {
                 display-touch := TouchArea {
                     mouse-cursor: default;
                     clicked => {
-                        let index = floor((self.mouse-y - 4px) / 30px);
-                        let row-y = self.mouse-y - 4px - index * 30px;
-                        if self.mouse-y >= 4px && row-y < 29px
+                        let index = floor((self.mouse-y - 8px) / 30px);
+                        let row-y = self.mouse-y - 8px - index * 30px;
+                        if self.mouse-y >= 8px && row-y < 29px
                             && index >= 0 && index < root.displays.length {
                             display-menu-open-timer.running = false;
                             root.display-menu-animation-enabled = false;
@@ -1410,12 +1688,12 @@ export component StreamWindow inherits Window {
                 }
             }
 
-            if root.shortcut-menu-open: Rectangle {
-                x: control.x + shortcut-button.x; y: control.y + 40px; width: 180px; height: root.shortcut-menu-height;
-                background: white; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.menu; z: 11;
+            if root.shortcut-menu-open: StreamControlSurface {
+                x: control.x + shortcut-button.x; y: root.shortcut-menu-y;
+                width: 180px; height: root.shortcut-menu-height; z: 11;
                 TouchArea { mouse-cursor: default; scroll-event(event) => { accept } }
                 VerticalLayout {
-                    padding: 4px; spacing: 1px;
+                    padding: 8px; spacing: 1px;
                     for shortcut in root.shortcut-items: Rectangle {
                         height: 29px; background: shortcut-touch.has-hover ? #e8eef9 : transparent;
                         Text { x: 8px; text: shortcut; color: #30343b; font-size: ImGuiFontStyle.body; vertical-alignment: center; }

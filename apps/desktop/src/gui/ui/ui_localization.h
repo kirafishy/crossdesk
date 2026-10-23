@@ -228,6 +228,11 @@ inline int ApplyStreamWindowStrings(
   strings.set_fullscreen(Text(localization::fullscreen[language]));
   strings.set_exit_fullscreen(Text(localization::exit_fullscreen[language]));
   strings.set_disconnect(Text(localization::disconnect[language]));
+  strings.set_confirm_disconnect(
+      Text(localization::stream_confirm_disconnect[language]));
+  strings.set_disconnect_description(
+      Text(localization::stream_disconnect_description[language]));
+  strings.set_cancel(Text(localization::cancel[language]));
   strings.set_file_transfer(
       Text(localization::file_transfer_progress[language]));
   strings.set_expand_control(Text(localization::expand_control_bar[language]));

@@ -115,6 +115,11 @@ struct TranslationRow {
   X(recent_connections, u8"近期连接", "Recent Connections",                    \
     u8"Недавние подключения")                                                  \
   X(disconnect, u8"断开连接", "Disconnect", u8"Отключить")                     \
+  X(stream_confirm_disconnect, u8"断开当前连接？", "Disconnect this session?", \
+    u8"Отключить текущий сеанс?")                                              \
+  X(stream_disconnect_description, u8"当前远程控制会话将结束。",               \
+    "The current remote session will end.",                                  \
+    u8"Текущий сеанс удалённого управления будет завершён.")                   \
   X(select_display, u8"选择显示器", "Select Display", u8"Выбрать дисплей")     \
   X(display_screen, u8"显示屏", "Display", u8"Экран")                        \
   X(expand_control_bar, u8"展开控制栏", "Expand Control Bar",                  \
