@@ -267,6 +267,15 @@ struct Mobile {
         MobileSegment({ labels: ['帧率优先', '画质优先', '平衡'], selection: this.state.videoPreference,
           changed: (i: number) => this.controller?.setPreference(i) })
       }.padding(12).width('100%').backgroundColor(Color.White).borderRadius(26).border({ width: 0.5, color: MobileTheme.line })
+      this.SectionTitle('屏幕方向')
+      Row() {
+        Text('连接后自动横屏').fontSize(16).fontColor(MobileTheme.ink).layoutWeight(1)
+        Toggle({ type: ToggleType.Switch, isOn: this.state.autoLandscape }).selectedColor(MobileTheme.green)
+          .onChange((value: boolean) => this.controller?.setAutoLandscape(value)).accessibilityText('连接后自动横屏')
+      }.padding({ left: 16, right: 16, top: 10, bottom: 10 }).width('100%').backgroundColor(Color.White)
+        .borderRadius(26).border({ width: 0.5, color: MobileTheme.line })
+      Text('手机连接后先进入横屏，将手机横过来后恢复跟随设备方向。关闭后始终跟随设备方向。平板和多窗口不受影响。')
+        .fontSize(12).fontColor(MobileTheme.secondary).width('100%').padding({ left: 16, right: 16, top: 8, bottom: 12 })
       Column() {
         this.SettingRow('服务器', this.customServer ? '自定义' : '默认', () => this.serverExpanded = !this.serverExpanded)
         if (this.serverExpanded) {

@@ -75,7 +75,7 @@ struct ContentView: View {
         }
         .onAppear {
             if !session.sessionVisible {
-                AppOrientation.update(to: .portrait)
+                AppOrientation.endSession()
             }
             if scenePhase == .active {
                 session.applicationDidBecomeActive()
@@ -839,6 +839,11 @@ private struct ServerSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            }
+            Section {
+                Toggle("连接后自动横屏", isOn: $session.autoLandscape)
+            } header: {
+                Text("屏幕方向")
             }
             Section {
                 DisclosureGroup(isExpanded: $serverConfigurationExpanded) {

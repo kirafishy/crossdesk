@@ -312,6 +312,9 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     @Published var videoAdaptationPolicy = VideoAdaptationPolicy.saved {
         didSet { videoAdaptationPolicy.save() }
     }
+    @Published var autoLandscape = UserDefaults.standard.object(forKey: AppOrientation.autoLandscapeKey) as? Bool ?? true {
+        didSet { UserDefaults.standard.set(autoLandscape, forKey: AppOrientation.autoLandscapeKey) }
+    }
     @Published private(set) var videoSettings = RemoteVideoSettingsState()
     @Published var remoteID = ""
     @Published var password = ""
@@ -437,6 +440,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     func applicationDidBecomeActive() {
         appIsActive = true
+        AppOrientation.resume()
         pictureInPicture.didBecomeActive()
         appUpdates.setEnabled(hasNetworkConsent)
         privacyNotice.didBecomeActive(hasNetworkConsent: hasNetworkConsent)
@@ -447,6 +451,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     func applicationDidEnterBackground() {
         appIsActive = false
+        AppOrientation.suspend()
         appUpdates.setEnabled(false)
         privacyNotice.didEnterBackground()
         suspendVideoForBackground()
@@ -591,6 +596,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     }
 
     private func beginRemoteConnection(_ identifier: String) {
+        AppOrientation.endSession()
         networkStatistics = RemoteNetworkStatistics()
         resetRemoteHostInfo()
         cancelVideoRecovery()
@@ -714,7 +720,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         selectedDisplay = 0
         connectionStatus = "未连接"
         audioPlayer.endSession()
-        AppOrientation.update(to: .portrait)
+        AppOrientation.endSession()
         appUpdates.checkNow()
     }
 
@@ -1191,7 +1197,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
             recordSuccessfulConnectionIfNeeded()
             audioPlayer.setEnabled(audioEnabled)
             bridge.setAudioEnabled(audioEnabled)
-            AppOrientation.update(to: .allButUpsideDown)
+            AppOrientation.beginSession(autoLandscape: autoLandscape)
         case 2: connectionStatus = "正在收集 ICE 候选"
         case 3: finishConnection(withError: "网络连接已中断，请重新连接。")
         case 4:

@@ -19,6 +19,7 @@ final class BackgroundSession implements NativeSession.Listener {
     RemoteVideoSettings videoSettings;
     int signalState, selectedDisplay, width, height;
     boolean muted, remoteServiceAvailable, background, ended;
+    boolean waitingForLandscape;
     File receivedFile;
 
     BackgroundSession(Context context, NativeSession session, String host, int port, String remote) {

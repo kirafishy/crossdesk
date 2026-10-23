@@ -50,6 +50,7 @@ export class MobileState {
   muted: boolean = false;
   previews: boolean = false;
   videoPreference: number = 1;
+  autoLandscape: boolean = true;
   version: string = '0.1.0';
   update: string = '';
   updateStatus: string = '';
@@ -122,6 +123,7 @@ export class MobileController {
     this.state.consent = this.store.flag('consent'); this.state.server = this.store.text('server', 'api.crossdesk.cn');
     this.state.port = this.store.text('port', '9099'); this.state.remote = this.store.text('lastRemote');
     this.state.relative = this.store.flag('relative', true); this.state.videoPreference = this.store.number('videoPreference', 1);
+    this.state.autoLandscape = this.store.flag('autoLandscape', true);
     this.state.previews = this.store.flag('previews');
     try { this.state.version = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT).versionName; } catch {}
     try {
@@ -280,6 +282,7 @@ export class MobileController {
     this.settingsTimeout = setTimeout(() => { this.video.expire(id); this.syncVideo(); }, 5000); this.syncVideo();
   }
   setPreference(value: number): void { this.store.put('videoPreference', value); this.state.videoPreference = value; }
+  setAutoLandscape(value: boolean): void { this.store.put('autoLandscape', value); this.state.autoLandscape = value; }
   setPreviews(value: boolean): void {
     this.store.put('previews', value); this.state.previews = value;
     if (!value) { this.send({ op: 'cancelPreview' }); this.previewEligible = false; this.store.clearPreviews(); this.history(); }
@@ -427,7 +430,7 @@ export class MobileController {
         this.history();
       }
     }).catch(() => this.toast('密码保存失败，本次连接仍可使用'));
-    this.platform.connected();
+    this.platform.connected(this.state.autoLandscape);
     if (this.video.supported && this.video.requestId === 0) this.updateVideo(0, this.video.selection.quality);
     if (this.receivedHostInfo) this.checkRemote(this.remoteVersion);
   }
