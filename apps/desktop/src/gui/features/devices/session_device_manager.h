@@ -23,6 +23,7 @@
 #include "display_info.h"
 #include "features/input/captured_keyboard_queue.h"
 #include "features/input/remote_mouse_buttons.h"
+#include "screen_sharing_power.h"
 #include "speaker_capture_controller.h"
 
 struct SDL_AudioStream;
@@ -105,6 +106,8 @@ private:
   bool ShouldSendCapturedFrame(std::chrono::steady_clock::time_point now,
                                int fps);
   bool ShouldCaptureCursor() const;
+  bool HasConnectedController() const;
+  void UpdateScreenSharingPower();
   bool SyncDisplayInfo();
   void SetDisplayInfoList(std::vector<DisplayInfo> displays);
   void RecordCaptureCadence(std::chrono::steady_clock::time_point now, int fps,
@@ -115,6 +118,7 @@ private:
   std::unordered_map<std::string, SDL_AudioStream*> output_streams_;
   ScreenCapturerFactory *screen_capturer_factory_ = nullptr;
   ScreenCapturer *screen_capturer_ = nullptr;
+  ScreenSharingPower screen_sharing_power_;
   std::atomic<bool> cursor_capture_dirty_{true};
   SpeakerCaptureController speaker_capture_;
   DeviceControllerFactory *device_controller_factory_ = nullptr;

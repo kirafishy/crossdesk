@@ -1225,6 +1225,9 @@ bool GuiApplication::InitializeSDL() {
         "windows while retaining Wayland portal capture and input");
   }
 #endif
+  // SDL disables the screensaver by default. A background remote desktop app
+  // should leave automatic display sleep under the user's system settings.
+  SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
     LOG_ERROR("SDL initialization failed: {}", SDL_GetError());
     return false;

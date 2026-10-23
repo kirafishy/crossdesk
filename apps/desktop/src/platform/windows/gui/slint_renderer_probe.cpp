@@ -11,6 +11,8 @@ namespace crossdesk {
 
 int RunSlintRendererProbe() {
   SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+  // Renderer probing should not inhibit automatic display sleep either.
+  SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
   if (!SDL_Init(SDL_INIT_VIDEO)) {
     return 1;
   }

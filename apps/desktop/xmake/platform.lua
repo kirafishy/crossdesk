@@ -57,6 +57,16 @@ function setup_platform_settings()
             "/usr/local/include/freetype2"
         }, {system = true})
 
+        -- Screen sharing power inhibitors also use D-Bus in X11-only builds.
+        add_links("dbus-1")
+        add_existing_include_dirs({
+            "/usr/include/dbus-1.0",
+            "/usr/local/include/dbus-1.0"
+        }, {system = true})
+        for _, include_dir in ipairs(collect_dbus_arch_include_dirs()) do
+            add_includedirs(include_dir, {system = true})
+        end
+
         if is_config("USE_DRM", true) then
             add_links("drm")
             add_defines("CROSSDESK_HAS_DRM=1")
@@ -69,11 +79,8 @@ function setup_platform_settings()
         end
 
         if is_config("USE_WAYLAND", true) then
-            add_links("dbus-1")
             add_defines("CROSSDESK_HAS_WAYLAND_CAPTURER=1")
             add_existing_include_dirs({
-                "/usr/include/dbus-1.0",
-                "/usr/local/include/dbus-1.0",
                 "/usr/include/pipewire-0.3",
                 "/usr/local/include/pipewire-0.3",
                 "/usr/include/pipewire",
@@ -85,9 +92,6 @@ function setup_platform_settings()
                 "/usr/local/include/spa",
                 "/opt/crossdesk-pipewire-sdk/include/spa-0.2"
             }, {system = true})
-            for _, include_dir in ipairs(collect_dbus_arch_include_dirs()) do
-                add_includedirs(include_dir, {system = true})
-            end
         else
             add_defines("CROSSDESK_HAS_WAYLAND_CAPTURER=0")
         end
@@ -98,7 +102,7 @@ function setup_platform_settings()
             add_ldflags("-Wl,-ld_classic")
         end
         add_cxflags("-Wno-unused-variable")
-        add_frameworks("Cocoa", "CoreGraphics", "Metal", "QuartzCore",
+        add_frameworks("Cocoa", "CoreGraphics", "Metal", "QuartzCore", "IOKit",
             "IOSurface",
             "ScreenCaptureKit", "AVFoundation", "CoreMedia", "CoreVideo",
             "CoreAudio", "AudioToolbox")

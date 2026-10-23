@@ -298,6 +298,21 @@ bool SessionDeviceManager::ShouldCaptureCursor() const {
   });
 }
 
+bool SessionDeviceManager::HasConnectedController() const {
+  std::shared_lock lock(owner_.connection_status_mutex_);
+  return std::any_of(owner_.connection_status_.begin(),
+                     owner_.connection_status_.end(), [](const auto& entry) {
+    return entry.second == ConnectionStatus::Connected;
+  });
+}
+
+void SessionDeviceManager::UpdateScreenSharingPower() {
+  // Wayland keeps capture warm after the last disconnect. Only live viewers
+  // justify keeping the host awake; an outgoing viewing session does not.
+  screen_sharing_power_.SetSharing(owner_.screen_capturer_is_started_ &&
+                                   HasConnectedController());
+}
+
 int SessionDeviceManager::StartScreenCapturer() {
 #ifdef __APPLE__
   if (!owner_.EnsureMacScreenRecordingPermission()) {
@@ -317,8 +332,10 @@ int SessionDeviceManager::StartScreenCapturer() {
   cursor_capture_dirty_.store(false, std::memory_order_relaxed);
   const bool show_cursor = ShouldCaptureCursor();
   LOG_INFO("Start screen capturer, show cursor: {}", show_cursor);
+  screen_sharing_power_.SetSharing(HasConnectedController());
   const int ret = screen_capturer_->Start(show_cursor);
   if (ret != 0) {
+    screen_sharing_power_.SetSharing(false);
     LOG_ERROR("Start screen capturer failed: {}", ret);
   }
   return ret;
@@ -329,6 +346,8 @@ int SessionDeviceManager::StopScreenCapturer() {
     LOG_INFO("Stop screen capturer");
     screen_capturer_->Stop();
   }
+  owner_.screen_capturer_is_started_ = false;
+  screen_sharing_power_.SetSharing(false);
   return 0;
 }
 
@@ -647,6 +666,8 @@ void SessionDeviceManager::PushAudio(const std::string& remote_id,
 }
 
 void SessionDeviceManager::UpdateInteractions() {
+  // Release even when pending remote-input cleanup makes this tick return early.
+  UpdateScreenSharingPower();
 #ifdef _WIN32
   if (owner_.screen_capturer_is_started_ &&
       cursor_capture_dirty_.load(std::memory_order_relaxed)) {
@@ -679,6 +700,8 @@ void SessionDeviceManager::UpdateInteractions() {
     StopScreenCapturer();
     owner_.screen_capturer_is_started_ = false;
   }
+
+  UpdateScreenSharingPower();
 
   if (owner_.start_mouse_controller_ && !owner_.mouse_controller_is_started_) {
     if (StartMouseController() == 0) {
@@ -823,6 +846,8 @@ std::vector<HostDisplay> SessionDeviceManager::host_display_list() const {
 }
 
 void SessionDeviceManager::DestroyDevices() {
+  owner_.screen_capturer_is_started_ = false;
+  screen_sharing_power_.SetSharing(false);
   speaker_capture_.Shutdown();
   StopMouseController(true);
   if (screen_capturer_) {
