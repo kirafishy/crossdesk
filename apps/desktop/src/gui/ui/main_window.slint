@@ -2674,8 +2674,20 @@ export component MainWindow inherits Window {
                             }
                             SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: !root.settings-session-active; }
                             SettingsToggleRow {
+                                label: UiStrings.self-hosted;
+                                label-reserve: self-host-edit.width + 84px;
                                 checked <=> root.self-hosted-enabled; enabled: !root.settings-session-active; divider: false;
-                                SettingsButton { x: 0px; y: 2px; width: parent.width - 60px; height: 32px; quiet: true; align-left: true; text: UiStrings.self-hosted; enabled: !root.settings-session-active; clicked => { root.self-host-settings-open = true; } }
+                                self-host-edit := SettingsButton {
+                                    x: parent.width - self.width - 60px; y: 4px;
+                                    width: self-host-edit-metrics.preferred-width + 24px; height: 28px;
+                                    text: GalleryStrings.tr("编辑", "Edit", "Изменить");
+                                    enabled: !root.settings-session-active;
+                                    clicked => { root.self-host-settings-open = true; }
+                                    self-host-edit-metrics := Text {
+                                        visible: false; accessible-role: none;
+                                        text: parent.text; font-size: 12px;
+                                    }
+                                }
                             }
                         }
                         Text {

@@ -152,7 +152,7 @@ Open **☰ → Settings** in the top-right corner, choose **General / DeskHub**,
 | Force Relay | When off, automatically select a connection path with P2P and TURN relay fallback; when on, use relay connections only |
 | Save remote screen previews | On by default. When disabled, the thumbnail area shows the remote device’s platform and existing previews are cleared; connection records and passwords are preserved |
 | Privacy screen on connect | Automatically enable privacy when this computer is controlled remotely; the controller can toggle it from the session toolbar |
-| Self-Hosted Config | Set the server address and signaling port, then enable the checkbox |
+| Self-Hosted Config | Click Edit to set the server address and signaling port, then enable the switch on the right |
 | Auto Start / Enable Daemon | Configure startup and process supervision; restart as indicated by the UI |
 | File Save Path | Choose where received files are saved |
 

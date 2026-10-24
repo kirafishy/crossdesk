@@ -43,9 +43,9 @@ sudo docker compose ps
 For a self-signed deployment, complete the [certificate trust steps](#3-trust-the-tls-certificate) on both clients before checking their connection status.
 
 1. Disconnect existing sessions and open **☰ → Settings**.
-2. Scroll down and click **Self-Hosted Config**.
+2. Scroll down and click **Edit** in the **Self-Hosted Config** row.
 3. Enter **Server Address** and **Signal Service Port**, then confirm. The address accepts a hostname or IP (such as `my-server.example.com`), a signaling path (such as `my-server.example.com/signal-path`), or an `https://` / `wss://` URL. An explicit URL port takes precedence; otherwise the separate signaling port is used. Connections always use WSS. Paths must be routed to the signaling WebSocket service by your reverse proxy; an ordinary web page is not a signaling endpoint.
-4. Enable the checkbox beside **Self-Hosted Config**, then click **OK** in the parent settings window.
+4. Enable the switch beside **Self-Hosted Config**, then click **Save** in the parent settings window.
 5. Configure both the controller and host this way. Once both report a server connection, connect using the host's currently displayed ID.
 
 <p align="center">
