@@ -172,6 +172,7 @@ Host your own signaling and TURN services, then enable them under **Settings →
 
 - [Build from source](docs/BUILD_EN.md): desktop dependencies, build options, and packaging. Use the platform guides above for mobile builds.
 - [GUI architecture](docs/gui-architecture.md) (Chinese): desktop UI, platform implementation, and project structure.
+- [Connection architecture](docs/connection-architecture.md) (Chinese): discovery, authentication, negotiation, data paths, and lifecycle for ID and direct IP modes.
 - [FAQ](docs/FAQ.md#english): connections, blank video, permissions, received files, and build issues.
 - [Report an issue or suggestion](https://github.com/kunkundi/crossdesk/issues): include both operating systems, client versions, connection mode, and reproduction steps.
 

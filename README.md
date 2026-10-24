@@ -172,6 +172,7 @@ PC 端可控制和被控制，复用桌面界面与桌面墙；手机和平板�
 
 - [源码构建](docs/BUILD.md)：桌面端依赖、编译参数与打包；移动端请使用上方各平台的构建指南。
 - [GUI 架构](docs/gui-architecture.md)：桌面界面、平台实现与工程结构。
+- [连接模式架构](docs/connection-architecture.md)：ID 连接与 IP 直连的寻址、认证、协商、数据路径及生命周期。
 - [常见问题](docs/FAQ.md)：连接失败、黑屏、系统权限、文件位置与构建问题。
 - [提交问题或建议](https://github.com/kunkundi/crossdesk/issues)：请提供两端系统、客户端版本、连接方式和可复现步骤。
 

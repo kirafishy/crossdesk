@@ -2,6 +2,8 @@
 
 本文档说明 `apps/desktop/src/gui` 的目录结构、核心类型、依赖方向和代码归属规则，用于避免 `Render`、`GuiApplication` 或 `GuiRuntime` 再次演变成职责混杂的大类。
 
+ID 连接与 IP 直连的网络拓扑、认证和传输流程见 [连接模式架构](connection-architecture.md)。
+
 ## 目录结构
 
 ```text
@@ -160,7 +162,7 @@ Render::Run
        → Tick 协调连接、处理后台事件并同步窗口状态
 ```
 
-### 建立远端连接
+### 建立 ID 远端连接
 
 ```text
 MainWindow::connect_requested
@@ -172,6 +174,21 @@ MainWindow::connect_requested
   → PeerEventHandler 接收连接状态
   → SyncStreamWindow 创建串流窗口并开始呈现视频
 ```
+
+### 建立 IP 直连
+
+```text
+MainWindow 地址校验与密码弹窗
+  → GuiRuntime::ConnectLan
+  → lan::SessionManager::Connect
+  → WSS 连接被控端 IP:端口，由被控端验证密码
+  → MiniRTC InitDirectPeer / StartDirectSession
+  → WSS 交换 SDP 与候选，HostOnly ICE 建立 UDP 通道
+  → DTLS/SRTP 就绪，SessionManager 标记授权
+  → PeerEventHandler 与原有串流窗口、输入、文件及剪贴板处理
+```
+
+LAN 初始化和生命周期集中在 `runtime/lan_runtime.cpp`，监听、密码及协商协议位于 `src/network/lan`。主窗口模式切换与 IP 功能启停独立；后者负责停止监听并排空 LAN 会话。
 
 ### 接收远端数据
 
