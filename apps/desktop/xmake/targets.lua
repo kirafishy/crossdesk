@@ -563,7 +563,9 @@ function setup_targets()
         -- version and use fmt's supported runtime-parser fallback here.
         add_defines("FMT_CONSTEVAL=")
         add_packages("slint", {public = true})
-        add_packages("libyuv", "tinyfiledialogs", "openssl3", "libsdl3", "nlohmann_json")
+        add_packages("libyuv", "tinyfiledialogs", "openssl3", "libsdl3", "nlohmann_json", "asio", "websocketpp")
+        add_defines("ASIO_STANDALONE")
+        add_files("apps/desktop/src/network/lan/*.cpp")
         if not is_config("CROSSDESK_PORTABLE", true) then
             add_defines("CROSSDESK_HAS_UPDATER=1", {public = true})
             add_deps("updater_core")
@@ -599,7 +601,7 @@ function setup_targets()
             add_deps("windows_unattended_config")
             add_files("apps/desktop/src/platform/windows/gui/application/unattended_application.cpp")
             add_links("opengl32")
-            add_syslinks("Comctl32", {public = true})
+            add_syslinks("Comctl32", "Iphlpapi", "Ws2_32", "Advapi32", {public = true})
             add_files("apps/desktop/src/platform/windows/gui/tray/win_tray.cpp",
                 "apps/desktop/src/platform/windows/gui/slint_backend.cpp",
                 "apps/desktop/src/platform/windows/gui/window_icons.cpp",
