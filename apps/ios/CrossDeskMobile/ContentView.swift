@@ -750,8 +750,10 @@ private struct PasswordPromptView: View {
                         SecureField("访问密码", text: $password)
                     }
                 }
-                .keyboardType(.numberPad)
+                .keyboardType(.asciiCapable)
                 .textContentType(.password)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
                 .focused($passwordFocused)
 
                 Button {
