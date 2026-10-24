@@ -2437,8 +2437,8 @@ void GuiApplication::Tick() {
     if (changed) {
       std::vector<slint::SharedString> addresses;
       addresses.reserve(available_interfaces.size());
-      for (const auto& interface : available_interfaces)
-        addresses.push_back(UiText(interface.address));
+      for (const auto& network_interface : available_interfaces)
+        addresses.push_back(UiText(network_interface.address));
       ui_->main->set_lan_interfaces(
           std::make_shared<slint::VectorModel<slint::SharedString>>(std::move(addresses)));
     }
