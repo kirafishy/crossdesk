@@ -7,124 +7,32 @@ body:
   - type: markdown
     attributes:
       value: |
-        请先查看 [常见问题 / FAQ](https://github.com/kunkundi/crossdesk/blob/deskhub/docs/FAQ.md) 并搜索 [已有问题 / Existing issues](https://github.com/kunkundi/crossdesk/issues?q=is%3Aissue)。可使用中文或英文填写。
-        Please check the FAQ and existing issues first. You can write in Chinese or English.
+        只需描述问题，其余选填。中文或英文均可。
+        Only a problem description is required. Chinese or English is welcome.
 
   - type: textarea
     id: problem
     attributes:
-      label: 问题与预期 / Problem and expected behavior
-      description: 描述实际发生的情况、错误提示，以及期望的行为。Describe what happened, any error messages, and what you expected.
-      placeholder: |
-        实际结果 / Actual behavior:
-        预期结果 / Expected behavior:
+      label: 问题描述 / Problem description
+      description: 遇到了什么问题？如方便，也请说明触发操作或错误提示。What went wrong? If possible, include what you were doing or any error message.
     validations:
       required: true
 
-  - type: textarea
-    id: reproduction
+  - type: input
+    id: environment
     attributes:
-      label: 复现步骤 / Steps to reproduce
-      description: 说明操作步骤和出现频率；偶发问题可描述发生前的操作。Include the steps and frequency. For intermittent issues, describe what you were doing.
-      placeholder: |
-        1.
-        2.
-        3.
-        出现频率 / Frequency:
-    validations:
-      required: true
-
-  - type: dropdown
-    id: clients
-    attributes:
-      label: 涉及客户端 / Affected clients
-      description: 可多选；Web 与原生移动端请分别选择。Select all that apply; distinguish Web from native mobile apps.
-      multiple: true
-      options:
-        - 桌面客户端（Windows / macOS / Linux） / Desktop client
-        - iOS / iPadOS（原生 / Native）
-        - Android（原生 / Native）
-        - 鸿蒙 PC / HarmonyOS PC
-        - 鸿蒙手机或平板 / HarmonyOS mobile
-        - Web 客户端 / Web client
-        - 服务端 / Server
-        - 其他 / Other
-    validations:
-      required: true
-
-  - type: textarea
-    id: controller
-    attributes:
-      label: 控制端或本机环境 / Controller or local environment
-      description: |
-        控制端是发起远程操作的设备。请填写完整系统和客户端版本；Web 用户另填浏览器及其版本。自行构建请附提交号。
-        仅涉及安装、启动或服务端时，在此填写发生问题的本机环境。
-        The controller initiates remote access. Include full OS and client versions; Web users should also include the browser and its version. For source builds, include the commit.
-        For installation, startup, or server-only issues, describe the affected local environment here.
-      placeholder: |
-        操作系统及版本 / OS and version:
-        CPU 架构（x64 / arm64 等） / CPU architecture:
-        CrossDesk 版本或提交号 / CrossDesk version or commit:
-        浏览器及版本（仅 Web） / Browser and version (Web only):
-    validations:
-      required: true
-
-  - type: textarea
-    id: host
-    attributes:
-      label: 被控端环境 / Remote host environment
-      description: |
-        被控端是接受远程操作的电脑。连接或会话问题请补充这一端的信息；不涉及远程设备时可留空。
-        The host is the computer being controlled. Include its details for connection or session issues; leave empty if no remote device is involved.
-      placeholder: |
-        操作系统及版本 / OS and version:
-        CPU 架构（x64 / arm64 等） / CPU architecture:
-        CrossDesk 版本或提交号 / CrossDesk version or commit:
-    validations:
-      required: false
-
-  - type: dropdown
-    id: service
-    attributes:
-      label: 服务部署方式 / Server deployment
-      options:
-        - 公共服务 / Public service
-        - 自托管 / Self-hosted
-        - 不确定 / Unknown
-        - 不适用 / Not applicable
-    validations:
-      required: false
-
-  - type: dropdown
-    id: connection
-    attributes:
-      label: 连接方式 / Connection type
-      description: 可在会话的网络状态中查看；无法确认时选择“不确定”。Check the session's network status, or choose Unknown.
-      options:
-        - P2P 直连 / Direct P2P
-        - TURN 中继 / TURN relay
-        - 尚未建立连接 / Connection not established
-        - 不确定 / Unknown
-        - 不适用 / Not applicable
-    validations:
-      required: false
-
-  - type: textarea
-    id: context
-    attributes:
-      label: 补充环境 / Additional environment
-      description: |
-        按问题补充相关信息，例如普通会话或桌面墙、自托管服务端版本、局域网或公网、VPN；画面问题可补充显卡、编码格式、硬件编解码设置和显示器情况。
-        Include relevant details such as a normal session or DeskHub, self-hosted server version, LAN or Internet, and VPN use. For video issues, add GPU, codec, hardware codec settings, and display configuration.
+      label: 使用环境（选填） / Environment (optional)
+      description: 操作系统和 CrossDesk 版本；连接问题可填写两端信息。OS and CrossDesk version; include both devices for connection issues.
+      placeholder: Windows 11 → macOS 15; CrossDesk x.y.z
     validations:
       required: false
 
   - type: textarea
     id: attachments
     attributes:
-      label: 日志与截图 / Logs and screenshots
+      label: 截图或日志（选填） / Screenshots or logs (optional)
       description: |
-        可粘贴相关日志，或拖入日志文件、截图和录屏。上传前请隐去连接密码等敏感信息。
-        Paste relevant logs or attach log files, screenshots, and recordings. Redact connection passwords and other private information before uploading.
+        可直接拖入截图、录屏或日志文件，请隐去密码等敏感信息。
+        Drag in screenshots, recordings, or logs. Hide passwords and other sensitive information.
     validations:
       required: false

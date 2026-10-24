@@ -7,66 +7,21 @@ body:
   - type: markdown
     attributes:
       value: |
-        提交前请搜索 [已有建议 / Existing requests](https://github.com/kunkundi/crossdesk/issues?q=is%3Aissue)。可使用中文或英文填写。
-        Please search existing requests before submitting. You can write in Chinese or English.
-
-  - type: textarea
-    id: use-case
-    attributes:
-      label: 使用场景与问题 / Use case and problem
-      description: 你希望完成什么？目前遇到什么限制？What are you trying to do, and what limitation do you encounter?
-    validations:
-      required: true
+        只需描述你的建议，其余选填。中文或英文均可。
+        Only a description of your idea is required. Chinese or English is welcome.
 
   - type: textarea
     id: proposal
     attributes:
-      label: 功能建议与预期效果 / Proposal and expected outcome
-      description: 描述希望新增或改进的行为，以及理想的使用方式。Describe the behavior you would like to add or improve and how you expect to use it.
+      label: 你的建议 / Your idea
+      description: 希望新增或改进什么？如方便，也请说明使用场景。What would you like to add or improve? If possible, describe when you would use it.
     validations:
       required: true
-
-  - type: dropdown
-    id: scope
-    attributes:
-      label: 适用范围 / Scope
-      description: 可多选；通用建议可选择“跨平台或通用”。Select all that apply, or choose Cross-platform or general.
-      multiple: true
-      options:
-        - 跨平台或通用 / Cross-platform or general
-        - 桌面客户端（Windows / macOS / Linux） / Desktop client
-        - iOS / iPadOS
-        - Android
-        - 鸿蒙 PC / HarmonyOS PC
-        - 鸿蒙手机或平板 / HarmonyOS mobile
-        - Web 客户端 / Web client
-        - 桌面墙 / DeskHub
-        - 自托管服务 / Self-hosted services
-        - 文档或安装体验 / Documentation or installation
-        - 其他 / Other
-    validations:
-      required: false
-
-  - type: textarea
-    id: impact
-    attributes:
-      label: 影响范围与使用频率 / Impact and frequency
-      description: 哪些用户或场景会受益？你会多频繁地使用？Who would benefit, in which situations, and how often would you use this?
-    validations:
-      required: false
-
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: 替代方案 / Alternatives
-      description: 目前如何处理这个需求？是否考虑过其他实现方式？How do you handle this today, and what other approaches have you considered?
-    validations:
-      required: false
 
   - type: textarea
     id: references
     attributes:
-      label: 参考资料与补充说明 / References and additional context
-      description: 可提供参考链接、截图、示意图或其他要求。Include links, screenshots, mockups, or any additional requirements.
+      label: 补充说明（选填） / Additional context (optional)
+      description: 可附截图、参考链接或其他说明。Add screenshots, links, or any other details.
     validations:
       required: false
