@@ -105,7 +105,7 @@ class ConfigCenter {
   bool enable_autostart_ = false;
   bool enable_daemon_ = false;
   std::atomic<bool> enable_privacy_screen_{true};
-  std::atomic<bool> lock_on_disconnect_{false};
+  std::atomic<bool> lock_on_disconnect_{true};
   std::atomic<bool> save_remote_previews_{true};
   bool portable_service_prompt_suppressed_ = false;
   std::string sponsorship_prompt_dismissed_version_;

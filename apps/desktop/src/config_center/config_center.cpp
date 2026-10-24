@@ -138,7 +138,7 @@ int ConfigCenter::Load() {
   enable_privacy_screen_.store(
       ini_->GetBoolValue(section_, "enable_privacy_screen", true));
   lock_on_disconnect_.store(
-      ini_->GetBoolValue(section_, "lock_on_disconnect", false));
+      ini_->GetBoolValue(section_, "lock_on_disconnect", true));
   save_remote_previews_.store(
       ini_->GetBoolValue(section_, "save_remote_previews", true));
   portable_service_prompt_suppressed_ =
