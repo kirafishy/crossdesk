@@ -94,13 +94,19 @@ void FileTransferManager::ProcessQueue(std::shared_ptr<RemoteSession> props) {
       peer = props ? props->peer_ : owner_.peer_;
       events = props ? props->peer_events_ : owner_.peer_events_;
     }
+    if (!props && file.remote_id.rfind("lan/", 0) == 0) {
+      events = owner_.ControllerEvents(file.remote_id);
+      peer = events ? events->DirectPeer() : nullptr;
+    }
     auto session = std::make_shared<file_transfer::Session>(
         [peer, events, file, props](const char*, const char* data, size_t size) {
           if (!peer || !events || (props && props->closing_)) return -1;
           auto callback = events->EnterCallback();
-          if (!callback) return -1;
-          return SendReliableDataFrameToPeer(peer, data, size, file.file_label.c_str(),
-                                             file.remote_id.c_str(), file.remote_id.size());
+          if (!callback || !events->DataAllowed()) return -1;
+          const auto wire_id = events->WireId(file.remote_id);
+          return SendReliableDataFrameToPeer(
+              peer, data, size, file.file_label.c_str(),
+              wire_id.data(), wire_id.size());
         }, file_transfer::Session::Progress{});
     state.file_sent_bytes_ = 0; state.file_total_bytes_ = 0; state.file_send_rate_bps_ = 0;
     state.current_file_id_ = id;
@@ -313,6 +319,10 @@ void FileTransferManager::Receive(const char* data, size_t size,
     peer = props ? props->peer_ : owner_.peer_;
     events = props ? props->peer_events_ : owner_.peer_events_;
   }
+  if (!props && remote.rfind("lan/", 0) == 0) {
+    events = owner_.ControllerEvents(remote);
+    peer = events ? events->DirectPeer() : nullptr;
+  }
   if (!peer || !events || events.get() != handler || (props && props->closing_)) return;
   std::shared_ptr<FileReceiver> receiver;
   std::filesystem::path default_directory;
@@ -333,10 +343,12 @@ void FileTransferManager::Receive(const char* data, size_t size,
           });
       entry.session->SetOnSendAck([peer, events, remote](const FileTransferAck& ack) {
         auto callback = events->EnterCallback();
-        if (!callback) return -1;
+        if (!callback || !events->DataAllowed()) return -1;
         const auto bytes = EncodeFileTransferAck(ack);
-        return SendReliableDataFrameToPeer(peer, bytes.data(), bytes.size(), kFileFeedbackStream,
-                                           remote.c_str(), remote.size());
+        const auto wire_id = events->WireId(remote);
+        return SendReliableDataFrameToPeer(
+            peer, bytes.data(), bytes.size(), kFileFeedbackStream,
+            wire_id.data(), wire_id.size());
       });
     }
     receiver = entry.session;

@@ -38,20 +38,21 @@ void PeerEventHandler::OnReceiveVideoBuffer(
   auto* handler = static_cast<PeerEventHandler*>(user_data);
   if (!handler) return;
   auto callback = handler->EnterCallback();
-  if (!callback) return;
-  GuiRuntime* runtime = handler ? &handler->owner_ : nullptr;
-  if (!runtime || !video_frame) {
+  if (!callback || !handler->DataAllowed()) return;
+  GuiRuntime* runtime = &handler->owner_;
+  if (!video_frame) {
     return;
   }
 
-  std::string remote_id(user_id, user_id_size);
+  std::string remote_id = handler->ConnectionKey(user_id, user_id_size);
   auto props = runtime->FindRemoteSession(remote_id);
   if (!props) return;
 
   if (props->connection_established_) {
     const auto timing_now = VideoLatencyFrame::Clock::now();
     // Pair the clocks before preview conversion so its cost is included.
-    const auto local_now_us = GetSystemTimeMicros(props->peer_);
+    const auto local_now_us = GetSystemTimeMicros(
+        handler->IsDirect() ? handler->DirectPeer() : props->peer_);
     const auto* received_native = GetNativeVideoFrame(video_frame);
     props->received_video_stats_.Record(
         received_native ? received_native->width : video_frame->width,
@@ -274,15 +275,15 @@ void PeerEventHandler::OnReceiveAudioBuffer(
   auto* handler = static_cast<PeerEventHandler*>(user_data);
   if (!handler) return;
   auto callback = handler->EnterCallback();
-  if (!callback) return;
-  GuiRuntime* runtime = handler ? &handler->owner_ : nullptr;
-  if (!runtime || runtime->unattended_host_) {
+  if (!callback || !handler->DataAllowed()) return;
+  GuiRuntime* runtime = &handler->owner_;
+  if (runtime->unattended_host_) {
     return;
   }
 
   std::lock_guard delivery_lock(runtime->audio_delivery_mutex_);
   const auto session =
-      runtime->FindRemoteSession(std::string(user_id, user_id_size));
+      runtime->FindRemoteSession(handler->ConnectionKey(user_id, user_id_size));
   if (!session || session->closing_ || !session->audio_allowed_.load()) return;
   runtime->audio_buffer_fresh_ = true;
 

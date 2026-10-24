@@ -54,6 +54,7 @@ public:
   void DestroyFactories();
 
   int InitializeScreenCapturer();
+  int EnsureCaptureReady();
   int StartScreenCapturer();
   int StopScreenCapturer();
   bool ReleaseRemoteMouseButtons();

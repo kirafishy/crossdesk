@@ -22,6 +22,7 @@ inline nlohmann::json BuildDevicePresenceRequest(
   const auto append = [&](const std::string& id) {
     // Recent connection keys contain Y/N plus display settings after the ID.
     const std::string pure_id = id.substr(0, id.find_first_of("YN"));
+    if (pure_id.rfind("lan-", 0) == 0 || pure_id.rfind("lan/", 0) == 0) return;
     if (!pure_id.empty() &&
         std::find(devices.begin(), devices.end(), pure_id) == devices.end()) {
       devices.push_back(pure_id);

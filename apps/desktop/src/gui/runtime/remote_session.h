@@ -31,7 +31,12 @@
 #include "runtime/received_video_stats.h"
 #include "runtime/connection_auth_state.h"
 
-namespace crossdesk { class PeerEventHandler; }
+namespace crossdesk {
+class PeerEventHandler;
+namespace lan {
+struct Session;
+}
+}  // namespace crossdesk
 
 namespace crossdesk::gui_detail {
 
@@ -105,6 +110,7 @@ struct RemoteSession {
   // Decoder-thread scratch memory, never shared with the UI.
   std::mutex gallery_conversion_mutex_;
   std::vector<unsigned char> gallery_nv12_, gallery_scaled_, gallery_scratch_;
+  std::shared_ptr<lan::Session> lan_session_;
   Params params_;
   PeerPtr* peer_ = nullptr;
   std::shared_ptr<PeerEventHandler> peer_events_;

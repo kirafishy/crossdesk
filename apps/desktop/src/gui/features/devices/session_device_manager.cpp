@@ -43,18 +43,17 @@ SessionDeviceManager::SessionDeviceManager(GuiRuntime &owner)
                 SpeakerCapturerFactory().Create());
           },
           [this](unsigned char *data, size_t size, const char *) {
-            if (!owner_.peer_) return;
             MiniRtcAudioFrame frame{};
             frame.data = reinterpret_cast<const char *>(data);
             frame.size = size;
-            frame.captured_timestamp = GetSystemTimeMicros(owner_.peer_);
-            std::shared_lock lock(owner_.connection_status_mutex_);
-            for (const auto& [id, status] : owner_.connection_status_) {
-              if (status == ConnectionStatus::Connected)
-                SendAudioFrameToPeer(owner_.peer_, &frame,
-                                     owner_.audio_label_.c_str(), id.data(),
-                                     id.size());
-            }
+            for (const auto& id : owner_.ConnectedControllers())
+              owner_.WithController(
+                  id, [&](PeerPtr* peer, const std::string& wire) {
+                    frame.captured_timestamp = GetSystemTimeMicros(peer);
+                    return SendAudioFrameToPeer(peer, &frame,
+                                                owner_.audio_label_.c_str(),
+                                                wire.data(), wire.size());
+                  });
           }) {}
 
 SessionDeviceManager::~SessionDeviceManager() { speaker_capture_.Shutdown(); }
@@ -132,6 +131,10 @@ void SessionDeviceManager::Initialize() {
           DeviceControllerFactory::Device::Keyboard));
 }
 
+int SessionDeviceManager::EnsureCaptureReady() {
+  return screen_capturer_ ? 0 : InitializeScreenCapturer();
+}
+
 int SessionDeviceManager::InitializeScreenCapturer() {
 #ifdef __APPLE__
   if (!owner_.EnsureMacScreenRecordingPermission()) {
@@ -193,16 +196,7 @@ int SessionDeviceManager::InitializeScreenCapturer() {
                       .count()
                 : 0;
 
-        std::vector<std::string> connected_remote_ids;
-        {
-          std::shared_lock lock(owner_.connection_status_mutex_);
-          connected_remote_ids.reserve(owner_.connection_status_.size());
-          for (const auto &[remote_id, status] : owner_.connection_status_) {
-            if (status == ConnectionStatus::Connected) {
-              connected_remote_ids.push_back(remote_id);
-            }
-          }
-        }
+        const auto connected_remote_ids = owner_.ConnectedControllers();
 
         // Capture can still deliver frames while ICE is gathering or after
         // the final controller disconnects. Do not broadcast those frames to
@@ -232,28 +226,27 @@ int SessionDeviceManager::InitializeScreenCapturer() {
             has_previous_frame && duration_ms >= kCaptureResumeKeyFrameGapMs;
         const bool stream_changed = !last_video_frame_stream_id_.empty() &&
                                     last_video_frame_stream_id_ != stream_id;
-        if (resumed_after_gap || stream_changed) {
-          if (RequestVideoKeyFrame(owner_.peer_, stream_id.c_str()) == 0) {
-            LOG_DEBUG("Request video key frame before sending captured frame, "
-                     "stream='{}', gap_ms={}, stream_changed={}",
-                     stream_id, duration_ms, stream_changed);
-          }
-        }
 
         MiniRtcVideoFrame frame{};
         frame.data = reinterpret_cast<const char *>(data);
         frame.size = size;
         frame.width = width;
         frame.height = height;
-        frame.captured_timestamp = GetSystemTimeMicros(owner_.peer_);
+
         frame.native_frame = native_frame;
         const auto send_started = std::chrono::steady_clock::now();
         uint64_t send_errors = 0;
         for (const std::string &remote_id : connected_remote_ids) {
           if (!owner_.preview_subscriptions_.ShouldSend(remote_id, now_time,
                                                         stream_id)) continue;
-          if (SendVideoFrameToPeer(owner_.peer_, &frame, stream_id.c_str(),
-                                   remote_id.data(), remote_id.size()) != 0)
+          if (owner_.WithController(
+                  remote_id, [&](PeerPtr* peer, const std::string& wire) {
+                    if (resumed_after_gap || stream_changed)
+                      RequestVideoKeyFrame(peer, stream_id.c_str());
+                    frame.captured_timestamp = GetSystemTimeMicros(peer);
+                    return SendVideoFrameToPeer(peer, &frame, stream_id.c_str(),
+                                                wire.data(), wire.size());
+                  }) != 0)
             ++send_errors;
         }
         const auto send_us =

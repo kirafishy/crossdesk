@@ -744,6 +744,8 @@ std::string SettingsManager::RecentConnectionDisplayName(
       connection.remote_host_name != "unknown") {
     return connection.remote_host_name;
   }
+  if (!connection.lan.device_id.empty())
+    return connection.lan.address + ":" + std::to_string(connection.lan.port);
   return connection.remote_id;
 }
 

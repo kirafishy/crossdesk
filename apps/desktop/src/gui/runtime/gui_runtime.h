@@ -19,6 +19,7 @@
 #include "features/input/keyboard_controller.h"
 #include "features/input/remote_input_dispatcher.h"
 #include "features/settings/settings_manager.h"
+#include "network/lan/lan_session_manager.h"
 #include "privacy_controller.h"
 #include "runtime/gui_state.h"
 #include "runtime/announcement_inbox.h"
@@ -50,6 +51,35 @@ class GuiRuntime : protected gui_detail::GuiState {
   static void SdlCaptureAudioIn(void* userdata, uint8_t* stream, int len);
   static void SdlCaptureAudioOut(void* userdata, uint8_t* stream, int len);
 
+  void InitializeLan();
+  void ApplyLanSettings();
+  bool LanAvailable() const;
+  void TickLan();
+  void BeginShutdown();
+  bool ShutdownDrained();
+  void RegisterStreams(PeerPtr* peer, size_t display_count);
+  void ConnectLan(const std::string& address, unsigned port,
+                  std::string password, bool remember_password = false);
+  int WithController(
+      const std::string& id,
+      const std::function<int(PeerPtr*, const std::string&)>& operation);
+  int SendControllerData(const std::string& id, const char* data, size_t size,
+                         const char* label);
+  std::shared_ptr<PeerEventHandler> ControllerEvents(const std::string& id);
+  std::vector<std::string> ConnectedControllers();
+  std::unique_ptr<lan::SessionManager> lan_;
+  std::string lan_error_;
+  std::shared_ptr<lan::Session> lan_connecting_;
+  bool lan_stopping_ = false;
+  bool stopping_ = false;
+  std::chrono::steady_clock::time_point shutdown_report_at_{};
+  struct LanController {
+    std::shared_ptr<lan::Session> session;
+    std::shared_ptr<PeerEventHandler> events;
+  };
+  // Protected by remote_sessions_mutex_; snapshots acquire callback leases
+  // before releasing that lock, so removal cannot race a raw Peer use.
+  std::map<std::string, LanController> lan_controllers_;
   int CreateConnectionPeer();
   int ConnectTo(const std::string& remote_id, const char* password,
                 bool remember_password, bool bypass_presence_check = false,

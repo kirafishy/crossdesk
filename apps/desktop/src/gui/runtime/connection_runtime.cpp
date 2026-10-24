@@ -26,6 +26,7 @@ constexpr auto kPresenceRetryInterval = std::chrono::seconds(1);
 }  // namespace
 
 bool GuiRuntime::HasActiveSession() {
+  if (lan_ && !lan_->Quiescent()) return true;
   if (stream_window_inited_) return true;
   std::shared_lock lock(connection_status_mutex_);
   return std::any_of(connection_status_.begin(), connection_status_.end(),
@@ -188,7 +189,8 @@ void GuiRuntime::HandlePresenceProbeTimeout() {
 
 void GuiRuntime::HandleServerControllerDisconnected(
     const std::string& remote_id, const char* reason) {
-  transfers_.Cancel(peer_events_.get(), remote_id);
+  if (auto events = ControllerEvents(remote_id))
+    transfers_.Cancel(events.get(), remote_id);
   preview_subscriptions_.Remove(remote_id);
 
   bool has_connected_controller = false;
@@ -243,7 +245,15 @@ void GuiRuntime::HandleServerControllerDisconnected(
 #endif
   devices_.StopSpeakerCapturer();
   start_mouse_controller_ = false;
-  start_keyboard_capturer_ = false;
+  {
+    std::shared_lock lock(remote_sessions_mutex_);
+    start_keyboard_capturer_ = std::any_of(
+        remote_sessions_.begin(), remote_sessions_.end(), [](const auto& item) {
+          const auto& session = item.second;
+          return session && !session->closing_ &&
+                 session->connection_established_ && !session->wall_managed_;
+        });
+  }
   remote_client_id_.clear();
   audio_capture_ = false;
 }
@@ -294,10 +304,15 @@ int GuiRuntime::ForceSignalReconnect() {
 }
 
 void GuiRuntime::CloseRemoteSession(std::shared_ptr<RemoteSession> props) {
-  if (!props || props->closing_.exchange(true)) return;
+  if (!props) return;
+  if (props->lan_session_ && !props->lan_session_->closing) {
+    if (lan_) lan_->Close(props->lan_session_);
+    return;
+  }
+  if (props->closing_.exchange(true)) return;
   MuteRemoteAudio(props);
   if (props->peer_events_) {
-    props->peer_events_->Deactivate();
+    props->peer_events_->StopAccepting();
     transfers_.Cancel(props->peer_events_.get());
   }
   props->connection_established_ = false;
@@ -350,7 +365,8 @@ void GuiRuntime::CloseRemoteSession(std::shared_ptr<RemoteSession> props) {
   session_cleanup_tasks_[props->remote_id_] = session_cleanup_queue_.PostTask(
       [props, peer, frame_snapshot, video_width, video_height, platform,
        thumbnail = thumbnail_, queued_at]() mutable {
-        if (peer) {
+        if (props->peer_events_) props->peer_events_->Deactivate();
+        if (peer && !props->lan_session_) {
           LOG_INFO("[{}] Background leave connection [{}]", props->local_id_,
                    props->remote_id_);
           LeaveConnection(peer, props->remote_id_.c_str());
@@ -359,11 +375,20 @@ void GuiRuntime::CloseRemoteSession(std::shared_ptr<RemoteSession> props) {
         if (thumbnail && props->was_connected_) {
           const char* nv12 = frame_snapshot && !frame_snapshot->empty()
               ? reinterpret_cast<const char*>(frame_snapshot->data()) : nullptr;
+          const auto direct = props->lan_session_;
+          const Thumbnail::LanTarget target =
+              direct ? Thumbnail::LanTarget{direct->target.address,
+                                            direct->target.device_id,
+                                            direct->target.port}
+                     : Thumbnail::LanTarget{};
+          const auto record_id = direct
+                                     ? Thumbnail::LanRecordId(target.device_id)
+                                     : props->remote_id_;
           if (thumbnail->SaveToThumbnail(
-                  nv12, video_width, video_height, props->remote_id_,
+                  nv12, video_width, video_height, record_id,
                   props->remote_host_name_,
                   props->remember_password_ ? props->remote_password_ : "",
-                  platform) != 0) {
+                  platform, direct ? &target : nullptr) != 0) {
             LOG_ERROR("[{}] Failed to save recent connection", props->remote_id_);
           }
         }
@@ -375,6 +400,17 @@ void GuiRuntime::CloseRemoteSession(std::shared_ptr<RemoteSession> props) {
 }
 
 void GuiRuntime::CloseServerController(const std::string& remote_id) {
+  if (remote_id.rfind("lan/", 0) == 0) {
+    std::shared_ptr<lan::Session> session;
+    {
+      std::shared_lock lock(remote_sessions_mutex_);
+      if (auto it = lan_controllers_.find(remote_id);
+          it != lan_controllers_.end())
+        session = it->second.session;
+    }
+    if (session && lan_) lan_->Close(session);
+    return;
+  }
   if (!peer_ || remote_id.empty() || controller_cleanup_tasks_.count(remote_id))
     return;
   controller_cleanup_tasks_[remote_id] = session_cleanup_queue_.PostTask(
@@ -392,20 +428,17 @@ void GuiRuntime::CloseConnectionPeer() {
     announcements_.Reset();
     return;
   }
-  peer_events_->Deactivate();
+  peer_events_->StopAccepting();
   transfers_.Cancel(peer_events_.get());
   announcements_.Reset();
   std::vector<std::string> controllers;
   {
     std::shared_lock lock(connection_status_mutex_);
-    for (const auto& [id, status] : connection_status_) controllers.push_back(id);
+    for (const auto& [id, status] : connection_status_)
+      if (id.rfind("lan/", 0) != 0) controllers.push_back(id);
   }
   for (const auto& id : controllers)
     HandleServerControllerDisconnected(id, "peer_closed");
-  devices_.StopMouseController();
-  devices_.StopScreenCapturer();
-  devices_.StopSpeakerCapturer();
-  devices_.StopKeyboardCapturer();
   signal_connected_ = false;
   device_presence_cache_.SetSignalConnected(false);
   signal_status_ = SignalStatus::SignalClosed;
@@ -418,6 +451,7 @@ void GuiRuntime::CloseConnectionPeer() {
   // these finish before the shared peer is destroyed.
   connection_peer_cleanup_ = session_cleanup_queue_.PostTask(
       [peer, handler = peer_events_, id = std::string(client_id_)]() mutable {
+        handler->Deactivate();
         LOG_INFO("[{}] Background connection peer cleanup", id);
         LeaveConnection(peer, id.c_str());
         DestroyPeer(&peer);
@@ -551,6 +585,12 @@ std::shared_ptr<GuiRuntime::RemoteSession> GuiRuntime::FindRemoteSession(
   std::shared_lock lock(remote_sessions_mutex_);
   auto it = remote_sessions_.find(remote_id);
   if (it == remote_sessions_.end()) {
+    if (remote_id.rfind("lan-", 0) == 0)
+      for (const auto& [_, props] : remote_sessions_)
+        if (props->lan_session_ && !props->closing_ &&
+            Thumbnail::LanRecordId(props->lan_session_->target.device_id) ==
+                remote_id)
+          return props;
     return nullptr;
   }
   return it->second;

@@ -49,6 +49,22 @@ constexpr HostPlatform kClientPlatform = HostPlatform::Unknown;
 
 }  // namespace
 
+std::string PeerEventHandler::ConnectionKey(const char* id, size_t size) const {
+  if (auto session = direct_.lock()) return session->key;
+  return direct_bound_ ? std::string{} : std::string(id, size);
+}
+
+std::string PeerEventHandler::WireId(const std::string& key) const {
+  if (auto session = direct_.lock()) return session->remote_id;
+  return key;
+}
+
+bool PeerEventHandler::DataAllowed() const {
+  if (!direct_bound_) return true;
+  auto session = direct_.lock();
+  return session && session->authorized && !session->closing;
+}
+
 void PeerEventHandler::SendClientInfo(PeerPtr* peer,
                                       const std::string& client_id) {
   if (!peer) {
@@ -74,8 +90,8 @@ void PeerEventHandler::OnSignalMessage(const char* message, size_t size,
   if (!handler) return;
   auto callback = handler->EnterCallback();
   if (!callback) return;
-  GuiRuntime* runtime = handler ? &handler->owner_ : nullptr;
-  if (!runtime || !message || size == 0) {
+  GuiRuntime* runtime = &handler->owner_;
+  if (!message || size == 0) {
     return;
   }
   std::string s(message, size);
@@ -179,10 +195,7 @@ void PeerEventHandler::OnSignalStatus(SignalStatus status, const char* user_id,
   if (!handler) return;
   auto callback = handler->EnterCallback();
   if (!callback) return;
-  GuiRuntime* runtime = handler ? &handler->owner_ : nullptr;
-  if (!runtime) {
-    return;
-  }
+  GuiRuntime* runtime = &handler->owner_;
 
   std::string client_id(user_id, user_id_size);
   if (client_id == runtime->client_id_) {
@@ -251,17 +264,30 @@ void PeerEventHandler::OnSignalStatus(SignalStatus status, const char* user_id,
 }
 
 void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
-                                          const char* user_id,
-                                          const size_t user_id_size,
-                                          void* user_data) {
+                                          const char* user_id, size_t size,
+                                          void* context) {
+  auto* handler = static_cast<PeerEventHandler*>(context);
+  if (!handler) return;
+  if (handler->direct_bound_) {
+    auto callback = handler->EnterCallback();
+    if (callback)
+      if (auto session = handler->direct_.lock()) session->Status(status);
+    return;
+  }
+  DispatchConnectionStatus(status, user_id, size, context);
+}
+
+void PeerEventHandler::DispatchConnectionStatus(ConnectionStatus status,
+                                                const char* user_id,
+                                                const size_t user_id_size,
+                                                void* user_data) {
   auto* handler = static_cast<PeerEventHandler*>(user_data);
   if (!handler) return;
   auto callback = handler->EnterCallback();
   if (!callback) return;
-  GuiRuntime* runtime = handler ? &handler->owner_ : nullptr;
-  if (!runtime) return;
+  GuiRuntime* runtime = &handler->owner_;
 
-  std::string remote_id(user_id, user_id_size);
+  std::string remote_id = handler->ConnectionKey(user_id, user_id_size);
   if (status == ConnectionStatus::Connected) runtime->transfers_.Connected(handler, remote_id);
   else if (status == ConnectionStatus::Disconnected || status == ConnectionStatus::Failed ||
            status == ConnectionStatus::Closed) runtime->transfers_.Cancel(handler, remote_id);
@@ -474,8 +500,8 @@ void PeerEventHandler::OnConnectionStatus(ConnectionStatus status,
           }
           std::string msg = remote_action.to_json();
           const int ret =
-              SendReliableDataFrame(runtime->peer_, msg.data(), msg.size(),
-                                    runtime->control_data_label_.c_str());
+              runtime->SendControllerData(remote_id, msg.data(), msg.size(),
+                                          runtime->control_data_label_.c_str());
           if (ret != 0) {
             LOG_WARN("[{}] host information send failed, ret={}", remote_id,
                      ret);
@@ -516,21 +542,12 @@ void PeerEventHandler::OnNetStatusReport(
   if (!handler) return;
   auto callback = handler->EnterCallback();
   if (!callback) return;
-  GuiRuntime* runtime = handler ? &handler->owner_ : nullptr;
-  if (!runtime) {
-    return;
-  }
+  GuiRuntime* runtime = &handler->owner_;
 
-  if (strchr(client_id, '@') != nullptr && strchr(user_id, '-') == nullptr) {
-    std::string id, password;
-    const char* at_pos = strchr(client_id, '@');
-    if (at_pos == nullptr) {
-      id = client_id;
-      password.clear();
-    } else {
-      id.assign(client_id, at_pos - client_id);
-      password = at_pos + 1;
-    }
+  if (const char* at_pos = handler->IsDirect() ? nullptr : strchr(client_id, '@');
+      at_pos && strchr(user_id, '-') == nullptr) {
+    const std::string id(client_id, at_pos - client_id);
+    const std::string password(at_pos + 1);
 
     bool is_self_hosted = runtime->config_center_->IsSelfHosted();
 
@@ -578,7 +595,7 @@ void PeerEventHandler::OnNetStatusReport(
 #endif
   }
 
-  std::string remote_id(user_id, user_id_size);
+  std::string remote_id = handler->ConnectionKey(user_id, user_id_size);
   auto props = runtime->FindRemoteSession(remote_id);
   if (!props) {
     bool report_codecs = false;
@@ -597,9 +614,8 @@ void PeerEventHandler::OnNetStatusReport(
                     net_traffic_stats->video_encoder);
       const auto message = action.to_json();
       // Report only to this controller, after releasing the status lock.
-      SendReliableDataFrameToPeer(runtime->peer_, message.data(), message.size(),
-                                  runtime->control_data_label_.c_str(),
-                                  remote_id.data(), remote_id.size());
+      runtime->SendControllerData(remote_id, message.data(), message.size(),
+                                  runtime->control_data_label_.c_str());
     }
     return;
   }

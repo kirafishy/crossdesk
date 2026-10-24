@@ -1,3 +1,4 @@
+import { LanStrings } from "lan_strings.slint";
 import { AboutPanel, AboutPage, AboutComponent, AboutStrings, AboutNavigationRow, AboutNavigationGroup, AboutRowSeparator } from "about_panel.slint";
 import { UiRadius } from "ui_radius.slint";
 import { WorkbenchStyle, WorkbenchButton, WorkbenchCard, WorkbenchNotice } from "workbench_controls.slint";
@@ -22,6 +23,8 @@ export struct RecentConnection {
     host-name: string,
     group-names: string,
     online: bool,
+    lan: bool,
+    endpoint: string,
     connected: bool,
     thumbnail: image,
     has-thumbnail: bool,
@@ -372,6 +375,172 @@ export component MainWindow inherits Window {
     private property <length> wayland-corner-radius: 12px;
     in property <string> local-id: "";
     in property <string> local-password: "";
+    in property <bool> ip-direct-enabled: true;
+    changed ip-direct-enabled => {
+        if !root.ip-direct-enabled {
+            root.lan-port-dirty = false;
+            root.lan-port-editing = false;
+            root.lan-apply-pending = false;
+            root.lan-local-port = root.lan-listener-port;
+            root.lan-endpoint-error = "";
+            root.lan-access-warning = "";
+            root.lan-access-warning-endpoint = "";
+            root.lan-listener-error = "";
+            root.lan-open = false;
+            root.lan-connecting = false;
+            root.lan-listening = false;
+            root.lan-password-pending = false;
+            root.lan-retry-after = 0;
+            root.lan-access-password = "";
+            root.lan-new-password = "";
+            root.lan-message = "";
+            lan-ip-picker.close-menu();
+            if root.lan-mode {
+                root.reset-password-open = false;
+                root.set-connection-mode(false);
+            }
+        }
+    }
+    in-out property <bool> lan-open;
+    changed lan-open => {
+        if !root.lan-open { root.lan-access-password = ""; }
+        if root.lan-open { root.gallery-action("release", ""); }
+    }
+    in-out property <bool> lan-mode;
+    callback connection-mode-changed(bool);
+    changed lan-mode => {
+        root.recent-tooltip-visible = false;
+        recent-scroll.viewport-x = 0px;
+        if !root.lan-mode {
+            root.lan-port-editing = false;
+            if root.lan-port-dirty && root.lan-endpoint-error == "" { root.lan-apply-pending = true; }
+        }
+    }
+    private property <string> id-connection-draft;
+    private property <string> ip-connection-draft;
+    private property <bool> lan-password-visible: true;
+    private property <bool> active-password-visible: root.lan-mode ? root.lan-password-visible : root.password-visible;
+    private property <string> active-password: root.lan-mode ? root.lan-new-password : root.local-password;
+    function set-connection-mode(lan: bool) {
+        recent-group-filter.close-menu();
+        if root.lan-mode { root.ip-connection-draft = root.remote-id-input; }
+        else { root.id-connection-draft = root.remote-id-input; }
+        root.lan-mode = lan;
+        root.remote-id-input = root.lan-mode ? root.ip-connection-draft : root.id-connection-draft;
+        root.connection-input-error = "";
+        root.copy-feedback = CopyFeedback.idle;
+        root.menu-open = false;
+        focus-sink.focus();
+    }
+    function switch-connection-mode() {
+        if !root.ip-direct-enabled { return; }
+        root.set-connection-mode(!root.lan-mode);
+        root.connection-mode-changed(root.lan-mode);
+    }
+    function submit-connection() {
+        if root.connection-pending || root.lan-connecting { return; }
+        if root.lan-mode {
+            root.request-lan-connection(root.remote-id-input);
+        } else { root.connect-requested(root.remote-id-input); }
+    }
+    public function request-lan-connection(address: string) {
+        if !root.ip-direct-enabled || root.connection-pending || root.lan-connecting || root.lan-open { return; }
+        root.lan-access-password = "";
+        root.lan-remember-password = false;
+        let error = root.lan-prepare-connect(address);
+        root.connection-input-error = error == "Enter a numeric IPv4 address or IPv4:port"
+            ? GalleryStrings.tr("请输入有效的 IPv4 或 IPv4:端口", "Enter a valid IPv4 or IPv4:port", "Укажите IPv4 или IPv4:порт")
+            : LanStrings.error-message(error);
+        if error == "" {
+            root.lan-open = true;
+            if root.lan-remember-password && root.lan-access-password != "" && root.lan-retry-after == 0 {
+                root.submit-connection-password();
+            }
+        }
+    }
+    in-out property <bool> lan-listening;
+    in-out property <string> lan-listener-ip;
+    in-out property <string> lan-listener-port: "52888";
+    out property <string> lan-listener-address: root.lan-listener-ip == "" ? "" : root.lan-listener-ip + ":" + root.lan-listener-port;
+    in-out property <[string]> lan-interfaces;
+    in-out property <int> lan-interface-index: 0;
+    in-out property <int> lan-interface-draft-index: 0;
+    in-out property <string> lan-local-port: "52888";
+    in-out property <bool> lan-port-editing;
+    in-out property <bool> lan-port-dirty;
+    in-out property <string> lan-endpoint-error;
+    in-out property <string> lan-access-warning;
+    in-out property <string> lan-access-warning-endpoint;
+    in-out property <string> lan-listener-error;
+    function dismiss-lan-access-warning() {
+        root.lan-access-warning = "";
+        root.lan-access-warning-endpoint = "";
+        // Keep the failed draft ready to edit and validate it on every new blur.
+        if root.lan-mode && root.lan-port-dirty && root.sponsorship-unobstructed {
+            lan-port-editor.focus();
+        } else { focus-sink.focus(); }
+    }
+    private property <bool> lan-apply-pending;
+    callback lan-configure(string, string) -> bool;
+    callback lan-select-address(string) -> bool;
+    function apply-lan-endpoint() -> bool {
+        root.lan-apply-pending = false;
+        if !root.ip-direct-enabled || root.lan-password-pending { return false; }
+        if root.lan-configure(root.lan-listener-ip, root.lan-local-port) {
+            root.lan-port-dirty = false;
+            return true;
+        }
+        root.lan-access-warning-endpoint = root.lan-listener-ip
+            + (root.lan-endpoint-error == "Invalid LAN port" ? "" : ":" + root.lan-local-port);
+        root.lan-access-warning = root.lan-endpoint-error;
+        return false;
+    }
+    Timer {
+        interval: 1ms;
+        running: root.lan-apply-pending;
+        triggered => {
+            root.lan-apply-pending = false;
+            if root.lan-port-dirty { root.apply-lan-endpoint(); }
+        }
+    }
+    in-out property <string> lan-remote-address;
+    in-out property <string> lan-remote-port: "52888";
+    in-out property <bool> lan-password-pending;
+    in-out property <bool> lan-connecting;
+    in-out property <int> lan-retry-after;
+    in-out property <string> lan-access-password;
+    in-out property <bool> lan-remember-password;
+    in-out property <string> lan-new-password;
+    in-out property <string> lan-message;
+    callback lan-reset-password;
+    callback lan-copy-text(string) -> bool;
+    callback lan-cancel-connect;
+    callback lan-prepare-connect(string) -> string;
+    callback lan-connect(string, string, string, bool);
+    private property <bool> prompt-password-required: root.lan-open || root.connection-password-required;
+    private property <bool> prompt-validating: root.lan-open ? root.lan-connecting : root.connection-validating;
+    private property <bool> prompt-pending: root.lan-open ? root.lan-connecting : root.connection-pending;
+    private property <string> prompt-status-text: !root.lan-open ? root.connection-status-text
+        : root.lan-connecting ? GalleryStrings.tr("正在连接…", "Connecting…", "Подключение…")
+        : root.lan-retry-after > 0 ? GalleryStrings.tr("请在 " + root.lan-retry-after + " 秒后重试", "Try again in " + root.lan-retry-after + "s", "Повторите через " + root.lan-retry-after + " с")
+        : root.lan-message == "InvalidCredentials" ? UiStrings.reinput-password
+        : root.lan-message == "" || root.lan-message == "AuthenticationRateLimited" ? UiStrings.input-password
+        : LanStrings.error-message(root.lan-message);
+    function submit-connection-password() {
+        if root.lan-open {
+            if root.lan-connecting || root.lan-retry-after > 0 || root.lan-access-password.character-count != 6 { return; }
+            root.lan-connect(root.lan-remote-address, root.lan-remote-port, root.lan-access-password, root.lan-remember-password);
+            root.lan-access-password = "";
+        } else { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
+    }
+    function cancel-connection-prompt() {
+        if root.lan-open {
+            root.lan-cancel-connect();
+            root.lan-access-password = "";
+            root.lan-open = false;
+            focus-sink.focus();
+        } else { root.connection-cancel(); }
+    }
     in-out property <string> remote-id-input: "";
     in property <bool> password-visible: true;
     in property <bool> password-change-pending: false;
@@ -456,6 +625,8 @@ export component MainWindow inherits Window {
     in-out property <int> capture-method-index: 0;
     in-out property <int> codec-index: 0;
     in-out property <bool> turn-enabled: true;
+    in-out property <bool> ip-direct-enabled-draft: true;
+    in property <string> settings-save-error;
     in-out property <bool> force-relay-enabled: false;
     changed turn-enabled => {
         if !root.turn-enabled { root.force-relay-enabled = false; }
@@ -555,11 +726,11 @@ export component MainWindow inherits Window {
         && !root.update-confirm-open
         && !root.reset-password-open && !root.alias-open && !root.delete-open
         && !root.disconnect-open
-        && !root.device-group-open && !root.connection-dialog-open
+        && !root.device-group-open && !root.connection-dialog-open && !root.lan-open
         && !root.permission-dialog-open && !root.wayland-notice-open
         && !root.portable-service-dialog-open
         && !root.portable-service-suppressed-notice-open
-        && root.offline-warning == "";
+        && root.offline-warning == "" && root.lan-access-warning == "";
     out property <bool> can-show-sponsorship: !root.sponsorship-open
         && root.sponsorship-unobstructed;
     // Follow the first available update. Dismissing the dialog replaces this
@@ -570,6 +741,10 @@ export component MainWindow inherits Window {
     }
     in-out property <bool> update-confirm-open: false;
     in-out property <bool> reset-password-open: false;
+    changed reset-password-open => {
+        root.new-password-input = "";
+        root.reset-password-invalid = false;
+    }
     in-out property <bool> reset-password-invalid: false;
     in-out property <string> new-password-input: "";
     in-out property <bool> alias-open: false;
@@ -926,9 +1101,21 @@ export component MainWindow inherits Window {
 
         // A compact application toolbar keeps global actions outside device cards.
         // Center the 28px buttons above the cards with 6px of space on each side.
+        connection-mode-button := WorkbenchButton {
+            visible: !root.gallery-mode && root.ip-direct-enabled;
+            x: 20px; y: 6px;
+            width: 120px; height: 28px;
+            text: root.lan-mode ? GalleryStrings.tr("IP 直连模式", "Direct IP mode", "Режим IP") : GalleryStrings.tr("ID 连接模式", "ID mode", "Режим ID");
+            tooltip: root.lan-mode ? GalleryStrings.tr("切换到 ID 连接模式", "Switch to ID mode", "Переключить в режим ID") : GalleryStrings.tr("切换到 IP 直连模式", "Switch to direct IP mode", "Переключить в режим IP");
+            accessible-label: self.text + " · " + self.tooltip;
+            enabled: !root.connection-pending && !root.lan-connecting;
+            z: 8;
+            clicked => { root.switch-connection-mode(); }
+        }
         open-gallery-button := WorkbenchButton {
             visible: !root.gallery-mode;
-            x: 20px; y: 6px;
+            x: root.ip-direct-enabled ? connection-mode-button.x + connection-mode-button.width + 8px : 20px;
+            y: connection-mode-button.y;
             width: 80px; height: 28px;
             text: GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub");
             z: 8;
@@ -1024,22 +1211,166 @@ export component MainWindow inherits Window {
                 x: 0px; y: 0px;
                 width: (parent.width - 16px) / 2; height: parent.height;
                 Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.local-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
-                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: GalleryStrings.tr("将 ID 和密码分享给连接方", "Share your ID and password to get connected", "Передайте ID и пароль для подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
-                Text { x: 16px; y: 68px; height: 18px; text: UiStrings.local-id; font-size: 12px; color: WorkbenchStyle.muted; }
-                Rectangle {
+                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("将 IP 和密码分享给连接方", "Share your IP and password to get connected", "Передайте IP и пароль для управления") : GalleryStrings.tr("将 ID 和密码分享给连接方", "Share your ID and password to get connected", "Передайте ID и пароль для подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                local-address-label := Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("本机 IP / 端口", "Local IP / Port", "IP / Порт") : UiStrings.local-id; font-size: 12px; color: WorkbenchStyle.muted; vertical-alignment: top; }
+                lan-switch-ip-metrics := Text {
+                    visible: false; accessible-role: none;
+                    text: GalleryStrings.tr("切换 IP", "Switch IP", "Сменить IP");
+                    font-size: 12px; font-weight: 500;
+                }
+                lan-edit-port-metrics := Text {
+                    visible: false; accessible-role: none;
+                    text: GalleryStrings.tr("修改端口", "Edit port", "Изменить порт");
+                    font-size: 12px; font-weight: 500;
+                }
+                lan-switch-ip-action := WorkbenchButton {
+                    visible: root.lan-mode;
+                    x: local-address-label.x + local-address-label.preferred-width + 4px;
+                    y: local-address-label.y - 5px;
+                    width: lan-switch-ip-metrics.preferred-width + 20px; height: 22px;
+                    quiet: true; text: lan-switch-ip-metrics.text;
+                    text-size: 12px; text-color: WorkbenchStyle.accent;
+                    enabled: root.lan-mode && !root.lan-password-pending && root.lan-interfaces.length > 0;
+                    clicked => {
+                        if root.lan-port-dirty && !root.apply-lan-endpoint() { return; }
+                        lan-ip-picker.open-menu();
+                    }
+                }
+                WorkbenchButton {
+                    visible: root.lan-mode;
+                    x: lan-switch-ip-action.x + lan-switch-ip-action.width + 2px;
+                    y: lan-switch-ip-action.y;
+                    width: lan-edit-port-metrics.preferred-width + 20px; height: 22px;
+                    quiet: true; text: lan-edit-port-metrics.text;
+                    text-size: 12px; text-color: WorkbenchStyle.accent;
+                    enabled: root.lan-mode && !root.lan-password-pending && root.lan-interfaces.length > 0;
+                    clicked => {
+                        // Moving from the editor to this action is still editing.
+                        root.lan-apply-pending = false;
+                        lan-port-editor.focus();
+                        lan-port-editor.select-all();
+                    }
+                }
+                local-address-field := Rectangle {
                     x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
+                    // Size the endpoint as one line; reserve five port digits so
+                    // editing never shifts the IP or changes the font size.
+                    private property <float> lan-font-scale: min(1,
+                        (self.width - 80px) / (lan-ip-metrics.preferred-width + lan-port-metrics.preferred-width));
+                    lan-ip-metrics := Text {
+                        visible: false; accessible-role: none;
+                        text: root.lan-interfaces[root.lan-interface-draft-index];
+                        font-size: 18px; font-weight: 600;
+                    }
+                    lan-port-metrics := Text {
+                        visible: false; accessible-role: none;
+                        text: "65535"; font-size: 18px; font-weight: 600;
+                    }
                     // Raise the whole field: a child's z cannot escape its
                     // parent's stacking order above the following password row.
                     z: 1;
                     background: WorkbenchStyle.field-surface; border-radius: UiRadius.control;
-                    border-width: 1px; border-color: WorkbenchStyle.border;
-                    Text { x: 12px; width: parent.width - 64px; height: parent.height; text: root.local-id; font-size: 24px; font-weight: 600; letter-spacing: 1px; color: WorkbenchStyle.text; vertical-alignment: center; }
+                    border-width: 1px;
+                    border-color: !root.lan-mode ? WorkbenchStyle.border
+                        : root.lan-endpoint-error != "" ? #d92d20
+                        : lan-ip-picker.has-focus || root.lan-port-editing ? WorkbenchStyle.accent
+                        : WorkbenchStyle.border;
+                    animate border-color { duration: 120ms; }
+                    if !root.lan-mode: Text { x: 12px; width: parent.width - 64px; height: parent.height; text: root.local-id; font-size: 24px; font-weight: 600; letter-spacing: 1px; overflow: elide; color: WorkbenchStyle.text; vertical-alignment: center; }
                     Rectangle { x: parent.width - 48px; y: 10px; width: 1px; height: parent.height - 20px; background: WorkbenchStyle.border; }
+                    lan-ip-picker := GroupFilter {
+                        visible: root.lan-mode;
+                        x: 4px; y: 2px;
+                        width: lan-ip-metrics.preferred-width * local-address-field.lan-font-scale + 16px;
+                        height: parent.height - 4px;
+                        embedded: true; text-size: 18px * local-address-field.lan-font-scale;
+                        text-weight: 600; text-color: WorkbenchStyle.text;
+                        show-indicator: false;
+                        popup-min-width: 160px;
+                        model: root.lan-interfaces; system-count: 0;
+                        current-index <=> root.lan-interface-draft-index;
+                        enabled: root.lan-mode && !root.lan-password-pending && root.lan-interfaces.length > 0;
+                        normal-border-color: WorkbenchStyle.control-border;
+                        hover-border-color: WorkbenchStyle.hover-border;
+                        focus-border-color: WorkbenchStyle.accent;
+                        accessible-label: GalleryStrings.tr("切换本机 IP", "Switch local IP", "Сменить локальный IP");
+                        selected(index) => {
+                            root.copy-feedback = CopyFeedback.idle;
+                            // Save the draft for its original IP before changing
+                            // the display. Selecting an IP never rebinds sockets.
+                            if root.lan-port-dirty && !root.apply-lan-endpoint() {
+                                root.lan-interface-draft-index = root.lan-interface-index;
+                                return;
+                            }
+                            if root.lan-select-address(root.lan-interfaces[index]) {
+                                root.lan-interface-index = index;
+                            } else {
+                                root.lan-access-warning-endpoint = root.lan-interfaces[index];
+                                root.lan-access-warning = root.lan-endpoint-error;
+                                root.lan-interface-draft-index = root.lan-interface-index;
+                            }
+                        }
+                    }
+                    if root.lan-mode: Text {
+                        x: lan-ip-picker.x + lan-ip-picker.width - 4px; width: 6px; height: parent.height;
+                        text: ":"; font-size: 18px * local-address-field.lan-font-scale;
+                        font-weight: 600; color: WorkbenchStyle.text;
+                        horizontal-alignment: center; vertical-alignment: center;
+                    }
+                    lan-port-field := Rectangle {
+                        visible: root.lan-mode;
+                        x: lan-ip-picker.x + lan-ip-picker.width + 2px; y: 2px;
+                        width: lan-port-metrics.preferred-width * local-address-field.lan-font-scale + 4px;
+                        height: parent.height - 4px;
+                        background: lan-port-editor.has-focus ? WorkbenchStyle.surface
+                            : lan-port-hover.has-hover ? WorkbenchStyle.hover-surface : transparent;
+                        border-radius: UiRadius.control;
+                        border-width: 1px;
+                        border-color: lan-port-editor.has-focus ? WorkbenchStyle.accent : transparent;
+                        animate background, border-color { duration: 120ms; }
+                        lan-port-hover := TouchArea {
+                            enabled: root.lan-mode && !root.lan-password-pending;
+                            mouse-cursor: text;
+                            FocusScope {
+                                width: parent.width; height: parent.height;
+                                key-pressed(event) => {
+                                    if event.text == Key.Escape {
+                                        root.lan-apply-pending = false;
+                                        root.lan-port-dirty = false;
+                                        root.lan-local-port = root.lan-listener-port;
+                                        root.lan-endpoint-error = "";
+                                        focus-sink.focus();
+                                        return accept;
+                                    }
+                                    return reject;
+                                }
+                                lan-port-editor := TextInput {
+                                    x: 2px; width: parent.width - 4px; height: parent.height;
+                                    text <=> root.lan-local-port;
+                                    font-size: 18px * local-address-field.lan-font-scale; font-weight: 600;
+                                    input-type: InputType.number; color: WorkbenchStyle.text;
+                                    enabled: root.lan-mode && !root.lan-password-pending;
+                                    accessible-label: GalleryStrings.tr("局域网端口", "LAN port", "Порт ЛВС");
+                                    vertical-alignment: center; horizontal-alignment: left;
+                                    selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
+                                    changed has-focus => {
+                                        root.lan-port-editing = self.has-focus;
+                                        // Opening the warning also moves focus: do not
+                                        // treat that as another attempt to save.
+                                        if !self.has-focus && root.lan-port-dirty && root.lan-access-warning == "" { root.lan-apply-pending = true; }
+                                    }
+                                    edited => { root.lan-port-dirty = true; root.lan-endpoint-error = ""; root.copy-feedback = CopyFeedback.idle; }
+                                    accepted => { if root.apply-lan-endpoint() { focus-sink.focus(); } }
+                                }
+                            }
+                        }
+                    }
                     copy-button := WorkbenchButton {
                         x: parent.width - 42px; y: 2px; width: 36px; quiet: true;
                         icon: root.copy-feedback == CopyFeedback.success ? FontAwesomeIcons.check : FontAwesomeIcons.copy;
                         icon-color: root.copy-feedback == CopyFeedback.success ? WorkbenchStyle.success : WorkbenchStyle.muted;
-                        tooltip: GalleryStrings.tr("复制本机 ID", "Copy local ID", "Копировать ID");
+                        tooltip: root.lan-mode ? GalleryStrings.tr("复制 IP 和端口", "Copy IP and port", "Копировать IP и порт") : GalleryStrings.tr("复制本机 ID", "Copy local ID", "Копировать ID");
+                        enabled: !root.lan-mode || root.lan-listener-address != "";
                         tooltip-suppressed: root.copy-feedback != CopyFeedback.idle;
                         // Let other controls receive the original click; moving
                         // focus away from Copy dismisses its transient feedback.
@@ -1047,8 +1378,34 @@ export component MainWindow inherits Window {
                             if !self.has-focus { root.copy-feedback = CopyFeedback.idle; }
                         }
                         clicked => {
-                            root.copy-feedback = root.copy-local-id() ? CopyFeedback.success : CopyFeedback.failed;
+                            if root.lan-mode && root.lan-port-dirty && !root.apply-lan-endpoint() { return; }
+                            let copied = root.lan-mode ? root.lan-copy-text(root.lan-listener-address) : root.copy-local-id();
+                            root.copy-feedback = copied ? CopyFeedback.success : CopyFeedback.failed;
                             copy-timer.restart();
+                        }
+                    }
+                    private property <string> edit-hint: !root.lan-mode || !root.sponsorship-unobstructed
+                        || root.lan-password-pending ? ""
+                        : lan-ip-picker.has-hover ? GalleryStrings.tr("点击切换本机 IP", "Click to switch the local IP", "Нажмите, чтобы сменить IP")
+                        : lan-port-hover.has-hover && !lan-port-editor.has-focus ? GalleryStrings.tr("点击修改端口", "Click to edit the port", "Нажмите, чтобы изменить порт") : "";
+                    private property <bool> edit-hint-visible;
+                    changed edit-hint => { local-address-field.edit-hint-visible = false; }
+                    Timer {
+                        interval: 450ms;
+                        running: local-address-field.edit-hint != "" && !local-address-field.edit-hint-visible;
+                        triggered => { local-address-field.edit-hint-visible = true; }
+                    }
+                    if local-address-field.edit-hint != "" && local-address-field.edit-hint-visible: Rectangle {
+                        x: clamp((lan-ip-picker.has-hover ? lan-ip-picker.x + lan-ip-picker.width / 2
+                            : lan-port-field.x + lan-port-field.width / 2) - self.width / 2, 0px, parent.width - self.width);
+                        y: parent.height + 6px;
+                        width: min(parent.width, edit-hint-text.preferred-width + 20px);
+                        height: max(28px, edit-hint-text.preferred-height + 12px);
+                        background: #24324a; border-radius: UiRadius.control; z: 20;
+                        edit-hint-text := Text {
+                            x: 10px; y: 6px; width: parent.width - 20px; height: parent.height - 12px;
+                            text: local-address-field.edit-hint; font-size: 12px; color: white;
+                            wrap: word-wrap; horizontal-alignment: center; vertical-alignment: center;
                         }
                     }
                 }
@@ -1057,25 +1414,25 @@ export component MainWindow inherits Window {
                     x: 16px; y: 158px; width: parent.width - 32px; height: 36px;
                     background: WorkbenchStyle.field-surface; border-radius: UiRadius.control;
                     border-width: 1px; border-color: WorkbenchStyle.border;
-                    Text { x: 12px; width: parent.width - 132px; height: parent.height; text: root.password-visible ? root.local-password : "••••••"; font-size: 20px; font-weight: 500; letter-spacing: 2px; color: WorkbenchStyle.text; vertical-alignment: center; }
+                    Text { x: 12px; width: parent.width - 132px; height: parent.height; text: root.active-password == "" ? "—" : root.active-password-visible ? root.active-password : "••••••"; font-size: 20px; font-weight: 500; letter-spacing: 2px; color: WorkbenchStyle.text; vertical-alignment: center; }
                     Rectangle { x: parent.width - 118px; y: 8px; width: 1px; height: parent.height - 16px; background: WorkbenchStyle.border; }
                     WorkbenchButton {
                         x: parent.width - 112px; y: 0px; width: 36px; quiet: true;
-                        icon: root.password-visible ? FontAwesomeIcons.eye : FontAwesomeIcons.eye-slash;
-                        tooltip: root.password-visible ? GalleryStrings.tr("隐藏密码", "Hide password", "Скрыть пароль") : GalleryStrings.tr("显示密码", "Show password", "Показать пароль");
-                        clicked => { root.toggle-password-visibility(); }
+                        icon: root.active-password-visible ? FontAwesomeIcons.eye : FontAwesomeIcons.eye-slash;
+                        tooltip: root.active-password-visible ? GalleryStrings.tr("隐藏密码", "Hide password", "Скрыть пароль") : GalleryStrings.tr("显示密码", "Show password", "Показать пароль");
+                        clicked => { if root.lan-mode { root.lan-password-visible = !root.lan-password-visible; } else { root.toggle-password-visibility(); } }
                     }
                     WorkbenchButton {
                         x: parent.width - 74px; y: 0px; width: 36px; quiet: true;
                         icon: FontAwesomeIcons.rotate; tooltip: UiStrings.refresh-password;
-                        enabled: !root.password-change-pending;
-                        clicked => { root.refresh-password(); }
+                        enabled: root.lan-mode ? !root.lan-password-pending : !root.password-change-pending;
+                        clicked => { if root.lan-mode { root.lan-reset-password(); } else { root.refresh-password(); } }
                     }
                     WorkbenchButton {
                         x: parent.width - 36px; y: 0px; width: 36px; quiet: true;
                         icon: FontAwesomeIcons.pen;
                         tooltip: GalleryStrings.tr("修改密码", "Change password", "Изменить пароль");
-                        enabled: !root.password-change-pending;
+                        enabled: root.lan-mode ? !root.lan-password-pending : !root.password-change-pending;
                         clicked => { root.reset-password-open = true; }
                     }
                 }
@@ -1083,8 +1440,8 @@ export component MainWindow inherits Window {
             WorkbenchCard {
                 x: local-card.width + 16px; y: 0px; width: local-card.width; height: parent.height;
                 Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.remote-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
-                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: GalleryStrings.tr("输入设备 ID，连接远程桌面", "Enter a device ID to start a remote session", "Введите ID для удалённого подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
-                Text { x: 16px; y: 68px; height: 18px; text: UiStrings.remote-id; font-size: 12px; color: WorkbenchStyle.muted; }
+                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("输入 IP:端口，通过局域网连接", "Enter IP:port to connect over LAN", "Введите IP:порт для подключения по LAN") : GalleryStrings.tr("输入设备 ID，连接远程桌面", "Enter a device ID to start a remote session", "Введите ID для удалённого подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("远端 IP / 端口", "Remote IP / Port", "Удалённый IP / Порт") : UiStrings.remote-id; font-size: 12px; color: WorkbenchStyle.muted; }
                 Rectangle {
                     x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
                     background: white; border-radius: UiRadius.control; border-width: 1px;
@@ -1092,40 +1449,42 @@ export component MainWindow inherits Window {
                     animate border-color { duration: 120ms; }
                     if root.remote-id-input == "": Text {
                         x: 12px; width: parent.width - 24px; height: parent.height;
-                        text: GalleryStrings.tr("请输入 9 位设备 ID", "Enter a 9-digit device ID", "Введите ID из 9 цифр");
+                        text: root.lan-mode ? "192.168.1.20:52888" : GalleryStrings.tr("请输入 9 位设备 ID", "Enter a 9-digit device ID", "Введите ID из 9 цифр");
                         font-size: 13px; color: #8290a4; vertical-alignment: center;
                     }
                     remote-id-editor := TextInput {
                         x: 12px; width: parent.width - 24px; height: parent.height;
-                        text <=> root.remote-id-input; font-size: 24px; font-weight: 600; letter-spacing: 1px;
-                        input-type: InputType.number; color: WorkbenchStyle.text;
-                        accessible-label: UiStrings.remote-id;
+                        text <=> root.remote-id-input; font-size: root.lan-mode ? 18px : 24px; font-weight: 600; letter-spacing: root.lan-mode ? 0px : 1px;
+                        input-type: root.lan-mode ? InputType.text : InputType.number; color: WorkbenchStyle.text;
+                        accessible-label: root.lan-mode ? GalleryStrings.tr("远端 IP / 端口", "Remote IP / Port", "Удалённый IP / Порт") : UiStrings.remote-id;
+                        enabled: !root.connection-pending && !root.lan-connecting;
                         vertical-alignment: center;
                         selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
                         edited => {
                             root.connection-input-error = "";
                             // Enforce the digit limit before the next frame can
                             // render the text from typing, paste, or replacement.
-                            let formatted = root.format-remote-id(self.text);
+                            let formatted = root.lan-mode ? self.text : root.format-remote-id(self.text);
                             self.text = formatted;
                             // Formatted IDs are ASCII, so these are UTF-8 offsets.
                             self.set-selection-offsets(
                                 formatted.character-count, formatted.character-count);
                         }
-                        accepted => { if !root.connection-pending { root.connect-requested(root.remote-id-input); } }
+                        accepted => { root.submit-connection(); }
                     }
                 }
                 Text {
                     x: 16px; y: 133px; width: parent.width - 32px; height: 24px;
-                    text: root.connection-input-error;
-                    font-size: 11px; color: #be3d42; wrap: word-wrap;
+                    text: root.connection-input-error != "" ? root.connection-input-error
+                        : root.lan-mode ? GalleryStrings.tr("不填端口时，默认使用 52888", "Port defaults to 52888 if omitted", "Без порта используется 52888") : "";
+                    font-size: 11px; color: root.connection-input-error != "" ? #be3d42 : WorkbenchStyle.muted; wrap: word-wrap;
                 }
                 WorkbenchButton {
                     x: 16px; y: 158px; width: parent.width - 32px; height: 36px;
                     primary: true; icon: FontAwesomeIcons.arrow-right-long;
-                    text: root.connection-pending ? GalleryStrings.tr("正在连接…", "Connecting…", "Подключение…") : UiStrings.connect;
-                    enabled: !root.connection-pending;
-                    clicked => { root.connect-requested(root.remote-id-input); }
+                    text: root.connection-pending || root.lan-connecting ? GalleryStrings.tr("正在连接…", "Connecting…", "Подключение…") : UiStrings.connect;
+                    enabled: !root.connection-pending && !root.lan-connecting;
+                    clicked => { root.submit-connection(); }
                 }
             }
         }
@@ -1137,6 +1496,7 @@ export component MainWindow inherits Window {
 
             Text { x: 20px; y: 0px; width: recent-group-filter.x - self.x - 12px; height: 32px; text: UiStrings.recent-connections; font-size: 15px; font-weight: 600; color: WorkbenchStyle.text; vertical-alignment: center; }
             recent-group-filter := GroupFilter {
+                visible: !root.lan-mode;
                 x: parent.width - self.width - 20px; y: 0px;
                 width: 155px; height: 32px;
                 normal-border-color: WorkbenchStyle.control-border;
@@ -1169,14 +1529,18 @@ export component MainWindow inherits Window {
                     }
                     Text {
                         x: 84px; y: 36px; width: parent.width - 104px; height: 24px;
-                        text: root.recent-group-index == 0
+                        text: root.lan-mode
+                            ? GalleryStrings.tr("暂无 IP 直连设备", "No recent IP connections", "Нет недавних IP-подключений")
+                            : root.recent-group-index == 0
                             ? GalleryStrings.tr("暂无近期连接", "No recent connections", "Нет недавних подключений")
                             : GalleryStrings.tr("该分组暂无近期连接", "No recent connections in this group", "В этой группе нет недавних подключений");
                         color: WorkbenchStyle.text; font-size: 14px; font-weight: 600;
                     }
                     Text {
                         x: 84px; y: 68px; width: parent.width - 104px; height: 20px;
-                        text: root.recent-group-index == 0
+                        text: root.lan-mode
+                            ? GalleryStrings.tr("通过 IP 连接过的设备会显示在这里。", "Devices you connect to by IP will appear here.", "Здесь появятся устройства, подключённые по IP.")
+                            : root.recent-group-index == 0
                             ? GalleryStrings.tr("连接过的设备会显示在这里，方便下次快速访问。", "Devices you connect to will appear here for quick access.", "Устройства появятся здесь после первого подключения.")
                             : GalleryStrings.tr("切换设备分组，查看其他连接记录。", "Choose another group to see your other connections.", "Выберите другую группу для просмотра подключений.");
                         color: WorkbenchStyle.muted; font-size: 12px;
@@ -1202,7 +1566,7 @@ export component MainWindow inherits Window {
                         width: (recent-scroll.width - 24px) / 3;
                         height: 126px;
                         background: transparent;
-                        private property <bool> available: connection.online || connection.connected;
+                        private property <bool> available: connection.lan || connection.online || connection.connected;
                         private property <length> content-width: self.width;
                         private property <length> scroll-offset: recent-scroll.viewport-x;
                         private property <string> device-id: connection.remote-id;
@@ -1263,7 +1627,7 @@ export component MainWindow inherits Window {
                                     }
                                     presence-label := Text {
                                         x: 17px; width: self.preferred-width; height: parent.height;
-                                        text: connection-card.available ? UiStrings.online : UiStrings.offline;
+                                        text: connection.lan ? "LAN" : connection-card.available ? UiStrings.online : UiStrings.offline;
                                         color: connection-card.available ? WorkbenchStyle.success : WorkbenchStyle.muted;
                                         font-size: 10px; font-weight: 500; vertical-alignment: center;
                                     }
@@ -1286,7 +1650,7 @@ export component MainWindow inherits Window {
                                 }
                                 Text {
                                     x: 12px; y: 24px; height: 16px; width: parent.width - 56px;
-                                    text: connection.remote-id; font-size: 11px; color: WorkbenchStyle.muted;
+                                    text: connection.lan ? connection.endpoint : connection.remote-id; font-size: 11px; color: WorkbenchStyle.muted;
                                     overflow: elide;
                                 }
                             }
@@ -1367,7 +1731,7 @@ export component MainWindow inherits Window {
                                 menu-width: root.compact-language ? 116px : root.language-index == 2 ? 156px : 128px;
                                 items: [
                                     {label: GalleryStrings.tr("修改名称", "Rename", "Переименовать"), enabled: true},
-                                    {label: GalleryStrings.tr("修改分组", "Edit groups", "Изменить группы"), enabled: true},
+                                    {label: GalleryStrings.tr("修改分组", "Edit groups", "Изменить группы"), enabled: !connection.lan},
                                     {label: GalleryStrings.tr("删除记录", "Delete record", "Удалить запись"), enabled: true},
                                 ];
                                 item-icons: [FontAwesomeIcons.pen, FontAwesomeIcons.tags, FontAwesomeIcons.trash-can];
@@ -1465,7 +1829,7 @@ export component MainWindow inherits Window {
                 root.delete-remote-id = id; root.delete-from-gallery = true; root.delete-open = true;
             }
         }
-        // Server status and reconnect actions belong to the connection window.
+        // Show availability for the selected connection mode.
         if !root.gallery-mode: Rectangle {
             y: parent.height - 28px;
             height: 28px;
@@ -1477,13 +1841,16 @@ export component MainWindow inherits Window {
             }
             Rectangle {
                 x: 20px; y: 11px; width: 6px; height: 6px; border-radius: 3px;
-                background: root.signal-tls-error || root.signal-reconnecting ? #d6932b : root.signal-connected ? WorkbenchStyle.success : #d65252;
+                background: root.lan-mode ? (root.lan-message != "" || root.lan-listener-error != "" ? #d6932b : root.lan-listening ? WorkbenchStyle.success : WorkbenchStyle.muted) : root.signal-tls-error || root.signal-reconnecting ? #d6932b : root.signal-connected ? WorkbenchStyle.success : #d65252;
             }
             Text {
                     x: 34px;
                     y: 0px;
                     height: parent.height;
-                    text: root.signal-tls-error ? UiStrings.tls-error
+                    width: parent.width - 160px;
+                    overflow: elide;
+                    text: root.lan-mode ? (root.lan-message != "" ? LanStrings.error-message(root.lan-message) : root.lan-listener-error != "" ? (root.lan-listener-address == "" ? "" : root.lan-listener-address + " · ") + LanStrings.error-message(root.lan-listener-error) : root.lan-listening ? GalleryStrings.tr("局域网模式已启用", "LAN mode enabled", "Режим LAN включён") : root.lan-password-pending ? GalleryStrings.tr("局域网模式准备中…", "Preparing LAN mode…", "Подготовка режима LAN…") : GalleryStrings.tr("局域网模式未就绪", "LAN mode not ready", "Режим LAN не готов"))
+                          : root.signal-tls-error ? UiStrings.tls-error
                           : root.signal-connected ? UiStrings.signal-connected
                           : root.signal-reconnecting ? UiStrings.signal-reconnecting
                           : UiStrings.signal-disconnected;
@@ -1491,12 +1858,12 @@ export component MainWindow inherits Window {
                     font-size: 11px;
                     vertical-alignment: center;
             }
-            if root.signal-connected && !root.signal-tls-error: Text {
+            if root.lan-mode || (root.signal-connected && !root.signal-tls-error): Text {
                 x: parent.width - self.preferred-width - 20px; height: parent.height;
                 text: root.current-version;
                 font-size: 11px; color: WorkbenchStyle.muted; vertical-alignment: center;
             }
-            if !root.signal-connected && !root.signal-tls-error: WorkbenchButton {
+            if !root.lan-mode && !root.signal-connected && !root.signal-tls-error: WorkbenchButton {
                 x: parent.width - self.width - 20px;
                 y: (parent.height - self.height) / 2;
                 width: max(64px, reconnect-label-metrics.preferred-width + 22px);
@@ -1521,7 +1888,7 @@ export component MainWindow inherits Window {
     // Shared device details sit outside the clipped recent list and wall rail,
     // below the modal layer (z >= 39).
     if (root.gallery-mode ? gallery.hovered-device.id != "" : root.recent-tooltip-visible)
-        && !root.connection-dialog-open: device-tip := Rectangle {
+        && !root.connection-dialog-open && !root.lan-open: device-tip := Rectangle {
         private property <string> device-name: root.gallery-mode ? gallery.hovered-device.name : root.recent-tooltip-name;
         private property <string> host-name: root.gallery-mode ? gallery.hovered-device.host-name : root.recent-tooltip-host;
         private property <string> device-id: root.gallery-mode ? gallery.hovered-device.id : root.recent-tooltip-id;
@@ -1824,7 +2191,7 @@ export component MainWindow inherits Window {
         icon: self.error ? FontAwesomeIcons.xmark : FontAwesomeIcons.check;
         text: self.error
             ? GalleryStrings.tr("复制失败，请重试", "Couldn’t copy. Try again", "Не удалось скопировать. Повторите попытку")
-            : UiStrings.copied;
+            : root.lan-mode ? GalleryStrings.tr("IP 和端口已复制", "IP and port copied", "IP и порт скопированы") : UiStrings.copied;
         z: 30;
     }
 
@@ -1854,6 +2221,7 @@ export component MainWindow inherits Window {
                     alignment: center; spacing: 8px;
                     PrimaryButton {
                         text: UiStrings.ok;
+                        enabled: root.lan-mode ? !root.lan-password-pending : !root.password-change-pending;
                         clicked => {
                             if (root.reset-password(root.new-password-input)) {
                                 root.new-password-input = "";
@@ -2047,32 +2415,41 @@ export component MainWindow inherits Window {
     }
 
     // Connection feedback follows the workbench spacing and action hierarchy.
-    if root.connection-dialog-open: Rectangle {
+    if root.connection-dialog-open || root.lan-open: Rectangle {
         background: #15223850;
         z: 48;
-        TouchArea { clicked => { focus-sink.focus(); } }
+        TouchArea { clicked => { if !root.lan-open { focus-sink.focus(); } } }
         WorkbenchCard {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: 340px;
-            height: root.connection-password-required && !root.connection-validating ? 236px : 168px;
-            Text {
-                x: 24px; y: 24px; width: parent.width - 48px; height: 46px;
-                text: root.connection-status-text;
+            height: (root.prompt-password-required && !root.prompt-validating ? 236px : 168px)
+                + max(0px, connection-prompt-text.preferred-height - 46px);
+            connection-prompt-text := Text {
+                x: 24px; y: 24px; width: parent.width - 48px; height: max(46px, self.preferred-height);
+                text: root.prompt-status-text;
                 color: WorkbenchStyle.text; font-size: 14px;
                 wrap: word-wrap; horizontal-alignment: center; vertical-alignment: center;
             }
-            if root.connection-password-required && !root.connection-validating: PasswordInput {
-                x: (parent.width - self.width) / 2; y: 86px;
+            if !root.lan-open && root.connection-password-required && !root.connection-validating: PasswordInput {
+                x: (parent.width - self.width) / 2; y: connection-prompt-text.y + connection-prompt-text.height + 16px;
                 width: 164px; height: 36px; text-size: 16px;
                 border-radius: UiRadius.control; border-color: WorkbenchStyle.control-border;
                 text <=> root.connection-password;
-                accepted => { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
+                accepted => { root.submit-connection-password(); }
             }
-            if root.connection-password-required && !root.connection-validating: Rectangle {
-                x: (parent.width - self.width) / 2; y: 134px;
+            if root.lan-open && !root.lan-connecting: PasswordInput {
+                x: (parent.width - self.width) / 2; y: connection-prompt-text.y + connection-prompt-text.height + 16px;
+                width: 164px; height: 36px; text-size: 16px; max-length: 6;
+                border-radius: UiRadius.control; border-color: WorkbenchStyle.control-border;
+                text <=> root.lan-access-password;
+                accepted => { root.submit-connection-password(); }
+            }
+            if root.prompt-password-required && !root.prompt-validating: Rectangle {
+                x: (parent.width - self.width) / 2; y: connection-prompt-text.y + connection-prompt-text.height + 64px;
                 width: remember-label.preferred-width + 29px; height: 21px;
-                ImGuiCheckBox { x: 0px; y: 0px; checked <=> root.connection-remember-password; }
+                if root.lan-open: ImGuiCheckBox { x: 0px; y: 0px; checked <=> root.lan-remember-password; }
+                if !root.lan-open: ImGuiCheckBox { x: 0px; y: 0px; checked <=> root.connection-remember-password; }
                 remember-label := Text {
                     x: 29px; height: parent.height;
                     text: UiStrings.remember-password;
@@ -2080,21 +2457,25 @@ export component MainWindow inherits Window {
                 }
                 TouchArea {
                     x: 29px; width: parent.width - 29px; height: parent.height;
-                    clicked => { root.connection-remember-password = !root.connection-remember-password; }
+                    clicked => {
+                        if root.lan-open { root.lan-remember-password = !root.lan-remember-password; }
+                        else { root.connection-remember-password = !root.connection-remember-password; }
+                    }
                 }
             }
             HorizontalLayout {
                 x: 24px; y: parent.height - 60px; width: parent.width - 48px; height: 36px;
                 spacing: 12px; alignment: center;
-                if root.connection-password-required || root.connection-pending: WorkbenchButton {
+                if root.prompt-password-required || root.prompt-pending: WorkbenchButton {
                     text: UiStrings.cancel;
-                    clicked => { root.connection-cancel(); }
+                    clicked => { root.cancel-connection-prompt(); }
                 }
-                if root.connection-password-required && !root.connection-validating: WorkbenchButton {
+                if root.prompt-password-required && !root.prompt-validating: WorkbenchButton {
                     primary: true; text: UiStrings.ok;
-                    clicked => { root.connection-submit-password(root.connection-password, root.connection-remember-password); }
+                    enabled: !root.lan-open || (root.lan-retry-after == 0 && root.lan-access-password.character-count == 6);
+                    clicked => { root.submit-connection-password(); }
                 }
-                if !root.connection-password-required && !root.connection-pending: WorkbenchButton {
+                if !root.prompt-password-required && !root.prompt-pending: WorkbenchButton {
                     primary: true; text: UiStrings.ok;
                     clicked => { root.connection-acknowledge(); }
                 }
@@ -2253,7 +2634,7 @@ export component MainWindow inherits Window {
             if root.settings-tab == 0: settings-scroll := ScrollView {
                 x: settings-dialog.content-inset; y: 108px;
                 width: parent.width - 2 * settings-dialog.content-inset + settings-dialog.scrollbar-gutter;
-                height: parent.height - 174px;
+                height: parent.height - 174px - (root.settings-save-error == "" ? 0px : 28px);
                 viewport-width: self.visible-width;
                 viewport-height: settings-content.preferred-height;
                 viewport-y <=> root.settings-scroll-y;
@@ -2288,13 +2669,21 @@ export component MainWindow inherits Window {
                             }
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 3;
+                            title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 4;
+                            SettingsToggleRow {
+                                label: GalleryStrings.tr("启用 IP 直连", "Enable direct IP", "Прямое IP-подключение");
+                                checked <=> root.ip-direct-enabled-draft;
+                            }
                             SettingsToggleRow { label: UiStrings.turn-relay; checked <=> root.turn-enabled; enabled: !root.settings-session-active; }
                             SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: root.turn-enabled && !root.settings-session-active; }
                             SettingsToggleRow {
                                 checked <=> root.self-hosted-enabled; enabled: !root.settings-session-active; divider: false;
                                 SettingsButton { x: 0px; y: 2px; width: parent.width - 60px; height: 32px; quiet: true; align-left: true; text: UiStrings.self-hosted; enabled: !root.settings-session-active; clicked => { root.self-host-settings-open = true; } }
                             }
+                        }
+                        Text {
+                            text: GalleryStrings.tr("关闭 IP 直连将隐藏模式按钮，并断开 IP 直连会话。", "Disabling direct IP hides the mode button and disconnects direct IP sessions.", "Отключение скроет кнопку режима и завершит прямые IP-сеансы.");
+                            font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {
                             title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 1;
@@ -2324,11 +2713,17 @@ export component MainWindow inherits Window {
             }
             if root.settings-tab == 1: GallerySettings {
                 x: settings-dialog.content-inset; y: 108px;
-                width: parent.width - 2 * settings-dialog.content-inset; height: parent.height - 174px;
+                width: parent.width - 2 * settings-dialog.content-inset;
+                height: parent.height - 174px - (root.settings-save-error == "" ? 0px : 28px);
                 resolution-index <=> root.gallery-resolution-draft;
                 frame-rate-index <=> root.gallery-frame-rate-draft;
                 bandwidth-index <=> root.gallery-bandwidth-draft;
                 error: root.gallery-settings-error;
+            }
+            if root.settings-save-error != "": Text {
+                x: settings-dialog.content-inset; y: parent.height - 92px;
+                width: parent.width - 2 * settings-dialog.content-inset; height: 24px;
+                text: root.settings-save-error; font-size: 11px; color: #c53e3e; wrap: word-wrap;
             }
             Rectangle {
                 x: settings-dialog.content-inset; y: parent.height - 64px;
@@ -3104,4 +3499,79 @@ export component MainWindow inherits Window {
         z: 200;
     }
     }
+    // Each explicit validation failure opens one modal, without a focus loop.
+    if root.lan-access-warning != "": Rectangle {
+        width: parent.width; height: parent.height;
+        background: #00000042;
+        z: 300;
+        TouchArea { scroll-event(event) => { accept } }
+        lan-warning-focus := FocusScope {
+            width: parent.width; height: parent.height;
+            key-pressed(event) => {
+                if event.text == Key.Escape || event.text == Key.Return || event.text == " " {
+                    root.dismiss-lan-access-warning();
+                } else if event.text == Key.Tab {
+                    self.focus();
+                }
+                return accept;
+            }
+            Timer {
+                interval: 1ms;
+                running: true;
+                triggered => {
+                    self.running = false;
+                    // Defer focus until after Slint's accessibility update.
+                    root.menu-open = false;
+                    lan-ip-picker.close-menu();
+                    lan-warning-focus.focus();
+                }
+            }
+            DialogSurface {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: min(root.compact-language ? 270px : 320px, parent.width - 40px);
+                // Let short messages stay compact; longer translations grow
+                // naturally without stretching the gap above the action.
+                height: lan-warning-content.preferred-height;
+                TouchArea { scroll-event(event) => { accept } }
+                lan-warning-content := VerticalLayout {
+                    padding: 20px; spacing: 20px;
+                    padding-top: 28px; padding-bottom: 28px;
+                    if root.lan-access-warning-endpoint != "": Text {
+                        text: root.lan-access-warning-endpoint;
+                        font-size: 12px; font-weight: 600; color: WorkbenchStyle.text;
+                        horizontal-alignment: center; wrap: word-wrap;
+                    }
+                    lan-warning-message := Rectangle {
+                        private property <[string]> lines: LanStrings.access-error-lines(root.lan-access-warning);
+                        height: warning-lines.preferred-height;
+                        vertical-stretch: 0;
+                        accessible-role: text;
+                        accessible-label: LanStrings.error-message(root.lan-access-warning);
+                        warning-lines := VerticalLayout {
+                            width: parent.width;
+                            height: self.preferred-height;
+                            spacing: 6px;
+                            for line in (lan-warning-message.lines[0] != "" ? lan-warning-message.lines : [LanStrings.error-message(root.lan-access-warning)]): Text {
+                                text: line; font-size: ImGuiFontStyle.base; color: #30343b;
+                                horizontal-alignment: center; wrap: word-wrap;
+                                accessible-role: none;
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        height: 30px; alignment: center;
+                        PrimaryButton {
+                            text: UiStrings.ok;
+                            accessible-role: button;
+                            accessible-label: UiStrings.ok;
+                            accessible-action-default => { root.dismiss-lan-access-warning(); }
+                            clicked => { root.dismiss-lan-access-warning(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }

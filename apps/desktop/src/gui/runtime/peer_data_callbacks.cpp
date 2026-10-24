@@ -84,17 +84,52 @@ void LogSecureDesktopInputBlocked(uint32_t *last_tick, const char *side,
 
 } // namespace
 
+bool PeerEventHandler::QueueEarlyData(const char* data, size_t size,
+                                      const char* label, size_t label_size) {
+  if (!direct_bound_) return false;
+  auto session = direct_.lock();
+  if (!session || session->closing) return true;
+  std::lock_guard lock(early_data_mutex_);
+  if (session->authorized) return false;
+  // Keep bounded reliable metadata until the manager commits Connected. Mouse,
+  // keyboard, clipboard and files never enter this pre-authorization queue.
+  if (std::string_view(label, label_size) != owner_.control_data_label_)
+    return true;
+  if (size > 8192 || early_data_.size() >= 16 ||
+      early_data_bytes_ + size > 65536) {
+    session->failed = true;
+    return true;
+  }
+  early_data_bytes_ += size;
+  early_data_.emplace_back(data, size);
+  return true;
+}
+void PeerEventHandler::FlushEarlyData() {
+  std::vector<std::string> queued;
+  {
+    std::lock_guard lock(early_data_mutex_);
+    queued.swap(early_data_);
+    early_data_bytes_ = 0;
+  }
+  const auto session = direct_.lock();
+  if (!session || !session->authorized || session->closing) return;
+  const auto& label = owner_.control_data_label_;
+  for (const auto& data : queued)
+    OnReceiveDataBuffer(data.data(), data.size(), session->remote_id.data(),
+                        session->remote_id.size(), label.data(), label.size(),
+                        this);
+}
+
 void PeerEventHandler::OnReceiveDataBuffer(
     const char *data, size_t size, const char *user_id, size_t user_id_size,
     const char *src_id, size_t src_id_size, void *user_data) {
   auto *handler = static_cast<PeerEventHandler *>(user_data);
   if (!handler) return;
   auto callback = handler->EnterCallback();
-  if (!callback) return;
-  GuiRuntime *runtime = handler ? &handler->owner_ : nullptr;
-  if (!runtime) {
+  if (!callback || handler->QueueEarlyData(data, size, src_id, src_id_size) ||
+      !handler->DataAllowed())
     return;
-  }
+  GuiRuntime* runtime = &handler->owner_;
 
   std::string source_id = std::string(src_id, src_id_size);
   // The service-owned host runs as SYSTEM. Do not expose filesystem or
@@ -105,11 +140,13 @@ void PeerEventHandler::OnReceiveDataBuffer(
        source_id == runtime->clipboard_label_))
     return;
   if (source_id == runtime->file_label_) {
-    runtime->transfers_.Receive(data, size, handler, std::string(user_id, user_id_size));
+    runtime->transfers_.Receive(data, size, handler,
+                                handler->ConnectionKey(user_id, user_id_size));
     return;
   } else if (source_id == runtime->clipboard_label_) {
     if (size > 0) {
-      std::string remote_user_id(user_id, user_id_size);
+      std::string remote_user_id =
+          handler->ConnectionKey(user_id, user_id_size);
       auto props =
           runtime->FindRemoteSession(remote_user_id);
       if (props && !props->clipboard_allowed_.load()) {
@@ -121,11 +158,15 @@ void PeerEventHandler::OnReceiveDataBuffer(
     }
     return;
   } else if (source_id == runtime->file_feedback_label_) {
-    runtime->transfers_.HandleAck(data, size, handler, std::string(user_id, user_id_size));
+    runtime->transfers_.HandleAck(
+        data, size, handler, handler->ConnectionKey(user_id, user_id_size));
     return;
   }
 
-  const std::string remote_id(user_id, user_id_size);
+  const std::string remote_id = handler->ConnectionKey(user_id, user_id_size);
+  const std::string wire_id = handler->WireId(remote_id);
+  PeerPtr* bound_peer =
+      handler->IsDirect() ? handler->DirectPeer() : runtime->peer_;
   std::string json_str(data, size);
   const auto preview_json =
       json_str.find("\"deskhub_preview") != std::string::npos
@@ -145,29 +186,31 @@ void PeerEventHandler::OnReceiveDataBuffer(
     if (!previous || subscription->IsNewerThan(*previous)) {
       if (subscription->fps > 0)
         accepted = UpdateVideoSettings(
-                     runtime->peer_, remote_id.data(), remote_id.size(),
-                     static_cast<VideoQuality>(subscription->quality),
-                     subscription->frame_rate,
-                     static_cast<VideoDegradationPreference>(
-                         subscription->EncoderPreference())) == 0;
+                       bound_peer, wire_id.data(), wire_id.size(),
+                       static_cast<VideoQuality>(subscription->quality),
+                       subscription->frame_rate,
+                       static_cast<VideoDegradationPreference>(
+                           subscription->EncoderPreference())) == 0;
       if (accepted && (!previous || previous->max_bitrate_bps.value_or(0) !=
                                        subscription->max_bitrate_bps.value_or(0)))
         accepted = UpdateVideoBitrateLimit(
-                       runtime->peer_, remote_id.data(), remote_id.size(),
+                       bound_peer, wire_id.data(), wire_id.size(),
                        subscription->max_bitrate_bps.value_or(0)) == 0;
       // Rebalancing bandwidth alone must not force every device to send a
       // keyframe. The pause API requests its own keyframes on resume.
       if (accepted && (!previous || previous->width != subscription->width ||
                        previous->height != subscription->height))
-        accepted = UpdateVideoResolution(
-                       runtime->peer_, remote_id.data(), remote_id.size(),
-                       subscription->width, subscription->height) == 0;
+        accepted = UpdateVideoResolution(bound_peer, wire_id.data(),
+                                         wire_id.size(), subscription->width,
+                                         subscription->height) == 0;
       if (accepted)
-        accepted = SetVideoSendPaused(runtime->peer_, remote_id.data(),
-                                      remote_id.size(), subscription->fps == 0) == 0;
+        accepted =
+            SetVideoSendPaused(bound_peer, wire_id.data(), wire_id.size(),
+                               subscription->fps == 0) == 0;
       if (accepted)
-        accepted = SetAudioSendPaused(runtime->peer_, remote_id.data(),
-                                      remote_id.size(), !subscription->audio) == 0;
+        accepted =
+            SetAudioSendPaused(bound_peer, wire_id.data(), wire_id.size(),
+                               !subscription->audio) == 0;
       if (accepted && subscription->audio)
         runtime->devices_.StartSpeakerCapturer();
     }
@@ -178,9 +221,9 @@ void PeerEventHandler::OnReceiveDataBuffer(
         {"request_id", subscription->request_id},
         {"accepted",
          accepted}}.dump();
-    SendReliableDataFrameToPeer(runtime->peer_, reply.data(), reply.size(),
+    SendReliableDataFrameToPeer(bound_peer, reply.data(), reply.size(),
                                 runtime->control_data_label_.c_str(),
-                                remote_id.data(), remote_id.size());
+                                wire_id.data(), wire_id.size());
     return;
   }
   if (preview_json.is_object() &&
@@ -253,7 +296,7 @@ void PeerEventHandler::OnReceiveDataBuffer(
     const auto& settings = remote_action.vs;
     remote_action.vs.accepted =
         UpdateVideoSettings(
-            runtime->peer_, remote_id.data(), remote_id.size(),
+            bound_peer, wire_id.data(), wire_id.size(),
             static_cast<VideoQuality>(settings.quality), settings.frame_rate,
             static_cast<VideoDegradationPreference>(settings.preference)) == 0;
     LOG_INFO("Video settings: peer={} source={} request={} quality={} fps={} "
@@ -262,9 +305,9 @@ void PeerEventHandler::OnReceiveDataBuffer(
              settings.frame_rate, settings.preference, remote_action.vs.accepted);
     remote_action.type = ControlType::video_settings_status;
     const auto message = remote_action.to_json();
-    SendReliableDataFrameToPeer(runtime->peer_, message.data(), message.size(),
+    SendReliableDataFrameToPeer(bound_peer, message.data(), message.size(),
                                 runtime->control_data_label_.c_str(),
-                                remote_id.data(), remote_id.size());
+                                wire_id.data(), wire_id.size());
     return;
   }
   if (remote_action.type == ControlType::privacy_status) {
@@ -407,8 +450,10 @@ void PeerEventHandler::OnReceiveDataBuffer(
           props->video_settings_request_tick_ = SDL_GetTicks();
           settings.vs = props->video_settings_;
           const auto message = settings.to_json();
-          SendReliableDataFrame(props->peer_, message.data(), message.size(),
-                                props->control_data_label_.c_str());
+          SendReliableDataFrame(
+              handler->IsDirect() ? handler->DirectPeer() : props->peer_,
+              message.data(), message.size(),
+              props->control_data_label_.c_str());
         }
       }
       // client mode
@@ -456,8 +501,8 @@ void PeerEventHandler::OnReceiveDataBuffer(
       // command arrives after it (e.g. when unmuting an inactive window).
       const auto subscription = runtime->preview_subscriptions_.Get(remote_id);
       const bool paused = subscription ? !subscription->audio : !remote_action.a;
-      const int ret = SetAudioSendPaused(runtime->peer_, remote_id.data(),
-                                         remote_id.size(), paused);
+      const int ret = SetAudioSendPaused(bound_peer, wire_id.data(),
+                                         wire_id.size(), paused);
       if (remote_action.a)
         runtime->devices_.StartSpeakerCapturer();
       else if (ret != 0)

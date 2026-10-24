@@ -7,10 +7,19 @@ export component GroupFilter inherits Rectangle {
     in property <[string]> model;
     in property <int> system-count: 2;
     in property <bool> enabled: true;
+    // An embedded picker shares its enclosing field's border and focus ring.
+    in property <bool> embedded: false;
+    in property <bool> show-indicator: true;
+    in property <length> popup-min-width: 0px;
+    in property <length> text-size: 12px;
+    in property <int> text-weight: 400;
+    in property <color> text-color: #30343b;
     in property <color> normal-border-color: #c9cdd2;
     in property <color> hover-border-color: root.normal-border-color;
     in property <color> focus-border-color: #8db5df;
     in-out property <int> current-index: 0;
+    out property <bool> has-focus: trigger-focus.has-focus || popup.is-open;
+    out property <bool> has-hover: root.enabled && trigger-touch.has-hover && !popup.is-open;
     callback selected(int);
     private property <bool> has-divider: root.system-count > 0 && root.model.length > root.system-count;
     private property <length> list-height: root.model.length * 26px + (root.has-divider ? 6px : 0px);
@@ -25,8 +34,9 @@ export component GroupFilter inherits Rectangle {
     }
 
     width: 155px; height: 28px;
-    background: !root.enabled ? #f3f4f5 : trigger-touch.has-hover ? #f8f9fb : white;
-    border-width: 1px;
+    background: root.embedded ? (root.enabled && trigger-touch.has-hover ? #eef3fb : transparent)
+        : !root.enabled ? #f3f4f5 : trigger-touch.has-hover ? #f8f9fb : white;
+    border-width: root.embedded ? 0px : 1px;
     border-color: popup.is-open || trigger-focus.has-focus ? root.focus-border-color
         : trigger-touch.has-hover ? root.hover-border-color : root.normal-border-color;
     border-radius: UiRadius.control;
@@ -52,16 +62,18 @@ export component GroupFilter inherits Rectangle {
         root.reveal-selection();
         root.selected(root.current-index);
     }
-    function open-menu() {
+    public function open-menu() {
         if root.enabled && root.model.length > 0 {
             popup-open-timer.running = false;
             root.popup-animation-enabled = false;
             root.popup-progress = 0;
             root.reveal-selection();
+            trigger-focus.focus();
             popup.show();
             popup-open-timer.running = true;
         }
     }
+    public function close-menu() { popup.close(); }
     // Defer until the popup has its initial frame; animate its contents only,
     // keeping the native popup bounds and scrolling geometry stable.
     popup-open-timer := Timer {
@@ -87,14 +99,19 @@ export component GroupFilter inherits Rectangle {
         return reject;
     }
     Text {
-        x: 10px; width: parent.width - 36px; height: parent.height;
+        x: root.embedded ? 8px : 10px;
+        width: parent.width - (root.show-indicator
+            ? (root.embedded ? 26px : 36px) : (root.embedded ? 16px : 20px));
+        height: parent.height;
         text: root.model[root.current-index];
-        color: root.enabled ? #30343b : #92979f;
-        font-size: 12px; overflow: elide; vertical-alignment: center;
+        color: root.enabled ? root.text-color : #92979f;
+        font-size: root.text-size; font-weight: root.text-weight;
+        overflow: elide; vertical-alignment: center;
         accessible-role: none;
     }
-    Text {
-        x: parent.width - 25px; width: 16px; height: parent.height;
+    if root.show-indicator: Text {
+        x: parent.width - (root.embedded ? 16px : 25px);
+        width: root.embedded ? 10px : 16px; height: parent.height;
         text: FontAwesomeIcons.angle-down; font-family: "Font Awesome 6 Free";
         font-weight: 900; font-size: 10px; color: #858c96;
         horizontal-alignment: center; vertical-alignment: center;
@@ -107,12 +124,13 @@ export component GroupFilter inherits Rectangle {
         key-pressed(event) => { return root.handle-key(event); }
         trigger-touch := TouchArea {
             enabled: root.enabled;
-            clicked => { trigger-focus.focus(); root.open-menu(); }
+            mouse-cursor: pointer;
+            clicked => { root.open-menu(); }
         }
     }
     popup := PopupWindow {
         x: 0px; y: root.height + 4px;
-        width: root.width; height: root.visible-height + 8px;
+        width: max(root.width, root.popup-min-width); height: root.visible-height + 8px;
         close-policy: close-on-click-outside;
         forward-focus: popup-focus;
         popup-focus := FocusScope {

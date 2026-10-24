@@ -8,7 +8,10 @@
 #define _PEER_EVENT_HANDLER_H_
 
 #include <cstddef>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include "minirtc.h"
 #include "runtime/session_lifecycle.h"
@@ -16,12 +19,30 @@
 namespace crossdesk {
 
 class GuiRuntime;
+namespace lan {
+struct Session;
+}
 
 // Adapts MiniRTC C callbacks to the GUI runtime.
 class PeerEventHandler {
 public:
   explicit PeerEventHandler(GuiRuntime &owner);
 
+  void BindDirect(const std::shared_ptr<lan::Session>& session) {
+    direct_ = session;
+    direct_bound_ = true;
+  }
+  std::string ConnectionKey(const char* id, size_t size) const;
+  std::string WireId(const std::string& key) const;
+  bool DataAllowed() const;
+  bool IsDirect() const { return direct_bound_; }
+  void SetDirectPeer(PeerPtr* peer) { direct_peer_ = peer; }
+  PeerPtr* DirectPeer() const { return direct_peer_; }
+  void FlushEarlyData();
+  void ApplyConnectionStatus(ConnectionStatus status, const std::string& id) {
+    DispatchConnectionStatus(status, id.data(), id.size(), this);
+  }
+  void StopAccepting() { callbacks_.StopAccepting(); }
   bool IsActive() const { return callbacks_.IsActive(); }
   auto EnterCallback() { return callbacks_.Enter(); }
   void Deactivate() { callbacks_.Close(); }
@@ -51,9 +72,19 @@ public:
                                 void *user_data);
 
 private:
-  static void SendClientInfo(PeerPtr *peer, const std::string &client_id);
+  static void DispatchConnectionStatus(ConnectionStatus status, const char* id,
+                                       size_t size, void* context);
+  static void SendClientInfo(PeerPtr* peer, const std::string& client_id);
+  bool QueueEarlyData(const char* data, size_t size, const char* label,
+                      size_t label_size);
+  std::weak_ptr<lan::Session> direct_;
+  bool direct_bound_ = false;
+  PeerPtr* direct_peer_ = nullptr;
+  std::mutex early_data_mutex_;
+  std::vector<std::string> early_data_;
+  size_t early_data_bytes_ = 0;
 
-  GuiRuntime &owner_;
+  GuiRuntime& owner_;
   gui_detail::SessionCallbackGate callbacks_;
 };
 

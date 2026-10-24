@@ -21,6 +21,7 @@ namespace crossdesk {
 class ConfigCenter {
  public:
   enum class LANGUAGE { CHINESE = 0, ENGLISH = 1, RUSSIAN = 2 };
+  enum class CONNECTION_MODE { DEVICE_ID = 0, DIRECT_IP = 1 };
   enum class VIDEO_ENCODE_FORMAT { H264 = 0, AV1 = 1 };
   enum class TURN_MODE {
     DISABLED = 0,
@@ -35,6 +36,8 @@ class ConfigCenter {
 
   // write config
   int SetLanguage(LANGUAGE language);
+  int SetConnectionMode(CONNECTION_MODE mode);
+  int SetIpDirectEnabled(bool enabled);
   int SetScreenCaptureMethod(ScreenCaptureMethod method);
   int SetVideoEncodeFormat(VIDEO_ENCODE_FORMAT video_encode_format);
   int SetTurnMode(TURN_MODE turn_mode);
@@ -54,6 +57,8 @@ class ConfigCenter {
   // read config
 
   LANGUAGE GetLanguage() const;
+  CONNECTION_MODE GetConnectionMode() const;
+  bool IsIpDirectEnabled() const;
   ScreenCaptureMethod GetScreenCaptureMethod() const;
   VIDEO_ENCODE_FORMAT GetVideoEncodeFormat() const;
   TURN_MODE GetTurnMode() const;
@@ -86,6 +91,8 @@ class ConfigCenter {
   const char* section_ = "Settings";
 
   LANGUAGE language_ = LANGUAGE::CHINESE;
+  CONNECTION_MODE connection_mode_ = CONNECTION_MODE::DEVICE_ID;
+  bool enable_ip_direct_ = true;
   ScreenCaptureMethod screen_capture_method_ = ScreenCaptureMethod::Auto;
   VIDEO_ENCODE_FORMAT video_encode_format_ = VIDEO_ENCODE_FORMAT::H264;
   TURN_MODE turn_mode_ = TURN_MODE::AUTO_UDP_TCP;

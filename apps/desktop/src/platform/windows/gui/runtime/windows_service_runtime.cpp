@@ -197,8 +197,9 @@ void GuiRuntime::HandleWindowsServiceIntegration() {
       optimistic.available = local_service_available_;
       optimistic.interactive_stage = local_interactive_stage_;
       const auto message = BuildWindowsServiceStatusAction(optimistic).to_json();
-      SendReliableDataFrame(peer_, message.data(), message.size(),
-                            control_data_label_.c_str());
+      for (const auto& id : ConnectedControllers())
+        SendControllerData(id, message.data(), message.size(),
+                           control_data_label_.c_str());
     }
     result.reset();
   }
@@ -293,10 +294,11 @@ void GuiRuntime::HandleWindowsServiceIntegration() {
   RemoteAction remote_action =
       BuildWindowsServiceStatusAction(broadcast_status);
   std::string msg = remote_action.to_json();
-  int ret = SendReliableDataFrame(peer_, msg.data(), msg.size(),
-                                  control_data_label_.c_str());
-  if (ret != 0) {
-    LOG_WARN("Broadcast Windows service status failed, ret={}", ret);
+  for (const auto& id : ConnectedControllers()) {
+    const int ret = SendControllerData(id, msg.data(), msg.size(),
+                                       control_data_label_.c_str());
+    if (ret != 0)
+      LOG_WARN("Windows service status send failed, peer={}, ret={}", id, ret);
   }
 #endif
 }

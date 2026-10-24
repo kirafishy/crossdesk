@@ -70,6 +70,7 @@ GuiRuntime::~GuiRuntime() {
   windows_rdp_handoff_connected_->store(false, std::memory_order_relaxed);
   if (windows_service_worker_) windows_service_worker_->Reset();
 #endif
+  lan_.reset();
   transfers_.Shutdown();
   WaitForSessionCleanup();
 }
@@ -292,7 +293,7 @@ int GuiRuntime::CreateConnectionPeer() {
     LOG_INFO("Create peer [{}] instance failed", client_id_);
   }
 
-  if (0 == devices_.InitializeScreenCapturer()) {
+  if (0 == devices_.EnsureCaptureReady()) {
     const auto &displays = devices_.display_info_list();
     for (size_t index = 0; index < displays.size(); ++index) {
       const std::string stream_id = MakeDisplayStreamId(index);
@@ -334,10 +335,18 @@ void GuiRuntime::HandleRecentConnections() {
       // Record a successful connection before a preview or host info arrives.
       // The close path still updates its final thumbnail. Remember password
       // controls only credential storage, not whether this device is listed.
+      const auto direct = props->lan_session_;
+      const Thumbnail::LanTarget target =
+          direct ? Thumbnail::LanTarget{direct->target.address,
+                                        direct->target.device_id,
+                                        direct->target.port}
+                 : Thumbnail::LanTarget{};
+      const auto record_id =
+          direct ? Thumbnail::LanRecordId(target.device_id) : props->remote_id_;
       if (thumbnail_->SaveToThumbnail(
-              nullptr, 0, 0, props->remote_id_, host_name,
+              nullptr, 0, 0, record_id, host_name,
               props->remember_password_ ? props->remote_password_ : "",
-              platform) == 0)
+              platform, direct ? &target : nullptr) == 0)
         reload_recent_connections_ = true;
       else
         LOG_ERROR("[{}] Failed to save recent connection", props->remote_id_);
@@ -356,7 +365,8 @@ void GuiRuntime::HandleRecentConnections() {
 
       recent_connection_ids_.clear();
       for (const auto &conn : recent_connections_) {
-        recent_connection_ids_.push_back(conn.first);
+        if (conn.second.lan.device_id.empty())
+          recent_connection_ids_.push_back(conn.first);
       }
       need_to_send_recent_connections_ = true;
     }

@@ -15,6 +15,10 @@
 namespace crossdesk {
 
 bool GuiRuntime::IsAuthorizedController(const std::string& remote_id) {
+  if (remote_id.rfind("lan/", 0) == 0) {
+    const auto events = ControllerEvents(remote_id);
+    if (!events || !events->DataAllowed()) return false;
+  }
   // Connections appear here only after the existing password/signalling/RTC
   // admission path. Outgoing/viewer sessions live in remote_sessions_ instead.
   std::shared_lock lock(connection_status_mutex_);
@@ -109,9 +113,9 @@ void GuiRuntime::HandlePrivacy() {
                   "A connected controller does not support privacy screen");
     }
   }
-  if (!peer_ || (last_privacy_status_tick_ != 0 &&
-                 status.revision == last_privacy_revision_ &&
-                 now - last_privacy_status_tick_ < 1000))
+  if (last_privacy_status_tick_ != 0 &&
+       status.revision == last_privacy_revision_ &&
+       now - last_privacy_status_tick_ < 1000)
     return;
   RemoteAction action{};
   action.type = ControlType::privacy_status;
@@ -119,9 +123,8 @@ void GuiRuntime::HandlePrivacy() {
   const auto message = action.to_json();
   bool sent = true;
   for (const auto& id : controllers) {
-    const int result = SendReliableDataFrameToPeer(
-        peer_, message.data(), message.size(), control_data_label_.c_str(),
-        id.data(), id.size());
+    const int result = SendControllerData(id, message.data(), message.size(),
+                                          control_data_label_.c_str());
     if (result != 0) {
       sent = false;
       LOG_WARN("Privacy status send failed, peer={}, ret={}", id, result);

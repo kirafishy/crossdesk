@@ -118,7 +118,14 @@ bool IsRemoteId(const std::string& id) {
                      [](unsigned char c) { return c >= '0' && c <= '9'; });
 }
 
+bool IsLanRecordId(const std::string& id) {
+  return id.size() == 68 && id.rfind("lan-", 0) == 0 &&
+         std::all_of(id.begin() + 4, id.end(), [](char c) {
+           return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+         });
+}
 std::string ConnectionKey(const Thumbnail::RecentConnection& connection) {
+  if (!connection.lan.device_id.empty()) return connection.remote_id;
   return connection.remote_id + (connection.remember_password ? "Y" : "N") +
          connection.remote_host_name +
          (connection.remember_password ? "@" + connection.password : "");
@@ -126,17 +133,37 @@ std::string ConnectionKey(const Thumbnail::RecentConnection& connection) {
 
 }  // namespace
 
+std::string Thumbnail::LanRecordId(const std::string& device_id) {
+  unsigned char digest[32]{};
+  unsigned int size = 0;
+  const std::string input = "lan_direct/" + device_id;
+  if (EVP_Digest(input.data(), input.size(), digest, &size, EVP_sha256(),
+                 nullptr) != 1 ||
+      size != 32)
+    return {};
+  std::ostringstream text;
+  text << "lan-" << std::hex << std::setfill('0');
+  for (const auto byte : digest) text << std::setw(2) << unsigned(byte);
+  return text.str();
+}
+
 bool Thumbnail::WriteRecord(const RecentConnection& connection) {
+  const auto password = connection.remember_password
+      ? AES_encrypt(connection.password, aes128_key_, aes128_iv_) : "";
+  if (connection.remember_password && password.empty()) return false;
   const auto path =
       std::filesystem::path(save_path_) / (connection.remote_id + ".json");
   const auto temporary = path.string() + ".tmp";
   const nlohmann::json record = {
+      {"version", 2},
+      {"kind", connection.lan.device_id.empty() ? "cloud_id" : "lan_direct"},
+      {"lan",
+       {{"address", connection.lan.address},
+        {"port", connection.lan.port},
+        {"device_id", connection.lan.device_id}}},
       {"remote_id", connection.remote_id},
       {"host_name", connection.remote_host_name},
-      {"password",
-       connection.remember_password
-           ? AES_encrypt(connection.password, aes128_key_, aes128_iv_)
-           : ""},
+      {"password", password},
       {"platform", HostPlatformName(connection.platform)}};
   std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
   output << record.dump();
@@ -167,14 +194,25 @@ bool Thumbnail::ReadRecord(const std::filesystem::path& path,
   if (!record.is_object()) return false;
   try {
     connection->remote_id = record.value("remote_id", "");
-    if (!IsRemoteId(connection->remote_id) ||
-        path.stem() != connection->remote_id)
+    const auto kind = record.value("kind", "cloud_id");
+    if (kind == "lan_direct") {
+      const auto& target = record.at("lan");
+      connection->lan = {target.at("address"), target.at("device_id"),
+                         target.at("port")};
+      if (!IsLanRecordId(connection->remote_id) ||
+          connection->lan.device_id.size() != 32 ||
+          connection->remote_id != LanRecordId(connection->lan.device_id) ||
+          !connection->lan.port || connection->lan.port > 65535 ||
+          connection->lan.address.size() > 15)
+        return false;
+    } else if (kind != "cloud_id" || !IsRemoteId(connection->remote_id))
       return false;
+    if (path.stem() != connection->remote_id) return false;
     connection->remote_host_name = record.value("host_name", "");
     const auto password = record.value("password", "");
-    connection->remember_password = !password.empty();
     connection->password =
         password.empty() ? "" : AES_decrypt(password, aes128_key_, aes128_iv_);
+    connection->remember_password = !connection->password.empty();
     connection->platform =
         ParseHostPlatform(record.value("platform", "unknown"));
     const auto image = path.parent_path() / (connection->remote_id + ".png");
@@ -201,17 +239,21 @@ int Thumbnail::SaveToThumbnail(const char* nv12, int width, int height,
                                const std::string& remote_id,
                                const std::string& host_name,
                                const std::string& password,
-                               HostPlatform platform) {
+                               HostPlatform platform, const LanTarget* lan) {
   std::lock_guard lock(mutex_);
   // Successful connections are history even without saved credentials.
-  if (!IsRemoteId(remote_id)) return -1;
+  if (lan ? (!IsLanRecordId(remote_id) ||
+             remote_id != LanRecordId(lan->device_id))
+          : !IsRemoteId(remote_id))
+    return -1;
   RecentConnection connection;
   ReadRecord(std::filesystem::path(save_path_) / (remote_id + ".json"),
              &connection);
   connection.remote_id = remote_id;
   if (!host_name.empty()) connection.remote_host_name = host_name;
+  connection.lan = lan ? *lan : LanTarget{};
   connection.password = password;
-  connection.remember_password = !password.empty();
+  connection.remember_password = !connection.password.empty();
   if (platform != HostPlatform::Unknown) connection.platform = platform;
   if (!WriteRecord(connection)) return -1;
 
@@ -349,6 +391,12 @@ bool Thumbnail::DecodeImage(const std::filesystem::path& image_path,
 
 int Thumbnail::DeleteThumbnail(const std::string& filename_keyword) {
   std::lock_guard lock(mutex_);
+  if (IsLanRecordId(filename_keyword)) {
+    for (const auto* extension : {".json", ".png"})
+      std::filesystem::remove(std::filesystem::path(save_path_) /
+                              (filename_keyword + extension));
+    return 0;
+  }
   const auto remote_id = filename_keyword.substr(0, 9);
   if (!IsRemoteId(remote_id)) return -1;
   for (const auto& entry : std::filesystem::directory_iterator(save_path_)) {
@@ -411,14 +459,14 @@ std::string Thumbnail::AES_encrypt(const std::string& plaintext,
   ctx = EVP_CIPHER_CTX_new();
   if (!ctx) {
     LOG_ERROR("Error in EVP_CIPHER_CTX_new");
-    return plaintext;
+    return {};
   }
 
   ret = EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv);
   if (1 != ret) {
     LOG_ERROR("Error in EVP_EncryptInit_ex");
     EVP_CIPHER_CTX_free(ctx);
-    return plaintext;
+    return {};
   }
 
   ret = EVP_EncryptUpdate(
@@ -428,7 +476,7 @@ std::string Thumbnail::AES_encrypt(const std::string& plaintext,
   if (1 != ret) {
     LOG_ERROR("Error in EVP_EncryptUpdate");
     EVP_CIPHER_CTX_free(ctx);
-    return plaintext;
+    return {};
   }
 
   ciphertext_len = len;
@@ -436,7 +484,7 @@ std::string Thumbnail::AES_encrypt(const std::string& plaintext,
   if (1 != ret) {
     LOG_ERROR("Error in EVP_EncryptFinal_ex");
     EVP_CIPHER_CTX_free(ctx);
-    return plaintext;
+    return {};
   }
 
   ciphertext_len += len;
@@ -448,7 +496,7 @@ std::string Thumbnail::AES_encrypt(const std::string& plaintext,
   if (1 != ret) {
     LOG_ERROR("Error in OPENSSL_buf2hexstr_ex");
     EVP_CIPHER_CTX_free(ctx);
-    return plaintext;
+    return {};
   }
 
   EVP_CIPHER_CTX_free(ctx);
@@ -471,13 +519,13 @@ std::string Thumbnail::AES_decrypt(const std::string& ciphertext,
                               &ciphertext_buf_len, ciphertext.c_str(), '\0');
   if (1 != ret) {
     LOG_ERROR("Error in OPENSSL_hexstr2buf_ex");
-    return ciphertext;
+    return {};
   }
 
   ctx = EVP_CIPHER_CTX_new();
   if (!ctx) {
     LOG_ERROR("Error in EVP_CIPHER_CTX_new");
-    return ciphertext;
+    return {};
   }
 
   ret = EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv);
@@ -485,7 +533,7 @@ std::string Thumbnail::AES_decrypt(const std::string& ciphertext,
     LOG_ERROR("Error in EVP_DecryptInit_ex");
 
     EVP_CIPHER_CTX_free(ctx);
-    return ciphertext;
+    return {};
   }
 
   ret = EVP_DecryptUpdate(ctx, plaintext, &plaintext_len, ciphertext_buf,
@@ -494,7 +542,7 @@ std::string Thumbnail::AES_decrypt(const std::string& ciphertext,
     LOG_ERROR("Error in EVP_DecryptUpdate");
 
     EVP_CIPHER_CTX_free(ctx);
-    return ciphertext;
+    return {};
   }
 
   ret =
@@ -503,7 +551,7 @@ std::string Thumbnail::AES_decrypt(const std::string& ciphertext,
     LOG_ERROR("Error in EVP_DecryptFinal_ex");
 
     EVP_CIPHER_CTX_free(ctx);
-    return ciphertext;
+    return {};
   }
   plaintext_len += plaintext_final_len;
 

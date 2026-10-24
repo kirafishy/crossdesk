@@ -37,6 +37,11 @@ void SessionCallbackGate::EndCallback() {
   }
 }
 
+void SessionCallbackGate::StopAccepting() {
+  std::lock_guard lock(mutex_);
+  accepting_callbacks_ = false;
+}
+
 void SessionCallbackGate::Close() {
   std::unique_lock lock(mutex_);
   accepting_callbacks_ = false;

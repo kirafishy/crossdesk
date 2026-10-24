@@ -37,7 +37,7 @@ struct TranslationRow {
   X(console_cli_help, u8"Linux 无头运行选项：\n  --headless                  自动选择已有桌面并启用控制台\n  --headless-display DISPLAY  高级：指定已有显示会话\n  --headless-size WIDTHxHEIGHT 新建虚拟屏幕；默认1920x1080，偶数尺寸320..8192\n  --headless-session EXECUTABLE 启动桌面环境（startxfce4；none 仅启动裸屏幕）\n  --no-headless               禁用自动回退\n正常启动会自动选择已有桌面，无需填写显示编号。控制台输入 settings 管理设置。\n", "Linux headless options:\n  --headless                  Select an existing desktop and enable the console\n  --headless-display DISPLAY  Advanced: override desktop selection\n  --headless-size WIDTHxHEIGHT New virtual display; default 1920x1080, even 320..8192\n  --headless-session EXECUTABLE Start a desktop (startxfce4; none for a bare display)\n  --no-headless               Disable automatic fallback\nNormal startup selects your existing desktop automatically. Enter settings in the console to configure it.\n", u8"Параметры запуска без монитора:\n  --headless                  Выбрать рабочий стол и включить консоль\n  --headless-display DISPLAY  Дополнительно: указать сеанс дисплея\n  --headless-size WIDTHxHEIGHT Новый виртуальный экран; 1920x1080 по умолчанию, чётные размеры 320..8192\n  --headless-session EXECUTABLE Запустить рабочий стол (startxfce4; none — только экран)\n  --no-headless               Отключить автоматический резервный запуск\nРабочий стол выбирается автоматически. Команда settings открывает настройки консоли.\n") \
   X(console_title, u8"CrossDesk 无头控制台", "CrossDesk headless console", u8"Консоль CrossDesk") \
   X(console_log_file, u8"日志文件", "Log file", u8"Файл журнала") \
-  X(console_help, u8"命令: status 查看ID/密码/状态；settings 设置；password 修改密码；random 随机密码；help 帮助；quit 退出", "Commands: status, settings, password, random, help, quit", u8"Команды: status, settings, password, random, help, quit") \
+  X(console_help, u8"命令: status 查看 ID/密码/状态；settings 设置；password 修改密码；random 随机密码；help 帮助；quit 退出", "Commands: status, settings, password, random, help, quit", u8"Команды: status, settings, password, random, help, quit") \
   X(console_status, u8"状态", "Status", u8"Состояние") \
   X(console_online, u8"在线", "Online", u8"В сети") \
   X(console_offline, u8"未连接服务器", "Disconnected from server", u8"Нет подключения к серверу") \
@@ -100,7 +100,7 @@ struct TranslationRow {
   X(privacy_off, u8"隐私屏：已关闭", "Privacy screen: off", u8"Приватный экран: выключен") \
   X(privacy_unsupported, u8"隐私屏：不可用", "Privacy screen: unavailable", u8"Приватный экран: недоступен") \
   X(local_desktop, u8"本桌面", "Local Desktop", u8"Локальный рабочий стол")    \
-  X(local_id, u8"本机ID", "Local ID", u8"Локальный ID")                        \
+  X(local_id, u8"本机 ID", "Local ID", u8"Локальный ID")                       \
   X(local_id_copied_to_clipboard, u8"已复制到剪贴板", "Copied to clipboard",   \
     u8"Скопировано в буфер обмена")                                            \
   X(password, u8"密码", "Password", u8"Пароль")                                \
@@ -110,7 +110,7 @@ struct TranslationRow {
   X(remote_desktop, u8"远程桌面", "Remote Desktop",                            \
     u8"Удаленный рабочий стол")                                                \
   X(device_name, u8"设备名称", "Device Name", u8"Имя устройства")             \
-  X(remote_id, u8"对端ID", "Remote ID", u8"Удаленный ID")                      \
+  X(remote_id, u8"对端 ID", "Remote ID", u8"Удаленный ID")                     \
   X(connect, u8"连接", "Connect", u8"Подключиться")                            \
   X(recent_connections, u8"近期连接", "Recent Connections",                    \
     u8"Недавние подключения")                                                  \
@@ -145,16 +145,16 @@ struct TranslationRow {
   X(audio_capture, u8"播放声音", "Audio Capture", u8"Воспроизведение звука")   \
   X(mute, u8" 静音", " Mute", u8"Без звука")                                   \
   X(send_shortcut, u8"发送组合键", "Send Shortcut", u8"Сочетания клавиш")      \
-  X(send_sas, u8"发送SAS", "Send SAS", u8"Отправить SAS")                      \
+  X(send_sas, u8"发送 SAS", "Send SAS", u8"Отправить SAS")                     \
   X(lock_remote, u8"锁定远端", "Lock Remote", u8"Заблокировать")               \
   X(remote_password_box_visible, u8"远端密码框已出现",                         \
     "Remote password box visible", u8"Окно ввода пароля видно")                \
-  X(remote_lock_screen_hint, u8"远端处于锁屏封面，可发送SAS",                  \
+  X(remote_lock_screen_hint, u8"远端处于锁屏封面，可发送 SAS",                 \
     "Remote lock screen visible, send SAS",                                    \
     u8"Видна блокировка, отправьте SAS")                                       \
   X(remote_secure_desktop_active, u8"远端已进入安全桌面",                      \
     "Remote secure desktop active", u8"Активен защищенный рабочий стол")       \
-  X(remote_service_unavailable, u8"远端Windows服务不可用",                     \
+  X(remote_service_unavailable, u8"远端 Windows 服务不可用",                   \
     "Remote Windows service unavailable",                                      \
     u8"Служба Windows на удаленной стороне недоступна")                        \
   X(windows_service_setup_title, u8"安装 CrossDesk Service",                   \
@@ -288,7 +288,7 @@ struct TranslationRow {
   X(connection_not_authenticated, u8"登录状态已失效，请重新连接。", "Signaling login expired. Please reconnect.", u8"Сеанс входа истёк. Подключитесь заново.") \
   X(connection_retry_after, u8"请在 %d 秒后重试。", "Retry in %d seconds.", u8"Повторите через %d сек.") \
   X(p2p_closed, u8"对等连接已关闭", "P2P closed", u8"P2P закрыто")             \
-  X(no_such_id, u8"无此ID", "No such ID", u8"ID не найден")                    \
+  X(no_such_id, u8"无此 ID", "No such ID", u8"ID не найден")                   \
   X(about, u8"关于", "About", u8"О программе")                                 \
   X(sponsorship_title, u8"赞助支持", "Sponsorship", u8"Поддержка проекта")    \
   X(sponsorship_message, u8"如果 CrossDesk 对你有帮助，欢迎赞助支持项目的持续开发、跨平台测试与日常维护。感谢你的支持！", \

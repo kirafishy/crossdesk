@@ -68,6 +68,13 @@ int ConfigCenter::Load() {
     language_ = static_cast<LANGUAGE>(language_value);
   }
 
+  enable_ip_direct_ = ini_->GetBoolValue(section_, "enable_ip_direct", true);
+  connection_mode_ =
+      enable_ip_direct_ &&
+              std::strcmp(ini_->GetValue(section_, "connection_mode", "id"), "ip") == 0
+          ? CONNECTION_MODE::DIRECT_IP
+          : CONNECTION_MODE::DEVICE_ID;
+
   const long screen_capture_method_value = ini_->GetLongValue(
       section_, "screen_capture_method",
       static_cast<long>(ScreenCaptureMethod::Auto));
@@ -201,6 +208,9 @@ int ConfigCenter::StoreValues(
 
 int ConfigCenter::Save() {
   ini_->SetLongValue(section_, "language", static_cast<long>(language_));
+  ini_->SetValue(section_, "connection_mode",
+                connection_mode_ == CONNECTION_MODE::DIRECT_IP ? "ip" : "id");
+  ini_->SetBoolValue(section_, "enable_ip_direct", enable_ip_direct_);
   ini_->SetLongValue(section_, "screen_capture_method",
                     static_cast<long>(screen_capture_method_));
   ini_->SetLongValue(section_, "video_encode_format",
@@ -246,6 +256,34 @@ int ConfigCenter::SetLanguage(LANGUAGE language) {
   const int value = static_cast<int>(language);
   if (value < 0 || value > 2 || StoreValues({{"language", std::to_string(value)}}) != 0) return -1;
   language_ = language;
+  return 0;
+}
+
+int ConfigCenter::SetConnectionMode(CONNECTION_MODE mode) {
+  if (mode != CONNECTION_MODE::DEVICE_ID && mode != CONNECTION_MODE::DIRECT_IP) {
+    return -1;
+  }
+  if (mode == CONNECTION_MODE::DIRECT_IP && !enable_ip_direct_) return -1;
+  if (mode == connection_mode_) return 0;
+  if (StoreValues({{"connection_mode",
+                    mode == CONNECTION_MODE::DIRECT_IP ? "ip" : "id"}}) != 0) {
+    return -1;
+  }
+  connection_mode_ = mode;
+  return 0;
+}
+
+int ConfigCenter::SetIpDirectEnabled(bool enabled) {
+  if (enabled == enable_ip_direct_) return 0;
+  const auto mode = enabled ? connection_mode_ : CONNECTION_MODE::DEVICE_ID;
+  // Persist availability and the fallback mode together, so a failed save
+  // leaves both the current runtime and the next launch unchanged.
+  if (StoreValues({{"enable_ip_direct", enabled ? "true" : "false"},
+                   {"connection_mode", mode == CONNECTION_MODE::DIRECT_IP
+                                           ? "ip" : "id"}}) != 0)
+    return -1;
+  enable_ip_direct_ = enabled;
+  connection_mode_ = mode;
   return 0;
 }
 
@@ -408,6 +446,12 @@ int ConfigCenter::SetSponsorshipPromptDismissedVersion(
 // getters
 
 ConfigCenter::LANGUAGE ConfigCenter::GetLanguage() const { return language_; }
+
+ConfigCenter::CONNECTION_MODE ConfigCenter::GetConnectionMode() const {
+  return connection_mode_;
+}
+
+bool ConfigCenter::IsIpDirectEnabled() const { return enable_ip_direct_; }
 
 ScreenCaptureMethod ConfigCenter::GetScreenCaptureMethod() const {
   return screen_capture_method_;

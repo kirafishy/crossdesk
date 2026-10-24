@@ -226,15 +226,11 @@ int ClipboardController::SendToPeers(const std::string &text) {
     }
   }
 
-  if (owner_.peer_) {
-    const int ret =
-        SendReliableDataFrame(owner_.peer_, text.data(), text.size(),
-                              owner_.clipboard_label_.c_str());
-    if (ret != 0) {
-      LOG_WARN("Failed to send clipboard data to peer [{}], ret={}",
-               owner_.remote_id_display_, ret);
-      return ret;
-    }
+  lock.unlock();
+  for (const auto& id : owner_.ConnectedControllers()) {
+    const int ret = owner_.SendControllerData(id, text.data(), text.size(),
+                                              owner_.clipboard_label_.c_str());
+    if (ret != 0) return ret;
   }
 
   return 0;

@@ -1162,6 +1162,7 @@ int GuiApplication::Run() {
   updater_ = std::make_unique<updater::Controller>(path_manager_->GetCachePath());
 #endif
   InitializeUi();
+  InitializeLan();
 #ifndef __OHOS__
   ui_->activation_receiver = std::move(activation_receiver);
 #endif
@@ -1296,6 +1297,10 @@ void GuiApplication::InitializeUi() {
   slint::set_xdg_app_id("crossdesk");
 #endif
   ui_ = std::make_unique<SlintUi>();
+  for (const auto& window : {ui_->main, ui_->wall})
+    window->set_ip_direct_enabled(config_center_->IsIpDirectEnabled());
+  ui_->main->set_lan_mode(config_center_->GetConnectionMode() ==
+                          ConfigCenter::CONNECTION_MODE::DIRECT_IP);
 #if _WIN32
   ui_->shutdown_guard =
       std::make_unique<ShutdownSessionGuard>(windows_rdp_handoff_connected_);
@@ -1436,7 +1441,6 @@ void GuiApplication::InitializeSystemTray() {
   };
   auto exit_app = [this] {
     exit_ = true;
-    slint::quit_event_loop();
   };
 #if _WIN32
   ui_->tray = std::make_unique<WinTray>(
@@ -1485,6 +1489,8 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   main->set_language_index(language_button_value_);
   main->set_codec_index(video_encode_format_button_value_);
   main->set_turn_enabled(enable_turn_);
+  main->set_ip_direct_enabled_draft(config_center_->IsIpDirectEnabled());
+  main->set_settings_save_error("");
   main->set_force_relay_enabled(config_center_->IsForceRelay());
   main->set_self_hosted_enabled(enable_self_hosted_);
   main->set_autostart_enabled(enable_autostart_);
@@ -1544,6 +1550,19 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
       SendKeyInput(std::string(text), pressed, ctrl, alt, shift, meta);
   });
   main->on_open_gallery([this] { ShowGalleryWindow(); });
+  main->on_connection_mode_changed([this, main](bool lan_mode) {
+    const auto mode = lan_mode ? ConfigCenter::CONNECTION_MODE::DIRECT_IP
+                               : ConfigCenter::CONNECTION_MODE::DEVICE_ID;
+    if (config_center_->SetConnectionMode(mode) != 0) {
+      LOG_WARN("Could not save connection mode preference");
+      main->set_offline_warning(UiText(
+          localization_language_index_ == 0
+              ? "无法保存连接模式，下次启动可能不会恢复当前模式。"
+          : localization_language_index_ == 2
+              ? "Не удалось сохранить режим подключения. При следующем запуске он может не восстановиться."
+              : "Could not save the connection mode. It may not be restored on the next launch."));
+    }
+  });
   main->on_toggle_gallery_fullscreen(
       [this] { ToggleGalleryFullscreen(); });
   main->on_gallery_action(
@@ -1678,8 +1697,19 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     show_password_ = !show_password_;
     main->set_password_visible(show_password_);
   });
-  main->on_reset_password([this](slint::SharedString value) {
-    return RequestPasswordChange(std::string(value));
+  main->on_reset_password([this, main](slint::SharedString value) {
+    const std::string password(value);
+    if (!main->get_lan_mode()) return RequestPasswordChange(password);
+    if (!lan::ValidPassword(password)) return false;
+    if (!LanAvailable()) return true;  // The initialization error is shown on the main view.
+    try {
+      lan_error_.clear();
+      lan_->SetPassword(password);
+      main->set_lan_password_pending(lan_->password_pending());
+    } catch (const std::exception& error) {
+      lan_error_ = error.what();
+    }
+    return true;
   });
   main->on_refresh_password([this] {
     const auto password = GenerateRandomPassword(password_saved_);
@@ -1690,6 +1720,106 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
       return;
     }
     RequestPasswordChange(*password);
+  });
+  main->on_lan_select_address([this, main](slint::SharedString address) {
+    if (!LanAvailable()) {
+      main->set_lan_endpoint_error(UiText(lan_error_.empty() ? "Busy" : lan_error_));
+      return false;
+    }
+    try {
+      lan_->identity().SelectAddress(std::string(address));
+      const auto port =
+          UiText(std::to_string(lan_->identity().PortFor(std::string(address))));
+      main->set_lan_listener_ip(address);
+      main->set_lan_listener_port(port);
+      main->set_lan_local_port(port);
+      main->set_lan_port_dirty(false);
+      main->set_lan_endpoint_error("");
+      return true;
+    } catch (const std::exception& error) {
+      main->set_lan_endpoint_error(UiText(error.what()));
+      return false;
+    }
+  });
+  main->on_lan_configure([this, main](slint::SharedString address,
+                                      slint::SharedString port) {
+    if (!LanAvailable()) {
+      main->set_lan_endpoint_error(UiText(lan_error_.empty() ? "Busy" : lan_error_));
+      return false;
+    }
+    try {
+      const auto port_number = lan::ParsePort(std::string(port));
+      lan_->Configure(std::string(address), port_number);
+      const auto normalized_port = UiText(std::to_string(port_number));
+      main->set_lan_listener_ip(address);
+      main->set_lan_listener_port(normalized_port);
+      main->set_lan_local_port(normalized_port);
+      main->set_lan_port_dirty(false);
+      lan_error_.clear();
+      main->set_lan_endpoint_error("");
+      return true;
+    } catch (const std::exception& error) {
+      main->set_lan_endpoint_error(UiText(error.what()));
+      return false;
+    }
+  });
+  main->on_lan_reset_password([this] {
+    if (LanAvailable()) {
+      lan_error_.clear();
+      lan_->ResetPassword();
+    }
+  });
+  main->on_lan_copy_text([this](slint::SharedString value) {
+    if (!SDL_SetClipboardText(std::string(value).c_str())) {
+      lan_error_ = "Cannot copy text";
+      return false;
+    }
+    return true;
+  });
+  main->on_lan_prepare_connect([this, main](slint::SharedString endpoint) {
+    try {
+      const auto [address, port] = lan::ParseEndpoint(Trim(std::string(endpoint)), 52888);
+      if (!LanAvailable()) return UiText(lan_error_.empty() ? "Busy" : lan_error_);
+      main->set_lan_remote_address(UiText(address));
+      main->set_lan_remote_port(UiText(std::to_string(port)));
+      main->set_lan_retry_after(lan_->RetryAfter(address, port));
+      // History is newest first. Match both address and port, and only use
+      // the latest matching record when an endpoint has been reused.
+      for (const auto& [_, recent] : recent_connections_) {
+        if (recent.lan.device_id.empty() || recent.lan.address != address ||
+            recent.lan.port != port)
+          continue;
+        if (recent.remember_password && lan::ValidPassword(recent.password)) {
+          main->set_lan_access_password(UiText(recent.password));
+          main->set_lan_remember_password(true);
+        }
+        break;
+      }
+      lan_error_.clear();
+      main->set_lan_message("");
+      return slint::SharedString{};
+    } catch (const std::exception& error) {
+      return UiText(error.what());
+    }
+  });
+  main->on_lan_cancel_connect([this, main] {
+    if (lan_ && lan_connecting_) lan_->Close(lan_connecting_);
+    lan_connecting_.reset();
+    main->set_lan_connecting(false);
+    lan_error_.clear();
+    main->set_lan_message("");
+  });
+  main->on_lan_connect([this, main](slint::SharedString address,
+                              slint::SharedString port,
+                              slint::SharedString password, bool remember) {
+    try {
+      ConnectLan(std::string(address), lan::ParsePort(std::string(port)),
+                 std::string(password), remember);
+    } catch (const std::exception& error) {
+      lan_error_ = error.what();
+    }
+    main->set_lan_connecting(lan_connecting_ != nullptr);
+    main->set_lan_message(UiText(lan_error_));
   });
   main->on_connect_requested(
       [this](slint::SharedString id) { ConnectFromUi(std::string(id)); });
@@ -1703,7 +1833,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     if (auto props = FindRemoteSession(remote_id);
         props && props->connection_status_ == ConnectionStatus::Connected &&
         !props->closing_) {
-      CloseStreamTab(remote_id);
+      CloseStreamTab(props->remote_id_);
       SyncMainWindow();
     }
   });
@@ -2266,9 +2396,101 @@ void GuiApplication::BindServerCallbacks() {
 
 void GuiApplication::Tick() {
   if (exit_) {
-    slint::quit_event_loop();
+    BeginShutdown();
+    if (ShutdownDrained()) slint::quit_event_loop();
     return;
   }
+  TickLan();
+  if (LanAvailable()) {
+    const auto address = lan_->identity().settings().value("address", "");
+    ui_->main->set_lan_password_pending(lan_->password_pending());
+    ui_->main->set_lan_listening(lan_->listening());
+    if (lan_connecting_ && lan_connecting_->authorized) {
+      ui_->main->set_lan_open(false);
+      lan_connecting_.reset();
+    } else if (lan_connecting_ && lan_connecting_->closing) {
+      lan_connecting_.reset();
+    }
+    ui_->main->set_lan_connecting(lan_connecting_ != nullptr);
+    int retry_after = 0;
+    if (ui_->main->get_lan_open()) {
+      try {
+        retry_after = lan_->RetryAfter(
+            std::string(ui_->main->get_lan_remote_address()),
+            lan::ParsePort(std::string(ui_->main->get_lan_remote_port())));
+      } catch (const std::exception&) {
+        // An incomplete address has no cooldown; input validation handles it.
+      }
+    }
+    ui_->main->set_lan_retry_after(retry_after);
+    if (auto password = lan_->TakeNewPassword(); !password.empty())
+      ui_->main->set_lan_new_password(UiText(password));
+    const auto& available_interfaces = lan_->interfaces();
+    const auto previous = ui_->main->get_lan_interfaces();
+    bool changed = !previous || previous->row_count() != available_interfaces.size();
+    for (size_t i = 0; !changed && i < available_interfaces.size(); ++i)
+      changed = std::string_view(previous->row_data(i).value()) !=
+                available_interfaces[i].address;
+    if (changed) {
+      std::vector<slint::SharedString> addresses;
+      addresses.reserve(available_interfaces.size());
+      for (const auto& interface : available_interfaces)
+        addresses.push_back(UiText(interface.address));
+      ui_->main->set_lan_interfaces(
+          std::make_shared<slint::VectorModel<slint::SharedString>>(std::move(addresses)));
+    }
+    // Keep the current displayed address while it remains available, including
+    // when a previously missing preferred address returns during a port edit.
+    const auto previous_address = std::string(ui_->main->get_lan_listener_ip());
+    auto display_address = previous_address.empty() ? address : previous_address;
+    int interface_index = -1;
+    for (size_t i = 0; i < available_interfaces.size(); ++i)
+      if (available_interfaces[i].address == display_address) {
+        interface_index = static_cast<int>(i);
+        break;
+      }
+    if (interface_index < 0) {
+      interface_index = available_interfaces.empty() ? -1 : 0;
+      display_address = interface_index == 0
+          ? available_interfaces.front().address : "";
+    }
+    const auto port =
+        UiText(std::to_string(lan_->identity().PortFor(display_address)));
+    if (previous_address != display_address) {
+      // A disappearing address must not transfer its unfinished port edit to
+      // another interface. Explicit selection commits the old edit first.
+      if (!previous_address.empty() && ui_->main->get_lan_port_dirty()) {
+        ui_->main->set_lan_access_warning_endpoint(UiText(previous_address));
+        ui_->main->set_lan_access_warning("Selected LAN interface is unavailable");
+      }
+      ui_->main->set_lan_port_dirty(false);
+      ui_->main->set_lan_endpoint_error("");
+      ui_->main->set_lan_local_port(port);
+    }
+    ui_->main->set_lan_listener_ip(UiText(display_address));
+    ui_->main->set_lan_listener_port(port);
+    ui_->main->set_lan_interface_index(interface_index);
+    ui_->main->set_lan_interface_draft_index(interface_index);
+    if (!ui_->main->get_lan_port_editing() && !ui_->main->get_lan_port_dirty())
+      ui_->main->set_lan_local_port(port);
+    ui_->main->set_lan_listener_error(UiText(
+        display_address.empty() ? "Selected LAN interface is unavailable"
+                                : lan_->ListenerError(display_address)));
+    // Show failures one address at a time, without interrupting edits or another
+    // dialog. A working listener must not clear another address's error.
+    if (ui_->main->get_lan_mode() && ui_->main->get_can_show_sponsorship() &&
+        !ui_->main->get_lan_port_editing() && !ui_->main->get_lan_port_dirty()) {
+      if (auto issue = lan_->TakeListenerWarning()) {
+        ui_->main->set_lan_access_warning_endpoint(
+            UiText(issue->address + ":" + std::to_string(issue->port)));
+        ui_->main->set_lan_access_warning(UiText(issue->error));
+      }
+    }
+  }
+  const auto lan_message = lan_error_.rfind("ConnectionFailed", 0) == 0
+                               ? std::string("ConnectionFailed")
+                               : lan_error_;
+  ui_->main->set_lan_message(UiText(lan_message));
 #if _WIN32
   if (ui_->shutdown_guard) {
     ui_->shutdown_guard->Update(ui_->shutdown_reason);
@@ -2461,7 +2683,7 @@ void GuiApplication::ShareLocalCursorState() {
       }
     }
   }
-  if (!is_server_mode_ || !peer_ || connected_controllers.empty()) {
+  if (!is_server_mode_ || connected_controllers.empty()) {
     cursor_delivery_states_.clear();
     return;
   }
@@ -2587,9 +2809,8 @@ void GuiApplication::ShareLocalCursorState() {
     action.type = ControlType::cursor_state;
     action.cs = outgoing;
     const std::string message = action.to_json();
-    const int result = SendReliableDataFrameToPeer(
-        peer_, message.c_str(), message.size(), mouse_label_.c_str(),
-        recipient.remote_id.c_str(), recipient.remote_id.size());
+    const int result = SendControllerData(recipient.remote_id, message.c_str(),
+                                          message.size(), mouse_label_.c_str());
     if (result != 0) {
       LOG_WARN("Send cursor state to [{}] failed, ret={}",
                recipient.remote_id, result);
@@ -3008,8 +3229,9 @@ void GuiApplication::SyncMainWindow() {
   std::vector<slint::SharedString> recent_groups{
       tr_group("全部设备", "All devices", "Все устройства"),
       tr_group("未分组", "Ungrouped", "Без группы")};
+  const bool lan_mode = ui_->main->get_lan_mode();
   int recent_group_index = 0;
-  if (ui_->recent_group_filter) {
+  if (!lan_mode && ui_->recent_group_filter) {
     if (ui_->recent_group_filter->empty()) recent_group_index = 1;
     else {
       const auto found = std::find(ui_->gallery.groups.begin(),
@@ -3048,10 +3270,12 @@ void GuiApplication::SyncMainWindow() {
   };
   std::ostringstream signature_builder;
   signature_builder << config_center_->IsSaveRemotePreviews() << '\n'
+                    << lan_mode << '\n'
                     << bool(ui_->recent_group_filter) << '\0'
                     << ui_->recent_group_filter.value_or("") << '\n';
   for (const auto& [key, connection] : recent_connections_) {
     signature_builder << key << '\0' << connection.remote_id << '\0'
+                      << connection.lan.address << ':' << connection.lan.port << '\0'
                       << connection.remote_host_name << '\0'
                       << static_cast<int>(connection.platform) << '\0'
                       << settings_.RecentConnectionDisplayName(connection)
@@ -3072,7 +3296,9 @@ void GuiApplication::SyncMainWindow() {
   std::vector<ui::RecentConnection> model;
   model.reserve(recent_connections_.size());
   for (const auto& [_, connection] : recent_connections_) {
-    if (!ui_->gallery.MatchesGroup(connection.remote_id, ui_->recent_group_filter))
+    if (lan_mode != !connection.lan.device_id.empty()) continue;
+    if (!lan_mode &&
+        !ui_->gallery.MatchesGroup(connection.remote_id, ui_->recent_group_filter))
       continue;
     // Slint-generated scalar fields have no defaults. With no image,
     // has_thumbnail must remain false so the remote platform is rendered.
@@ -3082,7 +3308,12 @@ void GuiApplication::SyncMainWindow() {
     item.group_names = UiText(group_labels[connection.remote_id]);
     item.display_name =
         UiText(settings_.RecentConnectionDisplayName(connection));
-    item.online = device_presence_cache_.IsOnline(connection.remote_id);
+    item.lan = !connection.lan.device_id.empty();
+    item.endpoint = UiText(item.lan ? connection.lan.address + ":" +
+                                          std::to_string(connection.lan.port)
+                                    : "");
+    item.online =
+        !item.lan && device_presence_cache_.IsOnline(connection.remote_id);
     item.connected = is_connected(connection.remote_id);
     item.platform = UiText(HostPlatformName(connection.platform));
     std::vector<unsigned char> rgba;
@@ -3163,7 +3394,9 @@ void GuiApplication::SyncConnectionDialog() {
   } else if (auth.error == minirtc::JoinFailureKind::NotAuthenticated) {
     text = localization::connection_not_authenticated[localization_language_index_];
   } else {
-    text = ConnectionStatusText(status, localization_language_index_);
+    text = props->lan_session_ && !props->lan_session_->error.empty()
+               ? props->lan_session_->error
+               : ConnectionStatusText(status, localization_language_index_);
   }
   if (auth.retry_after > 0) {
     char retry_text[256];
@@ -4260,6 +4493,7 @@ bool GuiApplication::ValidateSelfHostedSettingsFromUi(bool gallery_window) {
 bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   const auto previous_server = GetSignalServerSettings(*config_center_);
   auto& main = ui_->Window(gallery_window);
+  main->set_settings_save_error("");
   const bool has_endpoint = main->get_self_hosted_enabled() ||
       !std::string(main->get_server_host()).empty() ||
       !std::string(main->get_server_port()).empty();
@@ -4296,6 +4530,15 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
         localization::self_hosted_save_failed[localization_language_index_]));
     main->set_settings_tab(0);
     main->set_self_host_settings_open(true);
+    return false;
+  }
+  if (config_center_->SetIpDirectEnabled(main->get_ip_direct_enabled_draft()) != 0) {
+    if (wall_changed && !ui_->gallery.Save(ui_->gallery_path))
+      LOG_ERROR("Failed to restore DeskHub settings after IP direct save failure");
+    main->set_settings_save_error(UiText(
+        localization_language_index_ == 0 ? "无法保存 IP 直连设置，请重试。"
+        : localization_language_index_ == 2 ? "Не удалось сохранить настройки IP. Повторите попытку."
+                                            : "Could not save direct IP settings. Try again."));
     return false;
   }
   language_button_value_ =
@@ -4407,9 +4650,12 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
 #endif
   if (ui_) {
     ui_->localized_language = -1;
+    for (const auto& window : {ui_->main, ui_->wall})
+      window->set_ip_direct_enabled(config_center_->IsIpDirectEnabled());
     if (!ui_->main->get_settings_open()) ResetSettingsUi();
     if (!ui_->wall->get_settings_open()) ResetSettingsUi(true);
   }
+  ApplyLanSettings();
   if (reconnect && !HasActiveSession()) {
     // Tick recreates the peer after asynchronous cleanup, using the committed
     // configuration. Keep the application and its console running throughout.
@@ -4434,6 +4680,26 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
 
 void GuiApplication::ConnectFromUi(const std::string& input) {
   ui_->gallery_auth_id.clear();
+  if (input.rfind("lan-", 0) == 0) {
+    if (!LanAvailable()) return;
+    if (auto existing = FindRemoteSession(input);
+        existing && existing->connection_established_) {
+      existing->tab_opened_ = true;
+      focused_remote_id_ = existing->remote_id_;
+      need_to_create_stream_window_ = true;
+      return;
+    }
+    for (const auto& [_, recent] : recent_connections_)
+      if (recent.remote_id == input && !recent.lan.device_id.empty()) {
+        ui_->main->invoke_request_lan_connection(
+            UiText(recent.lan.address +
+                   (recent.lan.port == 52888
+                        ? ""
+                        : ":" + std::to_string(recent.lan.port))));
+        return;
+      }
+    return;
+  }
   const std::string remote_id = CompactPeerId(input);
   if (!gallery::Workspace::ValidId(remote_id)) {
     ui_->main->set_connection_input_error(
@@ -5209,6 +5475,7 @@ void GuiApplication::GalleryAction(const std::string& action,
     std::set<std::string> seen;
     int available = 0;
     for (const auto& [_, recent] : recent_connections_) {
+      if (!recent.lan.device_id.empty()) continue;
       if (!gallery::Workspace::ValidId(recent.remote_id) ||
           !seen.insert(recent.remote_id).second)
         continue;
@@ -5697,8 +5964,9 @@ void GuiApplication::SyncGallery() {
   };
   const auto name = [this](const std::string& id) {
     for (const auto& [_, recent] : recent_connections_)
-      if (recent.remote_id == id)
-        return settings_.RecentConnectionDisplayName(recent);
+      if (recent.lan.device_id.empty())
+        if (recent.remote_id == id)
+          return settings_.RecentConnectionDisplayName(recent);
     Thumbnail::RecentConnection device{};
     device.remote_id = id;
     if (auto props = FindRemoteSession(id)) {
@@ -5716,7 +5984,7 @@ void GuiApplication::SyncGallery() {
     {
       std::shared_lock lock(remote_sessions_mutex_);
       for (const auto& [id, props] : remote_sessions_)
-        if (props && !props->closing_ &&
+        if (props && !props->lan_session_ && !props->closing_ &&
             props->connection_status_ == ConnectionStatus::Connected)
           connected_ids.push_back(id);
     }
@@ -5816,11 +6084,12 @@ void GuiApplication::SyncGallery() {
           bool remember = operation.remember_password;
           if (!operation.password)
             for (const auto& [_, recent] : recent_connections_)
-              if (recent.remote_id == operation.id) {
-                password = recent.password;
-                remember = recent.remember_password;
-                break;
-              }
+              if (recent.lan.device_id.empty())
+                if (recent.remote_id == operation.id) {
+                  password = recent.password;
+                  remember = recent.remember_password;
+                  break;
+                }
           // Join itself determines availability. Background probes must never
           // overwrite the interactive page's single pending presence probe.
           ConnectTo(operation.id, password.c_str(), remember, true, true);
@@ -5970,6 +6239,7 @@ void GuiApplication::SyncGallery() {
     tile.selected = wall.selected.count(id);
     auto props = FindRemoteSession(id);
     for (const auto& [_, recent] : recent_connections_) {
+      if (!recent.lan.device_id.empty()) continue;
       if (recent.remote_id != id) continue;
       tile.host_name = UiText(recent.remote_host_name);
       break;
@@ -6205,6 +6475,9 @@ void GuiApplication::SyncGallery() {
 }
 
 void GuiApplication::Cleanup() {
+  BeginShutdown();
+  while (!ShutdownDrained())
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
   remote_input_.Stop();
 #if _WIN32
   windows_rdp_handoff_allowed_->store(false, std::memory_order_relaxed);

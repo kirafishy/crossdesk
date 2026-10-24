@@ -20,12 +20,18 @@ namespace crossdesk {
 
 class Thumbnail {
  public:
+  struct LanTarget {
+    std::string address, device_id;
+    unsigned port = 52888;
+  };
+  static std::string LanRecordId(const std::string& device_id);
   struct RecentConnection {
     std::filesystem::path image_path;
     std::string remote_id;
     std::string remote_host_name;
     std::string password;
     bool remember_password = false;
+    LanTarget lan;
     HostPlatform platform = HostPlatform::Unknown;
   };
 
@@ -45,9 +51,9 @@ class Thumbnail {
   // credentials (and clears any remembered password from a previous session).
   int SaveToThumbnail(const char* nv12, int width, int height,
                       const std::string& remote_id,
-                      const std::string& host_name,
-                      const std::string& password,
-                      HostPlatform platform = HostPlatform::Unknown);
+                      const std::string& host_name, const std::string& password,
+                      HostPlatform platform = HostPlatform::Unknown,
+                      const LanTarget* lan = nullptr);
 
   int LoadThumbnail(
       std::vector<std::pair<std::string, Thumbnail::RecentConnection>>&
