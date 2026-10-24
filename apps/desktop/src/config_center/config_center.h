@@ -49,6 +49,7 @@ class ConfigCenter {
   int SetAutostart(bool enable_autostart);
   int SetDaemon(bool enable_daemon);
   int SetPrivacyScreen(bool enable_privacy_screen);
+  int SetLockOnDisconnect(bool enabled);
   int SetSaveRemotePreviews(bool enabled);
   int SetPortableServicePromptSuppressed(bool suppressed);
   int SetSponsorshipPromptDismissedVersion(const std::string& version);
@@ -73,6 +74,7 @@ class ConfigCenter {
   bool IsEnableAutostart() const;
   bool IsEnableDaemon() const;
   bool IsEnablePrivacyScreen() const;
+  bool IsLockOnDisconnect() const;
   bool IsSaveRemotePreviews() const;
   bool IsPortableServicePromptSuppressed() const;
   std::string GetSponsorshipPromptDismissedVersion() const;
@@ -104,6 +106,7 @@ class ConfigCenter {
   bool enable_autostart_ = false;
   bool enable_daemon_ = false;
   std::atomic<bool> enable_privacy_screen_{true};
+  std::atomic<bool> lock_on_disconnect_{false};
   std::atomic<bool> save_remote_previews_{true};
   bool portable_service_prompt_suppressed_ = false;
   std::string sponsorship_prompt_dismissed_version_;

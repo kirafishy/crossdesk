@@ -22,6 +22,7 @@
 #include "network/lan/lan_session_manager.h"
 #include "privacy_controller.h"
 #include "runtime/gui_state.h"
+#include "runtime/disconnect_lock_policy.h"
 #include "runtime/announcement_inbox.h"
 #include "runtime/peer_event_handler.h"
 #include "runtime/privacy_session_policy.h"
@@ -102,6 +103,7 @@ class GuiRuntime : protected gui_detail::GuiState {
                                           const char* reason);
   void HandleWindowsServiceIntegration();
   void HandlePrivacy();
+  void HandleScreenLock();
   bool IsAuthorizedController(const std::string& remote_id);
   void SetControllerPrivacySupport(const std::string& remote_id, bool supported);
   // Caller holds connection_status_mutex_ exclusively. Turns privacy off when
@@ -157,6 +159,7 @@ class GuiRuntime : protected gui_detail::GuiState {
   bool unattended_host_ = false;
   AnnouncementInbox announcements_;
   PrivacySessionPolicy privacy_sessions_;
+  DisconnectLockPolicy disconnect_lock_;
   std::mutex privacy_commands_mutex_;
   std::deque<std::pair<std::string, PrivacyCommand>> privacy_commands_;
   uint32_t last_privacy_revision_ = 0;

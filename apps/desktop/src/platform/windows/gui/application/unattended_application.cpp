@@ -45,6 +45,7 @@ int GuiApplication::RunUnattended(void* stop_event) {
       if (CreateConnectionPeer() != 0) CloseConnectionPeer();
     }
     HandleConnectionStatusChange();
+    HandleScreenLock();
     HandleWindowsServiceIntegration();
     devices_.UpdateInteractions();
     ShareLocalCursorState();
@@ -71,6 +72,7 @@ int GuiApplication::RunUnattended(void* stop_event) {
   devices_.DestroyDevices();
   devices_.DestroyFactories();
   privacy_.Shutdown();
+  HandleScreenLock();
   WriteUnattendedStatus(settings_.ActiveIdentity(), false, session);
   SDL_Quit();
   return 0;

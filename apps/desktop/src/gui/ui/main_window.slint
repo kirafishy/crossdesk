@@ -80,6 +80,7 @@ export global UiStrings {
     in-out property <string> save-remote-previews: "Save remote screen previews:";
     in-out property <string> unknown-platform: "Unknown platform";
     in-out property <string> privacy-on-connect: "Privacy screen on connect";
+    in-out property <string> lock-on-disconnect: "Lock screen on disconnect";
     in-out property <string> file-save-path: "File save path";
     in-out property <string> default-desktop: "Desktop";
     in-out property <string> server-host: "Server host";
@@ -648,6 +649,8 @@ export component MainWindow inherits Window {
     // Show the preference on every platform; only adapted hosts can change it.
     in property <bool> privacy-setting-available: false;
     in-out property <bool> privacy-on-connect-enabled: true;
+    in property <bool> lock-on-disconnect-available: false;
+    in-out property <bool> lock-on-disconnect-enabled: false;
     in-out property <string> file-save-path: "";
     in-out property <string> server-host: "";
     in-out property <string> server-port: "";
@@ -2686,8 +2689,13 @@ export component MainWindow inherits Window {
                             font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 1;
-                            SettingsToggleRow { label: UiStrings.privacy-on-connect; checked <=> root.privacy-on-connect-enabled; enabled: root.privacy-setting-available; divider: false; }
+                            title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 2;
+                            SettingsToggleRow { label: UiStrings.privacy-on-connect; checked <=> root.privacy-on-connect-enabled; enabled: root.privacy-setting-available; }
+                            SettingsToggleRow { label: UiStrings.lock-on-disconnect; checked <=> root.lock-on-disconnect-enabled; enabled: root.lock-on-disconnect-available; divider: false; }
+                        }
+                        Text {
+                            text: GalleryStrings.tr("最后一个远程控制端断开后，自动锁定本机。", "Lock this device when the last remote controller disconnects.", "Блокировать это устройство после отключения последнего управляющего клиента.");
+                            font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {
                             title: GalleryStrings.tr("本地存储", "Local storage", "Локальное хранение"); rows: 2;

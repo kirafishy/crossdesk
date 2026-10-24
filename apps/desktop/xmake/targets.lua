@@ -86,11 +86,14 @@ function setup_targets()
         add_packages("concurrentqueue")
         add_files("apps/desktop/src/common/*.cpp")
         if is_os("windows") then
-            add_files("apps/desktop/src/platform/windows/system_info.cpp")
+            add_files("apps/desktop/src/platform/windows/system_info.cpp",
+                "apps/desktop/src/platform/windows/screen_lock.cpp")
         elseif is_os("macosx") then
-            add_files("apps/desktop/src/platform/macos/system_info.cpp")
+            add_files("apps/desktop/src/platform/macos/system_info.cpp",
+                "apps/desktop/src/platform/macos/screen_lock.cpp")
         elseif is_os("linux") then
             add_files("apps/desktop/src/platform/linux/system_info.cpp",
+                "apps/desktop/src/platform/linux/screen_lock.cpp",
                 "apps/desktop/src/platform/linux/common/*.cpp")
             add_includedirs("apps/desktop/src/platform/linux/common")
         end

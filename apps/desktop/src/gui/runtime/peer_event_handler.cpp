@@ -458,6 +458,7 @@ void PeerEventHandler::DispatchConnectionStatus(ConnectionStatus status,
     {
       std::unique_lock lock(runtime->connection_status_mutex_);
       if (status == ConnectionStatus::Connected) {
+        runtime->disconnect_lock_.Connected(remote_id);
         // Local privacy requires explicit desktop capability. Host info may
         // arrive before Connected; consume that saved capability here.
         const bool automatic_enable = runtime->privacy_sessions_.Connected(

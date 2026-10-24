@@ -40,6 +40,7 @@ std::vector<ConsoleSetting> GetConsoleSettings(const ConfigCenter& config) {
       {"server_host", "console_setting_host", config.GetSignalServerHost(), "example.com"},
       {"server_port", "console_setting_port", std::to_string(config.GetSignalServerPort()), "1..65535"},
       {"privacy", "console_setting_privacy", OnOff(config.IsEnablePrivacyScreen()), "on / off"},
+      {"lock_on_disconnect", "lock_on_disconnect", OnOff(config.IsLockOnDisconnect()), "on / off"},
       {"file_path", "console_setting_files", config.GetFileTransferSavePath().empty() ? "default" : config.GetFileTransferSavePath(), "/path/to/directory / default"},
       {"autostart", "console_setting_autostart", OnOff(config.IsEnableAutostart()), "on / off"},
       {"daemon", "console_setting_daemon", OnOff(config.IsEnableDaemon()), "on / off"},
@@ -120,6 +121,8 @@ SettingResult ApplyConsoleSetting(ConfigCenter& config, const std::string& key,
       save = [&config, enabled] { return config.SetPrivacyScreen(enabled); };
       effect = SettingEffect::next_connection;
       message = "console_settings_next_connection";
+    } else if (key == "lock_on_disconnect") {
+      save = [&config, enabled] { return config.SetLockOnDisconnect(enabled); };
     } else if (key == "autostart") {
       save = [&config, enabled] { return config.SetAutostart(enabled); };
       effect = SettingEffect::next_login;

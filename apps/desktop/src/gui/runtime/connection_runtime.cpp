@@ -14,6 +14,7 @@
 #include "platform.h"
 #include "platform/video_renderer.h"
 #include "rd_log.h"
+#include "screen_lock.h"
 #include "runtime/device_presence_request.h"
 #include "runtime/gui_runtime.h"
 
@@ -198,6 +199,8 @@ void GuiRuntime::HandleServerControllerDisconnected(
   {
     std::unique_lock lock(connection_status_mutex_);
     connection_status_.erase(remote_id);
+    disconnect_lock_.Disconnected(remote_id,
+                                  config_center_->IsLockOnDisconnect());
     remote_input_.Disconnect(remote_id);
     devices_.OnControllerConnectionsChanged();
     connection_host_names_.erase(remote_id);
@@ -256,6 +259,17 @@ void GuiRuntime::HandleServerControllerDisconnected(
   }
   remote_client_id_.clear();
   audio_capture_ = false;
+}
+
+void GuiRuntime::HandleScreenLock() {
+  // Serialize request consumption with incoming admission so a reconnect
+  // cancels a pending lock before it can interrupt the new controller.
+  std::unique_lock lock(connection_status_mutex_);
+  if (!disconnect_lock_.TakeRequest(config_center_->IsLockOnDisconnect()))
+    return;
+#if defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__OHOS__))
+  if (LockScreen()) LOG_INFO("Requested screen lock after last controller disconnected");
+#endif
 }
 
 int GuiRuntime::RequestSingleDevicePresence(const std::string& remote_id,

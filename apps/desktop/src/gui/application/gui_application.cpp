@@ -1501,6 +1501,7 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   main->set_save_remote_previews(config_center_->IsSaveRemotePreviews());
   main->set_privacy_on_connect_enabled(
       config_center_->IsEnablePrivacyScreen());
+  main->set_lock_on_disconnect_enabled(config_center_->IsLockOnDisconnect());
 #ifdef _WIN32
   main->set_capture_method_visible(true);
   main->set_capture_method_index(
@@ -1508,8 +1509,10 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
 #endif
 #if defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__OHOS__))
   main->set_privacy_setting_available(true);
+  main->set_lock_on_disconnect_available(true);
 #else
   main->set_privacy_setting_available(false);
+  main->set_lock_on_disconnect_available(false);
 #endif
 #if defined(__OHOS__)
   // The sandbox default is not the system desktop. Show the actual receive
@@ -2583,6 +2586,7 @@ void GuiApplication::Tick() {
   HandlePendingPresenceProbe();
   HandlePresenceProbeTimeout();
   HandlePrivacy();
+  HandleScreenLock();
   HandleWindowsServiceIntegration();
 #if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
   SyncXWaylandWindowActivation();
@@ -4541,6 +4545,17 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
                                             : "Could not save direct IP settings. Try again."));
     return false;
   }
+#if defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__OHOS__))
+  if (config_center_->SetLockOnDisconnect(main->get_lock_on_disconnect_enabled()) != 0) {
+    if (wall_changed && !ui_->gallery.Save(ui_->gallery_path))
+      LOG_ERROR("Failed to restore DeskHub settings after lock preference save failure");
+    main->set_settings_save_error(UiText(
+        localization_language_index_ == 0 ? "无法保存断开后锁屏设置，请重试。"
+        : localization_language_index_ == 2 ? "Не удалось сохранить настройку блокировки. Повторите попытку."
+                                            : "Could not save lock screen settings. Try again."));
+    return false;
+  }
+#endif
   language_button_value_ =
       localization::detail::ClampLanguageIndex(main->get_language_index());
   video_encode_format_button_value_ = std::clamp(main->get_codec_index(), 0, 1);
@@ -6518,6 +6533,7 @@ void GuiApplication::Cleanup() {
   keyboard_.ReleaseAllRemotePressedKeys("application_exit");
   devices_.DestroyDevices();
   privacy_.Shutdown();
+  HandleScreenLock();
   devices_.DestroyFactories();
   CloseAllRemoteSessions();
   WaitForSessionCleanup();

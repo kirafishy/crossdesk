@@ -137,6 +137,8 @@ int ConfigCenter::Load() {
   enable_daemon_ = ini_->GetBoolValue(section_, "enable_daemon", enable_daemon_);
   enable_privacy_screen_.store(
       ini_->GetBoolValue(section_, "enable_privacy_screen", true));
+  lock_on_disconnect_.store(
+      ini_->GetBoolValue(section_, "lock_on_disconnect", false));
   save_remote_previews_.store(
       ini_->GetBoolValue(section_, "save_remote_previews", true));
   portable_service_prompt_suppressed_ =
@@ -232,6 +234,7 @@ int ConfigCenter::Save() {
   ini_->SetBoolValue(section_, "enable_daemon", enable_daemon_);
   ini_->SetBoolValue(section_, "enable_privacy_screen",
                     enable_privacy_screen_.load());
+  ini_->SetBoolValue(section_, "lock_on_disconnect", lock_on_disconnect_.load());
   ini_->SetBoolValue(section_, "save_remote_previews",
                     save_remote_previews_.load());
   ini_->SetBoolValue(section_, "portable_service_prompt_suppressed",
@@ -407,6 +410,17 @@ int ConfigCenter::SetPrivacyScreen(bool enable_privacy_screen) {
   enable_privacy_screen_.store(enable_privacy_screen);
   LOG_INFO("Privacy screen on incoming connection: {}", enable_privacy_screen);
   return 0;
+}
+
+int ConfigCenter::SetLockOnDisconnect(bool enabled) {
+  if (StoreValues({{"lock_on_disconnect", enabled ? "true" : "false"}}) != 0)
+    return -1;
+  lock_on_disconnect_.store(enabled);
+  return 0;
+}
+
+bool ConfigCenter::IsLockOnDisconnect() const {
+  return lock_on_disconnect_.load();
 }
 
 int ConfigCenter::SetSaveRemotePreviews(bool enabled) {

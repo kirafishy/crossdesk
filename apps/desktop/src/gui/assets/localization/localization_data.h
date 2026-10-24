@@ -339,6 +339,8 @@ struct TranslationRow {
   X(enable_daemon, u8"启用守护进程:", "Enable Daemon:", u8"Включить демон:")   \
   X(privacy_on_connect, u8"被连接时开启隐私屏:", "Privacy screen on connect:", \
     u8"Приватность при подключении:")                                       \
+  X(lock_on_disconnect, u8"连接断开后锁屏:", "Lock screen on disconnect:", \
+    u8"Блокировка при отключении:")                                         \
   X(takes_effect_after_restart, u8"重启后生效", "Takes effect after restart",  \
     u8"Вступит в силу после перезапуска")                                      \
   X(select_file, u8"选择文件发送", "Select File to Send",                      \
