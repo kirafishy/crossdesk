@@ -297,7 +297,7 @@
           "sha256": "d72eb6fa9d5e93abb11d13b6c6f04fda2ba183d0705e703887cda243f6f1eead"
         }
       ],
-      "recipe_sha256": "bc4b8d10ff76a79fc7cbffe3fe9b8c0272d320fc549cba4044d2b1d3337e0116",
+      "recipe_sha256": "dbb3cd85fd197f6495c611a08f99b1c70b88c48c91f6e6ea24946a1b0701a3d5",
       "recipe_path": "deps/submodules/minirtc/thirdparty/libnice/xmake.lua",
       "package": "libnice",
       "notice_prefixes": [
