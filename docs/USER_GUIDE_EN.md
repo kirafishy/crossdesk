@@ -4,7 +4,7 @@
 
 Start with [download and installation](../README_EN.md#download). This guide describes the current source; check the release notes for the features available in a downloaded build.
 
-[Installation and permissions](#installation) · [Quick start](#quick-start) · [DeskHub](#deskhub) · [Session controls](#session) · [Settings and updates](#settings) · [iOS](#ios) · [Android](#android) · [HarmonyOS](#harmonyos) · [Windows unattended access](#windows-service) · [Self-hosting](#self-hosting)
+[Installation and permissions](#installation) · [Quick start](#quick-start) · [Direct IP](#lan-direct) · [DeskHub](#deskhub) · [Session controls](#session) · [Settings and updates](#settings) · [iOS](#ios) · [Android](#android) · [HarmonyOS](#harmonyos) · [Windows unattended access](#windows-service) · [Self-hosting](#self-hosting)
 
 Screenshots use demonstration devices and credentials. See the [screenshot notes](images/README.md) for sources and reproduction instructions.
 
@@ -39,14 +39,35 @@ Both contain the same complete application, replace each other and preserve user
 
 ## Quick start
 
-### Connect from another computer
+### Connect from another computer by device ID
 
-1. **Prepare the host.** Install and run CrossDesk on the computer to control. Wait for the bottom status bar to show that the server is connected. Share the **Local ID** and **Password** shown under **Local Desktop** with the controller.
+1. **Prepare the host.** Install and run CrossDesk on the computer to control and select ID mode. Wait for the bottom status bar to show that the server is connected. Share the **Local ID** and **Password** shown under **Local Desktop** with the controller.
 2. **Enter the remote ID.** On the controlling computer, enter the host's **9-digit ID** in **Remote Desktop → Remote ID**, then click **Connect**.
 3. **Verify the password.** Enter the host's current connection password when prompted and confirm. Select **Remember password** if you want to save it.
 4. **Reconnect later.** Previously connected devices appear under **Recent Connections**. Reconnect from a card, open its top-right **…** menu to rename it, edit its groups, or remove its record, and use the bottom-right button to connect / disconnect. Use the group filter beside the heading to narrow the list.
 
 The eye button shows or hides the local password, the refresh button generates a new random password, and the pencil button lets you edit it. Passwords use **6 ASCII letters or digits**. Stay connected to the server when editing or refreshing a password. Wait for the change to succeed and the client to reconnect, then copy the current password. Controllers that saved the old password must enter it again.
+
+<a id="lan-direct"></a>
+
+### Connect directly over LAN
+
+The direct IP entry is available in the regular Windows, macOS, and Linux desktop clients. The computers must have mutually reachable IPv4 addresses. Internet access is optional, and there is no need to wait for a signaling server connection. Browsers, mobile clients, the Windows pre-sign-in service, and the Linux headless console currently use the device ID workflow.
+
+1. **Enable and switch.** On both computers, select **Enable direct IP** under **Settings → General → Network** and save (enabled by default). Use the top-left button to switch to **Direct IP mode**.
+2. **Get the host address.** Read **Local IP / Port** on the host. The copy button copies the full `IP:port`. If several addresses are available, choose one reachable from the controller.
+3. **Connect and verify.** Enter an address such as `192.168.1.20:52888` under **Remote IP / Port**, click **Connect**, and enter the host's six-character password for this mode. Omitting the port uses **52888**. Only numeric IPv4 addresses are currently supported, not hostnames or IPv6.
+4. **Save and reconnect.** Select **Remember password** in the password dialog if needed. Recent connections are separated by ID / IP mode. Device records are kept even without a saved password; you will be prompted next time. Cards let you reconnect, rename devices, or remove records.
+
+<p align="center">
+  <img src="images/desktop-lan-password-en.png" width="720" alt="Direct IP password dialog with Remember password and demonstration LAN devices in the background" />
+</p>
+
+**Addresses and ports:** use **Switch IP** to choose the displayed address and **Edit port** to change its port. The app listens on available physical-interface IPv4 addresses simultaneously and saves a separate port for each IP. Selecting a displayed address keeps the others listening. The first port assignment for an IP tries **52888**; if busy, it allocates and saves an available port. A conflict on an already saved port is reported and requires a manual change. Valid ports are **1–65535**; failed changes preserve the previous settings. Connect using the actual port displayed on the host. The LAN firewall must allow CrossDesk's TCP negotiation connection and UDP remote-control traffic.
+
+**Passwords:** direct IP has its own **six-character, case-sensitive ASCII letter/digit password**. A missing password is generated automatically. Use the eye, refresh, and pencil buttons to show/hide, randomly generate, or customize it. A successful change applies immediately without restarting or connecting to a server. Controllers that saved the old password must enter the new one.
+
+**Mode and availability:** the selected mode is remembered at the next launch. Switching back to ID mode changes the connection controls and recent list while IP listeners keep running. To stop direct IP, clear **Enable direct IP** in Settings and save. This disconnects IP sessions, releases listening ports, returns to ID mode, and hides the mode button. Existing ID sessions continue; IP passwords, ports, and recent records are retained for re-enabling.
 
 ### Connect from a browser
 
@@ -127,6 +148,7 @@ Open **☰ → Settings** in the top-right corner, choose **General / DeskHub**,
 | Language | 中文, English, Русский |
 | Capture Method (Windows) | Auto / DXGI / WGC / GDI; choose Auto for automatic headless adaptation |
 | Video Encode Format | H.264 / AV1; H.264 automatically prefers hardware codecs, with software fallback when unavailable or initialization fails; desktop AV1 uses software codecs |
+| Enable direct IP | Enabled by default; saving starts or stops direct IP immediately. Disabling disconnects IP sessions, stops listeners, and hides the mode button; the choice persists across restarts |
 | Enable TURN Service | Allow relay-assisted connections; check this setting if P2P fails |
 | Force Relay | Require relay connections when TURN is enabled; turning TURN off also disables this option |
 | Save remote screen previews | On by default. When disabled, the thumbnail area shows the remote device’s platform and existing previews are cleared; connection records and passwords are preserved |
@@ -134,6 +156,12 @@ Open **☰ → Settings** in the top-right corner, choose **General / DeskHub**,
 | Self-Hosted Config | Set the server address and signaling port, then enable the checkbox |
 | Auto Start / Enable Daemon | Configure startup and process supervision; restart as indicated by the UI |
 | File Save Path | Choose where received files are saved |
+
+The direct IP switch in the Network group is independent of the relay settings used for ID connections:
+
+<p align="center">
+  <img src="images/desktop-settings-network-en.png" width="720" alt="Network settings with Enable direct IP and an explanation of what happens when disabled" />
+</p>
 
 ### DeskHub video transmission
 

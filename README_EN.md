@@ -22,13 +22,14 @@
 
 CrossDesk connects your computers from desktop, browser, and mobile clients, with **DeskHub** for viewing and controlling multiple devices together. It is built on [MiniRTC](https://github.com/kunkundi/minirtc) and supports self-hosting.
 
-[Features](#features) · [Download and platforms](#download) · [Quick start](#quick-start) · [Preview](#preview) · [User guide](docs/USER_GUIDE_EN.md) · [Self-hosting](#self-hosting) · [Build and feedback](#development) · [Sponsor](#sponsor)
+[Features](#features) · [Download and platforms](#download) · [Quick start](#quick-start) · [Direct IP](#lan-direct) · [Preview](#preview) · [User guide](docs/USER_GUIDE_EN.md) · [Self-hosting](#self-hosting) · [Build and feedback](#development) · [Sponsor](#sponsor)
 
 <a id="features"></a>
 
 ## Features
 
 - **Cross-platform access:** control Windows, macOS, and Linux desktops from computers, browsers, or native iOS / Android clients. HarmonyOS PC and mobile clients are in development.
+- **Direct IP over LAN:** connect desktop clients using an IP address, port, and six-character password without a cloud signaling service. Each local IP has its own port; passwords can be remembered and recent devices are separated by mode.
 - **DeskHub:** live multi-device previews, groups, enlarged control, group input, and batch file distribution.
 - **Video and audio:** H.264 / AV1, hardware codecs, remote audio, and in-session quality and frame-rate controls. Capabilities depend on the platform and device.
 - **Everyday controls:** monitor switching, keyboard and mouse input, shortcuts, text clipboard, and file transfer.
@@ -61,11 +62,23 @@ Requirements follow the current source and build configuration. Check the releas
 
 ## Quick start
 
-1. **Prepare the host.** Install and run CrossDesk on the computer to control. Wait for the server-connected status, then find its ID and password under **Local Desktop**.
+### Connect by device ID
+
+1. **Prepare the host.** Install and run CrossDesk on the computer to control, select ID mode, and wait for the server-connected status, then find its ID and password under **Local Desktop**.
 2. **Connect.** On another computer, enter the host's 9-digit ID and click **Connect**. Native mobile clients and the [Web Client](https://web.crossdesk.cn/) can also connect.
 3. **Verify the password.** Enter the host's current connection password and wait for the desktop to appear. On desktop, select **Remember password** to reconnect later from **Recent Connections**.
 
 For self-hosting, both ends must use the same service. See the [user guide](docs/USER_GUIDE_EN.md#quick-start) for connection, password, and browser controls, or the [FAQ](docs/FAQ.md#english) for failed connections, blank video, and input problems.
+
+<a id="lan-direct"></a>
+
+### Connect directly over LAN
+
+1. **Switch modes.** Run a desktop client with direct IP support on both computers. Click the top-left mode button to select **Direct IP mode**. If the button is hidden, select **Enable direct IP** under **Settings → General → Network** and save.
+2. **Enter the address.** On the controller, enter the host's displayed `IP:port`, for example `192.168.1.20:52888`, and click **Connect**. Omitting the port uses **52888**; use the actual port shown on the host.
+3. **Enter the password.** Use the host's **six-character ASCII letter/digit password** shown in Direct IP mode. You can select **Remember password**. Switching modes also switches the recent device list.
+
+Both computers must be reachable over the LAN. Internet access may be available or absent; direct sessions do not depend on a cloud signaling service. The main window lets you select the local IP, edit its port, and change the password. Disabling **Enable direct IP** stops listeners, disconnects direct IP sessions, and hides the mode button. See the [direct IP guide](docs/USER_GUIDE_EN.md#lan-direct).
 
 <a id="preview"></a>
 
@@ -73,10 +86,18 @@ For self-hosting, both ends must use the same service. See the [user guide](docs
 
 ### Desktop client
 
-Local credentials, remote connections, and recent devices share the main window. Open DeskHub from the top-left corner.
+Local credentials, remote connections, and recent devices share the main window. The top-left controls switch connection modes and open DeskHub.
 
 <p align="center">
-  <img src="docs/images/desktop-main-en.png" width="800" alt="CrossDesk main window with local credentials, remote connection controls, and recent devices; demonstration data" />
+  <img src="docs/images/desktop-main-en.png" width="800" alt="CrossDesk ID mode with the mode switch, local ID, remote connection controls, and recent devices; demonstration data" />
+</p>
+
+### Direct IP mode
+
+Select the local IP, edit its port and password, and connect using the other desktop's address. Recent LAN devices have their own list below.
+
+<p align="center">
+  <img src="docs/images/desktop-lan-en.png" width="800" alt="CrossDesk Direct IP mode with local IP and port editing, a six-character password, remote address input, and recent LAN devices; demonstration data" />
 </p>
 
 <a id="deskhub"></a>
@@ -96,7 +117,7 @@ Group control sends input to all connected devices; closing DeskHub disconnects 
 
 ## Session controls and settings
 
-Remote sessions support monitor switching, video quality and frame-rate controls, audio, text clipboard synchronization, and file transfer. The toolbar also provides network statistics and privacy screen controls. Desktop settings configure codecs, relay, self-hosting, and the DeskHub video budget.
+Remote sessions support monitor switching, video quality and frame-rate controls, audio, text clipboard synchronization, and file transfer. The toolbar also provides network statistics and privacy screen controls. Desktop settings configure direct IP availability, codecs, relay, self-hosting, and the DeskHub video budget.
 
 - [Session controls](docs/USER_GUIDE_EN.md#session): toolbar, text clipboard, received files, and privacy screens.
 - [Client settings and updates](docs/USER_GUIDE_EN.md#settings): general options, DeskHub video settings, and version checks.

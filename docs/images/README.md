@@ -4,96 +4,127 @@
 
 ## 来源 / Sources
 
-- 两张常规设置截图（`desktop-settings-zh.png` / `desktop-settings-en.png`）于 **2026-10-22** 从 `f8f4aa3c` 加当前工作区修改重新渲染，移除硬件编解码开关；使用现有 `slint_ui_smoke_test`、macOS arm64 和 2× 软件渲染，PPM 中间文件存放在工程外临时目录。
-- 16 张中英文桌面截图更新于 **2026-10-19**，UI 源代码为 `1ef372d2`，使用 Slint 1.17.1、macOS arm64 和软件渲染器。图片直接渲染仓库中的 Slint 组件。
-- 捕获程序来自现有 [`slint_ui_smoke_test`](../../apps/desktop/tests/slint_ui_smoke_test.cpp)，在**工程外的临时目录**中复制源文件，仅为桌面墙调整演示设备数量、单元格宽度和网格窗口高度。Slint 组件没有改动，工程内没有新增或修改测试文件。
-- 主窗口展示桌面墙入口、连接区、近期设备卡片与分组筛选；设置展示“常规 / 桌面墙”选项卡，关于窗口展示三个赞助入口。桌面墙网格展示六台演示设备；放大图展示只读预览、群控和接管入口，没有建立真实连接。
-- 本机 ID `123 456 789`、密码 `123456`、设备名称、在线 / 连接状态及记录均为演示数据。主窗口展示三台设备，桌面墙展示六台；它们不是真实设备凭据或真实远程会话。示例配置不代表所有运行时默认值。
+- **2026-10-25** 从 `ae6f81e8` 的实际 Slint 组件重新生成 16 张中英文截图：更新主窗口、常规设置、桌面墙设置、自托管及关于共 10 张，新增 IP 直连主界面、记住密码弹窗和网络设置共 6 张。使用 Slint 1.17.1、macOS arm64 和 2× 软件渲染。
+- 捕获程序在**工程外临时目录**中复用现有 [`slint_ui_smoke_test`](../../apps/desktop/tests/slint_ui_smoke_test.cpp) 的截图辅助函数，并注入演示界面状态；没有启动应用运行时、打开监听端口或建立远控会话。没有修改产品组件或工程内测试，临时源码、可执行程序与 PPM 均位于工程外。
+- 主窗口展示 ID / IP 模式切换、桌面墙入口和各自的近期设备；IP 模式展示地址编辑、六位密码和默认端口 52888，网络设置展示“启用 IP 直连”及关闭说明。IP 近期设备的 `LAN` 标记表示记录类型，不代表在线探测结果。
+- 本机 ID `123 456 789`、密码 `Ab12Cd` / `Cd34Ef`、地址 `192.168.1.10` 与 `192.168.1.20–22`、设备名称和连接状态均为演示数据，不是真实设备凭据。IP 列表还包含 `192.168.2.10` 作为切换示例。截图中勾选的“记住密码”是演示选择，配置状态不代表全部运行时默认值。
+- 桌面墙网格、放大视图和会话画面设置共 6 张继续沿用 **2026-10-19** 从 `1ef372d2` 渲染的截图。桌面墙展示六台演示设备，主窗口展示三台；本轮没有重新采集这些页面。
 - “关于”中的 `v1.5.2` 和“已是最新版本”是捕获工具的示例值，不代表当前发布版本或实际在线检查结果。会话图使用公开页面作为远端画面，展示真实工具栏与画面设置菜单；隐私屏按钮处于关闭状态。
 - 缩略图沿用既有公开页面截图：`fixtures/source.png` 来自 [CrossDesk Xmake 源码页](https://github.com/kunkundi/crossdesk/blob/ios-support/xmake.lua)，`fixtures/website.png` 来自 [CrossDesk 官网](https://www.crossdesk.cn/)，两者采集于 2026-09-07。它们只用于展示预览效果，不代表这些页面正在对应设备上运行，页面中的版本信息也不代表最新发布。
 - `web-client.png` 保留 **2026-09-25** 从 [Web 客户端](https://web.crossdesk.cn/) 采集的 1280 × 720 连接首页，页面版本为 `2026.09.24.2`，ID 与密码为空。本次未重新采集 Web 页面；桌面设备预览继续复用这张图片。
 
-The two General settings images were refreshed again on **2026-10-22** from `f8f4aa3c` plus the current working-tree changes to remove the hardware codec switch, using the existing `slint_ui_smoke_test` on macOS arm64 at 2× software rendering scale. Intermediate PPM files were kept outside the repository.
-
-All 16 desktop images were previously refreshed on **2026-10-19** from UI source `1ef372d2`, using Slint 1.17.1 on macOS arm64. They render the actual components with demonstration data. The capture program is an external temporary copy of the existing source, adjusted only for DeskHub's six sample devices, 300 logical-pixel cells, and shorter grid window; no UI components or repository tests were changed in that refresh. The About view includes all three sponsorship links. IDs, credentials, connection states, versions, and update results are illustrative. No remote sessions were opened. Public-page fixtures remain from 2026-09-07, and the Web screenshot remains from 2026-09-25. This refresh does not include native mobile screenshots.
+On **2026-10-25**, 16 images were rendered from the actual Slint components at `ae6f81e8`: ten refreshed images (main window, General settings, DeskHub settings, self-hosting, and About) and six additions (Direct IP mode, its password dialog, and Network settings), in Chinese and English. The capture-only program reused the existing helper functions in an external temporary directory, using Slint 1.17.1 on macOS arm64 at 2× scale. No product components or repository tests were changed, and no listeners or remote sessions were opened. IDs, IPs, passwords, device records, connection states, and update results are illustrative; `LAN` labels indicate record type, not an online check. The checked Remember password box is a demonstration choice. The other six desktop screenshots remain from 2026-10-19, public-page fixtures from 2026-09-07, and the Web image from 2026-09-25. Native mobile screenshots are not included.
 
 ## 文件 / Files
 
 | 文件（`zh` / `en`） | 页面 | PNG 尺寸 |
 | --- | --- | --- |
-| `desktop-main-*.png` | 主窗口 / Main window | 1280 × 944 |
+| `desktop-main-*.png` | ID 连接模式 / ID mode | 1280 × 944 |
+| `desktop-lan-*.png`（不含 `password`） | IP 直连模式 / Direct IP mode | 1280 × 944 |
+| `desktop-lan-password-*.png` | IP 直连密码与记住密码 / Direct IP password dialog | 1280 × 944 |
+| `desktop-settings-network-*.png` | IP 直连开关与网络设置 / Direct IP switch and Network settings | 1280 × 944 |
 | `desktop-deskhub-*.png`（不含 `focus`） | 六设备桌面墙 / Six-device DeskHub grid | 1920 × 1000 |
 | `desktop-deskhub-focus-*.png` | 桌面墙放大视图 / Enlarged DeskHub view | 1920 × 1396 |
-| `desktop-settings-*.png`（不含 `deskhub`） | 常规设置 / General settings | 1280 × 944 |
+| `desktop-settings-zh.png` / `desktop-settings-en.png` | 常规设置 / General settings | 1280 × 944 |
 | `desktop-settings-deskhub-*.png` | 桌面墙传输设置 / DeskHub video settings | 1280 × 944 |
 | `desktop-self-hosted-*.png` | 自托管设置 / Self-hosting | 1280 × 944 |
 | `desktop-stream-video-settings-*.png` | 会话工具栏与画面设置 / Session video settings | 1920 × 1200 |
 | `desktop-about-*.png` | 关于与检查更新 / About and update check | 1280 × 944 |
 | `web-client.png`（中文） | Web 连接首页 / Web connection page | 1280 × 720 |
 
-桌面图片使用 2× 原生渲染缩放，捕获窗口内容区，不包含 macOS 原生标题栏。未放大旧 UI 截图，也未重绘控件；演示远端画面由实际组件按比例显示。Markdown 只设置展示宽度。常规设置可滚动，截图仅展示首屏；Windows 专属采集方式与便携版服务入口不会出现在这些 macOS 图片中。
+桌面图片使用 2× 原生渲染缩放，捕获窗口内容区，不包含 macOS 原生标题栏。未放大旧 UI 截图，也未重绘控件；演示远端画面由实际组件按比例显示。Markdown 只设置展示宽度。常规设置可滚动，`desktop-settings` 展示首屏，`desktop-settings-network` 展示网络连接分组；Windows 专属采集方式与便携版服务入口不会出现在这些 macOS 图片中。
 
 ## 重新生成 / Regenerate
 
-以下命令在仓库根目录、已配置依赖的 macOS 开发环境执行。所有临时源码、PPM 和额外捕获程序均写入系统临时目录，最终 PNG 才写入 `docs/images`。`sips` 仅做 PPM 到 PNG 的无损格式转换，其他平台可使用支持 PPM 的转换工具。
+以下命令在已配置依赖的 macOS 工程根目录执行。生成程序只渲染演示状态；所有临时源码、可执行文件和 PPM 均存放在工程外，确认图片后才将 PNG 复制进 `docs/images`。`sips` 仅做无损格式转换，图片没有重绘或后期修改。
 
-先检查 `/tmp/crossdesk-ui-capture-page` 和 `/tmp/crossdesk-ui-capture-language`：旧覆盖文件存在且非空时会优先于环境变量，应确认并移开后再捕获。`CROSSDESK_UI_CAPTURE_DEMO_ASSETS` 必须包含上述公开页面图片，缺失图片会导致捕获失败。工具等待窗口尺寸与缩放初始化后再截图。
+先检查 `/tmp/crossdesk-ui-capture-page` 和 `/tmp/crossdesk-ui-capture-language`：旧覆盖文件存在且非空时会优先于环境变量，需确认并移开后再捕获。`CROSSDESK_UI_CAPTURE_DEMO_ASSETS` 指向本目录，供近期设备缩略图使用。
 
-### 主窗口、设置与会话
+### 生成捕获程序
+
+复用现有源文件的捕获辅助函数，截去测试入口，在临时目录加入演示状态及独立入口；保持工程内测试文件不变。源码结构变化时需复核替换位置。
 
 ```bash
 set -e
-xmake b -y slint_ui_smoke_test
+xmake b -y crossdesk_ui
 capture_dir=$(mktemp -d "${TMPDIR:-/tmp}/crossdesk-readme-capture.XXXXXX")
 export capture_dir
-
-for locale in zh en; do
-  language=0
-  if [ "$locale" = en ]; then language=1; fi
-  for page in main settings settings-deskhub self-hosted about stream-video-settings; do
-    snapshot="$capture_dir/desktop-$page-$locale.ppm"
-    SLINT_BACKEND=winit-software SLINT_SCALE_FACTOR=2 \
-      CROSSDESK_UI_CAPTURE=1 \
-      CROSSDESK_UI_CAPTURE_DEMO_ASSETS="$PWD/docs/images" \
-      CROSSDESK_UI_CAPTURE_PAGE="$page" \
-      CROSSDESK_UI_CAPTURE_LANGUAGE="$language" \
-      CROSSDESK_UI_CAPTURE_SNAPSHOT="$snapshot" \
-      xmake r slint_ui_smoke_test
-    sips -s format png "$snapshot" \
-      --out "docs/images/desktop-$page-$locale.png"
-  done
-done
-```
-
-### 六设备桌面墙
-
-现有捕获模式的 `gallery` / `gallery-focus` 默认使用三台设备。要复现本页的六设备图，在上一步同一 shell 中创建临时副本，只修改演示场景：
-
-```bash
 python3 - <<'PY'
-import os
 from pathlib import Path
-
-source = Path('apps/desktop/tests/slint_ui_smoke_test.cpp').read_text()
-changes = [
-    ('options.page != "main-recent-scrolled") {',
-     'options.page != "main-recent-scrolled" &&\n'
-     '        !options.page.starts_with("gallery")) {'),
-    ('window->set_gallery_mode(true);\n    std::vector',
-     'window->set_gallery_mode(true);\n'
-     '    window->set_gallery_tile_width(300);\n    std::vector'),
-    ('698.0f;\n#else\n        720.0f;',
-     'options.page == "gallery" ? 500.0f : 698.0f;\n#else\n'
-     '        options.page == "gallery" ? 500.0f : 720.0f;'),
-]
-for old, new in changes:
-    assert source.count(old) == 1, 'Capture source changed; review the fixture adjustment.'
-    source = source.replace(old, new, 1)
-Path(os.environ['capture_dir'], 'readme_capture.cpp').write_text(source)
+import os
+root = Path.cwd()
+out = Path(os.environ['capture_dir'])
+source = (root / 'apps/desktop/tests/slint_ui_smoke_test.cpp').read_text()
+source = source[:source.index('// Sample the native window while')]
+old = '  // Preview DeskHub with the same demo images, without opening any sessions.'
+new = '''  // Documentation-only state; no runtime, listeners, or remote sessions.
+  window->set_local_password("Ab12Cd");
+  window->set_ip_direct_enabled(true);
+  window->set_ip_direct_enabled_draft(true);
+  if (options.page == "settings-network") window->set_settings_open(true);
+  if (options.page == "lan" || options.page == "lan-password") {
+    window->set_lan_mode(true);
+    window->set_lan_listener_ip("192.168.1.10");
+    window->set_lan_listener_port("52888");
+    window->set_lan_local_port("52888");
+    window->set_lan_interfaces(std::make_shared<slint::VectorModel<slint::SharedString>>(
+        std::vector<slint::SharedString>{"192.168.1.10", "192.168.2.10"}));
+    window->set_lan_new_password("Cd34Ef");
+    window->set_lan_listening(true);
+    window->set_remote_id_input("192.168.1.20:52888");
+    const auto recent = window->get_recent_connections();
+    for (size_t i = 0; i < recent->row_count(); ++i) {
+      auto device = recent->row_data(i).value();
+      device.lan = true;
+      device.online = false;
+      device.remote_id = slint::SharedString(("lan-demo-" + std::to_string(i)).c_str());
+      device.endpoint = slint::SharedString(("192.168.1." + std::to_string(20 + i) + ":52888").c_str());
+      recent->set_row_data(i, device);
+    }
+    if (options.page == "lan-password") {
+      window->set_lan_remote_address("192.168.1.20");
+      window->set_lan_remote_port("52888");
+      window->set_lan_open(true);
+      window->set_lan_remember_password(true);
+    }
+  }
+''' + old
+assert source.count(old) == 1
+source = source.replace(old,new)
+old = '      // Let settings scroll animations settle as well as hover/focus feedback.'
+new = '''      if (options.page == "settings-deskhub") window->set_settings_tab(1);
+      if (options.page == "settings-network") {
+        window->window().dispatch_pointer_scroll_event(
+            slint::LogicalPosition({400.0f, 250.0f}), 0.0f, -148.0f);
+        window->window().dispatch_pointer_move_event(slint::LogicalPosition({2.0f, 2.0f}));
+      }
+''' + old
+assert source.count(old) == 1
+source = source.replace(old,new)
+source += '''} // namespace
+int main() {
+  const auto options = LoadCaptureOptions();
+  if (!options.enabled || options.snapshot_path.empty()) return 1;
+  auto window = crossdesk::ui::MainWindow::create();
+  auto stream = crossdesk::ui::StreamWindow::create();
+  auto server = crossdesk::ui::ServerWindow::create();
+  if (!RegisterFontAwesome(window->window()) || !RegisterFontAwesome(stream->window()) ||
+      !RegisterFontAwesome(server->window())) return 2;
+  window->set_local_id("123 456 789");
+  window->set_local_password("Ab12Cd");
+  window->set_turn_enabled(true);
+  window->window().set_size(slint::LogicalSize({640.0f, 472.0f}));
+  return RunCaptureMode(options, window, stream, server);
+}
+'''
+(out / 'readme_capture.cpp').write_text(source)
+print(out / 'readme_capture.cpp')
 PY
 ```
 
-以下编译路径对应本次的 `macosx / arm64 / debug` 配置。其他配置先用 `xmake show -t slint_ui_smoke_test` 查看当前生成头文件和库目录，再替换路径；不要在工程内添加临时构建入口。
+### 编译与捕获
+
+以下路径对应 `macosx / arm64 / debug` 配置；其他配置先用 `xmake show -t slint_ui_smoke_test` 查看生成头文件与库路径，再调整。捕获按顺序执行，避免窗口互相抢占焦点。
 
 ```bash
 slint_prefix=$(xmake lua -c 'import("core.project.config"); config.load(); import("core.project.project"); print(project.target("slint_ui_smoke_test"):pkg("slint"):installdir())')
@@ -111,10 +142,8 @@ xcrun clang++ -std=c++20 \
 for locale in zh en; do
   language=0
   if [ "$locale" = en ]; then language=1; fi
-  for page in gallery gallery-focus; do
-    name=deskhub
-    if [ "$page" = gallery-focus ]; then name=deskhub-focus; fi
-    snapshot="$capture_dir/desktop-$name-$locale.ppm"
+  for page in main lan lan-password settings settings-network settings-deskhub self-hosted about; do
+    snapshot="$capture_dir/desktop-$page-$locale.ppm"
     SLINT_BACKEND=winit-software SLINT_SCALE_FACTOR=2 \
       CROSSDESK_UI_CAPTURE=1 \
       CROSSDESK_UI_CAPTURE_DEMO_ASSETS="$PWD/docs/images" \
@@ -123,9 +152,15 @@ for locale in zh en; do
       CROSSDESK_UI_CAPTURE_SNAPSHOT="$snapshot" \
       "$capture_dir/readme_capture"
     sips -s format png "$snapshot" \
-      --out "docs/images/desktop-$name-$locale.png"
+      --out "$capture_dir/desktop-$page-$locale.png"
   done
 done
 ```
 
-更新后逐张检查文字、布局、演示数据和文档引用，并同步日期、源码版本与图片尺寸。若更新 Web 图片，应打开 Web 客户端，等待表单与底部版本号加载完成，保持 ID 与密码为空，再截取页面视口；替换后也需重新生成桌面图以同步缩略图。
+逐张检查语言、页面、文字裁切、尺寸和演示数据后，将这些 PNG 复制到 `docs/images`，并更新日期与源码版本。桌面墙设置的标签在窗口初始化后设置，网络页滚动到对应分组，避免捕获尚未稳定的页面。
+
+### 其他页面
+
+会话图可用相同程序的 `stream-video-settings` 页面捕获。六设备桌面墙需要先调整**临时** `readme_capture.cpp` 的演示场景：在 `ConfigureDocumentationDemo` 的三设备限制中排除 `gallery` 开头的页面；在开启 gallery 模式后设置 `gallery_tile_width` 为 300；将 `gallery` 网格窗口的内容高度设为 500，`gallery-focus` 保持 698（macOS）。重新编译后，分别捕获 `gallery` / `gallery-focus` 并命名为 `desktop-deskhub-*` / `desktop-deskhub-focus-*`。这些调整只影响示例数据和窗口尺寸，不改变实际组件。
+
+若更新 Web 图片，应打开 Web 客户端，等待表单与底部版本号加载完成，保持 ID 与密码为空，再截取页面视口；替换后也需重新生成桌面图以同步缩略图。
