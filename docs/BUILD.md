@@ -138,6 +138,7 @@ PipeWire 不属于强制运行时依赖：程序在运行时检测宿主系统�
 --USE_DRM=true/false: 在 Linux 上启用 DRM 捕获，默认不启用
 --CROSSDESK_PORTABLE=true/false: 构建便携版本，默认不启用
 --CROSSDESK_VERSION=xxx: 指定 CrossDesk 的版本
+--CROSSDESK_UPDATE_PUBLIC_KEY=xxx: 可选的 Ed25519 更新验签公钥，64 个小写十六进制字符；默认为空，不启用自动安装更新
 --MINIRTC_ENABLE_AOM=true/false: 编译可选 libaom 后端，默认不启用；AV1 仍使用 SVT-AV1 / dav1d
 
 # 示例
@@ -149,6 +150,23 @@ xmake f --CROSSDESK_VERSION=1.4.3 --USE_CUDA=true
 ```bash
 xmake r crossdesk
 ```
+
+<a id="update-public-key"></a>
+
+### 更新公钥（可选）
+
+`CROSSDESK_UPDATE_PUBLIC_KEY` 在编译时嵌入桌面客户端，用于验证升级清单的 Ed25519 签名。本地开发可以省略：程序仍可正常编译、运行和检查新版本，但只提供手动下载入口，不执行应用内自动安装。
+
+需要应用内自动安装更新时，在对应平台的 `xmake f` 配置命令中加入此参数，再编译。例如，已完成平台配置后执行（将占位符替换为实际公钥）：
+
+```sh
+xmake f --CROSSDESK_UPDATE_PUBLIC_KEY="<64位小写十六进制公钥>"
+xmake b crossdesk
+```
+
+也可以在构建前设置同名环境变量；Xmake 配置值优先于环境变量。公钥必须是 32 字节 Ed25519 公钥的十六进制表示，共 64 个小写字符；非空但格式不正确时，构建配置会报错。发布清单必须由对应私钥签名，并满足安装位置等升级条件；便携版始终使用手动下载。
+
+GitHub Actions 构建从仓库 Actions variable `CROSSDESK_UPDATE_PUBLIC_KEY` 读取公钥。私钥仅供发布端签名使用，无需提供给普通构建。密钥生成、发布端配置及升级条件见 [桌面端应用内升级](UPDATER.md)。
 
 ## 无 CUDA 环境下的开发支持
 

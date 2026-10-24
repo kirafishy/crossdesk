@@ -154,6 +154,8 @@ Host your own signaling and TURN services, then enable them under **Settings →
 - [FAQ](docs/FAQ.md#english): connections, blank video, permissions, received files, and build issues.
 - [Report an issue or suggestion](https://github.com/kunkundi/crossdesk/issues): include both operating systems, client versions, connection mode, and reproduction steps.
 
+The optional desktop build parameter `CROSSDESK_UPDATE_PUBLIC_KEY` verifies Ed25519 signatures on in-app update manifests. Without it, the app still builds, runs, and checks for new versions, but updates require manual download. In-app update installation requires a public key matching the release signing private key. See [Update public key](docs/BUILD_EN.md#update-public-key) for configuration and the [desktop updater guide](docs/UPDATER.md) (Chinese) for key generation and publishing.
+
 <a id="sponsor"></a>
 
 ## Support CrossDesk

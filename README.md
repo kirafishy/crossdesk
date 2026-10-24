@@ -154,6 +154,8 @@ PC 端可控制和被控制，复用桌面界面与桌面墙；手机和平板�
 - [常见问题](docs/FAQ.md)：连接失败、黑屏、系统权限、文件位置与构建问题。
 - [提交问题或建议](https://github.com/kunkundi/crossdesk/issues)：请提供两端系统、客户端版本、连接方式和可复现步骤。
 
+桌面端的 `CROSSDESK_UPDATE_PUBLIC_KEY` 是可选编译参数，用于验证应用内升级清单的 Ed25519 签名。不配置仍可正常编译、运行和检查版本，但更新只能手动下载；需要应用内自动安装更新时，须配置与发布私钥匹配的公钥。配置方式见 [更新公钥](docs/BUILD.md#update-public-key)，密钥生成与发布流程见 [桌面端应用内升级](docs/UPDATER.md)。
+
 <a id="sponsor"></a>
 
 ## 支持 CrossDesk

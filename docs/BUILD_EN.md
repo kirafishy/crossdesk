@@ -144,6 +144,7 @@ enabled at build time) when it is unavailable.
 --USE_DRM=true/false: Enable DRM capture on Linux, disabled by default
 --CROSSDESK_PORTABLE=true/false: Build the portable variant, disabled by default
 --CROSSDESK_VERSION=xxx: Set the CrossDesk version
+--CROSSDESK_UPDATE_PUBLIC_KEY=xxx: Optional Ed25519 update verification key, 64 lowercase hex characters; empty by default, disabling in-app update installation
 
 # Example
 xmake f --CROSSDESK_VERSION=1.4.3 --USE_CUDA=true
@@ -154,6 +155,23 @@ Run:
 ```bash
 xmake r crossdesk
 ```
+
+<a id="update-public-key"></a>
+
+### Update public key (optional)
+
+`CROSSDESK_UPDATE_PUBLIC_KEY` is embedded in the desktop client at build time to verify Ed25519 signatures on update manifests. Local development builds can omit it: the app still builds, runs, and checks for new versions, but only offers manual downloads without in-app update installation.
+
+For in-app update installation, add this option to your platform's `xmake f` configuration command before building. For example, after configuring the platform, run the following with the placeholder replaced by your actual public key:
+
+```sh
+xmake f --CROSSDESK_UPDATE_PUBLIC_KEY="<64 lowercase hex characters>"
+xmake b crossdesk
+```
+
+You can also set the environment variable with the same name before building; the Xmake configuration value takes precedence. The value must encode a 32-byte Ed25519 public key as 64 lowercase hexadecimal characters. A nonempty value with an invalid format fails build configuration. Update manifests must be signed with the matching private key, and the installation must meet the other updater requirements, including a supported installation location. Portable builds always use manual downloads.
+
+GitHub Actions builds read the key from the repository Actions variable `CROSSDESK_UPDATE_PUBLIC_KEY`. The private key is only needed for release signing, not ordinary builds. See the [desktop updater guide](UPDATER.md) (Chinese) for key generation, release configuration, and updater requirements.
 
 ## Development Without CUDA Environment
 
