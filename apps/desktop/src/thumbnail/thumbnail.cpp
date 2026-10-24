@@ -11,11 +11,13 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -30,52 +32,40 @@
 #include "stb_image_write.h"
 
 namespace crossdesk {
+namespace {
 
-void ScaleNv12ToABGR(char* src, int src_w, int src_h, int dst_w, int dst_h,
-                     char* dst_rgba) {
-  uint8_t* y = reinterpret_cast<uint8_t*>(src);
-  uint8_t* uv = y + src_w * src_h;
+// Keep enough detail for high-DPI cards, independently of the display used
+// when the session closes. Preserve the source aspect ratio without bars.
+constexpr int kPreviewMaxEdge = 1024;
 
-  float src_aspect = float(src_w) / src_h;
-  float dst_aspect = float(dst_w) / dst_h;
-  int fit_w = dst_w, fit_h = dst_h;
-  if (src_aspect > dst_aspect) {
-    fit_h = int(dst_w / src_aspect);
-  } else {
-    fit_w = int(dst_h * src_aspect);
-  }
+bool ScaleNv12ToABGR(const char* src, int src_w, int src_h, int dst_w,
+                     int dst_h, uint8_t* dst_rgba) {
+  const auto* y = reinterpret_cast<const uint8_t*>(src);
+  const auto* uv = y + size_t(src_w) * src_h;
+  const int src_cw = (src_w + 1) / 2, src_ch = (src_h + 1) / 2;
+  const int dst_cw = (dst_w + 1) / 2, dst_ch = (dst_h + 1) / 2;
+  std::vector<uint8_t> y_i420(size_t(src_w) * src_h);
+  std::vector<uint8_t> u_i420(size_t(src_cw) * src_ch);
+  std::vector<uint8_t> v_i420(u_i420.size());
+  if (libyuv::NV12ToI420(y, src_w, uv, src_cw * 2, y_i420.data(), src_w,
+                         u_i420.data(), src_cw, v_i420.data(), src_cw,
+                         src_w, src_h) != 0)
+    return false;
 
-  std::vector<uint8_t> y_i420(src_w * src_h);
-  std::vector<uint8_t> u_i420((src_w / 2) * (src_h / 2));
-  std::vector<uint8_t> v_i420((src_w / 2) * (src_h / 2));
-  libyuv::NV12ToI420(y, src_w, uv, src_w, y_i420.data(), src_w, u_i420.data(),
-                     src_w / 2, v_i420.data(), src_w / 2, src_w, src_h);
-
-  std::vector<uint8_t> y_fit(fit_w * fit_h);
-  std::vector<uint8_t> u_fit((fit_w + 1) / 2 * (fit_h + 1) / 2);
-  std::vector<uint8_t> v_fit((fit_w + 1) / 2 * (fit_h + 1) / 2);
-  libyuv::I420Scale(y_i420.data(), src_w, u_i420.data(), src_w / 2,
-                    v_i420.data(), src_w / 2, src_w, src_h, y_fit.data(), fit_w,
-                    u_fit.data(), (fit_w + 1) / 2, v_fit.data(),
-                    (fit_w + 1) / 2, fit_w, fit_h, libyuv::kFilterBilinear);
-
-  std::vector<uint8_t> abgr(fit_w * fit_h * 4);
-  libyuv::I420ToABGR(y_fit.data(), fit_w, u_fit.data(), (fit_w + 1) / 2,
-                     v_fit.data(), (fit_w + 1) / 2, abgr.data(), fit_w * 4,
-                     fit_w, fit_h);
-
-  std::memset(dst_rgba, 0, dst_w * dst_h * 4);
-  for (int i = 0; i < dst_w * dst_h; ++i) {
-    dst_rgba[i * 4 + 3] = static_cast<char>(0xFF);
-  }
-
-  for (int row = 0; row < fit_h; ++row) {
-    int dst_offset =
-        ((row + (dst_h - fit_h) / 2) * dst_w + (dst_w - fit_w) / 2) * 4;
-    std::memcpy(dst_rgba + dst_offset, abgr.data() + row * fit_w * 4,
-                fit_w * 4);
-  }
+  std::vector<uint8_t> y_fit(size_t(dst_w) * dst_h);
+  std::vector<uint8_t> u_fit(size_t(dst_cw) * dst_ch);
+  std::vector<uint8_t> v_fit(u_fit.size());
+  if (libyuv::I420Scale(y_i420.data(), src_w, u_i420.data(), src_cw,
+                        v_i420.data(), src_cw, src_w, src_h, y_fit.data(), dst_w,
+                        u_fit.data(), dst_cw, v_fit.data(), dst_cw, dst_w,
+                        dst_h, libyuv::kFilterBox) != 0)
+    return false;
+  return libyuv::I420ToABGR(y_fit.data(), dst_w, u_fit.data(), dst_cw,
+                           v_fit.data(), dst_cw, dst_rgba, dst_w * 4,
+                           dst_w, dst_h) == 0;
 }
+
+}  // namespace
 
 Thumbnail::Thumbnail(std::string save_path) {
   if (!save_path.empty()) {
@@ -96,19 +86,6 @@ Thumbnail::Thumbnail(std::string save_path, unsigned char* aes128_key,
   std::memcpy(aes128_key_, aes128_key, sizeof(aes128_key_));
   std::memcpy(aes128_iv_, aes128_iv, sizeof(aes128_iv_));
   std::filesystem::create_directories(save_path_);
-}
-
-Thumbnail::~Thumbnail() {
-  if (rgba_buffer_) {
-    delete[] rgba_buffer_;
-    rgba_buffer_ = nullptr;
-  }
-}
-
-int Thumbnail::SetThumbnailDpiScale(float dpi_scale) {
-  thumbnail_width_ = static_cast<int>(thumbnail_width_ * dpi_scale);
-  thumbnail_height_ = static_cast<int>(thumbnail_height_ * dpi_scale);
-  return 0;
 }
 
 namespace {
@@ -260,14 +237,15 @@ int Thumbnail::SaveToThumbnail(const char* nv12, int width, int height,
 
   const auto image = std::filesystem::path(save_path_) / (remote_id + ".png");
   if (save_previews_ && nv12 && width > 0 && height > 0) {
-    if (!rgba_buffer_) {
-      rgba_buffer_ = new char[thumbnail_width_ * thumbnail_height_ * 4];
-    }
-    ScaleNv12ToABGR(const_cast<char*>(nv12), width, height, thumbnail_width_,
-                    thumbnail_height_, rgba_buffer_);
-    if (!stbi_write_png(image.string().c_str(), thumbnail_width_,
-                        thumbnail_height_, 4, rgba_buffer_,
-                        thumbnail_width_ * 4))
+    const double scale = std::min(1.0, double(kPreviewMaxEdge) /
+                                          std::max(width, height));
+    const int image_width = std::max(1, int(std::lround(width * scale)));
+    const int image_height = std::max(1, int(std::lround(height * scale)));
+    std::vector<uint8_t> rgba(size_t(image_width) * image_height * 4);
+    if (!ScaleNv12ToABGR(nv12, width, height, image_width, image_height,
+                         rgba.data()) ||
+        !stbi_write_png(image.string().c_str(), image_width, image_height, 4,
+                         rgba.data(), image_width * 4))
       return -1;
   } else if (!save_previews_) {
     std::error_code error;
@@ -278,11 +256,8 @@ int Thumbnail::SaveToThumbnail(const char* nv12, int width, int height,
 }
 
 int Thumbnail::LoadThumbnail(
-    std::vector<std::pair<std::string, RecentConnection>>& recent_connections,
-    int* width, int* height) {
+    std::vector<std::pair<std::string, RecentConnection>>& recent_connections) {
   std::lock_guard lock(mutex_);
-  if (width) *width = thumbnail_width_;
-  if (height) *height = thumbnail_height_;
   return LoadThumbnailLocked(recent_connections);
 }
 
@@ -366,27 +341,69 @@ int Thumbnail::LoadThumbnailLocked(
 }
 
 bool Thumbnail::DecodeImage(const std::filesystem::path& image_path,
+                            int target_width, int target_height,
                             std::vector<unsigned char>* rgba, int* width,
                             int* height) const {
-  if (!rgba || !width || !height) {
+  if (!rgba || !width || !height || target_width <= 0 || target_height <= 0) {
     return false;
   }
-
-  int channels = 0;
-  unsigned char* pixels =
-      stbi_load(image_path.string().c_str(), width, height, &channels, 4);
-  if (!pixels || *width <= 0 || *height <= 0) {
-    if (pixels) {
-      stbi_image_free(pixels);
-    }
-    rgba->clear();
+  rgba->clear();
+  *width = *height = 0;
+  int source_width = 0, source_height = 0, channels = 0;
+  std::unique_lock lock(mutex_);
+  const std::unique_ptr<unsigned char, decltype(&stbi_image_free)> pixels(
+      stbi_load(image_path.string().c_str(), &source_width, &source_height,
+                &channels, 4), stbi_image_free);
+  lock.unlock();
+  if (!pixels || source_width <= 0 || source_height <= 0)
     return false;
-  }
 
-  const size_t byte_count =
-      static_cast<size_t>(*width) * static_cast<size_t>(*height) * 4;
-  rgba->assign(pixels, pixels + byte_count);
-  stbi_image_free(pixels);
+  // Match image-fit: cover, cropping once from the original cached image.
+  int crop_width = source_width, crop_height = source_height;
+  if (int64_t(source_width) * target_height >
+      int64_t(source_height) * target_width)
+    crop_width = std::max(1, int(int64_t(source_height) * target_width /
+                                target_height));
+  else
+    crop_height = std::max(1, int(int64_t(source_width) * target_height /
+                                 target_width));
+  const double scale = std::min({1.0, double(crop_width) / target_width,
+                                double(crop_height) / target_height});
+  const int output_width = std::max(1, int(std::lround(target_width * scale)));
+  const int output_height = std::max(1, int(std::lround(target_height * scale)));
+  const auto* cropped = pixels.get() +
+      (size_t((source_height - crop_height) / 2) * source_width +
+       (source_width - crop_width) / 2) * 4;
+
+  // ARGBScale falls back to bilinear for general box downsampling. Scale
+  // separate color planes to get area filtering without another YUV conversion.
+  const size_t source_area = size_t(crop_width) * crop_height;
+  const size_t output_area = size_t(output_width) * output_height;
+  std::vector<uint8_t> source_planes(source_area * 4);
+  std::vector<uint8_t> output_planes(output_area * 4);
+  libyuv::SplitARGBPlane(cropped, source_width * 4,
+                         source_planes.data(), crop_width,
+                         source_planes.data() + source_area, crop_width,
+                         source_planes.data() + source_area * 2, crop_width,
+                         source_planes.data() + source_area * 3, crop_width,
+                         crop_width, crop_height);
+  for (size_t channel = 0; channel < 4; ++channel) {
+    if (libyuv::ScalePlane(source_planes.data() + source_area * channel,
+                           crop_width, crop_width, crop_height,
+                           output_planes.data() + output_area * channel,
+                           output_width, output_width, output_height,
+                           libyuv::kFilterBox) != 0)
+      return false;
+  }
+  rgba->resize(output_area * 4);
+  libyuv::MergeARGBPlane(output_planes.data(), output_width,
+                         output_planes.data() + output_area, output_width,
+                         output_planes.data() + output_area * 2, output_width,
+                         output_planes.data() + output_area * 3, output_width,
+                         rgba->data(), output_width * 4,
+                         output_width, output_height);
+  *width = output_width;
+  *height = output_height;
   return true;
 }
 

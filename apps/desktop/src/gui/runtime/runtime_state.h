@@ -59,8 +59,6 @@ struct RecentConnectionsState {
       recent_connections_;
   std::vector<std::string> recent_connection_ids_;
   std::vector<std::string> gallery_presence_ids_;
-  int recent_connection_image_width_ = 160;
-  int recent_connection_image_height_ = 90;
   uint32_t recent_connection_image_save_time_ = 0;
   DevicePresenceCache device_presence_cache_;
   std::atomic<bool> need_to_send_recent_connections_{true};

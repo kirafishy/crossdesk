@@ -355,9 +355,7 @@ void GuiRuntime::HandleRecentConnections() {
   if (session_cleanup_tasks_.empty() && reload_recent_connections_ && thumbnail_) {
     uint32_t now_time = SDL_GetTicks();
     if (now_time - recent_connection_image_save_time_ >= 50) {
-      int ret = thumbnail_->LoadThumbnail(recent_connections_,
-                                          &recent_connection_image_width_,
-                                          &recent_connection_image_height_);
+      int ret = thumbnail_->LoadThumbnail(recent_connections_);
       if (!ret) {
         LOG_INFO("Load recent connection thumbnails");
       }

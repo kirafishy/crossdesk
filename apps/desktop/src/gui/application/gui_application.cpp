@@ -42,6 +42,7 @@
 #include "features/gallery/gallery_window_state.h"
 #include "features/gallery/gallery_workspace.h"
 #include "features/gallery/preview_bandwidth.h"
+#include "features/gallery/preview_resolution.h"
 #include "filesystem_utf8.h"
 #include "localization.h"
 #include "platform.h"
@@ -1034,6 +1035,9 @@ struct GuiApplication::SlintUi {
   bool portable_service_dialog_initialized = false;
   bool sponsorship_prompt_pending = false;
   std::string recent_model_signature;
+  gallery::PreviewResolutionDebouncer recent_preview_resolution;
+  gallery::PreviewResolution recent_preview_size;
+  std::unordered_map<std::string, slint::Image> recent_preview_images;
   std::optional<std::string> recent_group_filter;
   std::vector<std::string> recent_filter_groups;
   slint::Timer timer;
@@ -2580,6 +2584,7 @@ void GuiApplication::Tick() {
   HandleRecentConnections();
   if (was_reloading_recent_connections && !reload_recent_connections_) {
     ui_->recent_model_signature.clear();
+    ui_->recent_preview_images.clear();
   }
   HandleConnectionStatusChange();
   HandlePendingPresenceProbe();
@@ -3271,8 +3276,20 @@ void GuiApplication::SyncMainWindow() {
     return props && props->connection_status_ == ConnectionStatus::Connected &&
            !props->closing_;
   };
+  const auto preview_size = ui_->recent_preview_resolution.Update(
+      gallery::PreviewResolution::Viewport(
+          ui_->main->get_recent_preview_width(),
+          ui_->main->get_recent_preview_height(),
+          ui_->main->window().scale_factor()),
+      gallery::PreviewResolutionDebouncer::Clock::now());
+  const bool save_previews = config_center_->IsSaveRemotePreviews();
+  if (!(preview_size == ui_->recent_preview_size) || !save_previews) {
+    ui_->recent_preview_size = preview_size;
+    ui_->recent_preview_images.clear();
+  }
   std::ostringstream signature_builder;
-  signature_builder << config_center_->IsSaveRemotePreviews() << '\n'
+  signature_builder << save_previews << '\n'
+                    << preview_size.width << ':' << preview_size.height << '\n'
                     << lan_mode << '\n'
                     << bool(ui_->recent_group_filter) << '\0'
                     << ui_->recent_group_filter.value_or("") << '\n';
@@ -3319,18 +3336,26 @@ void GuiApplication::SyncMainWindow() {
         !item.lan && device_presence_cache_.IsOnline(connection.remote_id);
     item.connected = is_connected(connection.remote_id);
     item.platform = UiText(HostPlatformName(connection.platform));
-    std::vector<unsigned char> rgba;
-    int image_width = 0;
-    int image_height = 0;
-    if (config_center_->IsSaveRemotePreviews() &&
-        !connection.image_path.empty() &&
-        thumbnail_->DecodeImage(connection.image_path, &rgba, &image_width,
-                                &image_height)) {
-      slint::SharedPixelBuffer<slint::Rgba8Pixel> pixels(image_width,
-                                                         image_height);
-      std::memcpy(pixels.begin(), rgba.data(), rgba.size());
-      item.thumbnail = slint::Image(std::move(pixels));
-      item.has_thumbnail = true;
+    if (save_previews && !connection.image_path.empty()) {
+      const auto path = connection.image_path.string();
+      auto cached = ui_->recent_preview_images.find(path);
+      if (cached == ui_->recent_preview_images.end()) {
+        std::vector<unsigned char> rgba;
+        int image_width = 0, image_height = 0;
+        if (thumbnail_->DecodeImage(connection.image_path, preview_size.width,
+                                    preview_size.height, &rgba, &image_width,
+                                    &image_height)) {
+          slint::SharedPixelBuffer<slint::Rgba8Pixel> pixels(image_width,
+                                                           image_height);
+          std::memcpy(pixels.begin(), rgba.data(), rgba.size());
+          cached = ui_->recent_preview_images.emplace(
+              path, slint::Image(std::move(pixels))).first;
+        }
+      }
+      if (cached != ui_->recent_preview_images.end()) {
+        item.thumbnail = cached->second;
+        item.has_thumbnail = true;
+      }
     }
     model.push_back(std::move(item));
   }

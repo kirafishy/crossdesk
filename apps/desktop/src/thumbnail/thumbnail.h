@@ -1,7 +1,7 @@
 /*
  * @Author: DI JUNKUN
  * @Date: 2024-11-07
- * Copyright (c) 2024 by DI JUNKUN, All Rights Reserved.
+ * Copyright (c) 2026 by DI JUNKUN, All Rights Reserved.
  */
 
 #ifndef _THUMBNAIL_H_
@@ -39,10 +39,6 @@ class Thumbnail {
   Thumbnail(std::string save_path);
   explicit Thumbnail(std::string save_path, unsigned char* aes128_key,
                      unsigned char* aes128_iv);
-  ~Thumbnail();
-
- public:
-  int SetThumbnailDpiScale(float dpi_scale);
 
   // Serialized with writes so disabling also clears any in-flight preview.
   int SetSavePreviews(bool enabled);
@@ -57,10 +53,12 @@ class Thumbnail {
 
   int LoadThumbnail(
       std::vector<std::pair<std::string, Thumbnail::RecentConnection>>&
-          recent_connections,
-      int* width, int* height);
+          recent_connections);
 
+  // Crop from the saved master and downsample for a physical-pixel viewport.
+  // Low-resolution legacy images are never enlarged in the cache.
   bool DecodeImage(const std::filesystem::path& image_path,
+                   int target_width, int target_height,
                    std::vector<unsigned char>* rgba, int* width,
                    int* height) const;
 
@@ -100,11 +98,8 @@ class Thumbnail {
                           unsigned char* iv);
 
  private:
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
   bool save_previews_ = true;
-  int thumbnail_width_ = 160;
-  int thumbnail_height_ = 90;
-  char* rgba_buffer_ = nullptr;
   std::string save_path_ = "thumbnails/";
 
   unsigned char aes128_key_[16];

@@ -548,6 +548,8 @@ export component MainWindow inherits Window {
     in property <bool> signal-reconnecting: false;
     in property <bool> signal-tls-error: false;
     in property <[RecentConnection]> recent-connections;
+    out property <length> recent-preview-width: max(1px, (recent-scroll.width - 24px) / 3);
+    out property <length> recent-preview-height: 80px;
     in property <[string]> recent-groups: [GalleryStrings.tr("全部设备", "All devices", "Все устройства"), GalleryStrings.tr("未分组", "Ungrouped", "Без группы")];
     in-out property <int> recent-group-index: 0;
     callback recent-group-selected(int);
@@ -1561,7 +1563,7 @@ export component MainWindow inherits Window {
                     spacing: 12px;
                     alignment: start;
                     for connection[index] in root.recent-connections: connection-card := Rectangle {
-                        width: (recent-scroll.width - 24px) / 3;
+                        width: root.recent-preview-width;
                         height: 126px;
                         background: transparent;
                         private property <bool> available: connection.lan || connection.online || connection.connected;
@@ -1584,7 +1586,7 @@ export component MainWindow inherits Window {
                                 x: 0px;
                                 y: 0px;
                                 width: parent.width;
-                                height: 80px;
+                                height: root.recent-preview-height;
                                 background: !connection-card.available ? DeviceCardStyle.offline-preview :
                                     connection.platform == "windows" ? @linear-gradient(135deg, #1f61b3, #337ac4) :
                                     connection.platform == "macos" ? @linear-gradient(135deg, #6e4aad, #8c63c4) :
