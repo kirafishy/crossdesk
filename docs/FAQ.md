@@ -12,7 +12,7 @@
 
 ## 对等连接失败
 
-在 **☰ → 设置** 中勾选 **启用中继服务**，点击“确认”后重新连接。自托管用户还需检查 Coturn 是否正常运行，以及中继端口 TCP/UDP、媒体端口范围 UDP 是否放通。
+默认连接策略已允许 TURN 中继回退。可在 **☰ → 设置** 中开启 **强制中继连接**，保存后重新连接以排查直连问题。自托管用户还需检查 Coturn 是否正常运行，以及中继端口 TCP/UDP、媒体端口范围 UDP 是否放通。
 
 公共服务的兼容性变更也会影响旧客户端；请核对 [Release 说明](https://github.com/kunkundi/crossdesk/releases)，尽量让两端使用兼容的近期版本。
 
@@ -85,7 +85,7 @@ Windows 安装包和便携包内置了 Amyuni 的 `usbmmidd_v2` 虚拟显示器�
 | --- | --- |
 | Server disconnected / TLS error | Network access, signaling endpoint, certificate dates, hostname, and system trust. See [self-hosting](SELF_HOSTING_EN.md). |
 | Remote device offline | Keep the host running, connect both sides to the same signaling server, and copy its current ID again. |
-| P2P connection failed | Enable TURN relay in Settings and reconnect. For self-hosting, check Coturn and relay/media firewall ports. Review [release compatibility notes](https://github.com/kunkundi/crossdesk/releases). |
+| P2P connection failed | The default connection policy already allows TURN relay fallback. Enable Force Relay in Settings, save, and reconnect to troubleshoot direct connections. For self-hosting, check Coturn and relay/media firewall ports. Review [release compatibility notes](https://github.com/kunkundi/crossdesk/releases). |
 | Black screen / no input on macOS | Grant Screen Recording and Accessibility, then reopen the app. A changed app path or signature may require fresh permission grants. |
 | No capture on Linux Wayland | Check the Wayland build option, host PipeWire 0.3, and desktop portal permission. Compare with an X11 session. See [Linux build instructions](BUILD_EN.md#linux). |
 | Linux host has no monitor or graphical session | Start CrossDesk normally to automatically discover and select your existing desktop, preserving its Dock and apps; no display number is needed. A bare Xvfb shows only CrossDesk on a black background; use an existing session or install Xfce and specify `--headless-session startxfce4`. See [Linux headless operation](HEADLESS_EN.md). |

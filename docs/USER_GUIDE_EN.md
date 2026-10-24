@@ -149,8 +149,7 @@ Open **☰ → Settings** in the top-right corner, choose **General / DeskHub**,
 | Capture Method (Windows) | Auto / DXGI / WGC / GDI; choose Auto for automatic headless adaptation |
 | Video Encode Format | H.264 / AV1; H.264 automatically prefers hardware codecs, with software fallback when unavailable or initialization fails; desktop AV1 uses software codecs |
 | Enable direct IP | Enabled by default; saving starts or stops direct IP immediately. Disabling disconnects IP sessions, stops listeners, and hides the mode button; the choice persists across restarts |
-| Enable TURN Service | Allow relay-assisted connections; check this setting if P2P fails |
-| Force Relay | Require relay connections when TURN is enabled; turning TURN off also disables this option |
+| Force Relay | When off, automatically select a connection path with P2P and TURN relay fallback; when on, use relay connections only |
 | Save remote screen previews | On by default. When disabled, the thumbnail area shows the remote device’s platform and existing previews are cleared; connection records and passwords are preserved |
 | Privacy screen on connect | Automatically enable privacy when this computer is controlled remotely; the controller can toggle it from the session toolbar |
 | Self-Hosted Config | Set the server address and signaling port, then enable the checkbox |

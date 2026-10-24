@@ -41,7 +41,7 @@ class ConfigCenter {
   int SetScreenCaptureMethod(ScreenCaptureMethod method);
   int SetVideoEncodeFormat(VIDEO_ENCODE_FORMAT video_encode_format);
   int SetTurnMode(TURN_MODE turn_mode);
-  int SetTurn(bool enable_turn, bool force_relay);
+  int SetForceRelay(bool force_relay);
   int SetServerHost(const std::string& signal_server_host);
   int SetServerPort(int signal_server_port);
   int SetServerEndpoint(const std::string& address, int port);
@@ -63,7 +63,6 @@ class ConfigCenter {
   ScreenCaptureMethod GetScreenCaptureMethod() const;
   VIDEO_ENCODE_FORMAT GetVideoEncodeFormat() const;
   TURN_MODE GetTurnMode() const;
-  bool IsEnableTurn() const;
   bool IsForceRelay() const;
   bool IsEnableSrtp() const;
   std::string GetSignalServerHost() const;

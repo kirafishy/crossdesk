@@ -237,8 +237,6 @@ struct TranslationRow {
     "Video Encode Format:", u8"Формат кодека видео:")                          \
   X(av1, u8"AV1", "AV1", "AV1")                                                \
   X(h264, u8"H.264", "H.264", "H.264")                                         \
-  X(enable_turn, u8"启用中继服务:",                                            \
-    "Enable TURN Service:", u8"Включить TURN-сервис:")                         \
   X(force_relay, u8"强制中继连接:", "Force Relay:", u8"Только через реле:")   \
   X(self_hosted_server_config, u8"自托管配置", "Self-Hosted Config",           \
     u8"Конфигурация self-hosted")                                              \

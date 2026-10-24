@@ -319,10 +319,7 @@ int ConfigCenter::SetTurnMode(TURN_MODE mode) {
   return 0;
 }
 
-int ConfigCenter::SetTurn(bool enable_turn, bool force_relay) {
-  if (!enable_turn) {
-    return SetTurnMode(TURN_MODE::DISABLED);
-  }
+int ConfigCenter::SetForceRelay(bool force_relay) {
   if (!force_relay) {
     return SetTurnMode(TURN_MODE::AUTO_UDP_TCP);
   }
@@ -477,10 +474,6 @@ ConfigCenter::VIDEO_ENCODE_FORMAT ConfigCenter::GetVideoEncodeFormat() const {
 
 ConfigCenter::TURN_MODE ConfigCenter::GetTurnMode() const {
   return turn_mode_;
-}
-
-bool ConfigCenter::IsEnableTurn() const {
-  return turn_mode_ != TURN_MODE::DISABLED;
 }
 
 bool ConfigCenter::IsForceRelay() const {

@@ -1488,7 +1488,6 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   auto& main = ui_->Window(gallery_window);
   main->set_language_index(language_button_value_);
   main->set_codec_index(video_encode_format_button_value_);
-  main->set_turn_enabled(enable_turn_);
   main->set_ip_direct_enabled_draft(config_center_->IsIpDirectEnabled());
   main->set_settings_save_error("");
   main->set_force_relay_enabled(config_center_->IsForceRelay());
@@ -4559,7 +4558,6 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   language_button_value_ =
       localization::detail::ClampLanguageIndex(main->get_language_index());
   video_encode_format_button_value_ = std::clamp(main->get_codec_index(), 0, 1);
-  enable_turn_ = main->get_turn_enabled();
   enable_self_hosted_ = main->get_self_hosted_enabled();
 #if !defined(__OHOS__)
   enable_autostart_ = main->get_autostart_enabled();
@@ -4575,7 +4573,7 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   config_center_->SetVideoEncodeFormat(
       static_cast<ConfigCenter::VIDEO_ENCODE_FORMAT>(
           video_encode_format_button_value_));
-  config_center_->SetTurn(enable_turn_, main->get_force_relay_enabled());
+  config_center_->SetForceRelay(main->get_force_relay_enabled());
   main->set_force_relay_enabled(config_center_->IsForceRelay());
 #if !defined(__OHOS__)
   config_center_->SetAutostart(enable_autostart_);
@@ -4641,7 +4639,6 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
   localization_language_index_ = localization::detail::ClampLanguageIndex(language_button_value_);
   localization_language_ = config_center_->GetLanguage();
   video_encode_format_button_value_ = static_cast<int>(config_center_->GetVideoEncodeFormat());
-  enable_turn_ = config_center_->IsEnableTurn();
   enable_self_hosted_ = config_center_->IsSelfHosted();
   enable_autostart_ = config_center_->IsEnableAutostart();
   enable_daemon_ = config_center_->IsEnableDaemon();
@@ -4655,7 +4652,6 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
   std::snprintf(signal_server_port_self_, sizeof(signal_server_port_self_), "%s", port_text.c_str());
   language_button_value_last_ = language_button_value_;
   video_encode_format_button_value_last_ = video_encode_format_button_value_;
-  enable_turn_last_ = enable_turn_;
   enable_self_hosted_last_ = enable_self_hosted_;
   enable_autostart_last_ = enable_autostart_;
   enable_daemon_last_ = enable_daemon_;

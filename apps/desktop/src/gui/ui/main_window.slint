@@ -72,7 +72,6 @@ export global UiStrings {
     in-out property <string> capture-method: "Capture method";
     in-out property <string> capture-method-auto: "Auto";
     in-out property <string> codec: "Video codec";
-    in-out property <string> turn-relay: "TURN relay";
     in-out property <string> force-relay: "Force relay";
     in-out property <string> self-hosted: "Self-hosted server";
     in-out property <string> autostart: "Start with system";
@@ -625,13 +624,9 @@ export component MainWindow inherits Window {
     in property <bool> capture-method-visible: false;
     in-out property <int> capture-method-index: 0;
     in-out property <int> codec-index: 0;
-    in-out property <bool> turn-enabled: true;
     in-out property <bool> ip-direct-enabled-draft: true;
     in property <string> settings-save-error;
     in-out property <bool> force-relay-enabled: false;
-    changed turn-enabled => {
-        if !root.turn-enabled { root.force-relay-enabled = false; }
-    }
     in-out property <bool> self-hosted-enabled: false;
     in-out property <bool> autostart-enabled: false;
     in property <bool> autostart-system-managed: false;
@@ -2672,13 +2667,12 @@ export component MainWindow inherits Window {
                             }
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 4;
+                            title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 3;
                             SettingsToggleRow {
                                 label: GalleryStrings.tr("启用 IP 直连", "Enable direct IP", "Прямое IP-подключение");
                                 checked <=> root.ip-direct-enabled-draft;
                             }
-                            SettingsToggleRow { label: UiStrings.turn-relay; checked <=> root.turn-enabled; enabled: !root.settings-session-active; }
-                            SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: root.turn-enabled && !root.settings-session-active; }
+                            SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: !root.settings-session-active; }
                             SettingsToggleRow {
                                 checked <=> root.self-hosted-enabled; enabled: !root.settings-session-active; divider: false;
                                 SettingsButton { x: 0px; y: 2px; width: parent.width - 60px; height: 32px; quiet: true; align-left: true; text: UiStrings.self-hosted; enabled: !root.settings-session-active; clicked => { root.self-host-settings-open = true; } }
