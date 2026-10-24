@@ -236,10 +236,10 @@ struct HostDisplay {
 };
 
 // Builds the host_infomation message advertised on every new connection.
-// |host_name| is truncated to the wire field size. The display arrays are
-// heap-allocated with the same layout the decoder produces; release the
-// result with FreeRemoteAction. An allocation failure yields an empty display
-// list rather than a partially filled one.
+// |host_name| is UTF-8 and truncated at a character boundary to fit the wire
+// field size. The display arrays are heap-allocated with the same layout the
+// decoder produces; release the result with FreeRemoteAction. An allocation
+// failure yields an empty display list rather than a partially filled one.
 // Missing or oversized app versions are advertised as unknown (empty).
 RemoteAction MakeHostInformation(const std::string& host_name,
                                  const std::vector<HostDisplay>& displays,

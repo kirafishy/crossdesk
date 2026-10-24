@@ -1,6 +1,7 @@
 #include "platform.h"
 
 #include <Winsock2.h>
+#include <Windows.h>
 #include <iphlpapi.h>
 
 #include <cstdio>
@@ -25,19 +26,38 @@ std::string GetMac() {
 }
 
 std::string GetHostName() {
-  WSADATA data = {};
-  if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
-    LOG_ERROR("WSAStartup failed");
+  // Read Unicode directly; Winsock's narrow hostname is not guaranteed UTF-8.
+  DWORD size = 0;
+  if (!GetComputerNameExW(ComputerNameDnsHostname, nullptr, &size) &&
+      GetLastError() != ERROR_MORE_DATA) {
+    LOG_ERROR("GetComputerNameExW size query failed: {}", GetLastError());
     return {};
   }
-  char hostname[256] = {};
-  if (gethostname(hostname, sizeof(hostname)) == SOCKET_ERROR) {
-    LOG_ERROR("gethostname failed: {}", WSAGetLastError());
-    WSACleanup();
+  if (size == 0) return {};
+
+  std::wstring hostname(size, L'\0');
+  if (!GetComputerNameExW(ComputerNameDnsHostname, hostname.data(), &size)) {
+    LOG_ERROR("GetComputerNameExW failed: {}", GetLastError());
     return {};
   }
-  WSACleanup();
-  return hostname;
+  if (size == 0) return {};
+
+  const int length = static_cast<int>(size);
+  const int utf8_size =
+      WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, hostname.data(),
+                          length, nullptr, 0, nullptr, nullptr);
+  if (utf8_size == 0) {
+    LOG_ERROR("Hostname UTF-8 size query failed: {}", GetLastError());
+    return {};
+  }
+  std::string utf8_name(utf8_size, '\0');
+  if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, hostname.data(),
+                          length, utf8_name.data(), utf8_size, nullptr,
+                          nullptr) == 0) {
+    LOG_ERROR("Hostname UTF-8 conversion failed: {}", GetLastError());
+    return {};
+  }
+  return utf8_name;
 }
 
 bool IsWaylandSession() { return false; }

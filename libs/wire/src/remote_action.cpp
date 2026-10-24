@@ -34,6 +34,19 @@ void ResetHostInfo(HostInfo& info) {
   info.supports_deskhub_bandwidth = false;
 }
 
+void CopyHostName(HostInfo& info, const std::string& host_name) {
+  std::size_t size = std::min(
+      {host_name.size(), host_name.find('\0'), sizeof(info.host_name) - 1});
+  // Keep the fixed-size UTF-8 field from ending inside a multibyte character.
+  while (size > 0 && size < host_name.size() &&
+         (static_cast<unsigned char>(host_name[size]) & 0xC0) == 0x80) {
+    --size;
+  }
+  std::memcpy(info.host_name, host_name.data(), size);
+  info.host_name[size] = '\0';
+  info.host_name_size = size;
+}
+
 bool AllocateHostDisplays(HostInfo& info, std::size_t count) {
   if (count == 0) return true;
 
@@ -104,11 +117,7 @@ RemoteAction MakeHostInformation(const std::string& host_name,
 
   action.i.supports_privacy_screen = supports_privacy_screen;
   action.i.platform = platform;
-  const std::size_t name_size =
-      std::min(host_name.size(), sizeof(action.i.host_name) - 1);
-  std::memcpy(action.i.host_name, host_name.data(), name_size);
-  action.i.host_name[name_size] = '\0';
-  action.i.host_name_size = name_size;
+  CopyHostName(action.i, host_name);
   // Never advertise a truncated version as a different, valid release.
   if (app_version.size() < sizeof(action.i.app_version) &&
       app_version.find('\0') == std::string::npos) {
@@ -462,10 +471,7 @@ bool RemoteAction::FromJson(const std::string& json_string,
             host_info_object.value("supports_deskhub_bandwidth", false);
         const std::string host_name =
             host_info_object.at("host_name").get<std::string>();
-        std::strncpy(output.i.host_name, host_name.c_str(),
-                     sizeof(output.i.host_name) - 1);
-        output.i.host_name[sizeof(output.i.host_name) - 1] = '\0';
-        output.i.host_name_size = std::strlen(output.i.host_name);
+        CopyHostName(output.i, host_name);
 
         const auto& displays = host_info_object.at("displays");
         if (!displays.is_array()) return false;
