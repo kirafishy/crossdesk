@@ -51,7 +51,7 @@ export class MobileState {
   muted: boolean = false;
   previews: boolean = false;
   videoPreference: number = 1;
-  autoLandscape: boolean = true;
+  autoLandscape: boolean = false;
   version: string = '0.1.0';
   update: string = '';
   updateStatus: string = '';
@@ -132,7 +132,7 @@ export class MobileController {
     this.state.consent = this.store.flag('consent'); this.state.server = this.store.text('server', 'api.crossdesk.cn');
     this.state.port = this.store.text('port', '9099'); this.state.remote = this.store.text('lastRemote');
     this.state.relative = this.store.flag('relative', true); this.state.videoPreference = this.store.number('videoPreference', 1);
-    this.state.autoLandscape = this.store.flag('autoLandscape', true);
+    this.state.autoLandscape = this.store.flag('autoLandscape', false);
     this.state.previews = this.store.flag('previews');
     try { this.state.version = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT).versionName; } catch {}
     try {

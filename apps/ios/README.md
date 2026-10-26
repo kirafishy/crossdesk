@@ -214,14 +214,13 @@ the available space. Settings and reading pages are limited to 720 points.
 Resizing preserves the connection fields and active session. iPhone retains its
 portrait home screen and two-column recent-connection grid.
 
-On iPhone, Settings → Screen orientation (屏幕方向) → Landscape after connecting
-(连接后自动横屏) is enabled by default and saved locally. A new session starts in
-landscape and keeps that orientation until the phone is physically held sideways;
-it then resumes the existing device-following policy for the rest of the session.
-Portrait, flat and unknown device poses do not release the initial landscape hold.
-Turning the option off keeps the existing rotation behavior. Leaving the session
-restores portrait; foregrounding the same session does not reapply a released hold.
-iPad orientation and multitasking are unaffected.
+On iPhone, Settings → Screen orientation (屏幕方向) → Lock landscape after connecting
+(连接建立后锁定横屏) is disabled by default and saved locally. When enabled, the session
+enters and stays in landscape; when disabled, it follows the device orientation.
+Leaving the session restores portrait, and returning to a background session keeps
+that session's orientation setting. The physical-device monitoring that released
+the initial landscape hold has been removed. iPad orientation and multitasking
+are unaffected.
 
 ## System keyboard and remote text
 

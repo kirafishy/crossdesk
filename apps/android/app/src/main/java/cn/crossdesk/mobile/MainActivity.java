@@ -326,8 +326,8 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         ProgressBar spinner=new ProgressBar(this);spinner.setIndeterminateTintList(ColorStateList.valueOf(BLUE));body.addView(spinner,ui.size(34,34));ui.gap(body,14);TextView title=text("正在连接",20,true);title.setGravity(Gravity.CENTER);body.addView(title);ui.gap(body,6);status=text("正在连接信令服务器…",14,false);status.setGravity(Gravity.CENTER);status.setTextColor(SECONDARY);status.setMinHeight(dp(36));body.addView(status);card.addView(body,ui.size(-1,-2));ui.divider(card);card.addView(ui.action("取消连接",RED,()->end("")),ui.size(-1,46));
         dialog.setContentView(card);dialog.setCanceledOnTouchOutside(false);dialog.setOnCancelListener(d->end(""));Window w=dialog.getWindow();if(w!=null){w.setBackgroundDrawableResource(android.R.color.transparent);w.setDimAmount(.08f);}dialog.show();if(w!=null)w.setLayout(dp(292),-2);
     }
-    private void sessionScreen(boolean waitForLandscape){
-        installRoot("session",true);remoteOrientation.begin(waitForLandscape&&!isTablet()&&!isInMultiWindowMode());video=new RemoteVideoView(this,session);video.setRelative(preferences.getBoolean("relativeMouse",true));canvas.addView(video,0,new FrameLayout.LayoutParams(-1,-1));
+    private void sessionScreen(boolean autoLandscape){
+        installRoot("session",true);remoteOrientation.begin(autoLandscape,!isTablet()&&!isInMultiWindowMode());video=new RemoteVideoView(this,session);video.setRelative(preferences.getBoolean("relativeMouse",true));canvas.addView(video,0,new FrameLayout.LayoutParams(-1,-1));
         controls=new SessionControls(this,ui,new SessionControls.Actions(){
             public void disconnect(){confirmDisconnect();}public void display(){selectDisplay();}public void clipboard(){MainActivity.this.clipboard();}
             public void sendFile(){chooseFile();}public void saveFile(){saveReceivedFile();}public void secureAttention(){MainActivity.this.secureAttention();}
@@ -370,9 +370,9 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         mouse.addView(segments(new String[]{"相对位置","绝对位置"},relative?0:1,true,index->preferences.edit().putBoolean("relativeMouse",index==0).apply()));
         LinearLayout picture=section(content,"画面偏好",MobileUi.SETTINGS_CARD_RADIUS);picture.setPadding(dp(12),dp(12),dp(12),dp(12));int preference=Math.max(0,Math.min(2,preferences.getInt("videoPreference",1)));
         picture.addView(segments(RemoteVideoSettings.PREFERENCES,preference,true,index->preferences.edit().putInt("videoPreference",index).apply()));ui.gap(content,28);
-        LinearLayout direction=section(content,"屏幕方向",MobileUi.SETTINGS_CARD_RADIUS);LinearLayout directionRow=row();directionRow.setPadding(dp(16),dp(10),dp(16),dp(10));directionRow.addView(text("连接后自动横屏",16,false),new LinearLayout.LayoutParams(0,-2,1));
-        Switch autoLandscape=new Switch(this);autoLandscape.setContentDescription("连接后自动横屏");autoLandscape.setChecked(preferences.getBoolean("autoLandscape",true));autoLandscape.setOnCheckedChangeListener((button,checked)->preferences.edit().putBoolean("autoLandscape",checked).apply());directionRow.addView(autoLandscape);direction.addView(directionRow);
-        footer(content,"手机连接后先进入横屏，将手机横过来后恢复跟随设备方向。关闭后始终跟随设备方向。平板和多窗口不受影响。");
+        LinearLayout direction=section(content,"屏幕方向",MobileUi.SETTINGS_CARD_RADIUS);LinearLayout directionRow=row();directionRow.setPadding(dp(16),dp(10),dp(16),dp(10));directionRow.addView(text("连接建立后锁定横屏",16,false),new LinearLayout.LayoutParams(0,-2,1));
+        Switch autoLandscape=new Switch(this);autoLandscape.setContentDescription("连接建立后锁定横屏");autoLandscape.setChecked(preferences.getBoolean("autoLandscape",false));autoLandscape.setOnCheckedChangeListener((button,checked)->preferences.edit().putBoolean("autoLandscape",checked).apply());directionRow.addView(autoLandscape);direction.addView(directionRow);
+        footer(content,"默认关闭。开启后，手机连接时进入并保持横屏；关闭时跟随设备方向。平板和多窗口不受影响。");
         LinearLayout server=section(content,"",MobileUi.SETTINGS_CARD_RADIUS);LinearLayout fields=column();fields.setVisibility(View.GONE);boolean custom=!host.equals("api.crossdesk.cn")||port!=9099;
         link(server,"服务器",custom?"自定义":"默认",()->fields.setVisibility(fields.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE));server.addView(fields);
         LinearLayout toggleRow=row();toggleRow.setPadding(dp(16),dp(8),dp(16),dp(8));toggleRow.addView(text("使用自定义服务器",16,false),new LinearLayout.LayoutParams(0,-2,1));Switch toggle=new Switch(this);toggle.setContentDescription("使用自定义服务器");toggle.setChecked(custom);toggleRow.addView(toggle);fields.addView(toggleRow);
@@ -604,7 +604,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         // Transport readiness can be reported again after ICE changes its selected path.
         // The first success consumes pendingPassword; a duplicate must not save it again.
         if(session==null||ready)return;ready=true;if(progressDialog!=null){progressDialog.dismiss();progressDialog=null;}
-        try{history.save(serverKey(),connectedRemote,connectedRemote,hostPlatform,rememberPassword,pendingPassword);}catch(Exception error){toast("密码保存失败，本次连接仍可使用");}pendingPassword="";sessionScreen(preferences.getBoolean("autoLandscape",true));
+        try{history.save(serverKey(),connectedRemote,connectedRemote,hostPlatform,rememberPassword,pendingPassword);}catch(Exception error){toast("密码保存失败，本次连接仍可使用");}pendingPassword="";sessionScreen(preferences.getBoolean("autoLandscape",false));
         if(!canUsePictureInPicture())prepareBackgroundSession(true);
         if(videoSettings.supported&&videoSettings.requestId==0)updateVideoSettings(videoSettings.selection);
         if(foreground&&preferences.getBoolean("networkConsent",false))remoteVersionCheck.connected();
@@ -682,7 +682,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         super.onConfigurationChanged(config);
         releaseKeys();
         if(!page.equals("session"))updateHomeOrientation();
-        else if(!isInPictureInPictureMode()&&(isTablet()||isInMultiWindowMode()))remoteOrientation.followDevice();
+        else if(!isInPictureInPictureMode())remoteOrientation.update(!isTablet()&&!isInMultiWindowMode());
         sizePasswordDialog();
         if(privacyDialog instanceof PrivacyConsentDialog)((PrivacyConsentDialog)privacyDialog).updateSize();
         if(controls!=null&&!pictureInPictureUi)controls.post(controls::constrainPanels);
@@ -701,7 +701,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         retained.muted=muted;retained.selectedDisplay=selectedDisplay;retained.remoteServiceAvailable=remoteServiceAvailable;
         retained.clipboard=remoteClipboard;retained.videoSettings=videoSettings;retained.receivedFile=receivedFile;
         retained.width=videoWidth;retained.height=videoHeight;
-        retained.waitingForLandscape=remoteOrientation.waitingForLandscape();
+        retained.autoLandscape=remoteOrientation.autoLandscape();
     }
     private boolean prepareBackgroundSession(boolean inform){
         if(!ready||session==null||session.isClosed()||isFinishing()||!hasNetworkConsent())return false;
@@ -737,7 +737,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         hostPlatform=retained.platform;displays=retained.displays;muted=retained.muted;selectedDisplay=retained.selectedDisplay;
         remoteServiceAvailable=retained.remoteServiceAvailable;remoteClipboard=retained.clipboard;receivedFile=retained.receivedFile;
         videoSettings=retained.videoSettings;ready=true;retained.attach(this);
-        if(rebuild)sessionScreen(retained.waitingForLandscape);
+        if(rebuild)sessionScreen(retained.autoLandscape);
         if(retained.width>0&&retained.height>0)videoSize(retained.width,retained.height);
         if(controls!=null){controls.setMuted(muted);controls.videoSettings(videoSettings);controls.fileStatus(retained.fileStatus,receivedFile!=null);}
         retained.setBackground(false);signaling(signalState,localIdentity);
@@ -785,9 +785,9 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         super.onPictureInPictureUiStateChanged(state);
         if(android.os.Build.VERSION.SDK_INT>=35&&state.isTransitioningToPip())setPictureInPictureUi(true);
     }
-    @Override protected void onResume(){super.onResume();privacyChanged();remoteOrientation.resume();if(!isInPictureInPictureMode())enteredPictureInPicture=false;setPictureInPictureUi(isInPictureInPictureMode());updatePictureInPicture();if(ready&&!canUsePictureInPicture())prepareBackgroundSession(true);if(backgroundSession!=null)requestBackgroundNotifications();}
+    @Override protected void onResume(){super.onResume();privacyChanged();if(!isInPictureInPictureMode())enteredPictureInPicture=false;setPictureInPictureUi(isInPictureInPictureMode());updatePictureInPicture();if(ready&&!canUsePictureInPicture())prepareBackgroundSession(true);if(backgroundSession!=null)requestBackgroundNotifications();}
     // onStart marks a new visit; focus/resume callbacks must not reopen a refused notice.
-    @Override protected void onPause(){remoteOrientation.pause();releaseKeys();if(controls!=null)controls.cancelMouseInput();if(video!=null)video.releaseMouse();super.onPause();}
+    @Override protected void onPause(){releaseKeys();if(controls!=null)controls.cancelMouseInput();if(video!=null)video.releaseMouse();super.onPause();}
     @Override protected void onStart(){super.onStart();foreground=true;restoreBackgroundSession();appUpdates.setEnabled(preferences.getBoolean("networkConsent",false));if(!preferences.getBoolean("networkConsent",false))consent(this::renderSignaling);ensureSignaling();showConnectionMessage();}
     @Override protected void onStop(){if(controls!=null)controls.closeKeyboard();foreground=false;appUpdates.setEnabled(false);if(privacyDialog!=null)privacyDialog.dismiss();pageHost.finish();
         if(connectionDialog!=null)connectionDialog.dismiss();

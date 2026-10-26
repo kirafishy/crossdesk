@@ -4,7 +4,6 @@ import { PiPWindow, window, display } from '@kit.ArkUI';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
 import { picker, fileIo as fs, fileUri } from '@kit.CoreFileKit';
 import { http } from '@kit.NetworkKit';
-import { sensor } from '@kit.SensorServiceKit';
 import { isAnnouncementURL } from './AnnouncementText';
 
 export class MobileLifecycle {
@@ -22,19 +21,9 @@ export class MobilePlatform {
   private generation: number = 0;
   private backgroundActive: boolean = false;
   private active: boolean = false;
-  private waitingForLandscape: boolean = false;
-  private observingOrientation: boolean = false;
+  private autoLandscape: boolean = false;
   private orientationRevision: number = 0;
   private orientationQueue: Promise<void> = Promise.resolve();
-  private gravityChanged: (data: sensor.GravityResponse) => void = (data: sensor.GravityResponse) => {
-    if (!this.active || !this.foreground || !this.waitingForLandscape || !this.observingOrientation) return;
-    // Gravity is in device coordinates, independent of programmatic window rotation.
-    // Reject flat and diagonal poses before handing rotation back to the system.
-    const x = Math.abs(data.x), y = Math.abs(data.y), z = Math.abs(data.z);
-    if (x >= 6 && x >= y * 1.7 && x >= z) {
-      this.waitingForLandscape = false; this.stopOrientationSensor(); this.orientation(true);
-    }
-  };
   private foreground: boolean = true;
   choosing: boolean = false;
   pipActive: boolean = false;
@@ -51,9 +40,9 @@ export class MobilePlatform {
     this.context = context; this.ended = ended; this.release = release; this.feedback = feedback;
     try { backgroundTaskManager.on('continuousTaskCancel', this.backgroundCancelled); } catch {}
   }
-  async connected(autoLandscape: boolean = true): Promise<void> {
+  async connected(autoLandscape: boolean = false): Promise<void> {
     if (this.active) return;
-    this.waitingForLandscape = autoLandscape && deviceInfo.deviceType === 'phone';
+    this.autoLandscape = autoLandscape;
     this.active = true; const generation = ++this.generation;
     this.muted = false; this.orientation(true);
     this.backgroundQueue = this.backgroundQueue.then(async () => {
@@ -106,7 +95,7 @@ export class MobilePlatform {
   }
   videoSize(width: number, height: number): void { try { this.pip?.updateContentSize(width, height); } catch { /* Not supported on this device. */ } }
   async background(): Promise<void> {
-    this.foreground = false; this.stopOrientationSensor(); this.release(); this.cancelRequests();
+    this.foreground = false; this.release(); this.cancelRequests();
     this.onVisibility(this.pipActive);
     if (!this.active) return;
     const generation = this.generation;
@@ -125,7 +114,7 @@ export class MobilePlatform {
   }
   dispose(): void { this.disconnect(); try { backgroundTaskManager.off('continuousTaskCancel', this.backgroundCancelled); } catch {} }
   disconnect(): void {
-    this.waitingForLandscape = false; this.stopOrientationSensor();
+    this.autoLandscape = false;
     this.active = false; this.choosing = false; this.generation++; this.cancelRequests();
     const pip = this.pip; this.pip = undefined; this.pipActive = false;
     if (pip) { try { pip.setAutoStartEnabled(false); pip.stopPiP().catch(() => {}); } catch { /* Already stopped. */ } }
@@ -134,27 +123,10 @@ export class MobilePlatform {
     });
     this.orientation(false);
   }
-  private stopOrientationSensor(): void {
-    if (!this.observingOrientation) return;
-    this.observingOrientation = false;
-    try { sensor.off(sensor.SensorId.GRAVITY, this.gravityChanged); } catch {}
-  }
-  private startOrientationSensor(): void {
-    if (!this.waitingForLandscape || !this.foreground || this.observingOrientation) return;
-    try {
-      sensor.getSingleSensorSync(sensor.SensorId.GRAVITY);
-      sensor.on(sensor.SensorId.GRAVITY, this.gravityChanged, { interval: 100000000 });
-      this.observingOrientation = true;
-    } catch {
-      // A phone without a usable sensor keeps the previous system-following policy.
-      this.waitingForLandscape = false;
-    }
-  }
   private orientation(session: boolean): void {
     const generation = this.generation;
     const revision = ++this.orientationRevision;
-    // Serialize window requests so an earlier landscape request cannot win after
-    // the sensor has released it or the session has disconnected.
+    // Serialize window requests so the latest policy wins after a lifecycle change.
     this.orientationQueue = this.orientationQueue.then(async () => {
       if (generation !== this.generation || revision !== this.orientationRevision) return;
       try {
@@ -167,10 +139,9 @@ export class MobilePlatform {
         const rect = win.getWindowProperties().windowRect;
         const narrow = Math.min(rect.width, rect.height) / display.getDefaultDisplaySync().densityPixels < 600;
         const fullScreen = win.getWindowStatus() === window.WindowStatusType.FULL_SCREEN;
-        if (!phone || !narrow || !fullScreen) { this.waitingForLandscape = false; this.stopOrientationSensor(); }
-        if (session) this.startOrientationSensor();
         const orientation = !session && phone && narrow && fullScreen ? window.Orientation.PORTRAIT :
-          session && this.waitingForLandscape ? window.Orientation.AUTO_ROTATION_LANDSCAPE : window.Orientation.AUTO_ROTATION;
+          session && this.autoLandscape && phone && narrow && fullScreen ?
+            window.Orientation.AUTO_ROTATION_LANDSCAPE : window.Orientation.AUTO_ROTATION;
         await win.setPreferredOrientation(orientation);
       } catch { /* Window may already be going away. */ }
     });

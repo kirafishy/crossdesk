@@ -840,9 +840,11 @@ private struct ServerSettingsView: View {
                 .pickerStyle(.segmented)
             }
             Section {
-                Toggle("连接后自动横屏", isOn: $session.autoLandscape)
+                Toggle("连接建立后锁定横屏", isOn: $session.autoLandscape)
             } header: {
                 Text("屏幕方向")
+            } footer: {
+                Text("默认关闭。开启后，iPhone 连接时进入并保持横屏；关闭时跟随设备方向。iPad 不受影响。")
             }
             Section {
                 DisclosureGroup(isExpanded: $serverConfigurationExpanded) {

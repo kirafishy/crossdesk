@@ -312,7 +312,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     @Published var videoAdaptationPolicy = VideoAdaptationPolicy.saved {
         didSet { videoAdaptationPolicy.save() }
     }
-    @Published var autoLandscape = UserDefaults.standard.object(forKey: AppOrientation.autoLandscapeKey) as? Bool ?? true {
+    @Published var autoLandscape = UserDefaults.standard.object(forKey: AppOrientation.autoLandscapeKey) as? Bool ?? false {
         didSet { UserDefaults.standard.set(autoLandscape, forKey: AppOrientation.autoLandscapeKey) }
     }
     @Published private(set) var videoSettings = RemoteVideoSettingsState()
@@ -457,7 +457,6 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     func applicationDidEnterBackground() {
         appIsActive = false
-        AppOrientation.suspend()
         appUpdates.setEnabled(false)
         privacyNotice.didEnterBackground()
         suspendVideoForBackground()
