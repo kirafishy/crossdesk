@@ -37,6 +37,7 @@ rule("slint")
 
     before_build_file(function(target, sourcefile, opt)
         import("core.project.depend")
+        import("core.project.project")
         import("core.tools.gcc.parse_deps", {alias = "parse_deps"})
         import("utils.progress")
 
@@ -70,8 +71,46 @@ rule("slint")
             return files
         end
 
-        local depopts = {dependfile = target:dependfile(outputs.header),
-            values = argv, files = dependencies(),
+        local function input_hashes(files)
+            -- Rapid edits can share an mtime with the last generation too.
+            local hashes = {}
+            for _, file in ipairs(files) do
+                if file ~= compiler then
+                    table.insert(hashes, os.isfile(file) and hash.sha256(file) or "missing")
+                end
+            end
+            return hashes
+        end
+
+        local function invalidate_consumers(changed_files)
+            for _, consumer in pairs(project.targets()) do
+                local uses_target = consumer == target
+                for _, dependency in ipairs(consumer:orderdeps()) do
+                    uses_target = uses_target or dependency == target
+                end
+                if uses_target then
+                    for _, dependfile in ipairs(consumer:dependfiles()) do
+                        local info = depend.load(dependfile, {target = consumer})
+                        for _, file in ipairs(info and info.files or {}) do
+                            if changed_files[path.absolute(file)] then
+                                os.tryrm(dependfile)
+                                break
+                            end
+                        end
+                    end
+                    -- Archiving/linking uses the same coarse mtime comparison.
+                    if consumer:targetfile() then
+                        os.tryrm(consumer:dependfile())
+                    end
+                end
+            end
+        end
+
+        local dependfile = target:dependfile(outputs.header)
+        local previous = depend.load(dependfile) or {}
+        local files = dependencies()
+        local depopts = {dependfile = dependfile,
+            values = {argv, input_hashes(files)}, files = files,
             changed = target:is_rebuilt() or missing_output or not os.isfile(depfile)}
         -- Slint preserves timestamps of unchanged outputs. Use the dependency
         -- cache's successful-generation time, not the oldest output's time.
@@ -79,8 +118,24 @@ rule("slint")
             progress.show(opt.progress, "${color.build.object}generating.slint %s", sourcefile)
             os.mkdir(path.directory(outputs.header))
             os.vrunv(compiler, argv)
+            -- Xmake compares mtimes in whole seconds. A generated header can
+            -- change in the same second as a consumer's last compilation, so
+            -- ordering alone cannot prevent mixing incompatible UI bindings.
+            local generated, changed_files = {}, {}
+            for _, file in ipairs(table.join({outputs.header}, outputs.sources)) do
+                local absolute = path.absolute(file)
+                generated[absolute] = hash.sha256(absolute)
+                if generated[absolute] ~= (previous.generated or {})[absolute] then
+                    changed_files[absolute] = true
+                end
+            end
+            if not table.empty(changed_files) then
+                invalidate_consumers(changed_files)
+            end
             -- Save the freshly discovered dependencies on the first build too.
             depopts.files = dependencies()
+            depopts.values = {argv, input_hashes(depopts.files)}
+            return {generated = generated}
         end, depopts)
     end)
 rule_end()
