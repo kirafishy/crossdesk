@@ -431,10 +431,7 @@ private struct ConnectionHomeView: View {
                 Button {
                     presentPasswordPrompt(for: trimmedRemoteID)
                 } label: {
-                    HStack(spacing: 6) {
-                        Text("连接")
-                        Image(systemName: "arrow.right")
-                    }
+                    Text("连接")
                         .font(.system(size: 16, weight: .bold))
                         .frame(width: 96, height: 54)
                         .foregroundStyle(.white)
@@ -701,7 +698,7 @@ private struct RecentConnectionCard: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button(action: connect) {
-                Label("连接", systemImage: "arrow.right.circle")
+                Text("连接")
             }
             Button(role: .destructive, action: delete) {
                 Label("删除记录", systemImage: "trash")
@@ -785,7 +782,7 @@ private struct PasswordPromptView: View {
             }
 
             Button(action: connect) {
-                Label("连接", systemImage: "arrow.right")
+                Text("连接")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)

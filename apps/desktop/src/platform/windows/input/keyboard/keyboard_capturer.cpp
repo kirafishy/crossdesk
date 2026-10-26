@@ -7,6 +7,7 @@
 #include "windows_input_injector.h"
 #include "windows_input_marker.h"
 #include "windows_key_metadata.h"
+#include "windows_text_input.h"
 
 namespace crossdesk {
 namespace {
@@ -393,52 +394,17 @@ int PlatformKeyboardCapturer::SendKeyboardCommand(int key_code, bool is_down,
 }
 
 int PlatformKeyboardCapturer::SendTextCommand(const std::string& text) {
-  if (text.empty() || text.size() > kMaxTextInputBytes ||
-      text.find('\0') != std::string::npos) {
-    return -1;
-  }
-  // Validate the entire UTF-8 commit before injecting any characters.
-  const int byte_count = static_cast<int>(text.size());
-  const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                                         text.data(), byte_count, nullptr, 0);
-  if (length == 0) return -1;
-  std::wstring characters(length, L'\0');
-  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text.data(),
-                          byte_count, characters.data(), length) != length) {
-    return -1;
-  }
-
   std::vector<INPUT> inputs;
-  inputs.reserve(characters.size() * 2);
-  for (size_t index = 0; index < characters.size(); ++index) {
-    const wchar_t character = characters[index];
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.dwExtraInfo = static_cast<ULONG_PTR>(kInjectedKeyboardInputMarker);
-    if (character == L'\r' || character == L'\n' || character == L'\t') {
-      input.ki.wVk = character == L'\t' ? VK_TAB : VK_RETURN;
-      if (character == L'\r' && index + 1 < characters.size() &&
-          characters[index + 1] == L'\n') {
-        ++index;
-      }
-    } else {
-      // VK_PACKET carries UTF-16 units, including both halves of emoji.
-      input.ki.wScan = static_cast<WORD>(character);
-      input.ki.dwFlags = KEYEVENTF_UNICODE;
-    }
-    inputs.push_back(input);
-    input.ki.dwFlags |= KEYEVENTF_KEYUP;
-    inputs.push_back(input);
-  }
+  if (!BuildWindowsTextInputs(text, inputs)) return -1;
 
   // One batch keeps surrogate pairs and key releases together with the text.
   const UINT count = static_cast<UINT>(inputs.size());
-  const UINT sent = SendInputOnUserDesktop(inputs.data(), count);
+  const UINT sent = SendWindowsTextInputs(
+      inputs, [](INPUT* batch, UINT size) {
+        return SendInputOnUserDesktop(batch, size);
+      });
   if (sent != count) {
     const DWORD error = GetLastError();
-    if (sent < count && sent % 2 != 0) {
-      SendInputOnUserDesktop(inputs[sent]);  // Best-effort release.
-    }
     LOG_WARN(
         "SendInput failed for committed text, sent={}, expected={}, err={}",
         sent, count, error);

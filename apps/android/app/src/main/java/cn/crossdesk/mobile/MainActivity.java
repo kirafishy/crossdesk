@@ -218,7 +218,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         remote.setOnFocusChangeListener((view,focused)->{GradientDrawable shape=ui.background(BACKGROUND,12);shape.setStroke(dp(focused?2:1),focused?BLUE:LINE);remote.setBackground(shape);});
         remote.setFilters(new InputFilter[]{new InputFilter.LengthFilter(11)});remote.setText(formatId(preferences.getString("lastRemote","")));
         entry.addView(remote,new LinearLayout.LayoutParams(0,-1,1));
-        TextView connect=ui.primary("连接  →",()->promptConnection(id()));connect.setContentDescription("连接");LinearLayout.LayoutParams buttonParams=ui.size(96,54);buttonParams.leftMargin=dp(10);entry.addView(connect,buttonParams);
+        TextView connect=ui.primary("连接",()->promptConnection(id()));connect.setContentDescription("连接");LinearLayout.LayoutParams buttonParams=ui.size(96,54);buttonParams.leftMargin=dp(10);entry.addView(connect,buttonParams);
         Runnable update=()->{connect.setEnabled(!id().isEmpty());connect.setAlpha(id().isEmpty()?.45f:1);};update.run();
         remote.addTextChangedListener(new TextWatcher(){boolean editing;public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){update.run();}public void afterTextChanged(Editable value){if(editing)return;String formatted=formatId(value.toString());if(!formatted.equals(value.toString())){editing=true;int cursor=remote.getSelectionStart(),digits=value.subSequence(0,Math.max(0,cursor)).toString().replaceAll("[^0-9]","").length();remote.setText(formatted);remote.setSelection(Math.min(formatted.length(),digits+Math.max(0,digits-1)/3));editing=false;}}});
         LinearLayout recent=column();recent.setPadding(dp(16),dp(16),dp(16),dp(16));ui.card(recent,18);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,0,1);p.topMargin=dp(20);content.addView(recent,p);
@@ -295,7 +295,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         View eye=ui.iconButton("eye","显示密码",()->{boolean hidden=password.getTransformationMethod()!=null;password.setTransformationMethod(hidden?null:PasswordTransformationMethod.getInstance());password.setSelection(password.length());});passwordRow.addView(eye,ui.size(44,44));sheet.addView(passwordRow);ui.gap(sheet,18);
         LinearLayout save=row(),saveText=column();saveText.addView(text("保存密码",15,true));ui.gap(saveText,3);TextView security=text("密码将加密保存在本机 Android Keystore 中",11,false);security.setTextColor(SECONDARY);saveText.addView(security);save.addView(saveText,new LinearLayout.LayoutParams(0,-2,1));Switch remember=new Switch(this);remember.setContentDescription("保存密码");save.addView(remember);sheet.addView(save);
         remember.setChecked(rememberDefault);
-        ui.gap(sheet,18);TextView connect=ui.primary("连接  →",()->{
+        ui.gap(sheet,18);TextView connect=ui.primary("连接",()->{
             String secret=password.getText().toString();if(secret.isEmpty()||secret.length()>128||secret.contains("@")){password.setError("请输入有效访问密码");return;}
             rememberPassword=remember.isChecked();password.setText("");dialog.dismiss();begin(id,secret);
         });connect.setContentDescription("确认连接");sheet.addView(connect,ui.size(-1,48));
@@ -331,6 +331,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         controls=new SessionControls(this,ui,new SessionControls.Actions(){
             public void disconnect(){confirmDisconnect();}public void display(){selectDisplay();}public void clipboard(){MainActivity.this.clipboard();}
             public void sendFile(){chooseFile();}public void saveFile(){saveReceivedFile();}public void secureAttention(){MainActivity.this.secureAttention();}
+            public void togglePrivacy(){if(ready&&session!=null)session.togglePrivacy();}
             public void key(int code){tapKey(code);}
             public boolean textEdit(int count,String value){return sendTextEdit(count,value);}
             public void chord(int code,int[] modifiers){if(session==null)return;for(int modifier:modifiers)session.key(modifier,true);tapKey(code);for(int i=modifiers.length-1;i>=0;i--)session.key(modifiers[i],false);}public void shortcut(int code){MainActivity.this.shortcut(code);}public void text(String value){sendText(value);}
@@ -339,6 +340,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             public void videoSettings(int field,int value){RemoteVideoSettings.Values old=MainActivity.this.videoSettings.selection;updateVideoSettings(new RemoteVideoSettings.Values(field==0?value:old.quality,field==1?value:old.frameRate,field==2?value:old.preference));}
         });controls.setRelative(preferences.getBoolean("relativeMouse",true));controls.setMuted(muted);controls.videoSettings(videoSettings);root.addView(controls,new LinearLayout.LayoutParams(-1,-1));getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         controls.attachMouseBar(canvas,new VirtualMouseBar(ui,video.mouseInput));
+        privacyChanged();
         video.remoteFocusChanged=()->{if(controls!=null)controls.resetKeyboardContext();};
         controls.requestApplyInsets();
         video.addOnLayoutChangeListener((view,left,top,right,bottom,oldLeft,oldTop,oldRight,oldBottom)->{
@@ -655,6 +657,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             if(foreground&&preferences.getBoolean("networkConsent",false))remoteVersionCheck.hostInfo(info);
         }
     }
+    @Override public void privacyChanged(){if(controls!=null&&session!=null)controls.privacyScreen(session.privacyScreen);}
     @Override public void videoSize(int width,int height){videoWidth=width;videoHeight=height;if(video!=null)video.videoSize(width,height);if(controls!=null)controls.videoSize(width,height);pictureInPicture.videoSize(width,height);updatePictureInPicture();}
     @Override public void clipboard(String value){remoteClipboard=value;}
     @Override public void statistics(RemoteNetworkStatistics.Snapshot value){if(controls!=null)controls.statistics(value);if(value.fps>0)capturePreviewIfNeeded();}
@@ -782,7 +785,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         super.onPictureInPictureUiStateChanged(state);
         if(android.os.Build.VERSION.SDK_INT>=35&&state.isTransitioningToPip())setPictureInPictureUi(true);
     }
-    @Override protected void onResume(){super.onResume();remoteOrientation.resume();if(!isInPictureInPictureMode())enteredPictureInPicture=false;setPictureInPictureUi(isInPictureInPictureMode());updatePictureInPicture();if(ready&&!canUsePictureInPicture())prepareBackgroundSession(true);if(backgroundSession!=null)requestBackgroundNotifications();}
+    @Override protected void onResume(){super.onResume();privacyChanged();remoteOrientation.resume();if(!isInPictureInPictureMode())enteredPictureInPicture=false;setPictureInPictureUi(isInPictureInPictureMode());updatePictureInPicture();if(ready&&!canUsePictureInPicture())prepareBackgroundSession(true);if(backgroundSession!=null)requestBackgroundNotifications();}
     // onStart marks a new visit; focus/resume callbacks must not reopen a refused notice.
     @Override protected void onPause(){remoteOrientation.pause();releaseKeys();if(controls!=null)controls.cancelMouseInput();if(video!=null)video.releaseMouse();super.onPause();}
     @Override protected void onStart(){super.onStart();foreground=true;restoreBackgroundSession();appUpdates.setEnabled(preferences.getBoolean("networkConsent",false));if(!preferences.getBoolean("networkConsent",false))consent(this::renderSignaling);ensureSignaling();showConnectionMessage();}

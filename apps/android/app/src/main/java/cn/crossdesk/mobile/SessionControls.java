@@ -15,6 +15,7 @@ final class SessionControls extends FrameLayout {
         default boolean textEdit(int deletions,String value){return false;}
         void videoSettings(int field,int value);
         void sendFile(); void saveFile(); void secureAttention();
+        default void togglePrivacy() { }
     }
     private final MobileUi ui;
     private final Actions actions;
@@ -36,6 +37,9 @@ final class SessionControls extends FrameLayout {
         keyboardInsets(height,height>ui.dp(80),0);
     }
     private TextView networkLabel,videoFeedback;
+    private RemotePrivacyScreen privacy=new RemotePrivacyScreen();
+    private View privacyButton;
+    private TextView privacyFeedback,privacyCaption;
     private TextView transferLabel,saveFileButton;
     private String transferStatus="";
     private boolean hasReceivedFile;
@@ -100,12 +104,13 @@ final class SessionControls extends FrameLayout {
     void resetVideoStatistics(){statistics(new RemoteNetworkStatistics.Snapshot(network.report,0,0,0,Double.NaN,network.rtt));}
     void statistics(RemoteNetworkStatistics.Snapshot value){network=value;renderNetwork();}
     void videoSettings(RemoteVideoSettings value){settings=value;renderVideoSettings();}
+    void privacyScreen(RemotePrivacyScreen value){privacy=value;renderPrivacy();}
     void fileStatus(String status,boolean received){transferStatus=status;hasReceivedFile=received;renderFileStatus();}
     private void renderFileStatus(){
         if(transferLabel!=null){transferLabel.setText(transferStatus);transferLabel.setVisibility(transferStatus.isEmpty()?GONE:VISIBLE);}
         if(saveFileButton!=null)saveFileButton.setVisibility(hasReceivedFile?VISIBLE:GONE);
     }
-    private void closeMenu(){if(menu!=null){removeView(menu);menu=null;menuScroll=null;}if(shield!=null){removeView(shield);shield=null;}networkLabel=videoFeedback=transferLabel=saveFileButton=null;trafficCells=null;trafficRows=null;networkDetails=null;encryptionLock=encryptionOpen=null;settingRows.clear();orb.setContentDescription("展开远程控制菜单");positionMouse();}
+    private void closeMenu(){if(menu!=null){removeView(menu);menu=null;menuScroll=null;}if(shield!=null){removeView(shield);shield=null;}networkLabel=videoFeedback=transferLabel=saveFileButton=null;privacyFeedback=privacyCaption=null;privacyButton=null;trafficCells=null;trafficRows=null;networkDetails=null;encryptionLock=encryptionOpen=null;settingRows.clear();orb.setContentDescription("展开远程控制菜单");positionMouse();}
     private void openMenu(String page){
         cancelMouseInput();
         closeMenu();menuPage=page;shield=new View(getContext());shield.setOnClickListener(v->closeMenu());addView(shield,new LayoutParams(-1,-1));
@@ -121,13 +126,15 @@ final class SessionControls extends FrameLayout {
             scroll.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_INSET);body.setPadding(0,0,ui.dp(6),0);
         }
         if(page.equals("controls")){
-            String[] labels={"键盘",mouseVisible?"收起鼠标":"虚拟鼠标",relative?"相对鼠标":"绝对鼠标","显示器","画面设置",muted?"静音":"声音","发送文件","网络状态","Ctrl+Alt+Del","剪贴板"};
-            String[] icons={"keyboard","mouse","mouse","display","sliders","audio","folder","chart","lock","clipboard"};
-            Runnable[] clicks={()->{closeMenu();toggleKeyboard();},this::toggleMouse,actions::mouse,actions::display,()->openMenu("video"),actions::mute,actions::sendFile,()->openMenu("network"),actions::secureAttention,actions::clipboard};
+            String[] labels={"键盘",mouseVisible?"收起鼠标":"虚拟鼠标",relative?"相对鼠标":"绝对鼠标","显示器","画面设置",muted?"静音":"声音","发送文件","网络状态","Ctrl+Alt+Del","剪贴板","隐私屏"};
+            String[] icons={"keyboard","mouse","mouse","display","sliders","audio","folder","chart","lock","clipboard","lock"};
+            Runnable[] clicks={()->{closeMenu();toggleKeyboard();},this::toggleMouse,actions::mouse,actions::display,()->openMenu("video"),actions::mute,actions::sendFile,()->openMenu("network"),actions::secureAttention,actions::clipboard,actions::togglePrivacy};
             menuColumns=controlColumns();
             for(int row=0;row<(labels.length+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int index=row*menuColumns+col;if(index>=labels.length){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));control.addView(ui.icon(icons[index],INK),ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setSingleLine();caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
+                    if(index==10){privacyButton=control;privacyCaption=caption;}
                     LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(control,p);
                 }body.addView(line);if((row+1)*menuColumns<labels.length)ui.gap(body,7);}
+            privacyFeedback=ui.text("",11,false);privacyFeedback.setTextColor(SECONDARY);privacyFeedback.setPadding(0,ui.dp(7),0,0);privacyFeedback.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(privacyFeedback);renderPrivacy();
             ui.gap(body,7);transferLabel=ui.text(transferStatus,11,false);transferLabel.setTextColor(SECONDARY);transferLabel.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(transferLabel);
             saveFileButton=ui.action("保存收到的文件",BLUE,actions::saveFile);body.addView(saveFileButton);renderFileStatus();
         }else if(page.equals("network")){
@@ -140,6 +147,16 @@ final class SessionControls extends FrameLayout {
         ui.gap(menu,9);TextView disconnect=ui.action("断开连接",Color.WHITE,()->{closeMenu();closeKeyboard();actions.disconnect();});disconnect.setMinHeight(ui.dp(34));disconnect.setTextSize(14);disconnect.setBackground(ui.background(RED,8));menu.addView(disconnect,ui.size(-1,34));
         addView(menu,new LayoutParams(panelWidth(getWidth()),panelHeight(getHeight())));orb.bringToFront();orb.setContentDescription("收起远程控制菜单");
         positionMouse();
+    }
+    private void renderPrivacy(){
+        if(privacyButton==null)return;
+        long now=android.os.SystemClock.elapsedRealtime();privacy.tick(now);
+        boolean enabled=privacy.enabled(now);String action=privacy.active()?"关闭隐私屏":"开启隐私屏";
+        privacyCaption.setText(privacy.buttonTitle(now));
+        privacyButton.setSelected(enabled);
+        privacyButton.setContentDescription(action+"，"+privacy.status(now));
+        privacyButton.setEnabled(privacy.canToggle(now));privacyButton.setAlpha(privacyButton.isEnabled()?1f:.45f);
+        String feedback=privacy.feedback(now);privacyFeedback.setText(feedback);privacyFeedback.setVisibility(feedback.isEmpty()?GONE:VISIBLE);
     }
     private final class SettingRow {
         final int field;final int[] values;final SegmentedControl group;

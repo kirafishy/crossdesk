@@ -316,6 +316,9 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         didSet { UserDefaults.standard.set(autoLandscape, forKey: AppOrientation.autoLandscapeKey) }
     }
     @Published private(set) var videoSettings = RemoteVideoSettingsState()
+    @Published var privacyScreen = RemotePrivacyScreen()
+    @Published private(set) var privacyClock = ProcessInfo.processInfo.systemUptime
+    private var privacyTimer: Timer?
     @Published var remoteID = ""
     @Published var password = ""
     @Published private(set) var signalStatus = "等待隐私授权"
@@ -432,6 +435,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     }
 
     deinit {
+        privacyTimer?.invalidate()
         presenceTimer?.invalidate()
         remoteVersionCheckTask?.cancel()
     }
@@ -439,6 +443,8 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     var privacyNoticeVisible: Bool { privacyNotice.isVisible }
 
     func applicationDidBecomeActive() {
+        privacyClock = ProcessInfo.processInfo.systemUptime
+        privacyScreen.tick(at: privacyClock)
         appIsActive = true
         AppOrientation.resume()
         pictureInPicture.didBecomeActive()
@@ -1029,6 +1035,9 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     }
 
     private func resetVideoSettings() {
+        privacyTimer?.invalidate(); privacyTimer = nil
+        privacyScreen = RemotePrivacyScreen()
+        privacyClock = ProcessInfo.processInfo.systemUptime
         videoSettingsTimeoutTask?.cancel()
         videoSettingsTimeoutTask = nil
         videoSettings = RemoteVideoSettingsState(
@@ -1085,6 +1094,35 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         transferStatus = "正在发送 \(url.lastPathComponent)"
         transferProgress = 0
         bridge.sendFile(at: url)
+    }
+
+    private func startPrivacyMonitoring() {
+        guard privacyTimer == nil else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            self.privacyClock = ProcessInfo.processInfo.systemUptime
+            self.privacyScreen.tick(at: self.privacyClock)
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        privacyTimer = timer
+    }
+
+    func togglePrivacyScreen() {
+        guard hasNetworkConsent, isConnected else { return }
+        privacyClock = ProcessInfo.processInfo.systemUptime
+        let enable = !privacyScreen.active
+        guard let request = privacyScreen.begin(at: privacyClock) else { return }
+        bridge.sendPrivacyCommand(enable, blockLocalInput: true, requestID: request)
+    }
+
+    func rtcBridge(_ bridge: CrossDeskRTCBridge, didReceivePrivacyStatus data: Data) {
+        guard isConnected || isConnecting else { return }
+        privacyClock = ProcessInfo.processInfo.systemUptime
+        privacyScreen.receive(data, at: privacyClock)
+    }
+
+    func rtcBridge(_ bridge: CrossDeskRTCBridge, didSendPrivacyRequest requestID: UInt32, success: Bool) {
+        if !success { privacyScreen.failed(request: requestID) }
     }
 
     func sendSecureAttention() {
@@ -1190,6 +1228,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         case 0: connectionStatus = "正在建立远程连接"
         case 1:
             connectionStatus = "已连接"
+            startPrivacyMonitoring()
             sessionVisible = true
             pictureInPicture.beginSession()
             if videoSettings.requestID == 0 { updateVideoSettings() }

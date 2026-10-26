@@ -90,6 +90,8 @@ class CrossDeskServiceHost {
                                              bool extended = false);
   std::string SendSecureDesktopMouseInput(DWORD client_session_id,
                                           int x, int y, int wheel, int flag);
+  std::string SendSecureDesktopTextInput(DWORD client_session_id,
+                                         const std::string& text);
 
   static void WINAPI ServiceMain(DWORD argc, LPWSTR* argv);
   static BOOL WINAPI ConsoleControlHandler(DWORD control_type);
@@ -197,6 +199,8 @@ std::string SendCrossDeskSecureDesktopKeyInput(int key_code, bool is_down,
 std::string SendCrossDeskSecureDesktopMouseInput(int x, int y, int wheel,
                                                  int flag,
                                                  DWORD timeout_ms = 1000);
+std::string SendCrossDeskSecureDesktopTextInput(const std::string& text,
+                                                DWORD timeout_ms = 1000);
 
 }  // namespace crossdesk
 

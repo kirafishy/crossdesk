@@ -23,6 +23,7 @@
 #include "path_manager.h"
 #include "rd_log.h"
 #include "session_helper_shared.h"
+#include "secure_text_input.h"
 #include "unattended_config.h"
 #include "unattended_policy.h"
 #include "rdp_session_handoff.h"
@@ -1421,7 +1422,7 @@ void CrossDeskServiceHost::IpcServerLoop() {
       }
     }
 
-    char buffer[1024] = {0};
+    char buffer[kSecureInputCommandBufferBytes] = {0};
     DWORD bytes_read = 0;
     DWORD transfer_error = ERROR_SUCCESS;
     if (pipe_deadline_detail::Transfer(
@@ -2235,6 +2236,14 @@ void CrossDeskServiceHost::RecordSessionEvent(DWORD event_type,
 std::string CrossDeskServiceHost::HandleIpcCommand(const std::string& command,
                                                  DWORD client_session_id,
                                                  HANDLE client_pipe) {
+  // Password text is case/whitespace sensitive. Parse before normalizing the
+  // legacy command verbs, and never accept the caller's desktop selection.
+  if (command.rfind(kSecureTextInputCommandPrefix, 0) == 0) {
+    SecureTextInputRequest request;
+    if (!ParseSecureTextInputCommand(command, request))
+      return BuildErrorJson("invalid_text_input");
+    return SendSecureDesktopTextInput(client_session_id, request.text);
+  }
   std::string normalized = ToLower(Trim(command));
   if (normalized == kRdpHandoffCommand) {
     bool observed_rdp = false;
@@ -2618,6 +2627,16 @@ std::string CrossDeskServiceHost::SendSecureDesktopMouseInput(
       1000);
 }
 
+std::string CrossDeskServiceHost::SendSecureDesktopTextInput(
+    DWORD client_session_id, const std::string& text) {
+  SecureInputTarget target;
+  const auto error = ResolveSecureInputTarget(client_session_id, target);
+  if (!error.empty()) return error;
+  return QueryNamedPipeMessage(
+      GetCrossDeskSecureInputHelperPipeName(target.session_id),
+      BuildSecureTextInputCommand(text, target.stage, target.desktop), 1000);
+}
+
 bool InstallCrossDeskService(const std::wstring& binary_path) {
   SC_HANDLE manager = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_ALL_ACCESS);
   if (manager == nullptr) {
@@ -2890,6 +2909,11 @@ std::string SendCrossDeskSecureDesktopMouseInput(int x, int y, int wheel,
                                                  int flag, DWORD timeout_ms) {
   return QueryDesktopInput(
       BuildSecureDesktopMouseIpcCommand(x, y, wheel, flag), timeout_ms);
+}
+
+std::string SendCrossDeskSecureDesktopTextInput(const std::string& text,
+                                                DWORD timeout_ms) {
+  return QueryDesktopInput(BuildSecureTextInputCommand(text), timeout_ms);
 }
 
 }  // namespace crossdesk

@@ -664,6 +664,7 @@ function setup_targets()
         target("crossdesk_service")
             set_kind("binary")
             add_packages("nlohmann_json")
+            add_includedirs("libs/wire/include")
             add_deps("rd_log", "path_manager", "windows_unattended_config")
             add_links("Advapi32", "Wtsapi32", "Ole32", "Userenv")
             add_files("apps/desktop/src/platform/windows/service/main.cpp",

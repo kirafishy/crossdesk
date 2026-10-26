@@ -149,7 +149,7 @@ struct Mobile {
           .padding({ left: 14, right: 14 }).onFocus(() => this.idFocused = true).onBlur(() => this.idFocused = false)
           .onChange((value: string) => this.state.remote = this.deviceId(value)).onSubmit(() => this.controller?.requestConnection(this.state.remote))
         Column() {
-          MobilePrimaryButton({ label: '连接', arrow: true, buttonHeight: 54, available: this.state.remote.length > 0,
+          MobilePrimaryButton({ label: '连接', buttonHeight: 54, available: this.state.remote.length > 0,
             action: () => this.controller?.requestConnection(this.state.remote) })
         }.width(96)
       }.width('100%')
@@ -486,7 +486,7 @@ struct Mobile {
           Toggle({ type: ToggleType.Switch, isOn: this.state.remember }).selectedColor(MobileTheme.green)
             .onChange((value: boolean) => this.state.remember = value).accessibilityText('保存密码')
         }.width('100%').margin({ top: 18, bottom: 18 })
-        MobilePrimaryButton({ label: '连接', arrow: true, available: this.state.password.length > 0, action: () => this.controller?.begin(this.state.password) })
+        MobilePrimaryButton({ label: '连接', available: this.state.password.length > 0, action: () => this.controller?.begin(this.state.password) })
       }.padding({ left: 22, right: 22, top: 10, bottom: 22 }).width('100%')
     }.width(this.viewWidth < 600 ? '100%' : Math.min(520, this.viewWidth - 48)).constraintSize({ maxHeight: this.viewHeight * 0.92 })
       .backgroundColor(MobileTheme.background).borderRadius(24).scrollBar(BarState.Off)

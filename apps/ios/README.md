@@ -8,6 +8,17 @@ UPnP discovery and router port mapping are disabled in iOS builds, matching
 Android. Local connections, ICE/STUN hole punching, and TURN UDP/TCP relay
 remain available. The native archive excludes GUPnP and its HTTP/XML dependencies.
 
+## Remote privacy screen
+
+The floating menu includes a **Privacy screen** button that toggles the host's
+local cover directly, without opening a detail page. Its label reports the confirmed
+on/off state without changing colors; normal toggling shows no extra text; errors and unavailable status still appear inline. It supports enabling/disabling
+the local cover, blocks local keyboard/mouse input when enabled like the desktop
+controller, and advertises support
+for the host’s automatic privacy-on-connect setting. Status older than five
+seconds is shown as stale; commands require confirmation within fifteen seconds.
+PiP/background transitions preserve the session state; disconnecting clears it.
+
 ## Background connection and Picture in Picture
 
 An established remote desktop session supports native Picture in Picture (PiP).
@@ -270,15 +281,23 @@ Closing the keyboard, switching keyboards, disconnecting or entering the
 background discards unfinished composition and pending callbacks. Already sent
 text remains on the remote computer.
 
-Direct UTF-8 text requires a host advertising `supports_text_input`. The macOS
-host implements this with native Unicode keyboard events and does not modify
+Direct UTF-8 text requires a host advertising `supports_text_input`. Windows and
+macOS hosts implement this with native Unicode keyboard events and do not modify
 the clipboard. Each replacement is validated before remote Backspace events are
 sent; text is limited to 16 KiB and deletions to 16,384 characters per update.
 Hosts without this capability retain ASCII key input. Unsupported input is
-rejected with an explanation and is not queued for later replay. For Windows,
-Linux or older macOS hosts, copy text from another app and send it with
+rejected with an explanation and is not queued for later replay. For hosts
+without text input support on an ordinary desktop, send text with
 **剪贴板** in the remote session menu, then use the computer keyboard's paste
 shortcut.
+
+This development build forwards complete UTF-8 commits through the Windows
+service on lock screens, sign-in screens and secure desktops. Digits, mixed-case
+letters, punctuation, spaces and non-ASCII characters stay on the text path.
+The Windows client, service and session helper must all be updated; updating
+iOS alone cannot enable this fix. Older Windows hosts may advertise
+`supports_text_input` for ordinary desktops while lacking secure desktop text
+forwarding. Actual password entry still requires validation on updated Windows.
 
 ## App updates
 

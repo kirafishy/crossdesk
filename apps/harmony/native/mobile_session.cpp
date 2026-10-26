@@ -143,7 +143,7 @@ class MobileSession {
       s->Event({{"type", "connection"}, {"status", status}}, true);
       if (status == Connected && !s->connected_) {
         s->connecting_ = false; s->connected_ = true;
-        auto info = MakeHostInformation("CrossDesk HarmonyOS Mobile", {}, false, s->version_, HostPlatform::HarmonyOS);
+        auto info = MakeHostInformation("CrossDesk HarmonyOS Mobile", {}, true, s->version_, HostPlatform::HarmonyOS);
         s->Send(info); FreeRemoteAction(info);
         RemoteAction audio{}; audio.type = audio_capture; audio.a = !s->muted_; s->Send(audio);
         s->audio_.Start();
@@ -328,6 +328,12 @@ class MobileSession {
         auto bytes=mobile_controller::VideoSettingsMessage(q,fps,pref,v.at("request").get<uint32_t>());
         if(SendReliableDataFrame(controller_,bytes.data(),bytes.size(),kControlStream)!=0)
           Event({{"type","settingsFailed"},{"request",v.at("request")}},true);
+      } else if (op=="privacy") {
+        const auto bytes = mobile_controller::PrivacyMessage(
+            v.at("flag").get<int>(), v.at("blockLocalInput").get<bool>());
+        if (bytes.empty() ||
+            SendReliableDataFrame(controller_, bytes.data(), bytes.size(), kControlStream) != 0)
+          Event({{"type", "privacyFailed"}, {"request", v.at("request")}}, true);
       } else if (op=="sas") {
         const auto bytes=mobile_controller::SecureAttentionMessage();
         const bool ok=SendReliableDataFrame(controller_,bytes.data(),bytes.size(),kControlStream)==0;

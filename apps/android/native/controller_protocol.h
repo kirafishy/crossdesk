@@ -10,6 +10,7 @@
 #include "../../../libs/controller/include/mobile_controller_protocol.h"
 namespace crossdesk::android_controller {
 using mobile_controller::SecureAttentionMessage;
+using mobile_controller::PrivacyMessage;
 using mobile_controller::VideoSettingsMessage;
 using mobile_controller::NetworkReport;
 }

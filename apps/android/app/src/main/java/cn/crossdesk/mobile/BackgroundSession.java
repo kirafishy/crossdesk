@@ -80,6 +80,7 @@ final class BackgroundSession implements NativeSession.Listener {
         if (view != null) view.fileTransfer(name, progress, sending, received);
     }
     @Override public void controlFeedback(String text) { if (view != null) view.controlFeedback(text); }
+    @Override public void privacyChanged() { if (view != null) view.privacyChanged(); }
     @Override public void presence(JSONObject message) { if (view != null) view.presence(message); }
     @Override public void announcement(JSONObject message) { if (view != null) view.announcement(message); }
     @Override public void announcementFailed(String id) { if (view != null) view.announcementFailed(id); }

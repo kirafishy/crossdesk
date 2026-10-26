@@ -133,9 +133,10 @@ export struct MobileRemoteView {
     if (index === 7) this.menu = 'network';
     if (index === 8) this.controller?.sas();
     if (index === 9) { this.state.modal = 'clipboard'; this.menu = ''; }
+    if (index === 10) this.controller?.togglePrivacy();
   }
-  private labels(): string[] { return ['键盘', this.state.relative ? '相对鼠标' : '绝对鼠标', this.mouseVisible ? '收起鼠标' : '虚拟鼠标', '显示器', '画面设置', this.state.muted ? '静音' : '声音', '发送文件', '网络状态', 'Ctrl+Alt+Del', '剪贴板']; }
-  private icons(): string[] { return ['keyboard', 'mouse', 'mouse', 'display', 'sliders', this.state.muted ? 'muted' : 'audio', 'folder', 'chart', 'lock', 'clipboard']; }
+  private labels(): string[] { return ['键盘', this.state.relative ? '相对鼠标' : '绝对鼠标', this.mouseVisible ? '收起鼠标' : '虚拟鼠标', '显示器', '画面设置', this.state.muted ? '静音' : '声音', '发送文件', '网络状态', 'Ctrl+Alt+Del', '剪贴板', this.state.privacyButtonTitle]; }
+  private icons(): string[] { return ['keyboard', 'mouse', 'mouse', 'display', 'sliders', this.state.muted ? 'muted' : 'audio', 'folder', 'chart', 'lock', 'clipboard', 'lock']; }
   private columns(): number { return this.viewHeight < 400 && this.viewWidth >= 400 ? 4 : 3; }
   private menuWidth(): number { return Math.max(1, Math.min(this.viewWidth - 16, this.columns() === 4 ? 380 : Math.max(280, Math.min(340, this.viewWidth - 160)))); }
   private menuX(): number { return clamp(this.orbX > this.viewWidth / 2 ? this.orbX - this.menuWidth() - 12 : this.orbX + 66, 8, this.viewWidth - this.menuWidth() - 8); }
@@ -212,12 +213,20 @@ export struct MobileRemoteView {
             GridRow({ columns: this.columns(), gutter: 7 }) {
               ForEach(this.labels(), (label: string, index: number) => {
                 GridCol() {
-                  Column({ space: 4 }) { MobileIcon({ name: this.icons()[index], iconExtent: 19 }); Text(label).fontSize(10).fontColor(MobileTheme.ink).maxLines(1) }
-                    .height(52).width('100%').justifyContent(FlexAlign.Center).backgroundColor('#F0F0F2').borderRadius(10)
-                    .accessibilityText(label).accessibilityLevel('yes').onClick(() => this.action(index))
+                  Column({ space: 4 }) {
+                    MobileIcon({ name: this.icons()[index], iconExtent: 19 })
+                    Text(label).fontSize(10).fontColor(MobileTheme.ink).maxLines(1)
+                  }
+                    .height(52).width('100%').justifyContent(FlexAlign.Center)
+                    .backgroundColor('#F0F0F2').borderRadius(10)
+                    .enabled(index !== 10 || this.state.ready && this.state.privacyCanToggle)
+                    .opacity(index === 10 && (!this.state.ready || !this.state.privacyCanToggle) ? 0.45 : 1)
+                    .accessibilitySelected(index === 10 && this.state.privacyEnabled)
+                    .accessibilityText(index === 10 ? `${label}，${this.state.privacyStatus}` : label).accessibilityLevel('yes').onClick(() => this.action(index))
                 }
               }, (label: string) => label)
             }
+            if (this.state.privacyFeedback) { Text(this.state.privacyFeedback).fontSize(11).fontColor(MobileTheme.secondary).width('100%') }
             if (this.state.transfer) { Text(this.state.transfer).fontSize(11).fontColor(MobileTheme.secondary).width('100%') }
             if (this.state.receivedPath) { Button('保存收到的文件', { type: ButtonType.Normal }).fontSize(14).fontColor(MobileTheme.blue).backgroundColor(Color.White).height(42).width('100%').onClick(() => this.controller?.saveFile()) }
           } else if (this.menu === 'video') {

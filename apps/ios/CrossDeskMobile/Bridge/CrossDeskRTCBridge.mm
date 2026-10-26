@@ -1043,6 +1043,30 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
   });
 }
 
+- (void)sendPrivacyCommand:(BOOL)enable
+           blockLocalInput:(BOOL)blockLocalInput
+                 requestID:(uint32_t)requestID {
+  const uint64_t generation = _activeControllerGeneration.load();
+  dispatch_async(_rtcQueue, ^{
+    if (![self isControllerGenerationActive:generation]) return;
+    RemoteAction action{};
+    action.type = ControlType::privacy_command;
+    action.pc = {enable ? crossdesk::PrivacyCommandFlag::enable
+                        : crossdesk::PrivacyCommandFlag::disable,
+                 static_cast<bool>(blockLocalInput)};
+    const auto message = action.to_json();
+    const BOOL success = self->_state->controller_peer &&
+        SendReliableDataFrame(self->_state->controller_peer, message.data(),
+                              message.size(), kControlStream) == 0;
+    DispatchMain(^{
+      if (![self isControllerGenerationActive:generation]) return;
+      id<CrossDeskRTCBridgeDelegate> delegate = self.delegate;
+      if ([delegate respondsToSelector:@selector(rtcBridge:didSendPrivacyRequest:success:)])
+        [delegate rtcBridge:self didSendPrivacyRequest:requestID success:success];
+    });
+  });
+}
+
 - (void)sendSecureAttentionSequence {
   const uint64_t generation = _activeControllerGeneration.load();
   dispatch_async(_rtcQueue, ^{
@@ -1409,6 +1433,7 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
       RemoteAction action{};
       action.type = ControlType::host_infomation;
       action.i.platform = crossdesk::HostPlatform::IOS;
+      action.i.supports_privacy_screen = true;
       CopyCString(action.i.host_name, sizeof(action.i.host_name),
                   controller_name);
       action.i.host_name_size = std::strlen(action.i.host_name);
@@ -1694,6 +1719,17 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
   if (source == kControlStream) {
     RemoteAction action{};
     if (!action.from_json(std::string(data, size))) return;
+    if (action.type == ControlType::privacy_status) {
+      const auto message = action.to_json();
+      NSData *status = [NSData dataWithBytes:message.data() length:message.size()];
+      DispatchMain(^{
+        if (![self isControllerGenerationActive:generation]) return;
+        id<CrossDeskRTCBridgeDelegate> delegate = self.delegate;
+        if ([delegate respondsToSelector:@selector(rtcBridge:didReceivePrivacyStatus:)])
+          [delegate rtcBridge:self didReceivePrivacyStatus:status];
+      });
+      return;
+    }
     if (action.type == ControlType::video_settings_status) {
       [self notifyVideoSettings:action.vs generation:generation];
       return;

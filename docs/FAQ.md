@@ -32,6 +32,16 @@ Wayland 画面捕获依赖启用了 Wayland 支持的构建、宿主系统 PipeW
 
 在被控电脑检查 CrossDesk Service 是否安装、是否运行，并保持 CrossDesk 客户端运行。便携版可在“设置 → 锁屏控制服务”安装。服务状态检查命令见 [Windows 服务说明](../README.md#windows-service)。
 
+“断开连接后自动锁屏”可用不代表锁屏控制服务可用：锁屏由客户端调用系统功能，输入登录密码则需要服务。若 Android 手机能看到登录界面但输入法无法输入，可在远程键盘中切换到 **电脑键盘**，对比数字、字母与回车是否有效；反馈时注明两端版本、安装版或便携版，以及两种键盘的表现。
+
+若电脑键盘可用，而搜狗等系统输入法不可用，请确认被控端已安装包含文本转发修复的新 Windows 构建，并一并更新客户端、服务与会话辅助程序。旧版的按键转发与输入法文本转发是不同通道，仅更新手机端不会修复旧 Windows 的文本通道。本次修复转发完整文本，保留大小写、符号、空格及中文等字符，不限于数字密码；仍需在更新后的 Windows 锁屏、登录界面验证。
+
+## 移动端连接后没有进入隐私屏
+
+Android、iOS 和鸿蒙原生移动端可直接点击悬浮菜单的隐私屏按钮切换，按钮按电脑确认的状态显示“隐私屏已开启”或“隐私屏已关闭”，开启与关闭使用相同配色，无需进入详情页；开启时与桌面端一致屏蔽电脑本地键鼠，不提供独立屏蔽选项。自动开启还需要电脑勾选“被连接时开启隐私屏”，且电脑当前桌面支持遮罩；锁屏、登录界面或无人值守被控端不提供隐私遮罩。
+
+v1.7.3-1 的 Android 端尚未实现上述控制能力，需要使用包含该功能的新构建。若一直等待状态，请检查电脑端版本；若显示不可用或失败，请查看控制栏内的电脑返回原因。当前 PC 策略要求所有已连接控制端均支持隐私屏，旧版或 Web 控制端同时在线时仍会阻止开启。“断开连接后自动锁屏”是独立功能。Windows 被控端仍可通过 Ctrl+Alt+Shift+F12 应急恢复本地显示与输入。
+
 ## 被控 Windows 电脑没有接显示器
 
 没有显示器时，Windows 会把桌面放在一个分辨率固定的虚拟目标上，GPU 采集路径不可用。CrossDesk 会先尝试插入内置的 usbmmidd 虚拟显示器（见下一节）；无法插入时自动进入**无屏兼容模式**：用 GDI 采集，分辨率由系统决定（常见为 1024×768），帧率和画质低于正常模式，被控端日志会记录进入兼容模式的原因。键鼠控制、隐私屏、文件传输不受影响。
@@ -90,6 +100,8 @@ Windows 安装包和便携包内置了 Amyuni 的 `usbmmidd_v2` 虚拟显示器�
 | No capture on Linux Wayland | Check the Wayland build option, host PipeWire 0.3, and desktop portal permission. Compare with an X11 session. See [Linux build instructions](BUILD_EN.md#linux). |
 | Linux host has no monitor or graphical session | Start CrossDesk normally to automatically discover and select your existing desktop, preserving its Dock and apps; no display number is needed. A bare Xvfb shows only CrossDesk on a black background; use an existing session or install Xfce and specify `--headless-session startxfce4`. See [Linux headless operation](HEADLESS_EN.md). |
 | Cannot control a Windows lock screen | Install/start CrossDesk Service and keep the host client running. See [service commands](../README_EN.md#windows-service). |
+| Android can connect but cannot type a Windows login password | Locking on disconnect does not verify service availability. Check CrossDesk Service, then compare the phone IME with **Computer keyboard** in the remote keyboard panel. Include both client versions, installer/portable edition, and both keyboard results in the report. |
+| Privacy screen does not activate for a mobile connection | Toggle **Privacy screen** directly in the native Android, iOS or HarmonyOS floating menu. The button labels the host-confirmed on/off state without changing colors; normal toggling shows no extra text; errors and unavailable status still appear inline. Android v1.7.3-1 lacks this feature; use a build containing it. Automatic activation also needs the host setting and a supported unlocked desktop. The current host policy requires every connected controller to support privacy; older or Web controllers can prevent activation. Locking on disconnect is independent. |
 | Windows host has no monitor attached | The Windows installer and portable archive bundle Amyuni's `usbmmidd_v2` virtual display driver (in the `usbmmidd_v2` folder with its License.txt). On each connection to a host without a monitor (capture method Auto), CrossDesk starts streaming in compatibility mode and, in the background, asks the CrossDesk Service session helper to install the Microsoft-signed driver (first time only) and plug one virtual monitor at 1920×1080; capture then switches to DXGI/WGC on that monitor and it is unplugged when the session ends. Without the service only an elevated CrossDesk can plug it itself; otherwise the host stays in **headless compatibility mode**: GDI capture at an OS-fixed resolution (often 1024×768) with reduced frame rate; the host log records why. Input, privacy screen and file transfer still work. A real monitor or an HDMI/DP dummy plug also restores GPU capture. |
 | Removing the bundled virtual display driver | The uninstaller removes the driver when CrossDesk installed it and leaves a driver you installed yourself. For the portable build run `deviceinstaller64 enableidd 0`, `deviceinstaller64 stop usbmmidd` and `deviceinstaller64 remove usbmmidd` as administrator from the `usbmmidd_v2` folder, or uninstall "USB Mobile Monitor Virtual Display" in Device Manager. |
 | Saved password no longer works | Use 6 ASCII letters or digits when changing the password, with the host connected to the server. Wait for the change and reconnection to complete, then copy the current password and enter it on the controller. |

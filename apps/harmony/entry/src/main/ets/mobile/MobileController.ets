@@ -1,3 +1,4 @@
+import { RemotePrivacyScreen, PrivacyStatus } from './RemotePrivacyScreen';
 import bridge from 'libcrossdesk.so';
 import { common, bundleManager } from '@kit.AbilityKit';
 import { display, promptAction } from '@kit.ArkUI';
@@ -13,7 +14,7 @@ interface Command {
   logs?: string; certificates?: string; directory?: string; previewDirectory?: string; remote?: string; password?: string; version?: string;
   id?: string; x?: number; y?: number; flag?: number; scroll?: number; code?: number; down?: boolean;
   index?: number; muted?: boolean; visible?: boolean; text?: string; message?: Object; quality?: number; frameRate?: number;
-  preference?: number; request?: number; path?: string; name?: string; body?: string; local?: boolean;
+  preference?: number; blockLocalInput?: boolean; request?: number; path?: string; name?: string; body?: string; local?: boolean;
 }
 interface NativeEvent {
   type: string; session: number; connection?: number; status?: number; controller?: boolean; generation?: number;
@@ -25,7 +26,7 @@ export interface RemoteDisplay { name: string; }
 interface HostInfo { host_name: string; platform: string; app_version: string; supports_video_settings: boolean; displays: RemoteDisplay[]; }
 interface SettingAck { quality: number; frame_rate: number; preference: number; request_id: number; accepted: boolean; }
 interface ServiceStatus { available: boolean; }
-interface ControlData { type: number; host_info?: HostInfo; video_settings?: SettingAck; service_status?: ServiceStatus; }
+interface ControlData { type: number; host_info?: HostInfo; video_settings?: SettingAck; service_status?: ServiceStatus; privacy_status?: PrivacyStatus; }
 interface PresenceRequest { type: string; devices: string[]; subscribe: boolean; }
 interface SignalType { type: string; }
 
@@ -73,6 +74,12 @@ export class MobileState {
   videoSelectedPreference: number = 1;
   videoSupported: boolean = false;
   videoFeedback: string = '';
+  privacyStatus: string = '';
+  privacyButtonTitle: string = '隐私屏';
+  privacyFeedback: string = '';
+  privacyEnabled: boolean = false;
+  privacyActive: boolean = false;
+  privacyCanToggle: boolean = false;
   networkTime: number = 0;
   unread: number = 0;
   announcements: AnnouncementItem[] = [];
@@ -86,6 +93,7 @@ export class MobileController {
   store: MobileStore;
   platform: MobilePlatform;
   video: VideoSettings = new VideoSettings();
+  private privacyScreen: RemotePrivacyScreen = new RemotePrivacyScreen();
   network: NetworkStatistics = new NetworkStatistics();
   presence: RecentPresence;
   inbox: AnnouncementInbox;
@@ -159,7 +167,7 @@ export class MobileController {
     this.state.update = ''; this.state.updateStatus = ''; this.state.page = 'home'; this.state.modal = 'consent';
   }
   resume(): void {
-    this.foreground = true; this.platform.resume();
+    this.foreground = true; this.platform.resume(); this.syncPrivacy();
     if (this.state.consent) { this.ensureSignal(); this.checkLocal(); this.inbox.connect(this.state.signal === 1); }
     else this.state.modal = 'consent';
   }
@@ -236,6 +244,7 @@ export class MobileController {
     this.network = new NetworkStatistics(); let edge = 1920;
     try { const screen = display.getDefaultDisplaySync(); edge = Math.max(screen.width, screen.height); } catch {}
     this.video = new VideoSettings(this.state.videoPreference, edge); this.syncVideo();
+    this.privacyScreen = new RemotePrivacyScreen(); this.syncPrivacy();
     this.store.put('lastRemote', this.state.remote); this.state.password = '';
     this.ensureSignal(); this.joinIfReady();
   }
@@ -247,6 +256,7 @@ export class MobileController {
   end(reason: string): void {
     this.release(); this.send({ op: 'disconnect' }); this.platform.disconnect();
     this.connection++; this.uiEpoch++; this.pendingPassword = ''; this.joinSent = false; this.sendingFile = false;
+    this.privacyScreen = new RemotePrivacyScreen(); this.syncPrivacy();
     this.state.connecting = this.state.ready = false; this.state.page = 'home'; this.state.modal = ''; this.state.password = '';
     this.state.receivedPath = this.state.receivedName = this.state.remoteClipboard = this.state.clipboardText = ''; this.remoteVersionRequest = 0;
     if (this.settingsTimeout >= 0) clearTimeout(this.settingsTimeout); this.settingsTimeout = -1;
@@ -339,6 +349,21 @@ export class MobileController {
       this.state.documentTitle = title; this.state.documentBack = back; this.state.page = 'document'; this.state.modal = '';
     } catch { this.toast('无法读取文档'); }
   }
+  togglePrivacy(): void {
+    if (!this.state.ready || !this.state.consent) return;
+    const enable = !this.privacyScreen.active(), request = this.privacyScreen.begin(this.now());
+    if (request < 0) return;
+    this.send({ op: 'privacy', flag: enable ? 1 : 2, request: request,
+      blockLocalInput: true });
+    this.syncPrivacy();
+  }
+  private syncPrivacy(): void {
+    const now = this.now(); this.privacyScreen.tick(now);
+    this.state.privacyStatus = this.privacyScreen.status(now); this.state.privacyFeedback = this.privacyScreen.feedback(now);
+    this.state.privacyButtonTitle = this.privacyScreen.buttonTitle(now);
+    this.state.privacyEnabled = this.privacyScreen.enabled(now);
+    this.state.privacyActive = this.privacyScreen.active(); this.state.privacyCanToggle = this.privacyScreen.canToggle(now);
+  }
   private syncVideo(): void {
     this.state.videoQuality = this.video.selection.quality; this.state.videoRate = this.video.selection.frameRate;
     this.state.videoSelectedPreference = this.video.selection.preference; this.state.videoSupported = this.video.supported;
@@ -348,6 +373,7 @@ export class MobileController {
     try { const events = JSON.parse(bridge.mobilePoll()) as NativeEvent[]; events.forEach((event: NativeEvent) => this.event(event)); }
     catch { this.state.signalText = '原生通信库不可用，请重新构建并安装'; }
     if (++this.seconds % 20 === 0) {
+      if (this.state.ready) this.syncPrivacy();
       this.state.networkTime = this.now(); this.presence.tick(this.state.networkTime); this.history();
     }
   }
@@ -395,7 +421,8 @@ export class MobileController {
       if (e.sending && ((e.progress ?? 0) < 0 || (e.progress ?? 0) >= 1)) this.sendingFile = false;
       this.state.transfer = (e.progress ?? 0) < 0 ? `${e.name} 传输失败` : `${e.sending ? '发送' : '接收'} ${e.name} · ${(e.progress ?? 0) >= 1 ? '已完成' : Math.floor((e.progress ?? 0) * 100) + '%'}`;
       if (e.path) { this.state.receivedPath = e.path; this.state.receivedName = e.name ?? 'received-file'; }
-    } else if (e.type === 'settingsFailed') { this.video.expire(Number(e.request)); this.syncVideo(); }
+    } else if (e.type === 'privacyFailed') { this.privacyScreen.failed(Number(e.request)); this.syncPrivacy(); }
+    else if (e.type === 'settingsFailed') { this.video.expire(Number(e.request)); this.syncVideo(); }
     else if (e.type === 'preview') {
       this.previewPending = false;
       if (e.ok && e.path && this.previewEligible && this.state.previews) {
@@ -435,6 +462,7 @@ export class MobileController {
     if (this.receivedHostInfo) this.checkRemote(this.remoteVersion);
   }
   private data(message: ControlData): void {
+    if (message.type === 10 && message.privacy_status) { this.privacyScreen.receive(message.privacy_status, this.now()); this.syncPrivacy(); return; }
     if (message.type === 5) { this.serviceAvailable = message.service_status?.available === true; return; }
     if (message.type === 12 && message.video_settings) {
       const v = message.video_settings;

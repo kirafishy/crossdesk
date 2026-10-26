@@ -370,7 +370,7 @@ extern "C" JNIEXPORT jboolean JNICALL JNI_METHOD(nConnect)(
 }
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nReady)(JNIEnv*, jclass, jlong handle) {
   auto* s = From(handle); if (!s || !s->controller) return;
-  auto action = MakeHostInformation("CrossDesk Android", {}, false, "1.6.0", HostPlatform::Android);
+  auto action = MakeHostInformation("CrossDesk Android", {}, true, "1.6.0", HostPlatform::Android);
   s->Send(kControlStream, action.to_json()); FreeRemoteAction(action);
 }
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nPointer)(
@@ -428,6 +428,14 @@ extern "C" JNIEXPORT jboolean JNICALL JNI_METHOD(nSecureAttention)(JNIEnv*, jcla
   if (!s || !s->controller || s->stopping) return false;
   const auto data = android_controller::SecureAttentionMessage();
   return SendReliableDataFrame(s->controller, data.data(), data.size(), kControlStream) == 0;
+}
+extern "C" JNIEXPORT jboolean JNICALL JNI_METHOD(nPrivacy)(
+    JNIEnv*, jclass, jlong handle, jint flag, jboolean block_input) {
+  auto* s = From(handle);
+  if (!s || !s->controller || s->stopping) return false;
+  const auto data = android_controller::PrivacyMessage(flag, block_input);
+  return !data.empty() &&
+      SendReliableDataFrame(s->controller, data.data(), data.size(), kControlStream) == 0;
 }
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nFileDirectory)(JNIEnv* env, jclass, jlong handle, jstring directory) {
   auto* s = From(handle); if (s) s->files.SetDirectory(String(env, directory));

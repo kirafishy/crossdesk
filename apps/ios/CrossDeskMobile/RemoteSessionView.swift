@@ -1250,8 +1250,24 @@ private struct FloatingSessionMenu: View {
                                           action: session.sendSecureAttention)
                     FloatingControlButton(title: "剪贴板", symbol: "doc.on.clipboard",
                                           action: session.sendClipboard)
+                    FloatingControlButton(
+                        title: session.privacyScreen.buttonTitle(at: session.privacyClock),
+                        symbol: "eye.slash",
+                        selected: session.privacyScreen.enabled(at: session.privacyClock),
+                        action: session.togglePrivacyScreen
+                    )
+                    .disabled(!session.isConnected || !session.privacyScreen.canToggle(at: session.privacyClock))
+                    .opacity(session.isConnected && session.privacyScreen.canToggle(at: session.privacyClock) ? 1 : 0.45)
+                    .accessibilityLabel("隐私屏")
+                    .accessibilityValue(session.privacyScreen.status(at: session.privacyClock))
+                    .accessibilityHint(session.privacyScreen.active ? "关闭隐私屏" : "开启隐私屏")
                 }
 
+                let privacyFeedback = session.privacyScreen.feedback(at: session.privacyClock)
+                if !privacyFeedback.isEmpty {
+                    Text(privacyFeedback).font(.caption2).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if !session.controlStatus.isEmpty {
                     Text(session.controlStatus).font(.caption2).foregroundStyle(.secondary)
                 }
@@ -1435,6 +1451,7 @@ private struct FloatingVideoSettings: View {
 private struct FloatingControlButton: View {
     let title: String
     let symbol: String
+    var selected = false
     let action: () -> Void
 
     var body: some View {
@@ -1442,6 +1459,7 @@ private struct FloatingControlButton: View {
             FloatingControlLabel(title: title, symbol: symbol)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

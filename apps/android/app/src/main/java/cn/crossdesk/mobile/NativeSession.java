@@ -30,6 +30,7 @@ final class NativeSession implements AutoCloseable {
         void statistics(RemoteNetworkStatistics.Snapshot value);
         default void fileTransfer(String name,double progress,boolean sending,File received) { }
         default void controlFeedback(String message) { }
+        default void privacyChanged() { }
         default void signaling(int state, String deviceId) { }
         default void presence(JSONObject message) { }
         default void announcement(JSONObject message) { }
@@ -49,6 +50,7 @@ final class NativeSession implements AutoCloseable {
     private long handle;
     private boolean signalReady, joining, started;
     private volatile boolean connected, supportsTextInput;
+    final RemotePrivacyScreen privacyScreen = new RemotePrivacyScreen();
     private int signalState;
     private volatile long signalGeneration;
     private boolean presenceRequested;
@@ -63,6 +65,8 @@ final class NativeSession implements AutoCloseable {
     private final RemoteNetworkStatistics networkStatistics=new RemoteNetworkStatistics();
     private final Runnable statisticsTick=new Runnable(){public void run(){
         if(closed)return;
+        privacyScreen.tick(android.os.SystemClock.elapsedRealtime());
+        listener.privacyChanged();
         listener.statistics(networkStatistics.snapshot(RemoteNetworkStatistics.now()));
         if(!closed)main.postDelayed(this,1000);
     }};
@@ -193,7 +197,13 @@ final class NativeSession implements AutoCloseable {
                 } else if (type == 4) {
                     JSONObject info=event.optJSONObject("host_info");
                     if(info!=null)supportsTextInput=info.optBoolean("supports_text_input",false);
-                    ui(() -> listener.data(event));
+                    ui(() -> {
+                        if(event.optInt("type",-1)==10){
+                            privacyScreen.receive(event,android.os.SystemClock.elapsedRealtime());
+                            listener.privacyChanged();
+                        }
+                        listener.data(event);
+                    });
                 }
                 else if (type == 5) {
                     int width = event.getInt("width"), height = event.getInt("height");
@@ -266,6 +276,16 @@ final class NativeSession implements AutoCloseable {
         if (type == 2 && player != null) player.setEnabled(value != 0);
         execute(() -> { if (connected){nControl(handle, type, value);if(type==4)networkStatistics.resetVideo();} });
     }
+    void togglePrivacy() {
+        if(closed||!connected)return;
+        boolean enable=!privacyScreen.active();
+        long request=privacyScreen.begin(android.os.SystemClock.elapsedRealtime());
+        if(request<0)return;
+        listener.privacyChanged();
+        execute(()->{if(connected&&!nPrivacy(handle,enable?1:2,true))ui(()->{
+            privacyScreen.failed(request);listener.privacyChanged();
+        });});
+    }
     void clipboard(String value) {
         byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
         if (bytes.length == 0 || bytes.length > 128 * 1024) return;
@@ -319,6 +339,7 @@ final class NativeSession implements AutoCloseable {
     private static native boolean nPresenceRequest(long handle,byte[] data);
     private static native void nClipboard(long handle, byte[] data);
     private static native boolean nSecureAttention(long handle);
+    private static native boolean nPrivacy(long handle,int flag,boolean blockLocalInput);
     private static native void nFileDirectory(long handle,String directory);
     private static native boolean nSendFile(long handle,String path,byte[] name);
     private static native boolean nPumpFiles(long handle);

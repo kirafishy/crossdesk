@@ -21,6 +21,8 @@
 #include "interactive_desktop.h"
 #include "service_host.h"
 #include "unattended_config.h"
+#include "platform/windows/input/windows_input_injector.h"
+#include "platform/windows/input/windows_text_input.h"
 #endif
 
 namespace crossdesk {
@@ -275,11 +277,51 @@ InputOutcome KeyboardController::ApplyRemoteText(const std::string& remote_id,
   std::lock_guard input_lock(remote_input_mutex_);
   if (!owner_.IsAuthorizedController(remote_id)) return InputOutcome::ignored;
   if (!owner_.devices_.SupportsTextInput()) return InputOutcome::failed;
+#if _WIN32
+  std::vector<INPUT> inputs;
+  if (!BuildWindowsTextInputs(text, inputs)) return InputOutcome::failed;
+  if (owner_.privacy_.Engaged() && !IsWindowsPrivacyDesktopAvailable())
+    owner_.privacy_.SuspendForDesktop();
+  static const bool process_elevated = IsAdministratorProcess();
+  const bool injected = DispatchDesktopInput(
+      [&] {
+        return PreferUserDesktopInput(IsCurrentSessionUserDesktopActive(),
+                                      owner_.windows_consent_ui_.load(),
+                                      owner_.local_service_available_.load(),
+                                      process_elevated);
+      },
+      [&] {
+        const UINT sent = SendWindowsTextInputs(
+            inputs, [](INPUT* batch, UINT count) {
+              return SendInputOnUserDesktop(batch, count);
+            });
+        const DWORD error = GetLastError();
+        const bool blocked =
+            error == ERROR_ACCESS_DENIED || error == ERROR_GEN_FAILURE;
+        // A text commit is a batch: only zero insertion permits a retry.
+        return DesktopInputResult{
+            sent == inputs.size(),
+            sent == 0 && (IsDesktopTransitionInputError(error) || blocked),
+            sent == 0 && blocked};
+      },
+      [&]() -> DesktopInputResult {
+        const auto response = SendCrossDeskSecureDesktopTextInput(text, 1000);
+        const auto json = nlohmann::json::parse(response, nullptr, false);
+        if (json.is_object() && json.value("ok", false)) return {true, false};
+        const std::string error =
+            json.is_object() ? json.value("error", "") : "invalid_response";
+        // No text or raw reply in diagnostics; commits may be passwords.
+        LOG_WARN("Secure desktop text injection failed: error={}", error);
+        return {false, IsDesktopInputSetupPending(error)};
+      });
+  return injected ? InputOutcome::applied : InputOutcome::failed;
+#else
   if (!owner_.devices_.SendTextCommand(text)) {
     LOG_WARN("Failed to inject committed remote text");
     return InputOutcome::failed;
   }
   return InputOutcome::applied;
+#endif
 }
 
 InputOutcome KeyboardController::ApplyRemoteState(const std::string& remote_id,

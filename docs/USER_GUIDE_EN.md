@@ -212,7 +212,7 @@ The Android client supports Android 8.0+ arm64 phones and tablets. Install the s
 3. Open the floating menu to switch displays, adjust video quality and frame rate, use the virtual mouse, send and receive files, inspect network statistics, and send clipboard text. Use the save action to export received files.
 4. When switching apps, an active session uses system Picture in Picture when available, with a foreground service and notification as a fallback. Closing the Picture in Picture window or failing to start background session support ends the session.
 
-H.264 / AV1 use MediaCodec hardware decoding when available, with software fallback when unsupported or when decoding fails. Results depend on the device. Android does not currently support phone-as-host or privacy screens.
+H.264 / AV1 use MediaCodec hardware decoding when available, with software fallback when unsupported or when decoding fails. Results depend on the device. Android does not currently support phone-as-host. The floating menu’s **Privacy screen** button toggles the computer’s local cover directly, labels the host-confirmed on/off state without changing colors, and shows inline feedback only for errors or unavailable status. Enabling privacy also blocks local keyboard/mouse input, matching the desktop controller.
 
 <a id="harmonyos"></a>
 

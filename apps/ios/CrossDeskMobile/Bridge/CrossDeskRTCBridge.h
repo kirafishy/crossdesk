@@ -124,6 +124,10 @@ typedef struct {
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge
     didSendSecureAttention:(BOOL)success;
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge
+    didReceivePrivacyStatus:(NSData *)data;
+- (void)rtcBridge:(CrossDeskRTCBridge *)bridge
+    didSendPrivacyRequest:(uint32_t)requestID success:(BOOL)success;
+- (void)rtcBridge:(CrossDeskRTCBridge *)bridge
     didUpdateFileTransfer:(NSString *)fileName
                  progress:(double)progress
                   sending:(BOOL)sending;
@@ -186,6 +190,9 @@ typedef struct {
 - (void)sendClipboardText:(NSString *)text;
 - (void)sendFileAtURL:(NSURL *)fileURL;
 - (void)sendSecureAttentionSequence;
+- (void)sendPrivacyCommand:(BOOL)enable
+           blockLocalInput:(BOOL)blockLocalInput
+                 requestID:(uint32_t)requestID;
 
 @end
 

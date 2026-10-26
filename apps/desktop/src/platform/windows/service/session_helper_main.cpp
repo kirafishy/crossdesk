@@ -28,6 +28,7 @@
 #include "platform/path_backend.h"
 #include "rd_log.h"
 #include "session_helper_shared.h"
+#include "secure_text_input.h"
 #include "secure_desktop_dxgi_capture.h"
 #include "secure_desktop_frame_pacer.h"
 #include "secure_desktop_nv12_cache.h"
@@ -40,6 +41,7 @@
 #include "windows_cursor_state.h"
 #include "cursor_draw.h"
 #include "windows_input_marker.h"
+#include "windows_text_input.h"
 #include "windows_key_metadata.h"
 #include "../windows_thread_dpi.h"
 
@@ -948,6 +950,31 @@ InputInjectionResult InjectKeyboardInput(
   return BuildInputSuccess(std::move(desktop_switch));
 }
 
+InputInjectionResult InjectTextInput(
+    const crossdesk::SecureTextInputRequest& request) {
+  std::vector<INPUT> inputs;
+  if (!crossdesk::BuildWindowsTextInputs(request.text, inputs)) {
+    return BuildInputFailure("invalid_text_input", ERROR_INVALID_PARAMETER,
+                            BuildDesktopSwitchDetails(request.stage,
+                                                       request.desktop));
+  }
+  ScopedInteractiveDesktop desktop;
+  DesktopSwitchDetails desktop_switch;
+  if (!EnsureThreadInteractiveDesktopForStage(request.stage, request.desktop,
+                                               &desktop, &desktop_switch)) {
+    return BuildInputFailure("switch_interactive_desktop_failed", GetLastError(),
+                             desktop_switch);
+  }
+  const UINT sent = crossdesk::SendWindowsTextInputs(
+      inputs, [](INPUT* batch, UINT count) {
+        return SendInput(count, batch, sizeof(INPUT));
+      });
+  if (sent != inputs.size()) {
+    return BuildInputFailure("send_input_failed", GetLastError(), desktop_switch);
+  }
+  return BuildInputSuccess(std::move(desktop_switch));
+}
+
 void ParseInteractionTail(const std::string& tail,
                           std::string* interactive_stage_out,
                           std::string* interactive_desktop_out) {
@@ -1833,6 +1860,21 @@ std::vector<uint8_t> StartSecureDesktopSharedCapture(
 std::vector<uint8_t> HandleSecureInputHelperCommand(
     const std::string& command,
     SecureSharedCaptureState* capture_state) {
+  if (command.rfind(crossdesk::kSecureTextInputCommandPrefix, 0) == 0) {
+    crossdesk::SecureTextInputRequest request;
+    if (!crossdesk::ParseSecureTextInputCommand(command, request))
+      return BuildTextResponseBytes(BuildErrorJson("invalid_text_input"));
+    const auto result = InjectTextInput(request);
+    if (!result.ok) {
+      // Text may contain a login password. Never echo it in logs or replies.
+      LOG_WARN("Secure input helper text injection failed: error={}, code={}, "
+               "stage={}, target={}, current={}",
+               result.error, result.error_code, result.desktop.stage,
+               result.desktop.target_desktop, result.desktop.current_desktop);
+      return BuildTextResponseBytes(BuildInputFailureJson(result).dump());
+    }
+    return BuildTextResponseBytes("{\"ok\":true,\"injected\":\"text\"}");
+  }
   if (command == "ping") {
     return BuildTextResponseBytes("{\"ok\":true,\"reply\":\"pong\"}");
   }
@@ -1922,7 +1964,7 @@ std::vector<uint8_t> HandleSecureInputHelperCommand(
 void HandleSecureInputHelperPipeClient(
     HANDLE pipe, HANDLE event_handle,
     std::shared_ptr<SecureSharedCaptureState> capture_state) {
-  char buffer[1024] = {0};
+  char buffer[crossdesk::kSecureInputCommandBufferBytes] = {0};
   DWORD bytes_read = 0;
   DWORD error = ERROR_SUCCESS;
   if (crossdesk::pipe_deadline_detail::Transfer(

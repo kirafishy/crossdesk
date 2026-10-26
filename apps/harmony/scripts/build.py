@@ -61,11 +61,14 @@ def bootstrap(env):
         seed = Path.home() / '.xmake/repositories/xmake-repo'
         source = seed if (seed / '.git').exists() else 'https://github.com/xmake-io/xmake-repo.git'
         run(['git', 'clone', '--no-hardlinks', source, repository], env=env)
-        run(['git', 'remote', 'set-url', 'origin', 'https://github.com/xmake-io/xmake-repo.git'], cwd=repository, env=env)
+    run(['git', 'remote', 'set-url', 'origin', 'https://github.com/xmake-io/xmake-repo.git'], cwd=repository, env=env)
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repository, text=True).strip()
     if revision != PACKAGE_REVISION:
         run(['git', 'fetch', 'origin', PACKAGE_REVISION], cwd=repository, env=env)
         run(['git', 'checkout', '--detach', PACKAGE_REVISION], cwd=repository, env=env)
+    # Mark this pinned checkout as ready so Xmake's first-run repository update
+    # cannot replace it with a mirror or advance it beyond PACKAGE_REVISION.
+    (repository / 'updated').touch()
 
 
 def mobile_project():
