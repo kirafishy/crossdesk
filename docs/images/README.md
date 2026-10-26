@@ -4,17 +4,20 @@
 
 ## 来源 / Sources
 
+- **2026-10-26** 从 `e551e04e` 的实际 Slint 组件重新生成中英文 README 引用的 6 张截图：ID 连接主窗口、IP 直连主窗口与六设备桌面墙，展示更新后的柔和阴影、输入框与按钮配色。沿用原有演示数据、图片尺寸及 2× 软件渲染。
 - **2026-10-25** 删除“启用中继服务”开关，并将自托管配置拆分为普通标签、“编辑”按钮和开关后，从当前工作区组件重新生成常规设置与网络设置共 4 张中英文截图。
 - **2026-10-25** 从 `ae6f81e8` 的实际 Slint 组件重新生成 16 张中英文截图：更新主窗口、常规设置、桌面墙设置、自托管及关于共 10 张，新增 IP 直连主界面、记住密码弹窗和网络设置共 6 张。使用 Slint 1.17.1、macOS arm64 和 2× 软件渲染。
 - 捕获程序在**工程外临时目录**中复用现有 [`slint_ui_smoke_test`](../../apps/desktop/tests/slint_ui_smoke_test.cpp) 的截图辅助函数，并注入演示界面状态；没有启动应用运行时、打开监听端口或建立远控会话。没有修改产品组件或工程内测试，临时源码、可执行程序与 PPM 均位于工程外。
 - 主窗口展示 ID / IP 模式切换、桌面墙入口和各自的近期设备；IP 模式展示地址编辑、六位密码和默认端口 52888，网络设置展示“启用 IP 直连”及关闭说明。IP 近期设备的 `LAN` 标记表示记录类型，不代表在线探测结果。
 - 本机 ID `123 456 789`、密码 `Ab12Cd` / `Cd34Ef`、地址 `192.168.1.10` 与 `192.168.1.20–22`、设备名称和连接状态均为演示数据，不是真实设备凭据。IP 列表还包含 `192.168.2.10` 作为切换示例。截图中勾选的“记住密码”是演示选择，配置状态不代表全部运行时默认值。
-- 桌面墙网格、放大视图和会话画面设置共 6 张继续沿用 **2026-10-19** 从 `1ef372d2` 渲染的截图。桌面墙展示六台演示设备，主窗口展示三台；本轮没有重新采集这些页面。
+- 桌面墙放大视图和会话画面设置共 4 张继续沿用 **2026-10-19** 从 `1ef372d2` 渲染的截图。桌面墙展示六台演示设备，主窗口展示三台。
 - “关于”中的 `v1.5.2` 和“已是最新版本”是捕获工具的示例值，不代表当前发布版本或实际在线检查结果。会话图使用公开页面作为远端画面，展示真实工具栏与画面设置菜单；隐私屏按钮处于关闭状态。
 - 缩略图沿用既有公开页面截图：`fixtures/source.png` 来自 [CrossDesk Xmake 源码页](https://github.com/kunkundi/crossdesk/blob/ios-support/xmake.lua)，`fixtures/website.png` 来自 [CrossDesk 官网](https://www.crossdesk.cn/)，两者采集于 2026-09-07。它们只用于展示预览效果，不代表这些页面正在对应设备上运行，页面中的版本信息也不代表最新发布。
 - `web-client.png` 保留 **2026-09-25** 从 [Web 客户端](https://web.crossdesk.cn/) 采集的 1280 × 720 连接首页，页面版本为 `2026.09.24.2`，ID 与密码为空。本次未重新采集 Web 页面；桌面设备预览继续复用这张图片。
 
-On **2026-10-25**, 16 images were rendered from the actual Slint components at `ae6f81e8`: ten refreshed images (main window, General settings, DeskHub settings, self-hosting, and About) and six additions (Direct IP mode, its password dialog, and Network settings), in Chinese and English. Later that day, the four General and Network settings images were refreshed from the working tree after removing Enable TURN Service and separating Self-Hosted Config into a label, Edit button, and switch. The capture-only program reused the existing helper functions in an external temporary directory, using Slint 1.17.1 on macOS arm64 at 2× scale. Capture did not modify product components or repository tests, and no listeners or remote sessions were opened. IDs, IPs, passwords, device records, connection states, and update results are illustrative; `LAN` labels indicate record type, not an online check. The checked Remember password box is a demonstration choice. The other six desktop screenshots remain from 2026-10-19, public-page fixtures from 2026-09-07, and the Web image from 2026-09-25. Native mobile screenshots are not included.
+On **2026-10-26**, the six images referenced by the Chinese and English READMEs (ID mode, Direct IP mode, and the six-device DeskHub grid) were refreshed from the actual Slint components at `e551e04e`, showing the updated soft shadows and input and button colors. The existing demonstration data, image dimensions, and 2× software rendering were retained.
+
+On **2026-10-25**, 16 images were rendered from the actual Slint components at `ae6f81e8`: ten refreshed images (main window, General settings, DeskHub settings, self-hosting, and About) and six additions (Direct IP mode, its password dialog, and Network settings), in Chinese and English. Later that day, the four General and Network settings images were refreshed from the working tree after removing Enable TURN Service and separating Self-Hosted Config into a label, Edit button, and switch. The capture-only program reused the existing helper functions in an external temporary directory, using Slint 1.17.1 on macOS arm64 at 2× scale. Capture did not modify product components or repository tests, and no listeners or remote sessions were opened. IDs, IPs, passwords, device records, connection states, and update results are illustrative; `LAN` labels indicate record type, not an online check. The checked Remember password box is a demonstration choice. The four DeskHub enlarged-view and session-video images remain from 2026-10-19, public-page fixtures from 2026-09-07, and the Web image from 2026-09-25. Native mobile screenshots are not included.
 
 ## 文件 / Files
 
@@ -102,6 +105,17 @@ new = '''      if (options.page == "settings-deskhub") window->set_settings_tab(
 ''' + old
 assert source.count(old) == 1
 source = source.replace(old,new)
+# Preserve the six-device DeskHub composition used in the README.
+old = 'if (connections.size() == 3 && options.page != "main-recent-overflow" &&'
+new = 'if (connections.size() == 3 && !options.page.starts_with("gallery") && options.page != "main-recent-overflow" &&'
+assert source.count(old) == 1
+source = source.replace(old,new)
+old = '    window->set_gallery_mode(true);'
+assert source.count(old) == 1
+source = source.replace(old,old + '\n    window->set_gallery_tile_width(300);')
+old = '        698.0f;'
+assert source.count(old) == 1
+source = source.replace(old,'        options.page == "gallery" ? 500.0f : 698.0f;')
 source += '''} // namespace
 int main() {
   const auto options = LoadCaptureOptions();
@@ -142,8 +156,10 @@ xcrun clang++ -std=c++20 \
 for locale in zh en; do
   language=0
   if [ "$locale" = en ]; then language=1; fi
-  for page in main lan lan-password settings settings-network settings-deskhub self-hosted about; do
-    snapshot="$capture_dir/desktop-$page-$locale.ppm"
+  for page in main lan gallery; do
+    image_page="$page"
+    if [ "$page" = gallery ]; then image_page=deskhub; fi
+    snapshot="$capture_dir/desktop-$image_page-$locale.ppm"
     SLINT_BACKEND=winit-software SLINT_SCALE_FACTOR=2 \
       CROSSDESK_UI_CAPTURE=1 \
       CROSSDESK_UI_CAPTURE_DEMO_ASSETS="$PWD/docs/images" \
@@ -152,7 +168,7 @@ for locale in zh en; do
       CROSSDESK_UI_CAPTURE_SNAPSHOT="$snapshot" \
       "$capture_dir/readme_capture"
     sips -s format png "$snapshot" \
-      --out "$capture_dir/desktop-$page-$locale.png"
+      --out "$capture_dir/desktop-$image_page-$locale.png"
   done
 done
 ```
@@ -161,6 +177,6 @@ done
 
 ### 其他页面
 
-会话图可用相同程序的 `stream-video-settings` 页面捕获。六设备桌面墙需要先调整**临时** `readme_capture.cpp` 的演示场景：在 `ConfigureDocumentationDemo` 的三设备限制中排除 `gallery` 开头的页面；在开启 gallery 模式后设置 `gallery_tile_width` 为 300；将 `gallery` 网格窗口的内容高度设为 500，`gallery-focus` 保持 698（macOS）。重新编译后，分别捕获 `gallery` / `gallery-focus` 并命名为 `desktop-deskhub-*` / `desktop-deskhub-focus-*`。这些调整只影响示例数据和窗口尺寸，不改变实际组件。
+使用指南中的截图可用相同程序捕获，将循环中的页面列表换为 `lan-password settings settings-network settings-deskhub self-hosted about stream-video-settings`。桌面墙放大视图使用 `gallery-focus` 页面，输出文件命名为 `desktop-deskhub-focus-*`。生成器已为桌面墙保留六台演示设备、300px 磁贴宽度和 500px 网格窗口内容高度；放大视图保持 698px（macOS）。这些设置仅影响临时捕获程序的示例数据和窗口尺寸。
 
 若更新 Web 图片，应打开 Web 客户端，等待表单与底部版本号加载完成，保持 ID 与密码为空，再截取页面视口；替换后也需重新生成桌面图以同步缩略图。
