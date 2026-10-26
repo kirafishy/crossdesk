@@ -1,14 +1,13 @@
+import { ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
+import { ControlStyle } from "common.slint";
 // Colors and spacing for the connection workbench; shapes are shared app-wide.
 export global WorkbenchStyle {
-    out property <color> canvas: #f2f5f9;
+    out property <color> canvas: #edf2f8;
     out property <color> surface: #ffffff;
-    out property <color> border: #c6cfdd;
-    out property <color> control-border: #b2bfd1;
-    out property <color> hover-border: #7f97b8;
     out property <color> field-surface: #f5f7fb;
-    out property <color> hover-surface: #eef3fb;
-    out property <color> pressed-surface: #e4ebf6;
+    out property <color> hover-surface: ControlStyle.hover;
+    out property <color> pressed-surface: ControlStyle.pressed;
     out property <color> separator: #e1e7ef;
     out property <color> text: #1c2940;
     out property <color> muted: #69788e;
@@ -16,18 +15,20 @@ export global WorkbenchStyle {
     out property <color> success: #18835a;
 }
 
-export component WorkbenchButton inherits Rectangle {
+export component WorkbenchButton inherits ShadowSurface {
+    shadow-compact: true;
     in property <string> text;
     in property <length> text-size: 13px;
     in property <color> text-color: root.destructive || root.primary ? white : WorkbenchStyle.text;
-    in property <color> normal-border-color: WorkbenchStyle.control-border;
+    in property <color> normal-shadow-color: UiShadow.edge;
+    in property <color> normal-background: ControlStyle.surface;
     in property <string> icon;
     in property <string> tooltip;
     in property <bool> tooltip-above: false;
     in property <bool> tooltip-suppressed: false;
     in property <color> icon-color: root.destructive ? white : root.primary
         ? (root.soft && !touch.has-hover && !root.show-focus ? WorkbenchStyle.accent : white)
-        : WorkbenchStyle.muted;
+        : ControlStyle.icon;
     in property <bool> primary: false;
     in property <bool> destructive: false;
     in property <bool> soft: false;
@@ -45,24 +46,23 @@ export component WorkbenchButton inherits Rectangle {
     width: 112px;
     height: 36px;
     border-radius: UiRadius.control;
-    border-width: root.show-focus ? 2px : root.soft ? 0px : 1px;
-    border-color: root.destructive
-        ? (root.show-focus ? #7a271a : touch.pressed ? #912018 : touch.has-hover ? #b42318 : #d92d20)
-        : root.show-focus ? (root.primary ? #193da0 : WorkbenchStyle.accent)
-        : root.primary ? WorkbenchStyle.accent
-        : touch.has-hover ? WorkbenchStyle.hover-border
-        : root.quiet ? transparent : root.normal-border-color;
+    shadow-enabled: root.show-focus || !root.soft;
+    shadow-focused: root.show-focus;
+    shadow-color: root.destructive ? UiShadow.error
+        : root.show-focus || root.primary ? UiShadow.focus
+        : touch.has-hover ? UiShadow.hover
+        : root.quiet ? transparent : root.normal-shadow-color;
     background: root.destructive
         ? (touch.pressed ? #912018 : touch.has-hover ? #b42318 : #d92d20)
         : root.soft
         ? (root.primary
-            ? (touch.pressed ? #254cc0 : touch.has-hover || root.show-focus ? WorkbenchStyle.accent : #edf2ff)
-            : (touch.pressed ? WorkbenchStyle.pressed-surface : touch.has-hover ? WorkbenchStyle.hover-surface : WorkbenchStyle.field-surface))
+            ? (touch.pressed ? #254cc0 : touch.has-hover || root.show-focus ? WorkbenchStyle.accent : #dce7ff)
+            : (touch.pressed ? ControlStyle.pressed : touch.has-hover ? ControlStyle.hover : ControlStyle.surface))
         : root.primary
         ? (touch.pressed ? #254cc0 : touch.has-hover ? #4574f0 : WorkbenchStyle.accent)
-        : (touch.pressed ? WorkbenchStyle.pressed-surface : touch.has-hover ? WorkbenchStyle.hover-surface : root.quiet ? transparent : white);
+        : (touch.pressed ? ControlStyle.pressed : touch.has-hover ? ControlStyle.hover : root.quiet ? transparent : root.normal-background);
     opacity: root.enabled ? 1 : 0.45;
-    animate background, border-color { duration: 120ms; }
+    animate background, shadow-color { duration: 120ms; }
     forward-focus: button-focus;
     accessible-role: button;
     accessible-label: root.tooltip != "" ? root.tooltip : root.text;
@@ -150,7 +150,7 @@ export component WorkbenchButton inherits Rectangle {
 }
 
 // A raised surface keeps transient action feedback distinct from the workbench.
-export component WorkbenchNotice inherits Rectangle {
+export component WorkbenchNotice inherits ShadowSurface {
     in property <string> text;
     in property <string> icon;
     in property <bool> error: false;
@@ -159,8 +159,7 @@ export component WorkbenchNotice inherits Rectangle {
     width: min(root.width-limit, max(280px, message.preferred-width + 64px));
     height: 64px;
     background: root.error ? #fff1f0 : #e9f6ef;
-    border-width: 1px;
-    border-color: root.error ? #f0c4bf : #b9dfc9;
+    shadow-color: root.error ? UiShadow.error : UiShadow.edge;
     border-radius: UiRadius.surface;
     drop-shadow-color: #14294424;
     drop-shadow-blur: 24px;
@@ -192,9 +191,8 @@ export component WorkbenchNotice inherits Rectangle {
     }
 }
 
-export component WorkbenchCard inherits Rectangle {
+export component WorkbenchCard inherits ShadowSurface {
     background: WorkbenchStyle.surface;
-    border-width: 1px;
-    border-color: WorkbenchStyle.border;
+    shadow-color: UiShadow.edge;
     border-radius: UiRadius.surface;
 }

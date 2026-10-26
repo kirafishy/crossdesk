@@ -1,15 +1,17 @@
+import { ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { LineEdit } from "std-widgets.slint";
 import { UiRadius } from "ui_radius.slint";
+import { ControlStyle } from "common.slint";
 
 // Retain the standard editor's selection, clipboard, clear button and input
-// method support. Only its outer frame is replaced by the shared shape.
+// method support. Its frame receives the shared field tint and rounded shape.
 export component RoundedLineEdit inherits Rectangle {
     in-out property <string> text;
     in property <string> placeholder-text;
     in property <InputType> input-type: InputType.text;
     in property <bool> enabled: true;
     in property <length> font-size: 12px;
-    in property <color> normal-border-color: #dfe6ef;
+    in property <color> normal-shadow-color: UiShadow.edge;
     in property <brush> surrounding-background: white;
     callback accepted();
     callback edited();
@@ -20,8 +22,8 @@ export component RoundedLineEdit inherits Rectangle {
     forward-focus: editor;
 
     editor := LineEdit {
-        x: -1px; y: -1px;
-        width: parent.width + 2px; height: parent.height + 2px;
+        x: -2px; y: -2px;
+        width: parent.width + 4px; height: parent.height + 4px;
         text <=> root.text;
         placeholder-text: root.placeholder-text;
         input-type: root.input-type;
@@ -30,8 +32,15 @@ export component RoundedLineEdit inherits Rectangle {
         accepted => { root.accepted(); }
         edited => { root.edited(); }
     }
+    // Fluent's LineEdit paints its own background and exposes no fill override.
+    // A visual-only tint preserves the standard editor and its built-in actions.
+    Rectangle {
+        width: parent.width; height: parent.height;
+        background: !root.enabled ? transparent
+            : editor.has-focus ? ControlStyle.input-focus-tint : ControlStyle.input-tint;
+    }
     // The software renderer clips children to rectangular bounds. Mask the
-    // standard editor's corners before drawing our rounded border on top.
+    // standard editor's corners before drawing our soft focus edge on top.
     Rectangle {
         x: -root.border-radius; y: -root.border-radius;
         width: parent.width + 2 * root.border-radius;
@@ -40,11 +49,13 @@ export component RoundedLineEdit inherits Rectangle {
         border-radius: 2 * root.border-radius;
         border-color: root.surrounding-background;
     }
-    Rectangle {
+    ShadowSurface {
         width: parent.width; height: parent.height;
         border-radius: root.border-radius;
-        border-width: editor.has-focus ? 2px : 1px;
-        border-color: editor.has-focus ? #3564e3 : root.normal-border-color;
+        clip: true;
+        shadow-color: editor.has-focus ? UiShadow.focus : root.normal-shadow-color;
+        shadow-focused: editor.has-focus;
+        shadow-compact: true;
         background: transparent;
     }
 }

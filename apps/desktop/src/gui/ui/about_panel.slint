@@ -1,9 +1,10 @@
+import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { ScrollView, TextEdit } from "std-widgets.slint";
 import { SettingsDialog, SettingsButton } from "settings_controls.slint";
 import { WorkbenchStyle } from "workbench_controls.slint";
 import { UiRadius } from "ui_radius.slint";
 import { GalleryStrings } from "device_strings.slint";
-import { FontAwesomeIcons } from "common.slint";
+import { FontAwesomeIcons, ControlStyle } from "common.slint";
 import "../assets/fonts/message_spacing.ttf";
 
 export enum AboutPage { overview, components, component, document, source }
@@ -26,11 +27,11 @@ export global AboutStrings {
     out property <string> back: GalleryStrings.tr("返回", "Back", "Назад");
 }
 
-export component AboutNavigationGroup inherits Rectangle {
+export component AboutNavigationGroup inherits ShadowSurface {
     height: rows.preferred-height + 2px;
     background: WorkbenchStyle.surface;
     border-radius: UiRadius.control;
-    border-width: 1px; border-color: WorkbenchStyle.separator;
+    shadow-color: UiShadow.edge;
     clip: true;
     rows := VerticalLayout {
         x: 1px; y: 1px; width: parent.width - 2px;
@@ -41,13 +42,13 @@ export component AboutNavigationGroup inherits Rectangle {
 
 export component AboutRowSeparator inherits Rectangle {
     height: 1px;
-    Rectangle {
+    ShadowSeparator {
         x: 14px; width: parent.width - 30px; height: 1px;
-        background: WorkbenchStyle.separator;
+        shadow-color: UiShadow.separator;
     }
 }
 
-export component AboutNavigationRow inherits Rectangle {
+export component AboutNavigationRow inherits ShadowSurface {
     in property <string> title;
     in property <string> subtitle;
     in property <string> icon;
@@ -60,7 +61,7 @@ export component AboutNavigationRow inherits Rectangle {
     background: touch.pressed ? WorkbenchStyle.pressed-surface
         : touch.has-hover ? WorkbenchStyle.hover-surface : WorkbenchStyle.surface;
     border-radius: root.grouped ? 0px : UiRadius.control;
-    border-width: root.grouped ? 0px : 1px; border-color: WorkbenchStyle.separator;
+    shadow-enabled: !root.grouped; shadow-color: UiShadow.edge;
     accessible-role: button;
     accessible-label: root.title + (root.subtitle != "" ? ", " + root.subtitle : "")
         + (root.detail != "" ? ", " + root.detail : "");
@@ -69,10 +70,10 @@ export component AboutNavigationRow inherits Rectangle {
         x: 12px; y: (parent.height - self.height) / 2;
         width: 28px; height: 28px;
         border-radius: UiRadius.control;
-        background: WorkbenchStyle.field-surface;
+        background: ControlStyle.surface;
         Text {
             text: root.icon; font-family: "Font Awesome 6 Free"; font-weight: 900;
-            font-size: 13px; color: WorkbenchStyle.muted;
+            font-size: 13px; color: ControlStyle.icon;
             horizontal-alignment: center; vertical-alignment: center;
             accessible-role: none;
         }
@@ -226,7 +227,7 @@ export component AboutPanel inherits SettingsDialog {
     footer := VerticalLayout {
         x: 24px; y: parent.height - self.height - 24px;
         width: parent.width - 48px; height: self.preferred-height; spacing: 12px;
-        Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+        ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
         HorizontalLayout {
             alignment: end;
             SettingsButton { text: AboutStrings.back; clicked => { root.back(); } }

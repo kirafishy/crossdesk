@@ -1,15 +1,26 @@
+import { ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
-// The legacy client uses ImGui::StyleColorsLight(). Keep the structural line
-// colors in one place so the Slint renderer produces the same visual weight.
-export global ImGuiLineStyle {
-    out property <color> border: #0000004d;
-    out property <color> separator: #6363639e;
-    out property <color> divider: #0000007a;
-    out property <color> control-separator: #b2b2b2;
-}
-
 export global FloatingBarStyle {
     out property <length> corner-radius: UiRadius.menu;
+}
+
+// Filled controls remain distinct from white cards without restoring outlines.
+export global ControlStyle {
+    out property <color> surface: #dce6f3;
+    out property <color> hover: #cedef1;
+    out property <color> pressed: #bfd2ec;
+    out property <color> selected: #bcd4f7;
+    out property <color> selected-hover: #adcaf1;
+    out property <color> selected-pressed: #99bce8;
+    out property <color> selected-text: #1d4e9e;
+    out property <color> disabled: #f0f2f5;
+    out property <color> icon: #52657f;
+    out property <color> input-surface: #dee7f2;
+    out property <color> input-focused: #e5ecf5;
+    out property <color> input-placeholder: #566a84;
+    // These tints over white match the field fills for standard LineEdit.
+    out property <color> input-tint: #235eaa26;
+    out property <color> input-focus-tint: #235eaa1e;
 }
 
 // ImGui loads a 32px font atlas and applies per-window font scales. These
@@ -69,10 +80,10 @@ export component IconButton inherits Rectangle {
     in property <bool> enabled: true;
     in property <bool> danger: false;
     in property <length> icon-size: 16px;
-    in property <color> icon-color: #24272d;
+    in property <color> icon-color: ControlStyle.icon;
     in property <color> normal-background: transparent;
-    in property <color> hover-background: #edf0f5;
-    in property <color> pressed-background: #d9dde5;
+    in property <color> hover-background: ControlStyle.hover;
+    in property <color> pressed-background: ControlStyle.pressed;
     in property <bool> slashed: false;
     callback clicked;
 
@@ -138,8 +149,8 @@ export component ImageButton inherits Rectangle {
 
     width: 30px;
     height: 30px;
-    background: touch.pressed ? (danger ? #d92d20 : #d9dde5)
-                              : touch.has-hover ? (danger ? #f04438 : #edf0f5)
+    background: touch.pressed ? (danger ? #d92d20 : ControlStyle.pressed)
+                              : touch.has-hover ? (danger ? #f04438 : ControlStyle.hover)
                                                 : transparent;
     border-radius: UiRadius.control;
 
@@ -174,14 +185,15 @@ export component ImageButton inherits Rectangle {
     }
 }
 
-export component CompactComboBox inherits Rectangle {
+export component CompactComboBox inherits ShadowSurface {
+    shadow-compact: true;
     in property <[string]> model;
     in-out property <int> current-index: 0;
     in property <bool> enabled: true;
     in property <bool> subtle: false;
     in property <bool> show-arrow: true;
-    in property <color> normal-border-color: root.subtle ? #dfe6ef : #bfc2c7;
-    in property <color> hover-border-color: root.normal-border-color;
+    in property <color> normal-shadow-color: UiShadow.edge;
+    in property <color> hover-shadow-color: UiShadow.hover;
     property <bool> popup-animation-enabled: false;
     property <float> popup-progress: 0.0;
     callback selected(int);
@@ -205,9 +217,10 @@ export component CompactComboBox inherits Rectangle {
 
     width: 73px;
     height: 24px;
-    background: root.enabled ? (root.subtle ? #f8fafc : white) : root.subtle ? #f1f3f6 : #f1f1f1;
-    border-width: 1px;
-    border-color: root.enabled && combo-touch.has-hover ? root.hover-border-color : root.normal-border-color;
+    background: !root.enabled ? ControlStyle.disabled
+        : combo-touch.pressed || combo-popup.is-open ? ControlStyle.pressed
+        : combo-touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
+    shadow-color: root.enabled && combo-touch.has-hover ? root.hover-shadow-color : root.normal-shadow-color;
     border-radius: UiRadius.control;
 
     Text {
@@ -224,12 +237,12 @@ export component CompactComboBox inherits Rectangle {
         width: 20px;
         height: parent.height - 2px;
         y: 1px;
-        background: root.subtle ? transparent : root.enabled ? #9bc9f8 : #d7d9dc;
+        background: root.subtle ? transparent : root.enabled ? ControlStyle.selected : #d7d9dc;
         border-top-right-radius: UiRadius.control - 1px;
         border-bottom-right-radius: UiRadius.control - 1px;
         Text {
             text: FontAwesomeIcons.angle-down;
-            color: root.subtle ? #79879a : #202124;
+            color: root.subtle ? ControlStyle.icon : #202124;
             font-family: "Font Awesome 6 Free";
             font-weight: 900;
             font-size: 10px;
@@ -274,7 +287,7 @@ export component CompactComboBox inherits Rectangle {
         height: root.model.length * 23px;
         close-policy: close-on-click-outside;
 
-        Rectangle {
+        ShadowSurface {
             // Keep the reveal anchored to the popup's top edge while the
             // content settles downward into its final position.
             y: (1.0 - root.popup-progress) * -8px;
@@ -282,16 +295,22 @@ export component CompactComboBox inherits Rectangle {
             height: parent.height * root.popup-progress;
             opacity: root.popup-progress;
             background: white;
-            border-width: 1px;
-            border-color: root.normal-border-color;
+            shadow-color: root.normal-shadow-color;
             border-radius: UiRadius.menu;
             clip: true;
             for choice[index] in root.model: Rectangle {
                 y: index * 23px;
                 width: parent.width;
                 height: 23px;
-                background: option-touch.has-hover ? #dbeafb : index == root.current-index ? #eef5fd : white;
-                Text { x: 5px; width: parent.width - 10px; text: choice; color: #202124; font-size: root.subtle ? 12px : ImGuiFontStyle.body; overflow: elide; vertical-alignment: center; }
+                background: index == root.current-index
+                    ? (option-touch.pressed ? ControlStyle.selected-pressed : option-touch.has-hover ? ControlStyle.selected-hover : ControlStyle.selected)
+                    : option-touch.pressed ? ControlStyle.pressed : option-touch.has-hover ? ControlStyle.hover : white;
+                Text {
+                    x: 5px; width: parent.width - 10px; text: choice;
+                    color: index == root.current-index ? ControlStyle.selected-text : #202124;
+                    font-weight: index == root.current-index ? 600 : 400;
+                    font-size: root.subtle ? 12px : ImGuiFontStyle.body; overflow: elide; vertical-alignment: center;
+                }
                 option-touch := TouchArea {
                     enabled: root.enabled;
                     clicked => {
@@ -306,12 +325,12 @@ export component CompactComboBox inherits Rectangle {
                     }
                 }
             }
-            Rectangle {
+            ShadowSurface {
                 width: parent.width;
                 height: parent.height;
                 background: transparent;
-                border-width: 1px;
-                border-color: root.normal-border-color;
+                clip: true;
+                shadow-color: root.normal-shadow-color;
                 border-radius: UiRadius.menu;
                 z: 2;
             }
@@ -319,19 +338,21 @@ export component CompactComboBox inherits Rectangle {
     }
 }
 
-export component ImGuiCheckBox inherits Rectangle {
+export component ImGuiCheckBox inherits ShadowSurface {
+    shadow-compact: true;
     in-out property <bool> checked;
     in property <bool> enabled: true;
 
     width: 21px;
     height: 21px;
-    background: root.enabled ? white : #f1f1f1;
-    border-width: 1px;
-    border-color: check-touch.has-hover && root.enabled ? #8cbef2 : #b9bdc2;
+    background: !root.enabled ? ControlStyle.disabled
+        : root.checked ? (check-touch.pressed ? #254cc0 : check-touch.has-hover ? #4574f0 : #3564e3)
+        : check-touch.pressed ? ControlStyle.pressed : check-touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
+    shadow-color: check-touch.has-hover && root.enabled ? UiShadow.focus : UiShadow.edge;
     border-radius: 4px;
     if root.checked: Text {
         text: FontAwesomeIcons.check;
-        color: root.enabled ? #2e86de : #8b8f95;
+        color: root.enabled ? white : #8b8f95;
         font-family: "Font Awesome 6 Free";
         font-weight: 900;
         font-size: 16px;
@@ -368,7 +389,8 @@ export component MiniToggleSwitch inherits Rectangle {
     }
 }
 
-export component CompactButton inherits Rectangle {
+export component CompactButton inherits ShadowSurface {
+    shadow-compact: true;
     in property <string> text;
     in property <length> text-size: ImGuiFontStyle.body;
     in property <bool> primary: false;
@@ -378,12 +400,11 @@ export component CompactButton inherits Rectangle {
 
     width: 34px;
     height: 24px;
-    background: !root.enabled ? (root.quiet ? transparent : #eceef0)
-              : button-touch.pressed ? (root.primary ? #82b8f2 : #d8dadd)
-              : button-touch.has-hover ? (root.primary ? #b8d9fb : #f0f1f2)
-              : root.primary ? #a8d0fa : root.quiet ? transparent : #e2e4e7;
-    border-width: 1px;
-    border-color: root.primary ? #9bc3ed : root.quiet ? transparent : #c8cbd0;
+    background: !root.enabled ? (root.quiet ? transparent : ControlStyle.disabled)
+              : button-touch.pressed ? (root.primary ? #82b8f2 : ControlStyle.pressed)
+              : button-touch.has-hover ? (root.primary ? #b8d9fb : ControlStyle.hover)
+              : root.primary ? #a8d0fa : root.quiet ? transparent : ControlStyle.surface;
+    shadow-color: root.primary ? UiShadow.focus : root.quiet ? transparent : UiShadow.edge;
     border-radius: UiRadius.control;
     Text {
         text: root.text;
@@ -396,24 +417,29 @@ export component CompactButton inherits Rectangle {
     button-touch := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
 }
 
-export component PrimaryButton inherits Rectangle {
+export component PrimaryButton inherits ShadowSurface {
     in property <string> text;
-    in property <length> text-size: ImGuiFontStyle.body;
+    in property <length> text-size: 12px;
     in property <bool> enabled: true;
     callback clicked;
 
     min-width: 72px;
-    height: 30px;
+    height: 32px;
     background: !root.enabled ? #b8c1d1
-              : touch.pressed ? #1849a9
-              : touch.has-hover ? #2970d6
-              : #2463c7;
+              : touch.pressed ? #254cc0
+              : touch.has-hover ? #4574f0
+              : #3564e3;
+    shadow-compact: true;
+    shadow-enabled: root.enabled && !touch.pressed;
+    shadow-color: UiShadow.focus;
     border-radius: UiRadius.control;
+    animate background { duration: 100ms; }
 
     Text {
         text: root.text;
         color: white;
         font-size: root.text-size;
+        font-weight: 600;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -424,26 +450,28 @@ export component PrimaryButton inherits Rectangle {
     }
 }
 
-export component SecondaryButton inherits Rectangle {
+export component SecondaryButton inherits ShadowSurface {
     in property <string> text;
-    in property <length> text-size: ImGuiFontStyle.body;
+    in property <length> text-size: 12px;
     in property <bool> enabled: true;
     callback clicked;
 
     min-width: 72px;
-    height: 30px;
-    background: !root.enabled ? #f1f2f4
-              : touch.pressed ? #dfe3e9
-              : touch.has-hover ? #f3f4f6 : white;
-    border-width: 1px;
-    border-color: #c9ced7;
+    height: 32px;
+    background: !root.enabled ? ControlStyle.disabled
+              : touch.pressed ? ControlStyle.pressed
+              : touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
+    shadow-color: UiShadow.edge;
+    shadow-compact: true;
+    shadow-enabled: root.enabled && !touch.pressed;
     border-radius: UiRadius.control;
-    clip: true;
+    animate background { duration: 100ms; }
 
     Text {
         text: root.text;
-        color: root.enabled ? #24272d : #949aa5;
+        color: root.enabled ? #303f55 : #949aa5;
         font-size: root.text-size;
+        font-weight: 500;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -495,9 +523,8 @@ export component SectionTitle inherits Text {
     vertical-alignment: center;
 }
 
-export component DialogSurface inherits Rectangle {
+export component DialogSurface inherits ShadowSurface {
     background: white;
-    border-width: 1px;
-    border-color: ImGuiLineStyle.border;
+    shadow-color: UiShadow.edge;
     border-radius: UiRadius.surface;
 }

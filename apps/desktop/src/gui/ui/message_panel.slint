@@ -1,6 +1,7 @@
+import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ScrollView } from "std-widgets.slint";
-import { IconButton, FontAwesomeIcons } from "common.slint";
+import { IconButton, FontAwesomeIcons, ControlStyle } from "common.slint";
 import { SettingsDialog, SettingsButton } from "settings_controls.slint";
 import { WorkbenchStyle } from "workbench_controls.slint";
 import "../assets/fonts/message_spacing.ttf";
@@ -90,11 +91,11 @@ export component MessagePanel inherits SettingsDialog {
             text: root.notice-text; font-size: 12px; wrap: word-wrap; color: #b3261e;
         }
     }
-    message-content := Rectangle {
+    message-content := ShadowSurface {
         x: 24px; y: root.content-top + (root.notice-text == "" ? 0px : notice.height + 12px);
         width: parent.width - 48px; height: parent.height - self.y - 24px;
         background: WorkbenchStyle.surface;
-        border-radius: UiRadius.surface; border-width: 1px; border-color: WorkbenchStyle.border;
+        border-radius: UiRadius.surface; shadow-color: UiShadow.edge;
         if root.items.length > 0 || root.selected-id != "": Rectangle {
             x: 1px; y: 1px; width: content-divider.x - 1px; height: parent.height - 2px;
             background: WorkbenchStyle.field-surface;
@@ -112,19 +113,19 @@ export component MessagePanel inherits SettingsDialog {
                 announcement-entries := VerticalLayout {
                     width: announcements-scroll.viewport-width; spacing: 10px; padding: 0px;
                     alignment: start;
-                    for item in root.items: Rectangle {
+                    for item in root.items: ShadowSurface {
                         height: 64px;
-                        background: root.selected-id == item.id ? #e8efff
+                        background: root.selected-id == item.id
+                            ? (entry-touch.pressed ? ControlStyle.selected-pressed : entry-touch.has-hover ? ControlStyle.selected-hover : ControlStyle.selected)
                             : entry-touch.pressed ? WorkbenchStyle.pressed-surface
                             : entry-touch.has-hover ? WorkbenchStyle.hover-surface : WorkbenchStyle.surface;
                         border-radius: UiRadius.control;
-                        border-width: 1px;
-                        border-color: root.selected-id == item.id ? #b5c9f5 : WorkbenchStyle.border;
+                        shadow-color: root.selected-id == item.id ? UiShadow.focus : UiShadow.edge;
                         Text {
                             x: 10px; y: 9px; width: parent.width - 30px; height: 20px;
                             text: item.title; overflow: elide; font-size: 13px;
                             font-weight: item.read ? 400 : 600;
-                            color: root.selected-id == item.id ? WorkbenchStyle.accent : WorkbenchStyle.text;
+                            color: root.selected-id == item.id ? ControlStyle.selected-text : WorkbenchStyle.text;
                             vertical-alignment: center;
                         }
                         if !item.read: Rectangle {
@@ -154,10 +155,10 @@ export component MessagePanel inherits SettingsDialog {
             color: WorkbenchStyle.muted; font-size: 13px;
             horizontal-alignment: center; vertical-alignment: center;
         }
-        content-divider := Rectangle {
+        content-divider := ShadowSeparator {
             x: announcement-list.x + announcement-list.width + 8px;
             y: 1px; width: 1px; height: parent.height - 2px;
-            background: WorkbenchStyle.separator;
+            vertical: true; shadow-color: UiShadow.separator;
             visible: root.items.length > 0 || root.selected-id != "";
             accessible-role: none;
         }
@@ -199,13 +200,14 @@ export component MessagePanel inherits SettingsDialog {
                             x: parent.width - self.width; y: 0px; width: 28px; height: 28px;
                             icon: FontAwesomeIcons.trash-can; icon-size: 12px;
                             icon-color: WorkbenchStyle.muted; danger: true;
+                            normal-background: ControlStyle.surface;
                             accessible-role: button;
                             accessible-label: MessageStrings.delete-message + " " + root.selected-title;
                             accessible-action-default => { root.request-delete(root.selected-id, root.selected-revision); }
                             clicked => { root.request-delete(root.selected-id, root.selected-revision); }
                         }
                     }
-                    Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                    ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
                     StyledText {
                         vertical-stretch: 0;
                         text: root.selected-body;

@@ -1,7 +1,8 @@
+import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ComboBox, ScrollView } from "std-widgets.slint";
 import { RemoteCursor } from "remote_cursor.slint";
-import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
+import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiFontStyle, ControlStyle } from "common.slint";
 
 export struct StreamTab {
     remote-id: string,
@@ -80,10 +81,9 @@ struct ControlBarTooltip {
 }
 
 // Shared surface treatment for the capsule and its detached detail cards.
-component StreamControlSurface inherits Rectangle {
+component StreamControlSurface inherits ShadowSurface {
     background: white;
-    border-width: 1px;
-    border-color: #dbe5f1;
+    shadow-color: UiShadow.edge;
     border-radius: 16px;
     drop-shadow-color: #1d35571a;
     drop-shadow-blur: 10px;
@@ -121,14 +121,14 @@ component ControlBarButton inherits Rectangle {
         !root.show-logo && root.action-enabled && !root.muted && touch.pressed;
     // Share the fill with the slash cutout so every icon stays legible while
     // transitioning between idle, hover and pressed states.
-    private property <color> button-fill: root.muted ? #eef0f3
-        : root.button-pressed ? (root.danger ? #7a271a : #65a5f2)
+    private property <color> button-fill: root.muted ? ControlStyle.disabled
+        : root.button-pressed ? (root.danger ? #7a271a : root.selected ? ControlStyle.selected-pressed : ControlStyle.pressed)
         : root.button-hovered ? (root.danger ? (root.selected ? #912018 : #b42318)
-            : root.selected ? #86baff : #a7ceff)
+            : root.selected ? ControlStyle.selected-hover : ControlStyle.hover)
         : root.danger ? (root.selected ? #b42318 : #d92d20)
-        : root.selected ? #b3d5fd : #deecff;
+        : root.selected ? ControlStyle.selected : ControlStyle.surface;
     private property <color> button-foreground: root.muted ? #8a8f96
-        : root.danger ? white : #24272d;
+        : root.danger ? white : root.selected ? ControlStyle.selected-text : #303f55;
     animate button-fill, button-foreground {
         duration: 90ms;
         easing: ease-out;
@@ -242,14 +242,17 @@ component VideoSettingRow inherits VerticalLayout {
     Text { text: root.label; color: #5c626c; font-size: 11px; height: 18px; }
     HorizontalLayout {
         spacing: 4px;
-        for option[index] in root.options: Rectangle {
+        for option[index] in root.options: ShadowSurface {
             height: 27px;
-            background: !root.enabled ? #f1f1f1 : root.selected == index ? #d7eaff
-                : option-touch.has-hover ? #eaf3ff : #f5f6f8;
+            background: !root.enabled ? ControlStyle.disabled
+                : root.selected == index ? (option-touch.pressed ? ControlStyle.selected-pressed : option-touch.has-hover ? ControlStyle.selected-hover : ControlStyle.selected)
+                : option-touch.pressed ? ControlStyle.pressed
+                : option-touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
             border-radius: UiRadius.control;
-            border-width: 1px;
-            border-color: root.enabled && root.selected == index ? #4296fa : #dce0e6;
-            Text { text: option; color: root.enabled ? #30343b : #8b8f95;
+            shadow-color: root.enabled && root.selected == index ? UiShadow.focus : UiShadow.edge;
+            Text { text: option; color: !root.enabled ? #8b8f95
+                    : root.selected == index ? ControlStyle.selected-text : #30343b;
+                font-weight: root.selected == index ? 600 : 400;
                 font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
             option-touch := TouchArea {
                 mouse-cursor: root.enabled ? pointer : default;
@@ -899,10 +902,10 @@ export component StreamWindow inherits Window {
                     clicked => { root.close-stream-window(); }
                 }
             }
-            Rectangle {
+            ShadowSeparator {
                 y: parent.height - 1px;
                 height: 1px;
-                background: #d5d3d0;
+                shadow-color: UiShadow.separator;
             }
         }
 
@@ -922,11 +925,11 @@ export component StreamWindow inherits Window {
             z: 10;
             HorizontalLayout {
                 spacing: 1px;
-                for tab[index] in root.tabs: tab-item := Rectangle {
+                for tab[index] in root.tabs: tab-item := ShadowSurface {
                     width: min(190px, max(110px, (parent.width - 12px) / root.tabs.length));
                     background: index == root.selected-tab ? white : tab-touch.has-hover || root.dragging-tab == index ? #e5e7eb : #d8dbe0;
-                    border-width: root.dragging-tab == index ? 1px : 0px;
-                    border-color: #2463c7;
+                    shadow-enabled: root.dragging-tab == index;
+                    shadow-color: UiShadow.focus;
                     Rectangle {
                         width: parent.width - 27px;
                         height: parent.height;
@@ -1199,11 +1202,11 @@ export component StreamWindow inherits Window {
                     tooltip: root.fullscreen-enabled ? StreamStrings.exit-fullscreen : StreamStrings.fullscreen;
                     clicked => { root.close-control-menus(); root.toggle-fullscreen(); }
                 }
-                if root.control-content-visible: Rectangle {
+                if root.control-content-visible: ShadowSeparator {
                     opacity: root.control-content-progress;
                     x: close-button.x - 6px; y: 12px;
                     width: 1px; height: 14px;
-                    background: #dbe5f1;
+                    vertical: true; shadow-color: UiShadow.separator;
                 }
                 close-button := ControlBarButton {
                     reveal-progress: root.control-content-progress;
@@ -1408,12 +1411,12 @@ export component StreamWindow inherits Window {
                             vertical-alignment: center;
                             overflow: elide;
                         }
-                        if index < root.stats-rows.length - 2: Rectangle {
+                        if index < root.stats-rows.length - 2: ShadowSeparator {
                             x: 4px;
                             y: parent.height - 1px;
                             width: parent.width - 8px;
                             height: 1px;
-                            background: #edf0f4;
+                            shadow-color: UiShadow.separator;
                         }
                     }
 
@@ -1422,16 +1425,16 @@ export component StreamWindow inherits Window {
                         text: StreamStrings.stats-encoder + "\n" + StreamStrings.stats-decoder;
                         font-size: ImGuiFontStyle.small;
                     }
-                    Rectangle {
+                    ShadowSurface {
                         x: 0px;
                         y: root.stats-header-height + root.stats-rows.length * stats-table.row-height
                             + 70px;
                         width: parent.width; height: 44px;
                         background: #f7f9fc; border-radius: UiRadius.control;
-                        border-width: 1px; border-color: #e8edf4;
-                        Rectangle {
+                        shadow-color: UiShadow.edge;
+                        ShadowSeparator {
                             x: 8px; y: 22px; width: parent.width - 16px; height: 1px;
-                            background: #e8edf4;
+                            shadow-color: UiShadow.separator;
                         }
                         for codec[index] in [
                             { label: StreamStrings.stats-encoder, value: root.stats-encoder },
@@ -1639,16 +1642,16 @@ export component StreamWindow inherits Window {
                     padding: 8px; spacing: 1px;
                     for display[index] in root.displays: Rectangle {
                         height: 29px;
-                        background: index == display-menu.hovered-index && display-touch.pressed ? #bfd4f2
-                                  : index == display-menu.hovered-index ? #d8e6f8
-                                  : index == root.selected-display ? #e8eef9
-                                                                   : transparent;
+                        background: index == root.selected-display
+                            ? (index == display-menu.hovered-index ? (display-touch.pressed ? ControlStyle.selected-pressed : ControlStyle.selected-hover) : ControlStyle.selected)
+                            : index == display-menu.hovered-index ? (display-touch.pressed ? ControlStyle.pressed : ControlStyle.hover) : transparent;
                         border-radius: UiRadius.control;
                         Text {
                             x: 8px;
                             width: parent.width - 34px;
                             text: display;
-                            color: #30343b;
+                            color: index == root.selected-display ? ControlStyle.selected-text : #30343b;
+                            font-weight: index == root.selected-display ? 600 : 400;
                             font-size: ImGuiFontStyle.body;
                             overflow: elide;
                             vertical-alignment: center;
@@ -1657,7 +1660,7 @@ export component StreamWindow inherits Window {
                             x: parent.width - 24px;
                             width: 16px;
                             text: FontAwesomeIcons.check;
-                            color: #2463c7;
+                            color: ControlStyle.selected-text;
                             font-family: "Font Awesome 6 Free";
                             font-weight: 900;
                             font-size: 10px;
@@ -1695,7 +1698,9 @@ export component StreamWindow inherits Window {
                 VerticalLayout {
                     padding: 8px; spacing: 1px;
                     for shortcut in root.shortcut-items: Rectangle {
-                        height: 29px; background: shortcut-touch.has-hover ? #e8eef9 : transparent;
+                        height: 29px;
+                        border-radius: UiRadius.control;
+                        background: shortcut-touch.pressed ? ControlStyle.pressed : shortcut-touch.has-hover ? ControlStyle.hover : transparent;
                         Text { x: 8px; text: shortcut; color: #30343b; font-size: ImGuiFontStyle.body; vertical-alignment: center; }
                         shortcut-touch := TouchArea {
                             mouse-cursor: MouseCursor.pointer;
@@ -1745,7 +1750,7 @@ export component StreamWindow inherits Window {
                 y: min(max(64px, parent.height * 0.18), max(16px, parent.height - self.height - 16px));
                 width: min(400px, parent.width - 48px);
                 height: remote-update-message.y + remote-update-message.height + 84px;
-                border-color: #e5e9f0;
+                shadow-color: UiShadow.edge;
                 border-radius: UiRadius.surface;
                 drop-shadow-color: #07142b30;
                 drop-shadow-blur: 32px;
@@ -1774,8 +1779,8 @@ export component StreamWindow inherits Window {
                 IconButton {
                     x: parent.width - 44px; y: 12px; width: 32px; height: 32px;
                     icon: FontAwesomeIcons.xmark; icon-size: 14px;
-                    icon-color: #8a93a3;
-                    hover-background: #f2f4f7;
+                    icon-color: ControlStyle.icon;
+                    normal-background: ControlStyle.surface;
                     clicked => { root.dismiss-remote-update(); }
                 }
                 PrimaryButton {
@@ -1789,10 +1794,10 @@ export component StreamWindow inherits Window {
             }
 
             // Transfer progress overlay at bottom-left.
-            if root.file-transfer-visible: Rectangle {
+            if root.file-transfer-visible: ShadowSurface {
                 x: root.file-panel-x; y: root.file-panel-y;
                 width: root.file-panel-width; height: root.file-panel-height;
-                background: #fffffff0; border-width: 1px; border-color: ImGuiLineStyle.border; border-radius: UiRadius.surface; z: 7;
+                background: #fffffff0; shadow-color: UiShadow.edge; border-radius: UiRadius.surface; z: 7;
                 // Header/padding and drags leaving the panel belong to local UI.
                 TouchArea {
                     mouse-cursor: default;
@@ -1801,6 +1806,7 @@ export component StreamWindow inherits Window {
                 Text { x: 12px; y: 8px; text: StreamStrings.file-transfer; color: #2d3138; font-weight: 600; }
                 IconButton {
                     x: parent.width - 32px; y: 1px; icon: FontAwesomeIcons.xmark; icon-size: 13px;
+                    normal-background: ControlStyle.surface;
                     clicked => { root.close-file-transfer(); }
                 }
                 ScrollView {
@@ -1840,12 +1846,11 @@ export component StreamWindow inherits Window {
         }
         }
 
-        if root.custom-titlebar && !root.fullscreen-enabled: Rectangle {
+        if root.custom-titlebar && !root.fullscreen-enabled: ShadowSurface {
             width: parent.width;
             height: parent.height;
             background: transparent;
-            border-width: 1px;
-            border-color: #aaa8a6;
+            shadow-color: UiShadow.edge;
             border-radius:
                 root.window-maximized ? 0px : root.window-corner-radius;
             z: 200;

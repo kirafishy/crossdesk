@@ -1,9 +1,11 @@
+import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
-import { CompactComboBox, ToggleSwitch, DialogSurface, IconButton, FontAwesomeIcons } from "common.slint";
+import { CompactComboBox, ToggleSwitch, DialogSurface, IconButton, FontAwesomeIcons, ControlStyle } from "common.slint";
 import { WorkbenchStyle } from "workbench_controls.slint";
 
 // Shared visual treatment for the global settings pages.
-export component SettingsButton inherits Rectangle {
+export component SettingsButton inherits ShadowSurface {
+    shadow-compact: true;
     in property <string> text;
     in property <image> icon;
     in property <bool> primary: false;
@@ -14,12 +16,13 @@ export component SettingsButton inherits Rectangle {
     private property <length> content-padding: root.has-icon ? 8px : 12px;
     callback clicked();
     width: 88px; height: 32px; border-radius: UiRadius.control;
-    background: !root.enabled ? #f0f3f7
+    background: !root.enabled ? ControlStyle.disabled
         : root.primary ? (touch.pressed ? #1e4fa3 : touch.has-hover ? #2866c9 : #3275dc)
-        : touch.pressed ? #e9eef5 : touch.has-hover ? #f0f4fa : root.quiet ? transparent : white;
-    border-width: root.quiet || root.primary ? 0px : 1px;
-    border-color: !root.enabled ? WorkbenchStyle.border
-        : touch.has-hover ? WorkbenchStyle.hover-border : WorkbenchStyle.control-border;
+        : touch.pressed ? ControlStyle.pressed : touch.has-hover ? ControlStyle.hover
+        : root.quiet ? transparent : ControlStyle.surface;
+    shadow-enabled: !root.quiet && !root.primary;
+    shadow-color: !root.enabled ? UiShadow.edge
+        : touch.has-hover ? UiShadow.hover : UiShadow.edge;
     accessible-role: button; accessible-label: root.text;
     accessible-action-default => { if root.enabled { root.clicked(); } }
     Rectangle {
@@ -59,7 +62,7 @@ export component SettingsDialog inherits DialogSurface {
     callback action();
     callback close();
     background: #f8fafc;
-    border-color: WorkbenchStyle.separator;
+    shadow-color: UiShadow.edge;
     drop-shadow-color: #14294424;
     drop-shadow-blur: 24px;
     drop-shadow-offset-y: 8px;
@@ -97,6 +100,7 @@ export component SettingsDialog inherits DialogSurface {
             width: 28px; height: 28px;
             icon: FontAwesomeIcons.xmark; icon-size: 14px;
             icon-color: WorkbenchStyle.muted;
+            normal-background: ControlStyle.surface;
             hover-background: WorkbenchStyle.hover-surface;
             pressed-background: WorkbenchStyle.pressed-surface;
             accessible-role: button; accessible-label: root.close-label;
@@ -110,8 +114,8 @@ export component SettingsDialog inherits DialogSurface {
 export component SettingsSelect inherits CompactComboBox {
     subtle: true;
     show-arrow: false;
-    normal-border-color: WorkbenchStyle.control-border;
-    hover-border-color: WorkbenchStyle.hover-border;
+    normal-shadow-color: UiShadow.edge;
+    hover-shadow-color: UiShadow.hover;
     height: 28px;
 }
 
@@ -123,9 +127,9 @@ export component SettingsGroup inherits Rectangle {
         x: 2px; y: 0px; width: parent.width - 4px; height: 18px; text: root.title;
         font-size: 11px; font-weight: 600; color: #718096; vertical-alignment: center;
     }
-    Rectangle {
+    ShadowSurface {
         y: 24px; width: parent.width; height: parent.height - self.y;
-        background: white; border-radius: UiRadius.surface; border-color: WorkbenchStyle.border; border-width: 1px;
+        background: white; border-radius: UiRadius.surface; shadow-color: UiShadow.edge;
         VerticalLayout { padding: 0px; spacing: 0px; @children }
     }
 }
@@ -141,8 +145,8 @@ export component SettingsRow inherits Rectangle {
         text: root.label; color: root.enabled ? #34445a : #9ba5b3;
         font-size: 12px; overflow: elide; vertical-alignment: center;
     }
-    if root.divider: Rectangle {
-        x: 12px; y: parent.height - 1px; width: parent.width - 24px; height: 1px; background: #d9e1ec;
+    if root.divider: ShadowSeparator {
+        x: 12px; y: parent.height - 1px; width: parent.width - 24px; height: 1px; shadow-color: UiShadow.separator;
     }
     @children
 }

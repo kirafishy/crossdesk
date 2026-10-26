@@ -1,3 +1,4 @@
+import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { LanStrings } from "lan_strings.slint";
 import { AboutPanel, AboutPage, AboutComponent, AboutStrings, AboutNavigationRow, AboutNavigationGroup, AboutRowSeparator } from "about_panel.slint";
 import { UiRadius } from "ui_radius.slint";
@@ -14,7 +15,7 @@ import { GroupFilter } from "group_filter.slint";
 import { ScrollView } from "std-widgets.slint";
 import { RoundedLineEdit } from "rounded_line_edit.slint";
 import { AnnouncementItem, MessagePanel, MessageStrings } from "message_panel.slint";
-import { FontAwesomeIcons, IconButton, CompactComboBox, ImGuiCheckBox, CompactButton, PrimaryButton, SecondaryButton, ToggleSwitch, SectionTitle, DialogSurface, ImGuiLineStyle, ImGuiFontStyle } from "common.slint";
+import { FontAwesomeIcons, IconButton, CompactComboBox, ImGuiCheckBox, CompactButton, PrimaryButton, SecondaryButton, ToggleSwitch, SectionTitle, DialogSurface, ImGuiFontStyle, ControlStyle } from "common.slint";
 import "../assets/fonts/message_spacing.ttf";
 
 export struct RecentConnection {
@@ -206,26 +207,29 @@ component DialogPromptText inherits Rectangle {
     }
 }
 
-// Use the same compact, plain-text field for connection and password changes.
-component PasswordInput inherits Rectangle {
+// Use the same plain-text field for connection and password changes.
+component PasswordInput inherits ShadowSurface {
     in-out property <string> text;
     in property <int> max-length: 0;
     in property <length> text-size: ImGuiFontStyle.base;
+    in property <bool> error: false;
     private property <string> previous-text;
     callback accepted;
 
     width: 70px;
     height: 23px;
-    background: white;
-    border-width: 1px;
-    border-color: ImGuiLineStyle.border;
+    background: editor.has-focus ? ControlStyle.input-focused : ControlStyle.input-surface;
+    shadow-color: root.error ? UiShadow.error : editor.has-focus ? UiShadow.focus : UiShadow.edge;
+    shadow-focused: editor.has-focus || root.error;
+    shadow-compact: true;
     border-radius: UiRadius.control;
+    clip: true;
     forward-focus: editor;
 
     init => { root.previous-text = root.text; }
 
     editor := TextInput {
-        x: 5px; y: 1px; width: parent.width - 10px; height: parent.height - 2px;
+        x: 12px; y: 1px; width: parent.width - 24px; height: parent.height - 2px;
         text <=> root.text;
         input-type: InputType.text;
         single-line: true;
@@ -937,10 +941,10 @@ export component MainWindow inherits Window {
                     clicked => { root.close-main-window(); }
                 }
             }
-            Rectangle {
+            ShadowSeparator {
                 y: parent.height - 1px;
                 height: 1px;
-                background: #d5d3d0;
+                shadow-color: UiShadow.separator;
             }
         }
 
@@ -1024,10 +1028,10 @@ export component MainWindow inherits Window {
             }
             close-touch := TouchArea { clicked => { root.close-main-window(); } }
         }
-        Rectangle {
+        ShadowSeparator {
             y: parent.height - 1px;
             height: 1px;
-            background: #d4d4d4;
+            shadow-color: UiShadow.separator;
         }
     }
 
@@ -1090,12 +1094,12 @@ export component MainWindow inherits Window {
         // Slint owns the client area below the native macOS title bar. Draw
         // the boundary here because AppKit's titlebar separator is not shown
         // reliably when winit creates a window without an NSToolbar.
-        Rectangle {
+        ShadowSeparator {
             x: 0px;
             y: 0px;
             width: parent.width;
             height: 1px;
-            background: ImGuiLineStyle.control-separator;
+            shadow-color: UiShadow.separator;
             z: 7;
         }
 
@@ -1146,6 +1150,7 @@ export component MainWindow inherits Window {
             x: root.ip-direct-enabled ? connection-mode-switch.x + connection-mode-switch.width + 8px : 20px;
             y: connection-mode-switch.y;
             width: 80px; height: 28px;
+            normal-background: white;
             text: GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub");
             z: 8;
             clicked => { root.open-gallery(); }
@@ -1154,20 +1159,20 @@ export component MainWindow inherits Window {
             visible: !root.gallery-mode;
             x: parent.width - 56px; y: open-gallery-button.y;
             width: 36px; height: 28px;
+            normal-background: white;
             icon: FontAwesomeIcons.bars;
             tooltip: GalleryStrings.tr("更多", "More", "Ещё");
             z: 8;
             clicked => { root.gallery-action("release", ""); root.menu-open = !root.menu-open; }
         }
         // Unread messages take precedence so the menu has only one indicator.
-        if !root.gallery-mode && root.update-available && root.announcement-unread <= 0: Rectangle {
+        if !root.gallery-mode && root.update-available && root.announcement-unread <= 0: ShadowSurface {
             x: menu-button.x + menu-button.width - self.width + 4px;
             y: menu-button.y - 1px;
             width: 16px;
             height: 16px;
             border-radius: 8px;
-            border-width: 1px;
-            border-color: white;
+            shadow-color: UiShadow.edge;
             background: WorkbenchStyle.accent;
             opacity: root.menu-open || mod(animation-tick(), 2s) < 1s ? 1 : 0;
             z: 9;
@@ -1201,14 +1206,13 @@ export component MainWindow inherits Window {
                 clicked => { root.gallery-action("release", ""); root.menu-open = !root.menu-open; }
             }
         }
-        if !root.gallery-mode && root.announcement-unread > 0: Rectangle {
+        if !root.gallery-mode && root.announcement-unread > 0: ShadowSurface {
             x: menu-button.x + menu-button.width - self.width + 4px;
             y: menu-button.y - 1px;
             width: max(16px, unread-badge-label.preferred-width + 8px);
             height: 16px;
             border-radius: 8px;
-            border-width: 1px;
-            border-color: white;
+            shadow-color: UiShadow.edge;
             background: #d92d20;
             z: 9;
             accessible-role: button;
@@ -1280,7 +1284,7 @@ export component MainWindow inherits Window {
                         lan-port-editor.select-all();
                     }
                 }
-                local-address-field := Rectangle {
+                local-address-field := ShadowSurface {
                     x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
                     // Size the endpoint as one line; reserve five port digits so
                     // editing never shifts the IP or changes the font size.
@@ -1298,15 +1302,15 @@ export component MainWindow inherits Window {
                     // Raise the whole field: a child's z cannot escape its
                     // parent's stacking order above the following password row.
                     z: 1;
-                    background: WorkbenchStyle.field-surface; border-radius: UiRadius.control;
-                    border-width: 1px;
-                    border-color: !root.lan-mode ? WorkbenchStyle.border
-                        : root.lan-endpoint-error != "" ? #d92d20
-                        : lan-ip-picker.has-focus || root.lan-port-editing ? WorkbenchStyle.accent
-                        : WorkbenchStyle.border;
-                    animate border-color { duration: 120ms; }
+                    background: ControlStyle.input-surface; border-radius: UiRadius.control;
+                    shadow-compact: true;
+                    shadow-color: !root.lan-mode ? UiShadow.edge
+                        : root.lan-endpoint-error != "" ? UiShadow.error
+                        : lan-ip-picker.has-focus || root.lan-port-editing ? UiShadow.focus
+                        : UiShadow.edge;
+                    animate shadow-color { duration: 120ms; }
                     if !root.lan-mode: Text { x: 12px; width: parent.width - 64px; height: parent.height; text: root.local-id; font-size: 24px; font-weight: 600; letter-spacing: 1px; overflow: elide; color: WorkbenchStyle.text; vertical-alignment: center; }
-                    Rectangle { x: parent.width - 48px; y: 10px; width: 1px; height: parent.height - 20px; background: WorkbenchStyle.border; }
+                    ShadowSeparator { x: parent.width - 48px; y: 10px; width: 1px; height: parent.height - 20px; vertical: true; shadow-color: UiShadow.separator; }
                     lan-ip-picker := GroupFilter {
                         visible: root.lan-mode;
                         x: 4px; y: 2px;
@@ -1319,9 +1323,9 @@ export component MainWindow inherits Window {
                         model: root.lan-interfaces; system-count: 0;
                         current-index <=> root.lan-interface-draft-index;
                         enabled: root.lan-mode && !root.lan-password-pending && root.lan-interfaces.length > 0;
-                        normal-border-color: WorkbenchStyle.control-border;
-                        hover-border-color: WorkbenchStyle.hover-border;
-                        focus-border-color: WorkbenchStyle.accent;
+                        normal-shadow-color: UiShadow.edge;
+                        hover-shadow-color: UiShadow.hover;
+                        focus-shadow-color: WorkbenchStyle.accent;
                         accessible-label: GalleryStrings.tr("切换本机 IP", "Switch local IP", "Сменить локальный IP");
                         selected(index) => {
                             root.copy-feedback = CopyFeedback.idle;
@@ -1346,17 +1350,16 @@ export component MainWindow inherits Window {
                         font-weight: 600; color: WorkbenchStyle.text;
                         horizontal-alignment: center; vertical-alignment: center;
                     }
-                    lan-port-field := Rectangle {
+                    lan-port-field := ShadowSurface {
                         visible: root.lan-mode;
                         x: lan-ip-picker.x + lan-ip-picker.width + 2px; y: 2px;
                         width: lan-port-metrics.preferred-width * local-address-field.lan-font-scale + 4px;
                         height: parent.height - 4px;
-                        background: lan-port-editor.has-focus ? WorkbenchStyle.surface
-                            : lan-port-hover.has-hover ? WorkbenchStyle.hover-surface : transparent;
+                        background: lan-port-editor.has-focus ? ControlStyle.input-focused
+                            : lan-port-hover.has-hover ? ControlStyle.hover : transparent;
                         border-radius: UiRadius.control;
-                        border-width: 1px;
-                        border-color: lan-port-editor.has-focus ? WorkbenchStyle.accent : transparent;
-                        animate background, border-color { duration: 120ms; }
+                        shadow-color: lan-port-editor.has-focus ? UiShadow.focus : transparent;
+                        animate background, shadow-color { duration: 120ms; }
                         lan-port-hover := TouchArea {
                             enabled: root.lan-mode && !root.lan-password-pending;
                             mouse-cursor: text;
@@ -1439,12 +1442,13 @@ export component MainWindow inherits Window {
                     }
                 }
                 Text { x: 16px; y: 138px; height: 18px; text: UiStrings.password; font-size: 12px; color: WorkbenchStyle.muted; }
-                Rectangle {
+                ShadowSurface {
                     x: 16px; y: 158px; width: parent.width - 32px; height: 36px;
-                    background: WorkbenchStyle.field-surface; border-radius: UiRadius.control;
-                    border-width: 1px; border-color: WorkbenchStyle.border;
+                    background: ControlStyle.input-surface; border-radius: UiRadius.control;
+                    shadow-color: UiShadow.edge;
+                    shadow-compact: true;
                     Text { x: 12px; width: parent.width - 132px; height: parent.height; text: root.active-password == "" ? "—" : root.active-password-visible ? root.active-password : "••••••"; font-size: 20px; font-weight: 500; letter-spacing: 2px; color: WorkbenchStyle.text; vertical-alignment: center; }
-                    Rectangle { x: parent.width - 118px; y: 8px; width: 1px; height: parent.height - 16px; background: WorkbenchStyle.border; }
+                    ShadowSeparator { x: parent.width - 118px; y: 8px; width: 1px; height: parent.height - 16px; vertical: true; shadow-color: UiShadow.separator; }
                     WorkbenchButton {
                         x: parent.width - 112px; y: 0px; width: 36px; quiet: true;
                         icon: root.active-password-visible ? FontAwesomeIcons.eye : FontAwesomeIcons.eye-slash;
@@ -1471,15 +1475,18 @@ export component MainWindow inherits Window {
                 Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.remote-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
                 Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("输入 IP:端口，通过局域网连接", "Enter IP:port to connect over LAN", "Введите IP:порт для подключения по LAN") : GalleryStrings.tr("输入设备 ID，连接远程桌面", "Enter a device ID to start a remote session", "Введите ID для удалённого подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
                 Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("远端 IP / 端口", "Remote IP / Port", "Удалённый IP / Порт") : UiStrings.remote-id; font-size: 12px; color: WorkbenchStyle.muted; }
-                Rectangle {
+                ShadowSurface {
                     x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
-                    background: white; border-radius: UiRadius.control; border-width: 1px;
-                    border-color: root.connection-input-error != "" ? #d65252 : remote-id-editor.has-focus ? WorkbenchStyle.accent : WorkbenchStyle.control-border;
-                    animate border-color { duration: 120ms; }
+                    background: remote-id-editor.has-focus ? ControlStyle.input-focused : ControlStyle.input-surface;
+                    shadow-compact: true;
+                    border-radius: UiRadius.control;
+                    shadow-color: root.connection-input-error != "" ? UiShadow.error : remote-id-editor.has-focus ? UiShadow.focus : UiShadow.edge;
+                    shadow-focused: remote-id-editor.has-focus || root.connection-input-error != "";
+                    animate shadow-color { duration: 120ms; }
                     if root.remote-id-input == "": Text {
                         x: 12px; width: parent.width - 24px; height: parent.height;
                         text: root.lan-mode ? "192.168.1.20:52888" : GalleryStrings.tr("请输入 9 位设备 ID", "Enter a 9-digit device ID", "Введите ID из 9 цифр");
-                        font-size: 13px; color: #8290a4; vertical-alignment: center;
+                        font-size: 13px; color: ControlStyle.input-placeholder; vertical-alignment: center;
                     }
                     remote-id-editor := TextInput {
                         x: 12px; width: parent.width - 24px; height: parent.height;
@@ -1528,15 +1535,16 @@ export component MainWindow inherits Window {
                 visible: !root.lan-mode;
                 x: parent.width - self.width - 20px; y: 0px;
                 width: 155px; height: 32px;
-                normal-border-color: WorkbenchStyle.control-border;
-                hover-border-color: WorkbenchStyle.hover-border;
-                focus-border-color: WorkbenchStyle.accent;
+                normal-background: white;
+                normal-shadow-color: UiShadow.edge;
+                hover-shadow-color: UiShadow.hover;
+                focus-shadow-color: WorkbenchStyle.accent;
                 model: root.recent-groups;
                 current-index <=> root.recent-group-index;
                 selected(index) => { root.recent-group-selected(index); }
             }
 
-            recent-list := Rectangle {
+            recent-list := ShadowSurface {
                 x: 20px;
                 y: 36px;
                 width: parent.width - 40px;
@@ -1544,8 +1552,8 @@ export component MainWindow inherits Window {
                 // A continuous inset surface groups the cards into one
                 // horizontal scrolling lane, including its scrollbar.
                 background: root.recent-connections.length > 0 ? #e6edf6 : transparent;
-                border-width: root.recent-connections.length > 0 ? 1px : 0px;
-                border-color: #c9d4e3;
+                shadow-enabled: root.recent-connections.length > 0;
+                shadow-color: UiShadow.edge;
                 border-radius: UiRadius.surface;
                 clip: true;
 
@@ -1668,7 +1676,7 @@ export component MainWindow inherits Window {
                                 width: parent.width;
                                 height: 44px;
                                 background: white;
-                                Rectangle { x: 0px; y: 0px; width: parent.width; height: 1px; background: WorkbenchStyle.separator; }
+                                ShadowSeparator { x: 0px; y: 0px; width: parent.width; height: 1px; shadow-color: UiShadow.separator; }
                                 Text {
                                     x: 12px; y: 5px; height: 19px;
                                     width: parent.width - 56px;
@@ -1802,11 +1810,11 @@ export component MainWindow inherits Window {
                                 }
                             }
                         }
-                        Rectangle {
+                        ShadowSurface {
                             width: parent.width; height: 124px;
-                            border-width: 1px; border-radius: UiRadius.surface;
-                            border-color: card-touch.has-hover || card-menu.menu-open ? WorkbenchStyle.hover-border : WorkbenchStyle.border;
-                            animate border-color { duration: 120ms; }
+                             border-radius: UiRadius.surface;
+                            shadow-color: card-touch.has-hover || card-menu.menu-open ? UiShadow.hover : UiShadow.edge;
+                            animate shadow-color { duration: 120ms; }
                         }
                     }
                 }
@@ -1863,10 +1871,10 @@ export component MainWindow inherits Window {
             y: parent.height - 28px;
             height: 28px;
             background: white;
-            Rectangle {
+            ShadowSeparator {
                 y: 0px;
                 height: 1px;
-                background: WorkbenchStyle.border;
+                shadow-color: UiShadow.separator;
             }
             Rectangle {
                 x: 20px; y: 11px; width: 6px; height: 6px; border-radius: 3px;
@@ -1917,7 +1925,7 @@ export component MainWindow inherits Window {
     // Shared device details sit outside the clipped recent list and wall rail,
     // below the modal layer (z >= 39).
     if (root.gallery-mode ? gallery.hovered-device.id != "" : root.recent-tooltip-visible)
-        && !root.connection-dialog-open && !root.lan-open: device-tip := Rectangle {
+        && !root.connection-dialog-open && !root.lan-open: device-tip := ShadowSurface {
         private property <string> device-name: root.gallery-mode ? gallery.hovered-device.name : root.recent-tooltip-name;
         private property <string> host-name: root.gallery-mode ? gallery.hovered-device.host-name : root.recent-tooltip-host;
         private property <string> device-id: root.gallery-mode ? gallery.hovered-device.id : root.recent-tooltip-id;
@@ -1944,8 +1952,7 @@ export component MainWindow inherits Window {
             self.label-width + max(tooltip-id.preferred-width, tooltip-groups.preferred-width) + 32px));
         height: tooltip-groups.y + tooltip-groups.height + 10px;
         background: WorkbenchStyle.surface;
-        border-width: 1px;
-        border-color: #d5dfea;
+        shadow-color: UiShadow.edge;
         border-radius: UiRadius.menu;
         drop-shadow-color: #14294424;
         drop-shadow-blur: 14px;
@@ -1988,11 +1995,11 @@ export component MainWindow inherits Window {
             color: WorkbenchStyle.muted; font-size: 10px;
             wrap: word-wrap;
         }
-        tooltip-divider := Rectangle {
+        tooltip-divider := ShadowSeparator {
             x: 12px; y: tooltip-name.y + tooltip-name.height
                 + (device-tip.has-host-name ? tooltip-host.height + 3px : 0px) + 8px;
             width: parent.width - 24px; height: 1px;
-            background: WorkbenchStyle.separator;
+            shadow-color: UiShadow.separator;
         }
         tooltip-id-label := Text {
             x: 12px; y: tooltip-divider.y + 7px;
@@ -2039,7 +2046,7 @@ export component MainWindow inherits Window {
     }
 
     // Expand downward from the application toolbar.
-    if !root.gallery-mode && root.menu-open: Rectangle {
+    if !root.gallery-mode && root.menu-open: ShadowSurface {
         x: menu-button.x + menu-button.width - self.width;
         y: menu-button.y + menu-button.height + 6px;
         width: max(128px, max(menu-settings-label.preferred-width,
@@ -2047,8 +2054,7 @@ export component MainWindow inherits Window {
                        menu-about-label.preferred-width + (root.update-available ? menu-update-badge.width + 8px : 0px))) + 28px);
         height: application-menu-content.preferred-height;
         background: WorkbenchStyle.surface;
-        border-width: 1px;
-        border-color: WorkbenchStyle.control-border;
+        shadow-color: UiShadow.edge;
         border-radius: UiRadius.menu;
         z: 10;
         TouchArea { }
@@ -2081,9 +2087,9 @@ export component MainWindow inherits Window {
             }
             Rectangle {
                 height: 7px;
-                Rectangle {
+                ShadowSeparator {
                     x: 8px; y: 3px; width: parent.width - 16px; height: 1px;
-                    background: WorkbenchStyle.border;
+                    shadow-color: UiShadow.separator;
                 }
             }
             menu-messages := Rectangle {
@@ -2130,9 +2136,9 @@ export component MainWindow inherits Window {
             }
             Rectangle {
                 height: 7px;
-                Rectangle {
+                ShadowSeparator {
                     x: 8px; y: 3px; width: parent.width - 16px; height: 1px;
-                    background: WorkbenchStyle.border;
+                    shadow-color: UiShadow.separator;
                 }
             }
             menu-about := Rectangle {
@@ -2232,24 +2238,29 @@ export component MainWindow inherits Window {
         DialogSurface {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
-            width: root.compact-language ? 230px : 320px;
-            height: 170px;
-            VerticalLayout {
-                padding: 20px;
-                spacing: 12px;
-                DialogPromptText { prompt: UiStrings.new-password; }
-                HorizontalLayout {
-                    alignment: center;
-                    PasswordInput {
-                        text <=> root.new-password-input;
-                        max-length: 6;
-                    }
+            width: root.compact-language ? 260px : 320px;
+            height: reset-content.preferred-height;
+            reset-content := VerticalLayout {
+                padding: 24px;
+                spacing: 16px;
+                Text {
+                    text: UiStrings.new-password; color: WorkbenchStyle.text;
+                    font-size: 13px; font-weight: 500; wrap: word-wrap;
+                    min-height: 22px; vertical-alignment: center;
                 }
-                Text { height: root.reset-password-invalid ? 18px : 0px; visible: root.reset-password-invalid; text: UiStrings.invalid-password; color: #d92d20; font-size: ImGuiFontStyle.small; horizontal-alignment: center; }
+                PasswordInput {
+                    width: parent.width - 48px; height: 38px; text-size: 16px;
+                    text <=> root.new-password-input;
+                    max-length: 6;
+                    error: root.reset-password-invalid;
+                }
+                if root.reset-password-invalid: Text {
+                    text: UiStrings.invalid-password; color: #b42318; font-size: 12px; wrap: word-wrap;
+                }
                 HorizontalLayout {
-                    alignment: center; spacing: 8px;
+                    spacing: 12px; height: 34px;
                     PrimaryButton {
-                        text: UiStrings.ok;
+                        text: UiStrings.ok; height: 34px; horizontal-stretch: 1;
                         enabled: root.lan-mode ? !root.lan-password-pending : !root.password-change-pending;
                         clicked => {
                             if (root.reset-password(root.new-password-input)) {
@@ -2259,7 +2270,7 @@ export component MainWindow inherits Window {
                             } else { root.reset-password-invalid = true; }
                         }
                     }
-                    SecondaryButton { text: UiStrings.cancel; clicked => { root.new-password-input = ""; root.reset-password-invalid = false; root.reset-password-open = false; } }
+                    SecondaryButton { text: UiStrings.cancel; height: 34px; horizontal-stretch: 1; clicked => { root.new-password-input = ""; root.reset-password-invalid = false; root.reset-password-open = false; } }
                 }
             }
         }
@@ -2298,7 +2309,7 @@ export component MainWindow inherits Window {
                 DialogPromptText { prompt: UiStrings.edit-alias; }
                 RoundedLineEdit {
                     height: 28px;
-                    normal-border-color: ImGuiLineStyle.border;
+                    normal-shadow-color: UiShadow.edge;
                     text <=> root.alias-input;
                     accepted => {
                         root.recent-edit-alias(root.alias-remote-id, root.alias-input);
@@ -2373,7 +2384,7 @@ export component MainWindow inherits Window {
                 y: (parent.height - self.height) / 2;
                 width: min(420px, parent.width - 40px);
                 height: disconnect-content.preferred-height;
-                border-color: WorkbenchStyle.border;
+                shadow-color: UiShadow.edge;
                 TouchArea { scroll-event(event) => { accept } }
                 disconnect-content := VerticalLayout {
                     padding: 24px;
@@ -2463,14 +2474,14 @@ export component MainWindow inherits Window {
             if !root.lan-open && root.connection-password-required && !root.connection-validating: PasswordInput {
                 x: (parent.width - self.width) / 2; y: connection-prompt-text.y + connection-prompt-text.height + 16px;
                 width: 164px; height: 36px; text-size: 16px;
-                border-radius: UiRadius.control; border-color: WorkbenchStyle.control-border;
+                border-radius: UiRadius.control;
                 text <=> root.connection-password;
                 accepted => { root.submit-connection-password(); }
             }
             if root.lan-open && !root.lan-connecting: PasswordInput {
                 x: (parent.width - self.width) / 2; y: connection-prompt-text.y + connection-prompt-text.height + 16px;
                 width: 164px; height: 36px; text-size: 16px; max-length: 6;
-                border-radius: UiRadius.control; border-color: WorkbenchStyle.control-border;
+                border-radius: UiRadius.control;
                 text <=> root.lan-access-password;
                 accepted => { root.submit-connection-password(); }
             }
@@ -2522,7 +2533,7 @@ export component MainWindow inherits Window {
             y: (parent.height - self.height) / 2;
             width: min(400px, parent.width - 40px);
             height: permission-content.preferred-height;
-            background: #f8fafc; border-color: WorkbenchStyle.separator;
+            background: #f8fafc; shadow-color: UiShadow.edge;
             drop-shadow-color: #14294424; drop-shadow-blur: 24px; drop-shadow-offset-y: 8px;
             TouchArea { clicked => { focus-sink.focus(); } }
             permission-content := VerticalLayout {
@@ -2594,7 +2605,7 @@ export component MainWindow inherits Window {
                 }
                 VerticalLayout {
                     spacing: 12px;
-                    Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                    ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
                     Text {
                         text: GalleryStrings.tr("请在系统设置中允许 CrossDesk 访问。如系统提示重新打开应用，请按提示操作。",
                             "Allow CrossDesk access in System Settings. Reopen the app if macOS asks you to.",
@@ -2619,7 +2630,7 @@ export component MainWindow inherits Window {
             y: (parent.height - self.height) / 2;
             width: min(400px, parent.width - 40px);
             height: min(446px, parent.height - 16px);
-            background: #f8fafc; border-radius: UiRadius.surface; border-color: #e1e7ef;
+            background: #f8fafc; border-radius: UiRadius.surface; shadow-color: UiShadow.edge;
             drop-shadow-color: #14294424; drop-shadow-blur: 24px; drop-shadow-offset-y: 8px;
             TouchArea { clicked => { focus-sink.focus(); } }
             Text {
@@ -2627,16 +2638,16 @@ export component MainWindow inherits Window {
                 width: parent.width - 2 * settings-dialog.content-inset; height: 27px;
                 text: UiStrings.settings; font-size: 20px; font-weight: 600; color: #22324a;
             }
-            Rectangle {
+            ShadowSurface {
                 x: settings-dialog.content-inset; y: 56px;
                 width: parent.width - 2 * settings-dialog.content-inset; height: 40px;
-                background: WorkbenchStyle.canvas; border-radius: UiRadius.menu;
-                border-width: 1px; border-color: WorkbenchStyle.border;
-                Rectangle {
+                background: #dfe7f2; border-radius: UiRadius.menu;
+                shadow-color: UiShadow.edge;
+                ShadowSurface {
                     x: 4px + root.settings-tab * (parent.width - 4px) / 2;
                     y: 4px; width: (parent.width - 12px) / 2; height: parent.height - 8px;
                     background: WorkbenchStyle.surface; border-radius: UiRadius.control;
-                    border-width: 1px; border-color: WorkbenchStyle.control-border;
+                    shadow-color: UiShadow.edge;
                     animate x { duration: 140ms; easing: ease-out; }
                 }
                 for label[index] in [GalleryStrings.tr("常规", "General", "Общие"), GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub")]: Rectangle {
@@ -2770,9 +2781,9 @@ export component MainWindow inherits Window {
                 width: parent.width - 2 * settings-dialog.content-inset; height: 24px;
                 text: root.settings-save-error; font-size: 11px; color: #c53e3e; wrap: word-wrap;
             }
-            Rectangle {
+            ShadowSeparator {
                 x: settings-dialog.content-inset; y: parent.height - 64px;
-                width: parent.width - 2 * settings-dialog.content-inset; height: 1px; background: #e6ebf2;
+                width: parent.width - 2 * settings-dialog.content-inset; height: 1px; shadow-color: UiShadow.separator;
             }
             HorizontalLayout {
                 x: settings-dialog.content-inset; y: parent.height - 50px;
@@ -2798,7 +2809,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             width: min(460px, parent.width - 32px);
             height: min(380px, parent.height - 24px);
-            background: #f8fafc; border-color: #e1e7ef;
+            background: #f8fafc; shadow-color: UiShadow.edge;
             drop-shadow-color: #14294424; drop-shadow-blur: 18px; drop-shadow-offset-y: 6px;
             TouchArea { clicked => { focus-sink.focus(); } }
             Text {
@@ -2852,7 +2863,7 @@ export component MainWindow inherits Window {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: 360px; height: root.self-host-settings-error == "" ? 266px : 322px;
-            border-radius: UiRadius.surface; border-color: #e1e7ef; background: #f8fafc;
+            border-radius: UiRadius.surface; shadow-color: UiShadow.edge; background: #f8fafc;
             drop-shadow-color: #14294424; drop-shadow-blur: 18px; drop-shadow-offset-y: 6px;
             TouchArea { clicked => { focus-sink.focus(); } }
             Text {
@@ -2863,21 +2874,21 @@ export component MainWindow inherits Window {
             RoundedLineEdit {
                 x: 18px; y: 80px; width: parent.width - 36px; height: 30px;
                 surrounding-background: #f8fafc;
-                normal-border-color: WorkbenchStyle.control-border;
+                normal-shadow-color: UiShadow.edge;
                 text <=> root.server-host;
             }
             Text { x: 18px; y: 120px; width: parent.width - 36px; height: 20px; text: UiStrings.server-port; color: #34445a; font-size: 12px; overflow: elide; vertical-alignment: center; }
             RoundedLineEdit {
                 x: 18px; y: 144px; width: parent.width - 36px; height: 30px;
                 surrounding-background: #f8fafc;
-                normal-border-color: WorkbenchStyle.control-border;
+                normal-shadow-color: UiShadow.edge;
                 text <=> root.server-port; input-type: InputType.number;
             }
             if root.self-host-settings-error != "": Text {
                 x: 18px; y: 186px; width: parent.width - 36px; height: 48px;
                 text: root.self-host-settings-error; color: #c53e3e; font-size: 11px; wrap: word-wrap;
             }
-            Rectangle { x: 18px; y: parent.height - 66px; width: parent.width - 36px; height: 1px; background: #e6ebf2; }
+            ShadowSeparator { x: 18px; y: parent.height - 66px; width: parent.width - 36px; height: 1px; shadow-color: UiShadow.separator; }
             SettingsButton { x: parent.width - 114px; y: parent.height - 50px; width: 92px; primary: true; text: UiStrings.ok; clicked => { if root.save-self-hosted-settings() { root.self-host-settings-open = false; } } }
             SettingsButton { x: parent.width - 204px; y: parent.height - 50px; width: 80px; text: UiStrings.cancel; clicked => { root.cancel-self-hosted-settings(); root.self-host-settings-open = false; } }
         }
@@ -2915,7 +2926,7 @@ export component MainWindow inherits Window {
                     color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
                     font-family: "CrossDesk Message Spacing";
                 }
-                Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
                 HorizontalLayout {
                     alignment: end;
                     SettingsButton {
@@ -2983,11 +2994,11 @@ export component MainWindow inherits Window {
                     width: about-scroll.width; height: self.preferred-height;
                     // Keep the expanding scrollbar outside the content.
                     padding: 0px; padding-right: 22px; spacing: 16px;
-                    Rectangle {
+                    ShadowSurface {
                         height: max(80px, product-info.preferred-height + 32px);
                         background: WorkbenchStyle.surface;
                         border-radius: UiRadius.surface;
-                        border-width: 1px; border-color: WorkbenchStyle.border;
+                        shadow-color: UiShadow.edge;
                         Image {
                             x: 16px; y: (parent.height - self.height) / 2;
                             width: 56px; height: 56px;
@@ -3004,12 +3015,11 @@ export component MainWindow inherits Window {
                             }
                         }
                     }
-                    if root.update-available: Rectangle {
+                    if root.update-available: ShadowSurface {
                         height: update-summary.preferred-height + 24px;
                         background: WorkbenchStyle.field-surface;
                         border-radius: UiRadius.control;
-                        border-width: 1px;
-                        border-color: WorkbenchStyle.separator;
+                        shadow-color: UiShadow.edge;
                         update-summary := VerticalLayout {
                             x: 12px; y: 12px; width: parent.width - 24px;
                             height: self.preferred-height;
@@ -3079,7 +3089,7 @@ export component MainWindow inherits Window {
                 x: 24px; y: parent.height - self.height - 24px;
                 width: parent.width - 48px; height: self.preferred-height;
                 spacing: 16px;
-                Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
                 if root.update-status-text != "": Text {
                     text: root.update-status-text;
                     color: root.update-check-status == UpdateCheckStatus.failed ? #b3261e
@@ -3123,7 +3133,7 @@ export component MainWindow inherits Window {
             // Use the same content area for sizing and centering the dialog.
             height: min(488px, parent.height - 32px);
             border-radius: UiRadius.surface;
-            border-color: WorkbenchStyle.border;
+            shadow-color: UiShadow.edge;
             drop-shadow-color: #07142b24;
             drop-shadow-blur: 24px;
             drop-shadow-offset-y: 8px;
@@ -3179,10 +3189,9 @@ export component MainWindow inherits Window {
                         font-weight: 600;
                         vertical-alignment: center;
                     }
-                    Rectangle {
+                    ShadowSurface {
                         background: WorkbenchStyle.field-surface;
-                        border-width: 1px;
-                        border-color: WorkbenchStyle.separator;
+                        shadow-color: UiShadow.edge;
                         border-radius: UiRadius.control;
                         // Inset the viewport so text and the scrollbar stay clear
                         // of the rounded frame, including at either scroll limit.
@@ -3229,7 +3238,7 @@ export component MainWindow inherits Window {
                 VerticalLayout {
                     vertical-stretch: 0;
                     spacing: 16px;
-                    Rectangle { height: 1px; background: WorkbenchStyle.separator; }
+                    ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
                     if root.update-install-status != "": Text {
                         text: root.update-install-status;
                         font-size: 12px;
@@ -3302,7 +3311,7 @@ export component MainWindow inherits Window {
                 width: min(440px, parent.width - 40px);
                 height: update-confirm-content.preferred-height;
                 border-radius: UiRadius.surface;
-                border-color: WorkbenchStyle.border;
+                shadow-color: UiShadow.edge;
                 TouchArea {}
                 update-confirm-content := VerticalLayout {
                     padding: 24px;
@@ -3356,7 +3365,7 @@ export component MainWindow inherits Window {
             width: 512px;
             height: wayland-notice-content.preferred-height;
             border-radius: UiRadius.surface;
-            border-color: #dce3ee;
+            shadow-color: UiShadow.edge;
             drop-shadow-color: #07142b30;
             drop-shadow-blur: 28px;
             drop-shadow-offset-y: 10px;
@@ -3380,10 +3389,10 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                Rectangle {
+                ShadowSurface {
                     background: #fff8eb;
-                    border-color: #f0dfba;
-                    border-width: 1px;
+                    shadow-color: UiShadow.edge;
+
                     border-radius: UiRadius.surface;
                     VerticalLayout {
                         padding: 14px; spacing: 8px;
@@ -3403,10 +3412,10 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                Rectangle {
+                ShadowSurface {
                     background: #f3f7fd;
-                    border-color: #dfe8f5;
-                    border-width: 1px;
+                    shadow-color: UiShadow.edge;
+
                     border-radius: UiRadius.surface;
                     VerticalLayout {
                         padding: 14px; spacing: 8px;
@@ -3426,7 +3435,7 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                Rectangle { height: 1px; background: #e9edf3; }
+                ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
                 HorizontalLayout {
                     height: 34px; alignment: end;
                     PrimaryButton {
@@ -3459,8 +3468,8 @@ export component MainWindow inherits Window {
                     text-size: ImGuiFontStyle.prominent;
                     text-weight: 600;
                 }
-                Rectangle {
-                    background: #f7f8fa; border-color: #d9dde4; border-width: 1px; border-radius: UiRadius.surface;
+                ShadowSurface {
+                    background: #f7f8fa; shadow-color: UiShadow.edge; border-radius: UiRadius.surface;
                     Text { x: 14px; y: 22px; width: parent.width - 28px; height: parent.height - 24px; text: UiStrings.service-setup-message; color: #3d434d; wrap: word-wrap; vertical-alignment: center; }
                 }
                 if root.portable-service-status != "": Text {
@@ -3531,14 +3540,13 @@ export component MainWindow inherits Window {
         z: 250;
     }
 
-    if root.custom-titlebar: Rectangle {
+    if root.custom-titlebar: ShadowSurface {
         x: 0px;
         y: 0px;
         width: root.width;
         height: root.height;
         background: transparent;
-        border-width: 1px;
-        border-color: root.wayland-titlebar ? #aaa8a6 : #8b8b8b;
+        shadow-color: UiShadow.edge;
         border-radius:
             root.wayland-titlebar ? root.wayland-corner-radius : 0px;
         z: 200;

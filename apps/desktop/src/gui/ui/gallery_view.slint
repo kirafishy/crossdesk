@@ -1,3 +1,4 @@
+import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
 import { GalleryStrings } from "device_strings.slint";
 import { RemoteCursor } from "remote_cursor.slint";
@@ -6,7 +7,7 @@ import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { GroupFilter } from "group_filter.slint";
 import { ScrollView } from "std-widgets.slint";
 import { RoundedLineEdit } from "rounded_line_edit.slint";
-import { CompactButton, SecondaryButton, IconButton, FontAwesomeIcons, ImGuiCheckBox } from "common.slint";
+import { CompactButton, SecondaryButton, IconButton, FontAwesomeIcons, ImGuiCheckBox, ControlStyle } from "common.slint";
 
 component GalleryButton inherits CompactButton {
     border-radius: UiRadius.control;
@@ -473,7 +474,7 @@ export component GalleryView inherits Rectangle {
             height: root.card-height;
             opacity: root.dragging && root.drag-source == tile.id ? 0.45 : 1;
             background: !tile.online ? DeviceCardStyle.offline-background
-                : tile.selected ? #eaf3ff : root.batch && tile-touch.has-hover ? #f3f8fe : white;
+                : tile.selected ? ControlStyle.selected : root.batch && tile-touch.has-hover ? ControlStyle.hover : white;
             Rectangle {
                 x: root.card-inset; y: self.x;
                 width: parent.width - self.x * 2;
@@ -491,12 +492,13 @@ export component GalleryView inherits Rectangle {
                 width: parent.width - self.x - (tile-touch.has-hover && !root.batch ? DeviceCardStyle.toolbar-width + 12px : root.batch ? 35px : 9px);
                 height: 24px; text: tile.name; color: tile.online ? #24272d : DeviceCardStyle.offline-text; font-size: 12px; overflow: elide; vertical-alignment: center;
             }
-            if root.batch && !root.simplified: Rectangle {
+            if root.batch && !root.simplified: ShadowSurface {
                 x: parent.width - 27px; y: parent.height - 27px;
-                width: 18px; height: 18px; border-radius: 4px; border-width: 1px;
-                background: tile.selected ? (tile-touch.pressed ? #5c9fdf : tile-touch.has-hover ? #659fe0 : #6dabea) : tile-touch.has-hover ? #f3f8fe : white;
-                border-color: tile.selected ? #6dabea : tile-touch.has-hover ? #76aeea : #b7bec8;
-                animate background, border-color { duration: 120ms; }
+                width: 18px; height: 18px; border-radius: 4px;
+                background: tile.selected ? (tile-touch.pressed ? #254cc0 : tile-touch.has-hover ? #4574f0 : #3564e3)
+                    : tile-touch.pressed ? ControlStyle.pressed : tile-touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
+                shadow-color: tile.selected ? UiShadow.focus : tile-touch.has-hover ? UiShadow.hover : UiShadow.edge;
+                animate background, shadow-color { duration: 120ms; }
                 if tile.selected: Text {
                     text: FontAwesomeIcons.check; color: white;
                     font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 11px;
@@ -531,27 +533,27 @@ export component GalleryView inherits Rectangle {
             }
         }
         // Draw each table line once, continuously across occupied and empty cells.
-        for column in root.columns + 1: Rectangle {
+        for column in root.columns + 1: ShadowSeparator {
             visible: root.count > 0;
             x: min(column * root.card-width, grid.table-width - 1px);
             y: 0px;
             width: 1px; height: grid.table-height;
-            background: root.resizing || (grid.has-hover && grid.edge-x != 0 && grid.column-line == column)
-                ? #76aeea : #c9cdd2;
+            vertical: true; shadow-color: root.resizing || (grid.has-hover && grid.edge-x != 0 && grid.column-line == column)
+                ? UiShadow.focus : UiShadow.separator;
         }
-        for row in root.rows + 1: Rectangle {
+        for row in root.rows + 1: ShadowSeparator {
             visible: root.count > 0;
             x: 0px;
             y: min(row * root.card-height, grid.table-height - 1px);
             width: grid.table-width; height: 1px;
-            background: root.resizing || (grid.has-hover && grid.edge-y != 0 && grid.row-line == row)
-                ? #76aeea : #c9cdd2;
+            shadow-color: root.resizing || (grid.has-hover && grid.edge-y != 0 && grid.row-line == row)
+                ? UiShadow.focus : UiShadow.separator;
         }
-        if root.drag-target >= 0: Rectangle {
+        if root.drag-target >= 0: ShadowSurface {
             x: mod(root.drag-target, root.columns) * root.card-width + 1px;
             y: floor(root.drag-target / root.columns) * root.card-height + 1px;
             width: root.card-width - 2px; height: root.card-height - 2px;
-            background: #76aeea26; border-width: 2px; border-color: #4a94de;
+            background: #76aeea26; shadow-color: UiShadow.focus;
         }
         if root.count == 0: Text {
             text: root.simplified
@@ -597,11 +599,11 @@ export component GalleryView inherits Rectangle {
             }
             GalleryButton { width: 100px; primary: true; enabled: !root.focused.connected || root.controlling || (root.focused.has-frame && !root.focused.stale); text: root.focused.connected ? (root.controlling ? GalleryStrings.tr("释放操控", "Release", "Отпустить") : GalleryStrings.tr("接管操控", "Control", "Управлять")) : GalleryStrings.tr("连接", "Connect", "Подключить"); clicked => { root.action(root.focused.connected ? (root.controlling ? "release" : "control") : "connect", root.focused.id); } }
         }
-        Rectangle {
+        ShadowSurface {
             x: 0px; y: rail.visible ? focus-divider.y + focus-divider.height : 36px;
             width: parent.width; height: parent.height - self.y;
             background: root.focused.online ? #eff1f4 : DeviceCardStyle.offline-background; border-radius: UiRadius.surface;
-            border-width: root.controlling ? 2px : 1px; border-color: root.controlling ? #76aeea : root.focused.online ? #d5dbe3 : DeviceCardStyle.offline-border;
+            shadow-color: root.controlling ? UiShadow.focus : UiShadow.edge;
             video := Rectangle {
                 x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
                 background: root.focused.online ? #24272d : DeviceCardStyle.offline-preview;
@@ -668,12 +670,12 @@ export component GalleryView inherits Rectangle {
                     // Collapse the focused tile and its gap without changing the page model.
                     width: tile.id == root.focused.id ? 0px : root.rail-slot-width;
                     height: root.rail-card-height; visible: tile.id != root.focused.id;
-                    rail-card := Rectangle {
+                    rail-card := ShadowSurface {
                         private property <string> presence: tile.online ? GalleryStrings.tr("在线", "Online", "В сети")
                             : tile.presence-known ? GalleryStrings.tr("离线", "Offline", "Не в сети") : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
                         private property <string> details: tile.name + "\n" + tile.host-name + "\nID: " + tile.id + "\n" + tile.group-names + "\n" + self.presence;
                         width: root.rail-preview-width + 10px; height: root.rail-card-height; border-radius: UiRadius.surface;
-                        background: tile.online ? #f5f6f8 : DeviceCardStyle.offline-background; border-width: 1px; border-color: tile.online ? #d5dbe3 : DeviceCardStyle.offline-border;
+                        background: tile.online ? #f5f6f8 : DeviceCardStyle.offline-background; shadow-color: UiShadow.edge;
                         accessible-role: button;
                         accessible-label: self.details;
                         accessible-action-default => { root.action("focus", tile.id); }
@@ -714,9 +716,9 @@ export component GalleryView inherits Rectangle {
             visible: root.focus-rail-visible;
             x: 0px; y: rail.y + rail.height; width: parent.width; height: 12px;
             private property <bool> highlighted: divider-touch.has-hover || root.focus-resizing || divider-focus.has-focus;
-            Rectangle {
+            ShadowSeparator {
                 x: 0px; y: 5px; width: parent.width; height: 1px;
-                background: focus-divider.highlighted ? #a6c9ed : #e6e9ed;
+                shadow-color: focus-divider.highlighted ? UiShadow.focus : UiShadow.separator;
             }
             Rectangle {
                 x: (parent.width - self.width) / 2; y: 4px; width: 36px; height: 3px; border-radius: 1.5px;
@@ -775,7 +777,7 @@ export component GalleryView inherits Rectangle {
     }
     Rectangle {
         y: parent.height - 44px; height: 44px; background: #fafbfc;
-        Rectangle { y: 0px; width: parent.width; height: 1px; background: #e1e4e8; }
+        ShadowSeparator { y: 0px; width: parent.width; height: 1px; shadow-color: UiShadow.separator; }
     }
     // Connection status and pagination remain available in every selection state.
     footer := Rectangle {
@@ -793,7 +795,7 @@ export component GalleryView inherits Rectangle {
             network-button := SecondaryButton {
                 x: connection-count.x + connection-count.width + 12px;
                 min-width: 64px; width: 64px; height: parent.height;
-                border-color: #c8cbd0; border-radius: UiRadius.control;
+                shadow-color: UiShadow.edge; border-radius: UiRadius.control;
                 text: GalleryStrings.tr("网络状态", "Network", "Сеть");
                 accessible-role: button;
                 accessible-label: self.text;
@@ -823,6 +825,7 @@ export component GalleryView inherits Rectangle {
         IconButton {
             width: 24px; height: 24px;
             border-radius: UiRadius.control;
+            normal-background: ControlStyle.surface;
             icon: root.fullscreen ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
             tooltip: root.fullscreen ? GalleryStrings.tr("退出全屏", "Exit fullscreen", "Выйти из полноэкранного режима") : GalleryStrings.tr("全屏", "Fullscreen", "На весь экран");
             clicked => { root.toggle-fullscreen(); }
@@ -840,11 +843,11 @@ export component GalleryView inherits Rectangle {
             horizontal-alignment: center; vertical-alignment: center;
         }
     }
-    if root.dragging: Rectangle {
+    if root.dragging: ShadowSurface {
         x: clamp(grid.x + root.drag-x + 14px, 8px, parent.width - self.width - 8px);
         y: clamp(grid.y + root.drag-y + 14px, 8px, footer.y - self.height - 12px);
         width: 224px; height: 54px; z: 10;
-        background: #fffffff2; border-width: 1px; border-color: #76aeea; border-radius: UiRadius.surface;
+        background: #fffffff2; shadow-color: UiShadow.focus; border-radius: UiRadius.surface;
         Rectangle {
             x: 8px; y: 9px; width: 64px; height: 36px;
             background: root.dragged-tile.online ? #24272d : DeviceCardStyle.offline-preview;
@@ -862,20 +865,20 @@ export component GalleryView inherits Rectangle {
             font-size: 10px; color: #527ca8; overflow: elide;
         }
     }
-    if root.swap-save-failed: Rectangle {
+    if root.swap-save-failed: ShadowSurface {
         x: (parent.width - self.width) / 2; y: footer.y - self.height - 14px;
         width: min(420px, parent.width - 32px); height: 36px; z: 10;
-        background: #fff2f0; border-width: 1px; border-color: #e9b7b0; border-radius: UiRadius.surface;
+        background: #fff2f0; shadow-color: UiShadow.edge; border-radius: UiRadius.surface;
         Text { x: 12px; y: 0px; width: parent.width - 24px; height: parent.height; font-size: 12px; color: #9d4339; vertical-alignment: center;
             text: GalleryStrings.tr("换位未保存，请重试", "Couldn't save positions. Please try again.", "Не удалось сохранить порядок. Повторите попытку."); overflow: elide;
         }
     }
     // Device details are rendered by MainWindow; resize hints stay local.
-    if root.device-tooltip-visible && (root.device-tooltip-id == "resize-grid" || root.device-tooltip-id == "resize-focus"): Rectangle {
+    if root.device-tooltip-visible && (root.device-tooltip-id == "resize-grid" || root.device-tooltip-id == "resize-focus"): ShadowSurface {
         x: clamp(root.device-tooltip-x, 8px, parent.width - self.width - 8px);
         y: clamp(root.device-tooltip-y + self.height > footer.y ? root.device-tooltip-y - self.height - 8px : root.device-tooltip-y, 4px, parent.height - self.height - 4px);
         width: min(320px, parent.width - 16px); height: device-tooltip-label.preferred-height + 16px;
-        background: #22252bf2; border-width: 1px; border-color: #ffffff38; border-radius: UiRadius.control;
+        background: #22252bf2; shadow-color: UiShadow.edge; border-radius: UiRadius.control;
         device-tooltip-label := Text {
             x: 8px; y: 8px; width: parent.width - 16px;
             text: root.device-tooltip-text; color: white; font-size: 11px; wrap: word-wrap;
@@ -884,9 +887,9 @@ export component GalleryView inherits Rectangle {
     if root.adding: Rectangle {
         background: #00000042;
         TouchArea {}
-        add-dialog := Rectangle {
+        add-dialog := ShadowSurface {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 400px; height: 306px;
-            background: white; border-radius: UiRadius.surface; border-width: 1px; border-color: #b2b2b2;
+            background: white; border-radius: UiRadius.surface; shadow-color: UiShadow.edge;
             function submit() {
                 if root.add-device(device-id.text, password.text, group.text, remember.checked) {
                     password.text = "";
@@ -931,25 +934,27 @@ export component GalleryView inherits Rectangle {
     if root.importing: Rectangle {
         background: #00000042;
         TouchArea {}
-        Rectangle {
+        ShadowSurface {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: 440px; height: 378px;
-            background: white; border-radius: UiRadius.surface; border-width: 1px; border-color: #b2b2b2;
+            background: white; border-radius: UiRadius.surface; shadow-color: UiShadow.edge;
             Text { x: 18px; y: 16px; height: 24px; text: GalleryStrings.tr("从最近连接添加", "Add from recent connections", "Добавить из недавних"); font-size: 16px; }
             Text { x: 18px; y: 44px; width: 404px; height: 18px; text: GalleryStrings.tr("加入桌面墙后，可通过批量选择连接", "Add devices, then use Select to connect them.", "После добавления подключайтесь через выбор."); color: #62666d; font-size: 11px; }
             ImGuiCheckBox { x: 18px; y: 74px; enabled: root.recent-available > 0; checked: root.recent-devices.length > 0 && root.recent-selected == root.recent-available; }
             Text { x: 45px; y: 74px; height: 21px; text: GalleryStrings.tr("全选", "Select all", "Выбрать все"); color: root.recent-available > 0 ? #24272d : #92969e; font-size: 12px; vertical-alignment: center; }
             TouchArea { x: 18px; y: 74px; width: 144px; height: 21px; enabled: root.recent-available > 0; clicked => { root.action("recent-all", ""); } }
             Text { x: 224px; y: 74px; width: 198px; height: 21px; text: GalleryStrings.tr("待添加 ", "To add ", "К добавлению ") + root.recent-selected + " / " + root.recent-available; horizontal-alignment: right; vertical-alignment: center; font-size: 12px; color: #62666d; }
-            Rectangle {
+            ShadowSurface {
                 x: 18px; y: 102px; width: 404px; height: 160px;
-                border-width: 1px; border-color: #d8dadd; border-radius: UiRadius.surface; clip: true;
+                shadow-color: UiShadow.edge; border-radius: UiRadius.surface; clip: true;
                 recent-list := ScrollView {
                     x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
                     viewport-width: self.width - 12px;
                     viewport-height: max(self.height, root.recent-devices.length * 44px);
                     for device[index] in root.recent-devices: Rectangle {
                         y: index * 44px; width: recent-list.viewport-width; height: 44px;
-                        background: device.added ? #f1f2f4 : device.selected ? #edf5fe : row-touch.has-hover ? #f4f5f6 : white;
+                        background: device.added ? ControlStyle.disabled
+                            : device.selected ? (row-touch.pressed ? ControlStyle.selected-pressed : row-touch.has-hover ? ControlStyle.selected-hover : ControlStyle.selected)
+                            : row-touch.pressed ? ControlStyle.pressed : row-touch.has-hover ? ControlStyle.hover : white;
                         ImGuiCheckBox { x: 8px; y: 11px; enabled: !device.added; checked: device.added || device.selected; }
                         Text { x: 36px; y: 3px; width: parent.width - 126px; height: 20px; text: device.name; color: device.added ? #92969e : #24272d; font-size: 12px; overflow: elide; vertical-alignment: center; }
                         Text { x: 36px; y: 23px; width: parent.width - 126px; height: 16px; text: device.id; font-size: 11px; color: device.added ? #92969e : #808080; }
@@ -970,10 +975,10 @@ export component GalleryView inherits Rectangle {
                     border-width: UiRadius.surface; border-radius: 2 * UiRadius.surface;
                     border-color: white;
                 }
-                Rectangle {
+                ShadowSurface {
                     width: parent.width; height: parent.height;
-                    border-width: 1px; border-radius: UiRadius.surface;
-                    border-color: #d8dadd;
+                     border-radius: UiRadius.surface;
+                    shadow-color: UiShadow.edge;
                 }
             }
             Text { x: 18px; y: 274px; width: 60px; height: 30px; text: GalleryStrings.tr("分组", "Group", "Группа"); font-size: 12px; vertical-alignment: center; }
@@ -985,10 +990,10 @@ export component GalleryView inherits Rectangle {
     }
     if root.confirming: Rectangle {
         background: #00000042; TouchArea {}
-        Rectangle {
+        ShadowSurface {
             x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
             width: 360px; height: confirmation-list.height + 118px;
-            background: white; border-radius: UiRadius.surface; border-width: 1px; border-color: #b2b2b2;
+            background: white; border-radius: UiRadius.surface; shadow-color: UiShadow.edge;
             Text {
                 x: 20px; y: 18px; width: parent.width - 132px; height: 24px;
                 text: root.action-code == "disconnect" ? GalleryStrings.tr("断开连接", "Disconnect devices", "Отключение") : root.action-name;
@@ -999,10 +1004,10 @@ export component GalleryView inherits Rectangle {
                 background: #eff3f8; border-radius: UiRadius.surface;
                 Text { text: root.selected-count + GalleryStrings.tr(" 台设备", " devices", " устр."); color: #626e7d; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
             }
-            confirmation-list := Rectangle {
+            confirmation-list := ShadowSurface {
                 x: 20px; y: 58px; width: parent.width - 40px;
                 height: clamp(root.selected-devices.length * 52px + 2px, 54px, 210px);
-                background: #fcfdfe; border-width: 1px; border-color: #e2e6eb; border-radius: UiRadius.surface; clip: true;
+                background: #fcfdfe; shadow-color: UiShadow.edge; border-radius: UiRadius.surface; clip: true;
                 confirmation-scroll := ScrollView {
                     x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
                     viewport-width: self.width - 12px;
@@ -1018,7 +1023,7 @@ export component GalleryView inherits Rectangle {
                             Rectangle { x: 9px; y: 7px; width: 6px; height: 6px; border-radius: 3px; background: device.connected ? #27a762 : #a0a6b0; }
                             Text { x: 21px; width: parent.width - 27px; height: parent.height; text: device.connected ? GalleryStrings.tr("已连接", "Connected", "Подключено") : GalleryStrings.tr("未连接", "Not connected", "Нет связи"); color: device.connected ? #348259 : #858d98; font-size: 10px; vertical-alignment: center; }
                         }
-                        if index + 1 < root.selected-devices.length: Rectangle { x: 12px; y: parent.height - 1px; width: parent.width - 24px; height: 1px; background: #edf0f3; }
+                        if index + 1 < root.selected-devices.length: ShadowSeparator { x: 12px; y: parent.height - 1px; width: parent.width - 24px; height: 1px; shadow-color: UiShadow.separator; }
                     }
                 }
             }

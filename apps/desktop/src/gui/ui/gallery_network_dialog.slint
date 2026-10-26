@@ -1,3 +1,4 @@
+import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
 import { GalleryStrings } from "device_strings.slint";
 import { CompactButton } from "common.slint";
@@ -190,13 +191,13 @@ export component GalleryNetworkDialog inherits Rectangle {
     callback close();
     background: #00000042;
     TouchArea { clicked => { root.close(); } }
-    Rectangle {
+    ShadowSurface {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         width: min(760px, parent.width - 32px);
         height: min(120px + root.list-height, parent.height - 32px);
         background: white; border-radius: UiRadius.surface;
-        border-width: 1px; border-color: #c6cdd5;
+        shadow-color: UiShadow.edge;
         TouchArea {}
         FocusScope {
             init => { self.focus(); }
@@ -237,7 +238,7 @@ export component GalleryNetworkDialog inherits Rectangle {
             for device[index] in root.devices: NetworkRow {
                 y: index * root.row-height; width: list.viewport-width; height: root.row-height;
                 device: device; background: mod(index, 2) == 0 ? white : #f8fafc;
-                Rectangle { y: parent.height - 1px; height: 1px; background: #edf0f4; }
+                ShadowSeparator { y: parent.height - 1px; height: 1px; shadow-color: UiShadow.separator; }
             }
         }
         if root.devices.length == 0: NetworkEmptyState {

@@ -1,3 +1,4 @@
+import { ShadowSeparator, UiShadow } from "ui_shadow.slint";
 import { FileTransferEntry } from "stream_window.slint";
 import { DialogSurface, FontAwesomeIcons, IconButton, ImGuiFontStyle } from "common.slint";
 import { WorkbenchStyle, WorkbenchButton } from "workbench_controls.slint";
@@ -26,7 +27,7 @@ export component FileTransferNotification inherits Window {
     DialogSurface {
         width: parent.width; height: parent.height;
         background: WorkbenchStyle.surface;
-        border-color: WorkbenchStyle.separator;
+        shadow-color: UiShadow.edge;
         Text {
             x: 16px; y: 8px;
             width: parent.width - 64px - (root.remote-id == "" ? 0px : 108px);
@@ -50,9 +51,9 @@ export component FileTransferNotification inherits Window {
             pressed-background: WorkbenchStyle.pressed-surface;
             clicked => { root.dismissed(); }
         }
-        Rectangle {
+        ShadowSeparator {
             x: 16px; y: 40px; width: parent.width - 32px; height: 1px;
-            background: WorkbenchStyle.separator;
+            shadow-color: UiShadow.separator;
         }
         Text {
             x: 16px; y: 47px; width: parent.width - 32px; height: 18px;
@@ -96,7 +97,7 @@ export component FileTransferNotification inherits Window {
                 text: root.cancel-text;
                 text-size: ImGuiFontStyle.base;
                 text-color: WorkbenchStyle.muted;
-                normal-border-color: WorkbenchStyle.border;
+                normal-shadow-color: UiShadow.edge;
                 clicked => { root.cancel-requested(); }
             }
         }
