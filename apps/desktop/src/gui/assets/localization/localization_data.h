@@ -21,23 +21,30 @@ struct TranslationRow {
 
 // Single source of truth for all UI strings.
 #define CROSSDESK_LOCALIZATION_ALL(X)                                          \
+  X(window_minimize, u8"最小化", "Minimize", u8"Свернуть") \
+  X(window_maximize, u8"最大化", "Maximize", u8"Развернуть") \
+  X(window_restore, u8"还原窗口", "Restore window", u8"Восстановить окно") \
+  X(window_close, u8"关闭窗口", "Close window", u8"Закрыть окно") \
+  X(save, u8"保存", "Save", u8"Сохранить") \
+  X(copyright_notice, u8"© 2026 JUNKUN DI。保留所有权利。", "© 2026 by JUNKUN DI. All rights reserved.", u8"© 2026 JUNKUN DI. Все права защищены.") \
+  X(license_notice, u8"依据 GNU GPL v3 许可发布。", "Licensed under GNU GPL v3.", u8"Распространяется по лицензии GNU GPL v3.") \
   X(messages, u8"消息", "Messages", u8"Сообщения") \
   X(message_unread, u8"未读", "Unread", u8"Не прочитано") \
   X(message_read, u8"已读", "Read", u8"Прочитано") \
   X(message_read_all, u8"全部已读", "Mark all as read", u8"Отметить всё прочитанным") \
   X(message_empty, u8"暂无公告", "No announcements", u8"Нет объявлений") \
-  X(message_select, u8"选择公告查看详情", "Select an announcement to read", u8"Выберите объявление") \
+  X(message_select, u8"选择公告查看详情", "Select an announcement to read", u8"Выберите объявление для просмотра") \
   X(message_loading, u8"正在加载…", "Loading…", u8"Загрузка…") \
-  X(message_read_save_error, u8"无法保存本地阅读状态，请重试。", "Unable to save reading status locally. Please try again.", u8"Не удалось сохранить статус чтения. Повторите попытку.") \
+  X(message_read_save_error, u8"无法保存本地阅读状态，请重试。", "Unable to save reading status locally. Please try again.", u8"Не удалось сохранить статус чтения локально. Повторите попытку.") \
   X(message_close, u8"关闭", "Close", u8"Закрыть") \
   X(message_delete, u8"删除", "Delete", u8"Удалить") \
   X(message_delete_title, u8"删除公告", "Delete announcement", u8"Удалить объявление") \
   X(message_delete_confirmation, u8"删除这条公告？", "Delete this announcement?", u8"Удалить это объявление?") \
   X(message_delete_error, u8"无法删除这条公告，请重试。", "Unable to delete this announcement. Please try again.", u8"Не удалось удалить объявление. Повторите попытку.") \
   X(console_cli_help, u8"Linux 无头运行选项：\n  --headless                  自动选择已有桌面并启用控制台\n  --headless-display DISPLAY  高级：指定已有显示会话\n  --headless-size WIDTHxHEIGHT 新建虚拟屏幕；默认1920x1080，偶数尺寸320..8192\n  --headless-session EXECUTABLE 启动桌面环境（startxfce4；none 仅启动裸屏幕）\n  --no-headless               禁用自动回退\n正常启动会自动选择已有桌面，无需填写显示编号。控制台输入 settings 管理设置。\n", "Linux headless options:\n  --headless                  Select an existing desktop and enable the console\n  --headless-display DISPLAY  Advanced: override desktop selection\n  --headless-size WIDTHxHEIGHT New virtual display; default 1920x1080, even 320..8192\n  --headless-session EXECUTABLE Start a desktop (startxfce4; none for a bare display)\n  --no-headless               Disable automatic fallback\nNormal startup selects your existing desktop automatically. Enter settings in the console to configure it.\n", u8"Параметры запуска без монитора:\n  --headless                  Выбрать рабочий стол и включить консоль\n  --headless-display DISPLAY  Дополнительно: указать сеанс дисплея\n  --headless-size WIDTHxHEIGHT Новый виртуальный экран; 1920x1080 по умолчанию, чётные размеры 320..8192\n  --headless-session EXECUTABLE Запустить рабочий стол (startxfce4; none — только экран)\n  --no-headless               Отключить автоматический резервный запуск\nРабочий стол выбирается автоматически. Команда settings открывает настройки консоли.\n") \
-  X(console_title, u8"CrossDesk 无头控制台", "CrossDesk headless console", u8"Консоль CrossDesk") \
+  X(console_title, u8"CrossDesk 无头控制台", "CrossDesk headless console", u8"Консоль CrossDesk без графического интерфейса") \
   X(console_log_file, u8"日志文件", "Log file", u8"Файл журнала") \
-  X(console_help, u8"命令: status 查看 ID/密码/状态；settings 设置；password 修改密码；random 随机密码；help 帮助；quit 退出", "Commands: status, settings, password, random, help, quit", u8"Команды: status, settings, password, random, help, quit") \
+  X(console_help, u8"命令: status 查看 ID/密码/状态；settings 设置；password 修改密码；random 随机密码；help 帮助；quit 退出", "Commands: status — show ID/password/status; settings — configure; password — change password; random — random password; help — help; quit — exit", u8"Команды: status — ID/пароль/состояние; settings — настройки; password — сменить пароль; random — случайный пароль; help — справка; quit — выход") \
   X(console_status, u8"状态", "Status", u8"Состояние") \
   X(console_online, u8"在线", "Online", u8"В сети") \
   X(console_offline, u8"未连接服务器", "Disconnected from server", u8"Нет подключения к серверу") \
@@ -77,7 +84,7 @@ struct TranslationRow {
   X(console_settings_next_connection, u8"已保存，将用于后续连接。", "Saved; applies to subsequent connections.", u8"Сохранено. Будет применено к следующим подключениям.") \
   X(console_settings_next_file, u8"已保存，将用于后续接收的文件。", "Saved; applies to subsequently received files.", u8"Сохранено. Будет применено к следующим получаемым файлам.") \
   X(console_settings_autostart, u8"已保存，在下次图形桌面登录时生效。", "Saved; applies at the next graphical desktop login.", u8"Сохранено. Будет применено при следующем входе в графический сеанс.") \
-  X(console_settings_daemon, u8"已保存，普通模式重启后生效；无头控制台仍保持前台运行。", "Saved for the next normal-mode start; the headless console stays in the foreground.", u8"Сохранено для следующего запуска в обычном режиме. Консоль остаётся на переднем плане.") \
+  X(console_settings_daemon, u8"已保存，普通模式重启后生效；无头控制台仍保持前台运行。", "Saved for the next normal-mode start; the headless console stays in the foreground.", u8"Сохранено для следующего запуска в обычном режиме. Консоль без графического интерфейса остаётся на переднем плане.") \
   X(console_settings_server_required, u8"请先设置有效的服务器地址和端口，再启用自托管。", "Set a valid server host and port before enabling self-hosting.", u8"Укажите адрес и порт сервера перед включением собственного сервера.") \
   X(console_settings_path_invalid, u8"请选择已存在且可写的绝对目录路径；default 使用默认目录。", "Use an existing writable absolute directory, or default for the default location.", u8"Укажите существующий доступный для записи абсолютный путь к каталогу или default.") \
   X(console_settings_readonly, u8"该选项由系统或控制端管理，不可在此修改。", "This option is managed by the system or controller and is read-only here.", u8"Этот параметр управляется системой или клиентом и здесь недоступен для изменения.") \
@@ -91,7 +98,7 @@ struct TranslationRow {
   X(console_setting_files, u8"文件保存目录", "Received file directory", u8"Каталог получаемых файлов") \
   X(console_setting_autostart, u8"登录桌面时自启", "Start at desktop login", u8"Запуск при входе в систему") \
   X(console_setting_daemon, u8"守护进程（无头控制台中不生效）", "Daemon (inactive in headless console)", u8"Фоновый режим (не действует в консоли)") \
-  X(save_remote_previews, u8"保存远程画面预览:", "Save remote screen previews:", u8"Сохранять превью экрана:") \
+  X(save_remote_previews, u8"保存远程画面预览:", "Save remote screen previews:", u8"Сохранять превью удалённого экрана:") \
   X(unknown_platform, u8"未知平台", "Unknown platform", u8"Неизвестная платформа") \
   X(privacy_screen, u8"隐私屏", "Privacy screen", u8"Приватный экран") \
   X(privacy_enable, u8"开启隐私屏", "Enable privacy screen", u8"Включить приватный экран") \
@@ -106,7 +113,7 @@ struct TranslationRow {
   X(password, u8"密码", "Password", u8"Пароль")                                \
   X(refresh_password, u8"刷新随机密码", "Refresh random password",            \
     u8"Обновить случайный пароль")                                           \
-  X(max_password_len, u8"最大6个字符", "Max 6 chars", u8"Макс. 6 символов")    \
+  X(password_format_invalid, u8"密码必须为 6 位英文字母或数字。", "Use exactly 6 letters (A–Z, a–z) or digits (0–9).", u8"Пароль должен содержать ровно 6 латинских букв или цифр.")    \
   X(remote_desktop, u8"远程桌面", "Remote Desktop",                            \
     u8"Удаленный рабочий стол")                                                \
   X(device_name, u8"设备名称", "Device Name", u8"Имя устройства")             \
@@ -126,11 +133,9 @@ struct TranslationRow {
     u8"Развернуть панель управления")                                          \
   X(collapse_control_bar, u8"收起控制栏", "Collapse Control Bar",              \
     u8"Свернуть панель управления")                                            \
-  X(fullscreen, u8"全屏", " Fullscreen", u8"Полный экран")                     \
-  X(show_net_traffic_stats, u8"显示网络状态", "Show Net Traffic Stats",        \
-    u8"Показать статистику трафика")                                           \
-  X(hide_net_traffic_stats, u8"隐藏网络状态", "Hide Net Traffic Stats",        \
-    u8"Скрыть статистику трафика")                                             \
+  X(fullscreen, u8"全屏", "Fullscreen", u8"На весь экран")                     \
+  X(show_net_traffic_stats, u8"显示网络状态", "Show network status", u8"Показать состояние сети")                                           \
+  X(hide_net_traffic_stats, u8"隐藏网络状态", "Hide network status", u8"Скрыть состояние сети")                                             \
   X(video, u8"视频", "Video", u8"Видео")                                       \
   X(audio, u8"音频", "Audio", u8"Аудио")                                       \
   X(data, u8"数据", "Data", u8"Данные")                                        \
@@ -142,18 +147,14 @@ struct TranslationRow {
     u8"Выйти из полноэкранного режима")                                        \
   X(control_mouse, u8"控制鼠标", "Control Mouse", u8"Управление мышью")        \
   X(release_mouse, u8"释放鼠标", "Release Mouse", u8"Освободить мышь")         \
-  X(audio_capture, u8"播放声音", "Audio Capture", u8"Воспроизведение звука")   \
-  X(mute, u8" 静音", " Mute", u8"Без звука")                                   \
-  X(send_shortcut, u8"发送组合键", "Send Shortcut", u8"Сочетания клавиш")      \
+  X(audio_capture, u8"播放声音", "Play audio", u8"Воспроизведение звука")   \
+  X(mute, u8"静音", "Mute", u8"Без звука")                                   \
+  X(send_shortcut, u8"发送组合键", "Send Shortcut", u8"Отправить сочетание клавиш")      \
   X(send_sas, u8"发送 SAS", "Send SAS", u8"Отправить SAS")                     \
-  X(lock_remote, u8"锁定远端", "Lock Remote", u8"Заблокировать")               \
-  X(remote_password_box_visible, u8"远端密码框已出现",                         \
-    "Remote password box visible", u8"Окно ввода пароля видно")                \
-  X(remote_lock_screen_hint, u8"远端处于锁屏封面，可发送 SAS",                 \
-    "Remote lock screen visible, send SAS",                                    \
-    u8"Видна блокировка, отправьте SAS")                                       \
-  X(remote_secure_desktop_active, u8"远端已进入安全桌面",                      \
-    "Remote secure desktop active", u8"Активен защищенный рабочий стол")       \
+  X(lock_remote, u8"锁定远端", "Lock Remote", u8"Заблокировать удалённое устройство")               \
+  X(remote_password_box_visible, u8"远端密码框已出现", "Remote password box visible", u8"На удалённом устройстве появилось поле пароля")                \
+  X(remote_lock_screen_hint, u8"远端处于锁屏封面，可发送 SAS", "Remote lock screen visible, send SAS", u8"Удалённый экран заблокирован, можно отправить SAS")                                       \
+  X(remote_secure_desktop_active, u8"远端已进入安全桌面", "Remote secure desktop active", u8"На удалённом устройстве активен защищённый рабочий стол")       \
   X(remote_service_unavailable, u8"远端 Windows 服务不可用",                   \
     "Remote Windows service unavailable",                                      \
     u8"Служба Windows на удаленной стороне недоступна")                        \
@@ -173,8 +174,7 @@ struct TranslationRow {
     u8"нормально; будет недоступно только управление этим компьютером на "     \
     u8"экране блокировки.")                                                    \
   X(install_windows_service, u8"安装", "Install", u8"Установить")              \
-  X(windows_service_settings_label, u8"锁屏控制服务:",                         \
-    "Lock Screen Service:", u8"Служба блокировки экрана:")                     \
+  X(windows_service_settings_label, u8"锁屏控制服务:", "Lock-screen control service:", u8"Служба управления при блокировке:")                     \
   X(windows_service_installed, u8"已安装", "Installed", u8"Установлена")       \
   X(do_not_remind_again, u8"不再提醒", "Do not remind again",                  \
     u8"Больше не напоминать")                                                  \
@@ -210,13 +210,8 @@ struct TranslationRow {
     u8"Способ захвата:")                                                      \
   X(screen_capture_method_auto, u8"自动", "Auto", u8"Авто")                 \
   X(video_settings, u8"画面设置", "Video settings", u8"Настройки видео") \
-  X(remote_update_title, u8"建议升级被控端", "Remote update recommended", \
-    u8"Рекомендуется обновление") \
-  X(remote_update, \
-    u8"新版本包含功能改进和性能优化，建议将被控端升级至最新版本。", \
-    "Update the remote device to the latest version for improved features and performance.", \
-    u8"В новой версии улучшены функции и производительность. " \
-    u8"Рекомендуем обновить CrossDesk на удалённом устройстве.") \
+  X(remote_update_title, u8"建议升级被控端", "Remote update recommended", u8"Рекомендуем обновить удалённое устройство") \
+  X(remote_update, u8"新版本包含功能改进和性能优化，建议将被控端升级至最新版本。", "Update the remote device to the latest version for improved features and performance.", u8"В новой версии улучшены функции и производительность. Рекомендуем обновить CrossDesk на удалённом устройстве до последней версии.") \
   X(remote_update_dismiss, u8"知道了", "Got it", u8"Понятно") \
   X(video_settings_pending, u8"正在应用…", "Applying…", u8"Применение…") \
   X(video_settings_failed, u8"调整失败，请重试。", "Could not apply settings. Try again.", u8"Не удалось применить настройки. Повторите попытку.") \
@@ -233,44 +228,34 @@ struct TranslationRow {
   X(video_quality_high, u8"高", "High", u8"Высокое")                           \
   X(video_quality_medium, u8"中", "Medium", u8"Среднее")                       \
   X(video_quality_low, u8"低", "Low", u8"Низкое")                              \
-  X(video_encode_format, u8"视频编码格式:",                                    \
-    "Video Encode Format:", u8"Формат кодека видео:")                          \
+  X(video_encode_format, u8"视频编码格式:", "Video codec:", u8"Видеокодек:")                          \
   X(av1, u8"AV1", "AV1", "AV1")                                                \
   X(h264, u8"H.264", "H.264", "H.264")                                         \
-  X(force_relay, u8"强制中继连接:", "Force Relay:", u8"Только через реле:")   \
-  X(self_hosted_server_config, u8"自托管配置", "Self-Hosted Config",           \
-    u8"Конфигурация self-hosted")                                              \
-  X(self_hosted_server_settings, u8"自托管设置", "Self-Hosted Settings",       \
-    u8"Настройки self-hosted")                                                 \
+  X(force_relay, u8"强制中继连接:", "Force relay connection:", u8"Только через ретранслятор:")   \
+  X(self_hosted_server_config, u8"自托管配置", "Self-hosted server", u8"Собственный сервер")                                              \
+  X(self_hosted_server_settings, u8"自托管设置", "Self-hosted server settings", u8"Настройки своего сервера")                                                 \
   X(self_hosted_server_address, u8"服务器地址:",                               \
     "Server Address:", u8"Адрес сервера:")                                     \
-  X(self_hosted_server_port, u8"信令服务端口:",                                \
-    "Signal Service Port:", u8"Порт сигнального сервиса:")                     \
+  X(self_hosted_server_port, u8"信令服务端口:", "Signaling port:", u8"Порт сигнализации:")                     \
   X(self_hosted_address_invalid, u8"请输入有效的主机名、IP 或 HTTPS/WSS 信令地址，可包含路径。", "Enter a valid host, IP, or HTTPS/WSS signaling URL. Paths are supported.", u8"Введите имя хоста, IP или HTTPS/WSS-адрес сигнального сервиса. Путь допустим.") \
   X(self_hosted_port_invalid, u8"请输入 1–65535 范围内的信令端口。", "Enter a signaling port between 1 and 65535.", u8"Введите порт сигнального сервиса от 1 до 65535.") \
-  X(self_hosted_save_failed, u8"配置保存失败，请检查配置目录是否可写后重试。", "Could not save settings. Check that the configuration directory is writable and retry.", u8"Не удалось сохранить настройки. Проверьте доступ на запись в каталог конфигурации.") \
+  X(self_hosted_save_failed, u8"配置保存失败，请检查配置目录是否可写后重试。", "Could not save settings. Check that the configuration directory is writable and retry.", u8"Не удалось сохранить настройки. Проверьте доступ на запись в каталог конфигурации и повторите попытку.") \
   X(ok, u8"确认", "OK", u8"ОК")                                                \
   X(cancel, u8"取消", "Cancel", u8"Отмена")                                    \
-  X(new_password, u8"请输入六位密码:",                                         \
-    "Please input a six-char password:", u8"Введите шестизначный пароль:")     \
+  X(new_password, u8"请输入六位密码:", "Enter a six-character password:", u8"Введите пароль из 6 символов:")     \
   X(input_password, u8"请输入密码:",                                           \
     "Please input password:", u8"Введите пароль:")                             \
-  X(validate_password, u8"验证密码中...", "Validate password ...",             \
-    u8"Проверка пароля...")                                                    \
+  X(validate_password, u8"验证密码中...", "Validating password...", u8"Проверка пароля...")                                                    \
   X(reinput_password, u8"请重新输入密码", "Please input password again",       \
     u8"Повторно введите пароль")                                               \
   X(remember_password, u8"记住密码", "Remember password",                      \
     u8"Запомнить пароль")                                                      \
-  X(signal_connected, u8"已连接服务器", "Connected", u8"Подключено к серверу") \
-  X(signal_disconnected, u8"未连接服务器", "Disconnected",                     \
-    u8"Нет подключения к серверу")                                             \
+  X(signal_connected, u8"已连接服务器", "Connected to server", u8"Подключено к серверу") \
+  X(signal_disconnected, u8"未连接服务器", "Disconnected from server", u8"Нет подключения к серверу")                                             \
   X(signal_reconnect, u8"重新连接", "Reconnect", u8"Переподключиться")             \
   X(signal_reconnecting, u8"正在重新连接...", "Reconnecting...",               \
     u8"Переподключение...")                                                    \
-  X(signal_tls_cert_error, u8"证书验证失败，请重新安装自托管根证书",           \
-    "Certificate verification failed. Reinstall the self-hosted root "         \
-    "certificate.",                                                            \
-    u8"Ошибка проверки сертификата. Переустановите корневой сертификат.")      \
+  X(signal_tls_cert_error, u8"证书验证失败，请重新安装自托管根证书", "Certificate verification failed. Reinstall the self-hosted root certificate.", u8"Ошибка проверки сертификата. Переустановите корневой сертификат собственного сервера.")      \
   X(p2p_connected, u8"对等连接已建立", "P2P Connected", u8"P2P подключено")    \
   X(p2p_disconnected, u8"对等连接已断开", "P2P Disconnected",                  \
     u8"P2P отключено")                                                         \
@@ -281,7 +266,7 @@ struct TranslationRow {
   X(receiving_screen, u8"画面接收中...", "Receiving screen...",                \
     u8"Получение изображения...")                                              \
   X(p2p_failed, u8"对等连接失败", "P2P Failed", u8"Сбой P2P")                  \
-  X(connection_auth_throttled, u8"验证尝试过于频繁，请稍后重试。", "Too many authentication attempts. Try again later.", u8"Слишком много попыток. Повторите позже.") \
+  X(connection_auth_throttled, u8"验证尝试过于频繁，请稍后重试。", "Too many authentication attempts. Try again later.", u8"Слишком много попыток аутентификации. Повторите позже.") \
   X(connection_service_busy, u8"认证服务繁忙，请稍后重试。", "Authentication service busy. Try again later.", u8"Сервис проверки занят. Повторите позже.") \
   X(connection_not_authenticated, u8"登录状态已失效，请重新连接。", "Signaling login expired. Please reconnect.", u8"Сеанс входа истёк. Подключитесь заново.") \
   X(connection_retry_after, u8"请在 %d 秒后重试。", "Retry in %d seconds.", u8"Повторите через %d сек.") \
@@ -317,26 +302,22 @@ struct TranslationRow {
     "Access Website: ", u8"Официальный сайт: ")                                \
   X(update, u8"更新", "Update", u8"Обновить")                                  \
   X(install_update, u8"安装更新", "Install update", u8"Установить обновление") \
-  X(manual_download, u8"手动下载", "Download", u8"Скачать") \
+  X(manual_download, u8"手动下载", "Download manually", u8"Скачать вручную") \
   X(install_update_confirm, u8"下载完成后将关闭 CrossDesk 并安装更新，当前连接和文件传输会中断。安装需要系统授权，完成后重新启动。是否继续？", \
     "CrossDesk will close after downloading the update. Connections and file transfers will be interrupted. Installation requires system authorization, then CrossDesk will restart. Continue?", \
     u8"После загрузки CrossDesk закроется для обновления. Соединения и передача файлов будут прерваны. Потребуется разрешение системы, затем приложение перезапустится. Продолжить?") \
   X(update_preparing, u8"正在准备更新…", "Preparing update…", u8"Подготовка обновления…") \
   X(update_install_failed, u8"更新未完成，可重试或手动安装。", "Update did not complete. Retry or install manually.", u8"Обновление не завершено. Повторите или установите вручную.") \
-  X(connection_alias, u8"修改名称", "Edit Alias",                              \
-    u8"Изменить имя подключения")                                              \
+  X(connection_alias, u8"修改名称", "Rename", u8"Переименовать")                                              \
   X(delete_connection, u8"删除连接", "Delete Connection",                      \
     u8"Удалить подключение")                                                   \
-  X(connect_to_this_connection, u8"发起连接", "Connect to this connection",    \
-    u8"Подключиться")                                                          \
+  X(connect_to_this_connection, u8"发起连接", "Connect", u8"Подключиться")                                                          \
   X(input_connection_alias, u8"请输入连接名称:",                               \
     "Please input connection name:", u8"Введите имя подключения:")             \
-  X(confirm_delete_connection, u8"确认删除此连接",                             \
-    "Confirm to delete this connection", u8"Удалить это подключение?")         \
+  X(confirm_delete_connection, u8"确认删除此连接", "Delete this connection?", u8"Удалить это подключение?")         \
   X(enable_autostart, u8"开机自启:", "Auto Start:", u8"Автозапуск:")           \
   X(enable_daemon, u8"启用守护进程:", "Enable Daemon:", u8"Включить демон:")   \
-  X(privacy_on_connect, u8"被连接时开启隐私屏:", "Privacy screen on connect:", \
-    u8"Приватность при подключении:")                                       \
+  X(privacy_on_connect, u8"被连接时开启隐私屏:", "Privacy screen on incoming connection:", u8"Приватный экран при подключении:")                                       \
   X(lock_on_disconnect, u8"连接断开后锁屏:", "Lock screen on disconnect:", \
     u8"Блокировка при отключении:")                                         \
   X(takes_effect_after_restart, u8"重启后生效", "Takes effect after restart",  \
@@ -371,19 +352,19 @@ struct TranslationRow {
     "File Transfer Save Path:", u8"Путь сохранения файлов:")                   \
   X(default_desktop, u8"桌面", "Desktop", u8"Рабочий стол")                    \
   X(resolution, u8"分辨率", "Res", u8"Разрешение")                             \
-  X(video_latency, u8"视频延时", "Video delay", u8"Задержка") \
-  X(connection_latency, u8"连接延时", "Connection RTT", u8"Задержка соединения") \
-  X(connection_mode, u8"连接模式", "Mode", u8"Режим")                          \
+  X(video_latency, u8"视频延时", "Video latency", u8"Задержка видео") \
+  X(connection_latency, u8"连接延时", "Connection latency", u8"Задержка соединения") \
+  X(connection_mode, u8"连接模式", "Connection mode", u8"Режим подключения")                          \
   X(connection_mode_direct, u8"直连", "Direct", u8"Прямой")                    \
-  X(connection_mode_relay, u8"中继", "Relay", u8"Релейный")                    \
+  X(connection_mode_relay, u8"中继", "Relay", u8"Ретрансляция")                    \
   X(transport_encryption, u8"加密传输", "Encryption", u8"Шифрование")         \
   X(remote_video_encoder, u8"被控端编码器", "Remote encoder", u8"Кодер удалённой стороны") \
   X(local_video_decoder, u8"控制端解码器", "Local decoder", u8"Локальный декодер") \
   X(transport_encryption_enabled, u8"已开启", "Enabled", u8"Включено")         \
   X(transport_encryption_disabled, u8"未开启", "Disabled", u8"Выключено")       \
-  X(online, u8"在线", "Online", u8"Онлайн")                                    \
-  X(offline, u8"离线", "Offline", u8"Офлайн")                                  \
-  X(device_offline, u8"设备离线", "Device Offline", u8"Устройство офлайн")     \
+  X(online, u8"在线", "Online", u8"В сети")                                    \
+  X(offline, u8"离线", "Offline", u8"Не в сети")                                  \
+  X(device_offline, u8"设备离线", "Device Offline", u8"Устройство не в сети")     \
   X(request_permissions, u8"权限请求", "Request Permissions",                  \
     u8"Запрос разрешений")                                                     \
   X(screen_recording_permission, u8"屏幕录制权限",                             \

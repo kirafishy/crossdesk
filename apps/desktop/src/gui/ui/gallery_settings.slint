@@ -11,7 +11,7 @@ export component GallerySettings inherits Rectangle {
         y: 0px; width: parent.width;
         title: GalleryStrings.tr("画面传输", "Video transmission", "Передача видео"); rows: 3;
         SettingsRow {
-            label: GalleryStrings.tr("分辨率上限", "Resolution limit", "Разрешение");
+            label: GalleryStrings.tr("分辨率上限", "Resolution limit", "Макс. разрешение");
             label-reserve: self.width - 112px;
             SettingsSelect {
                 border-radius: UiRadius.control;
@@ -33,7 +33,7 @@ export component GallerySettings inherits Rectangle {
             }
         }
         SettingsRow {
-            label: GalleryStrings.tr("视频总带宽", "Video budget", "Бюджет видео");
+            label: GalleryStrings.tr("视频总带宽", "Total bandwidth", "Общий битрейт");
             label-reserve: self.width - 112px; divider: false;
             SettingsSelect {
                 border-radius: UiRadius.control;

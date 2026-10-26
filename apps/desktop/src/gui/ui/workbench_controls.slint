@@ -1,6 +1,6 @@
 import { ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
-import { ControlStyle } from "common.slint";
+import { ControlStyle, ButtonStyle } from "common.slint";
 // Colors and spacing for the connection workbench; shapes are shared app-wide.
 export global WorkbenchStyle {
     out property <color> canvas: #edf2f8;
@@ -21,7 +21,7 @@ export component WorkbenchButton inherits ShadowSurface {
     in property <length> text-size: 13px;
     in property <color> text-color: root.destructive || root.primary ? white : WorkbenchStyle.text;
     in property <color> normal-shadow-color: UiShadow.edge;
-    in property <color> normal-background: ControlStyle.surface;
+    in property <color> normal-background: ButtonStyle.surface;
     in property <string> icon;
     in property <string> tooltip;
     in property <bool> tooltip-above: false;
@@ -46,7 +46,12 @@ export component WorkbenchButton inherits ShadowSurface {
     width: 112px;
     height: 36px;
     border-radius: UiRadius.control;
-    shadow-enabled: root.show-focus || !root.soft;
+    border-width: root.show-focus || (!root.quiet && !root.soft && !root.primary && !root.destructive) ? 1px : 0px;
+    border-color: !root.enabled ? ButtonStyle.disabled-border
+        : root.show-focus ? WorkbenchStyle.accent
+        : touch.pressed ? ButtonStyle.pressed-border
+        : touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
+    shadow-enabled: root.enabled && (root.show-focus || (!root.soft && !root.quiet && !touch.pressed));
     shadow-focused: root.show-focus;
     shadow-color: root.destructive ? UiShadow.error
         : root.show-focus || root.primary ? UiShadow.focus
@@ -57,12 +62,12 @@ export component WorkbenchButton inherits ShadowSurface {
         : root.soft
         ? (root.primary
             ? (touch.pressed ? #254cc0 : touch.has-hover || root.show-focus ? WorkbenchStyle.accent : #dce7ff)
-            : (touch.pressed ? ControlStyle.pressed : touch.has-hover ? ControlStyle.hover : ControlStyle.surface))
+            : (touch.pressed ? ButtonStyle.pressed : touch.has-hover ? ButtonStyle.hover : ButtonStyle.surface))
         : root.primary
         ? (touch.pressed ? #254cc0 : touch.has-hover ? #4574f0 : WorkbenchStyle.accent)
-        : (touch.pressed ? ControlStyle.pressed : touch.has-hover ? ControlStyle.hover : root.quiet ? transparent : root.normal-background);
+        : (touch.pressed ? ButtonStyle.pressed : touch.has-hover ? ButtonStyle.hover : root.quiet ? transparent : root.normal-background);
     opacity: root.enabled ? 1 : 0.45;
-    animate background, shadow-color { duration: 120ms; }
+    animate background, border-color, shadow-color { duration: 120ms; }
     forward-focus: button-focus;
     accessible-role: button;
     accessible-label: root.tooltip != "" ? root.tooltip : root.text;

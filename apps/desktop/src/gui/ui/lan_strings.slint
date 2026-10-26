@@ -20,9 +20,9 @@ export global LanStrings {
             GalleryStrings.tr("原设置已保留。", "Your previous settings are unchanged.", "Прежние настройки сохранены.")
         ]; }
         if code == "Selected LAN interface is unavailable" { return [
-            GalleryStrings.tr("未找到可用的局域网连接。", "Connect to Wi-Fi or Ethernet,", "Подключитесь к Wi-Fi или Ethernet"),
-            GalleryStrings.tr("请连接 Wi-Fi 或网线，", "or select a local IP", "либо выберите IP"),
-            GalleryStrings.tr("或在主界面选择本机 IP。", "on the main screen.", "в главном окне.")
+            GalleryStrings.tr("未找到可用的局域网连接。", "No local network connection was found.", "Нет доступного подключения к LAN."),
+            GalleryStrings.tr("请连接 Wi-Fi 或网线，", "Connect to Wi-Fi or Ethernet,", "Подключитесь к Wi-Fi или Ethernet"),
+            GalleryStrings.tr("或在主界面选择本机 IP。", "or select a local IP on the main screen.", "или выберите локальный IP в главном окне.")
         ]; }
         // Keep all branches the same size for Slint's C++ model generator.
         return ["", "", ""];
@@ -33,15 +33,26 @@ export global LanStrings {
             let separator = GalleryStrings.tr("", " ", " ");
             return lines[0] + separator + lines[1] + separator + lines[2];
         }
-        if code == "InvalidCredentials" { return GalleryStrings.tr("密码不正确，或对方密码已更新。请查看对方的局域网访问密码后重试。", "Check the other desktop's current LAN password and try again.", "Проверьте текущий пароль LAN другого компьютера и повторите попытку."); }
+        if code == "" { return ""; }
+        if code == "InvalidCredentials" { return GalleryStrings.tr("密码不正确，或对方密码已更新。请查看对方的局域网访问密码后重试。", "The password is incorrect or has changed. Check the other desktop's current LAN password and try again.", "Пароль неверен или изменён. Проверьте текущий пароль LAN другого компьютера и повторите попытку."); }
         if code == "AuthenticationRateLimited" { return GalleryStrings.tr("尝试次数过多，请等待倒计时结束后重试。", "Too many attempts. Try again when the countdown ends.", "Слишком много попыток. Дождитесь окончания обратного отсчёта."); }
         if code == "CredentialsChanged" { return GalleryStrings.tr("对方密码已更新，请使用新密码重试。", "The password changed. Try again with the new password.", "Пароль изменился. Повторите с новым паролем."); }
         if code == "Busy" { return GalleryStrings.tr("设备正忙，请稍后重试。", "The desktop is busy. Try again shortly.", "Компьютер занят. Повторите позже."); }
         if code == "LAN password must contain exactly 6 ASCII letters or digits" { return GalleryStrings.tr("访问密码必须为 6 位英文字母或数字，区分大小写。", "Use exactly 6 letters (A–Z, a–z) or digits (0–9). Case-sensitive.", "Пароль: ровно 6 латинских букв или цифр. Регистр учитывается."); }
-        if code == "ConnectionFailed" || code == "ConnectionTimeout" || code == "Timeout" || code == "ConnectionClosed" { return GalleryStrings.tr("无法连接，请检查对方 IP、程序是否运行，以及防火墙是否放行。", "Check the IP, whether the other desktop is running CrossDesk, and its firewall settings.", "Проверьте IP, работу CrossDesk на другом компьютере и брандмауэр."); }
-        if code == "Enter a numeric IPv4 address or IPv4:port" { return GalleryStrings.tr("请输入有效的 IP，例如 192.168.1.20；指定端口可用 IP:端口，端口范围 1–65535。", "Enter a valid IP such as 192.168.1.20, or IP:port (1–65535).", "Введите IP, например 192.168.1.20, или IP:порт (1–65535)."); }
+        if code == "ConnectionFailed" || code == "ConnectionTimeout" || code == "IceConnectionTimeout" || code == "Timeout" || code == "ConnectionClosed" || code == "HeartbeatTimeout" || code == "SignalSendFailed" { return GalleryStrings.tr("无法连接，请检查对方 IP、程序是否运行，以及防火墙是否放行。", "Could not connect. Check the IP, whether the other desktop is running CrossDesk, and its firewall settings.", "Не удалось подключиться. Проверьте IP, работу CrossDesk на другом компьютере и брандмауэр."); }
+        if code == "Enter a numeric IPv4 address or IPv4:port" || code == "Invalid LAN endpoint" { return GalleryStrings.tr("请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。", "Enter a valid IPv4 address such as 192.168.1.20, or IPv4:port (1–65535).", "Введите IPv4, например 192.168.1.20, или IPv4:порт (1–65535)."); }
         if code == "Invalid LAN port" { return GalleryStrings.tr("请输入 1–65535 之间的整数端口。", "Enter a port number from 1 to 65535.", "Введите целый номер порта от 1 до 65535."); }
-        if code == "LAN password is not ready" { return GalleryStrings.tr("请点击主界面密码旁的修改按钮设置密码。", "Set a password using Edit next to the password on the main screen.", "Задайте пароль кнопкой редактирования в главном окне."); }
-        return code;
+        if code == "LAN password is not ready" { return GalleryStrings.tr("请点击主界面密码旁的修改按钮设置密码。", "Set a password using Edit next to the password on the main screen.", "Задайте пароль кнопкой редактирования рядом с паролем в главном окне."); }
+        if code == "LAN connection limit reached" { return GalleryStrings.tr("IP 连接数量已达上限，请先断开部分连接后重试。", "The IP connection limit has been reached. Disconnect some sessions and try again.", "Достигнут лимит IP-подключений. Завершите часть сеансов и повторите попытку."); }
+        if code == "UnsupportedNetworkPath" || code == "NetworkPolicyFailed" { return GalleryStrings.tr("当前网络路径不支持 IP 连接，请检查双方的局域网连接。", "This network path does not support IP connections. Check both devices' LAN connections.", "Этот сетевой маршрут не поддерживает IP-подключения. Проверьте подключения обоих устройств к LAN."); }
+        if code == "IncompatibleProtocol" || code == "RequiredCryptoUnsupported" || code == "TLS 1.3 is required for LAN connections" { return GalleryStrings.tr("双方的协议或加密能力不兼容，请将双方 CrossDesk 升级至最新版本后重试。", "The protocol or encryption capabilities are incompatible. Update CrossDesk on both devices and try again.", "Протоколы или возможности шифрования несовместимы. Обновите CrossDesk на обоих устройствах и повторите попытку."); }
+        if code == "InvalidCertificate" || code == "FingerprintMissing" || code == "FingerprintMismatch" { return GalleryStrings.tr("无法验证对方设备的身份，请确认连接地址和对方设备后重试。", "Could not verify the remote device's identity. Check the address and the remote device before retrying.", "Не удалось проверить подлинность удалённого устройства. Проверьте адрес и устройство перед повторной попыткой."); }
+        if code == "DtlsHandshakeFailed" || code == "SrtpInstallFailed" || code == "SrtpKeyExportFailed" || code == "SecureTransportFailed" { return GalleryStrings.tr("无法建立加密连接，请检查双方网络并重试。", "Could not establish an encrypted connection. Check both devices' networks and try again.", "Не удалось установить зашифрованное соединение. Проверьте сеть на обоих устройствах и повторите попытку."); }
+        if code == "InvalidSignal" || code == "InvalidLocalSignal" || code == "Invalid LAN protocol message" { return GalleryStrings.tr("连接协商数据无效，请重试并确认双方 CrossDesk 版本兼容。", "Invalid connection negotiation data. Try again and check that both CrossDesk versions are compatible.", "Неверные данные согласования соединения. Повторите попытку и проверьте совместимость версий CrossDesk."); }
+        if code == "ListenerChanged" { return GalleryStrings.tr("连接地址或监听端口已更改，请确认最新地址后重试。", "The connection address or listening port has changed. Check the current address and try again.", "Адрес подключения или порт прослушивания изменился. Проверьте текущий адрес и повторите попытку."); }
+        if code == "PeerPreparationFailed" { return GalleryStrings.tr("无法准备远程会话，请稍后重试。", "Could not prepare the remote session. Try again shortly.", "Не удалось подготовить удалённый сеанс. Повторите позже."); }
+        if code == "Cannot copy text" { return GalleryStrings.tr("复制失败，请重试。", "Could not copy. Try again.", "Не удалось скопировать. Повторите попытку."); }
+        // Keep diagnostic details for unexpected system errors, with a localized explanation.
+        return GalleryStrings.tr("IP 连接操作失败，详情：", "IP connection operation failed. Details: ", "Ошибка операции IP-подключения. Подробности: ") + code;
     }
 }

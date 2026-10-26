@@ -67,7 +67,7 @@ component NetworkRow inherits Rectangle {
                         text: !root.device.encryption-known
                             ? GalleryStrings.tr("待确认", "Unknown", "Неизвестно")
                             : root.device.encryption-enabled
-                                ? GalleryStrings.tr("已加密", "Encrypted", "Защищено")
+                                ? GalleryStrings.tr("已加密", "Encrypted", "Зашифровано")
                                 : GalleryStrings.tr("未加密", "Unencrypted", "Без шифр.");
                         color: !root.device.encryption-known ? #7a8490
                             : root.device.encryption-enabled ? #18794e : #8a6428;
@@ -208,7 +208,7 @@ export component GalleryNetworkDialog inherits Rectangle {
         }
         Text {
             x: 20px; y: 17px; width: parent.width - 120px; height: 24px;
-            text: GalleryStrings.tr("设备网络状态", "Device network status", "Сеть устройств");
+            text: GalleryStrings.tr("设备网络状态", "Device network status", "Состояние сети устройств");
             font-size: 17px; font-weight: 600; color: #293746;
         }
         CompactButton {

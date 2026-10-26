@@ -2,7 +2,7 @@ import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ComboBox, ScrollView } from "std-widgets.slint";
 import { RemoteCursor } from "remote_cursor.slint";
-import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiFontStyle, ControlStyle } from "common.slint";
+import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiFontStyle, ControlStyle, ButtonStyle } from "common.slint";
 
 export struct StreamTab {
     remote-id: string,
@@ -26,6 +26,10 @@ export struct NetworkStatsRow {
 }
 
 export global StreamStrings {
+    in-out property <string> window-minimize: "Minimize";
+    in-out property <string> window-maximize: "Maximize";
+    in-out property <string> window-restore: "Restore window";
+    in-out property <string> window-close: "Close window";
     in-out property <string> remote-update-title: "Remote update recommended";
     in-out property <string> remote-update: "Update the remote device to the latest version for improved features and performance.";
     in-out property <string> remote-update-dismiss: "Got it";
@@ -47,11 +51,11 @@ export global StreamStrings {
     in-out property <string> privacy-disable: "Turn privacy off / recover";
     in-out property <string> control-mouse: "Control Mouse";
     in-out property <string> release-mouse: "Release Mouse";
-    in-out property <string> audio: "Audio Capture";
+    in-out property <string> audio: "Play audio";
     in-out property <string> mute: "Mute";
     in-out property <string> select-file: "Select File to Send";
-    in-out property <string> show-stats: "Show Net Traffic Stats";
-    in-out property <string> hide-stats: "Hide Net Traffic Stats";
+    in-out property <string> show-stats: "Show network status";
+    in-out property <string> hide-stats: "Hide network status";
     in-out property <string> fullscreen: "Fullscreen";
     in-out property <string> exit-fullscreen: "Exit fullscreen";
     in-out property <string> disconnect: "Disconnect";
@@ -65,7 +69,7 @@ export global StreamStrings {
     in-out property <string> stats-out: "Out";
     in-out property <string> stats-loss-rate: "Loss Rate";
     in-out property <string> stats-resolution: "Res";
-    in-out property <string> stats-video-latency: "Video delay";
+    in-out property <string> stats-video-latency: "Video latency";
     in-out property <string> stats-connection-latency: "Connection RTT";
     in-out property <string> stats-connection-mode: "Mode";
     in-out property <string> stats-encoder: "Remote encoder";
@@ -245,13 +249,21 @@ component VideoSettingRow inherits VerticalLayout {
         for option[index] in root.options: ShadowSurface {
             height: 27px;
             background: !root.enabled ? ControlStyle.disabled
-                : root.selected == index ? (option-touch.pressed ? ControlStyle.selected-pressed : option-touch.has-hover ? ControlStyle.selected-hover : ControlStyle.selected)
-                : option-touch.pressed ? ControlStyle.pressed
-                : option-touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
+                : root.selected == index ? (option-touch.pressed ? ButtonStyle.selected-pressed : option-touch.has-hover ? ButtonStyle.selected-hover : ButtonStyle.selected)
+                : option-touch.pressed ? ButtonStyle.pressed
+                : option-touch.has-hover ? ButtonStyle.hover : ButtonStyle.surface;
             border-radius: UiRadius.control;
+            border-width: 1px;
+            border-color: !root.enabled ? ButtonStyle.disabled-border
+                : root.selected == index ? ButtonStyle.selected-pressed
+                : option-touch.pressed ? ButtonStyle.pressed-border
+                : option-touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
+            shadow-compact: true;
+            shadow-enabled: root.enabled && !option-touch.pressed;
             shadow-color: root.enabled && root.selected == index ? UiShadow.focus : UiShadow.edge;
+            animate background, border-color { duration: 120ms; }
             Text { text: option; color: !root.enabled ? #8b8f95
-                    : root.selected == index ? ControlStyle.selected-text : #30343b;
+                    : root.selected == index ? white : #30343b;
                 font-weight: root.selected == index ? 600 : 400;
                 font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
             option-touch := TouchArea {
@@ -809,7 +821,7 @@ export component StreamWindow inherits Window {
                           : root.window-active ? #e6e6e6
                                                : transparent;
                 accessible-role: button;
-                accessible-label: "Minimize";
+                accessible-label: StreamStrings.window-minimize;
                 accessible-action-default => { stream-minimize-touch.clicked(); }
                 Rectangle {
                     x: 8px;
@@ -835,7 +847,7 @@ export component StreamWindow inherits Window {
                           : root.window-active ? #e6e6e6
                                                : transparent;
                 accessible-role: button;
-                accessible-label: root.window-maximized ? "Restore" : "Maximize";
+                accessible-label: root.window-maximized ? StreamStrings.window-restore : StreamStrings.window-maximize;
                 accessible-action-default => { stream-maximize-touch.clicked(); }
                 if !root.window-maximized: Rectangle {
                     x: 8px;
@@ -885,7 +897,7 @@ export component StreamWindow inherits Window {
                           : root.window-active ? #e6e6e6
                                                : transparent;
                 accessible-role: button;
-                accessible-label: "Close";
+                accessible-label: StreamStrings.window-close;
                 accessible-action-default => { stream-close-touch.clicked(); }
                 Path {
                     width: parent.width;

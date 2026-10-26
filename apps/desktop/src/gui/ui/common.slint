@@ -4,7 +4,7 @@ export global FloatingBarStyle {
     out property <length> corner-radius: UiRadius.menu;
 }
 
-// Filled controls remain distinct from white cards without restoring outlines.
+// Fields and selection controls share a muted fill.
 export global ControlStyle {
     out property <color> surface: #dce6f3;
     out property <color> hover: #cedef1;
@@ -21,6 +21,20 @@ export global ControlStyle {
     // These tints over white match the field fills for standard LineEdit.
     out property <color> input-tint: #235eaa26;
     out property <color> input-focus-tint: #235eaa1e;
+}
+
+// Action buttons use a light surface and a crisp edge, distinct from fields.
+export global ButtonStyle {
+    out property <color> surface: #ffffff;
+    out property <color> hover: #f0f5ff;
+    out property <color> pressed: #dfe9fa;
+    out property <color> border: #b8c7db;
+    out property <color> hover-border: #7e9fd1;
+    out property <color> pressed-border: #6488bf;
+    out property <color> disabled-border: #dce2eb;
+    out property <color> selected: #3564e3;
+    out property <color> selected-hover: #4574f0;
+    out property <color> selected-pressed: #254cc0;
 }
 
 // ImGui loads a 32px font atlas and applies per-window font scales. These
@@ -218,43 +232,48 @@ export component CompactComboBox inherits ShadowSurface {
     width: 73px;
     height: 24px;
     background: !root.enabled ? ControlStyle.disabled
-        : combo-touch.pressed || combo-popup.is-open ? ControlStyle.pressed
-        : combo-touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
-    shadow-color: root.enabled && combo-touch.has-hover ? root.hover-shadow-color : root.normal-shadow-color;
+        : combo-touch.pressed ? ButtonStyle.pressed
+        : combo-popup.is-open || combo-touch.has-hover ? ButtonStyle.hover : ButtonStyle.surface;
+    border-width: 1px;
+    border-color: !root.enabled ? ButtonStyle.disabled-border
+        : combo-popup.is-open ? UiShadow.focus
+        : combo-touch.pressed ? ButtonStyle.pressed-border
+        : combo-touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
+    shadow-enabled: root.enabled && !combo-touch.pressed;
+    shadow-focused: root.enabled && combo-popup.is-open;
+    shadow-color: combo-popup.is-open ? UiShadow.focus
+        : root.enabled && combo-touch.has-hover ? root.hover-shadow-color : root.normal-shadow-color;
     border-radius: UiRadius.control;
+    animate background, border-color, shadow-color { duration: 120ms; }
+    accessible-role: combobox;
+    accessible-enabled: root.enabled;
+    accessible-expandable: true;
+    accessible-expanded: combo-popup.is-open;
+    accessible-value: root.model[root.current-index];
 
     Text {
-        x: root.subtle ? 10px : 5px;
-        width: parent.width - (root.show-arrow ? (root.subtle ? 36px : 24px) : (root.subtle ? 20px : 10px));
+        x: root.subtle ? 10px : 8px;
+        width: parent.width - self.x - (root.show-arrow ? 28px : self.x);
+        height: parent.height;
         text: root.model[root.current-index];
         color: root.enabled ? #202124 : #8b8f95;
         font-size: root.subtle ? 12px : ImGuiFontStyle.body;
         overflow: elide;
         vertical-alignment: center;
+        accessible-role: none;
     }
-    if root.show-arrow: Rectangle {
-        x: parent.width - (root.subtle ? 27px : 21px);
-        width: 20px;
-        height: parent.height - 2px;
-        y: 1px;
-        background: root.subtle ? transparent : root.enabled ? ControlStyle.selected : #d7d9dc;
-        border-top-right-radius: UiRadius.control - 1px;
-        border-bottom-right-radius: UiRadius.control - 1px;
-        Text {
-            text: FontAwesomeIcons.angle-down;
-            color: root.subtle ? ControlStyle.icon : #202124;
-            font-family: "Font Awesome 6 Free";
-            font-weight: 900;
-            font-size: 10px;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            transform-rotation: combo-popup.is-open ? 180deg : 0deg;
-            animate transform-rotation {
-                duration: 140ms;
-                easing: ease-out;
-                enabled: combo-popup.is-open;
-            }
-        }
+    if root.show-arrow: Text {
+        x: parent.width - 26px;
+        width: 18px; height: parent.height;
+        // Switch glyphs so the software renderer also shows the open state.
+        text: combo-popup.is-open ? FontAwesomeIcons.angle-up : FontAwesomeIcons.angle-down;
+        color: !root.enabled ? #98a2b3 : combo-popup.is-open ? UiShadow.focus : ControlStyle.icon;
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        font-size: 10px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        accessible-role: none;
     }
     combo-touch := TouchArea {
         enabled: root.enabled; mouse-cursor: pointer;
@@ -282,9 +301,9 @@ export component CompactComboBox inherits ShadowSurface {
 
     combo-popup := PopupWindow {
         x: 0px;
-        y: root.height;
+        y: root.height + 4px;
         width: root.width;
-        height: root.model.length * 23px;
+        height: root.model.length * 23px + 8px;
         close-policy: close-on-click-outside;
 
         ShadowSurface {
@@ -299,20 +318,29 @@ export component CompactComboBox inherits ShadowSurface {
             border-radius: UiRadius.menu;
             clip: true;
             for choice[index] in root.model: Rectangle {
-                y: index * 23px;
-                width: parent.width;
+                x: 4px; y: 4px + index * 23px;
+                width: parent.width - 8px;
                 height: 23px;
+                border-radius: UiRadius.control;
                 background: index == root.current-index
-                    ? (option-touch.pressed ? ControlStyle.selected-pressed : option-touch.has-hover ? ControlStyle.selected-hover : ControlStyle.selected)
-                    : option-touch.pressed ? ControlStyle.pressed : option-touch.has-hover ? ControlStyle.hover : white;
+                    ? (option-touch.pressed ? ButtonStyle.pressed : ButtonStyle.hover)
+                    : option-touch.pressed ? ButtonStyle.pressed : option-touch.has-hover ? ButtonStyle.hover : white;
                 Text {
-                    x: 5px; width: parent.width - 10px; text: choice;
+                    x: 6px; width: parent.width - 28px; height: parent.height; text: choice;
                     color: index == root.current-index ? ControlStyle.selected-text : #202124;
                     font-weight: index == root.current-index ? 600 : 400;
                     font-size: root.subtle ? 12px : ImGuiFontStyle.body; overflow: elide; vertical-alignment: center;
                 }
+                if index == root.current-index: Text {
+                    x: parent.width - 20px; width: 14px; height: parent.height;
+                    text: FontAwesomeIcons.check; color: UiShadow.focus;
+                    font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 10px;
+                    horizontal-alignment: center; vertical-alignment: center;
+                    accessible-role: none;
+                }
                 option-touch := TouchArea {
                     enabled: root.enabled;
+                    mouse-cursor: pointer;
                     clicked => {
                         popup-open-timer.running = false;
                         root.popup-animation-enabled = false;
@@ -332,6 +360,8 @@ export component CompactComboBox inherits ShadowSurface {
                 clip: true;
                 shadow-color: root.normal-shadow-color;
                 border-radius: UiRadius.menu;
+                border-width: 1px;
+                border-color: ButtonStyle.border;
                 z: 2;
             }
         }
@@ -401,11 +431,18 @@ export component CompactButton inherits ShadowSurface {
     width: 34px;
     height: 24px;
     background: !root.enabled ? (root.quiet ? transparent : ControlStyle.disabled)
-              : button-touch.pressed ? (root.primary ? #82b8f2 : ControlStyle.pressed)
-              : button-touch.has-hover ? (root.primary ? #b8d9fb : ControlStyle.hover)
-              : root.primary ? #a8d0fa : root.quiet ? transparent : ControlStyle.surface;
-    shadow-color: root.primary ? UiShadow.focus : root.quiet ? transparent : UiShadow.edge;
+              : button-touch.pressed ? (root.primary ? #82b8f2 : ButtonStyle.pressed)
+              : button-touch.has-hover ? (root.primary ? #b8d9fb : ButtonStyle.hover)
+              : root.primary ? #a8d0fa : root.quiet ? transparent : ButtonStyle.surface;
+    border-width: root.quiet ? 0px : 1px;
+    border-color: !root.enabled ? ButtonStyle.disabled-border
+        : root.primary ? UiShadow.focus
+        : button-touch.pressed ? ButtonStyle.pressed-border
+        : button-touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
+    shadow-enabled: root.enabled && !root.quiet && !button-touch.pressed;
+    shadow-color: root.primary ? UiShadow.focus : button-touch.has-hover ? UiShadow.hover : UiShadow.edge;
     border-radius: UiRadius.control;
+    animate background, border-color { duration: 100ms; }
     Text {
         text: root.text;
         color: root.enabled ? #24272d : #8e9298;
@@ -414,7 +451,7 @@ export component CompactButton inherits ShadowSurface {
         horizontal-alignment: center;
         vertical-alignment: center;
     }
-    button-touch := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+    button-touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
 
 export component PrimaryButton inherits ShadowSurface {
@@ -459,13 +496,17 @@ export component SecondaryButton inherits ShadowSurface {
     min-width: 72px;
     height: 32px;
     background: !root.enabled ? ControlStyle.disabled
-              : touch.pressed ? ControlStyle.pressed
-              : touch.has-hover ? ControlStyle.hover : ControlStyle.surface;
-    shadow-color: UiShadow.edge;
+              : touch.pressed ? ButtonStyle.pressed
+              : touch.has-hover ? ButtonStyle.hover : ButtonStyle.surface;
+    border-width: 1px;
+    border-color: !root.enabled ? ButtonStyle.disabled-border
+        : touch.pressed ? ButtonStyle.pressed-border
+        : touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
+    shadow-color: touch.has-hover ? UiShadow.hover : UiShadow.edge;
     shadow-compact: true;
     shadow-enabled: root.enabled && !touch.pressed;
     border-radius: UiRadius.control;
-    animate background { duration: 100ms; }
+    animate background, border-color { duration: 100ms; }
 
     Text {
         text: root.text;
@@ -478,6 +519,7 @@ export component SecondaryButton inherits ShadowSurface {
 
     touch := TouchArea {
         enabled: root.enabled;
+        mouse-cursor: pointer;
         clicked => { root.clicked(); }
     }
 }

@@ -42,6 +42,11 @@ inline int ApplyMainWindowStrings(
       localization::detail::ClampLanguageIndex(language_index);
   window->global<ui::GalleryStrings>().set_language(language);
   auto& strings = window->global<ui::UiStrings>();
+  strings.set_window_minimize(Text(localization::window_minimize[language]));
+  strings.set_window_close(Text(localization::window_close[language]));
+  strings.set_save(Text(localization::save[language]));
+  strings.set_copyright(Text(localization::copyright_notice[language]));
+  strings.set_license(Text(localization::license_notice[language]));
   auto& messages = window->global<ui::MessageStrings>();
   messages.set_messages(Text(localization::messages[language]));
   messages.set_unread(Text(localization::message_unread[language]));
@@ -81,7 +86,7 @@ inline int ApplyMainWindowStrings(
   strings.set_ok(Text(localization::ok[language]));
   strings.set_cancel(Text(localization::cancel[language]));
   strings.set_new_password(Text(localization::new_password[language]));
-  strings.set_invalid_password(Text(localization::max_password_len[language]));
+  strings.set_invalid_password(Text(localization::password_format_invalid[language]));
   strings.set_edit_alias(
       Text(localization::input_connection_alias[language]));
   strings.set_delete_connection(
@@ -192,6 +197,10 @@ inline int ApplyStreamWindowStrings(
   const int language =
       localization::detail::ClampLanguageIndex(language_index);
   auto& strings = window->template global<ui::StreamStrings>();
+  strings.set_window_minimize(Text(localization::window_minimize[language]));
+  strings.set_window_maximize(Text(localization::window_maximize[language]));
+  strings.set_window_restore(Text(localization::window_restore[language]));
+  strings.set_window_close(Text(localization::window_close[language]));
   strings.set_remote_update_title(Text(localization::remote_update_title[language]));
   strings.set_remote_update(Text(localization::remote_update[language]));
   strings.set_remote_update_dismiss(Text(localization::remote_update_dismiss[language]));

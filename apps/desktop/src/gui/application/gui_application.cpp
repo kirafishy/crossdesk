@@ -4544,7 +4544,7 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   if (!wall_settings || (wall_changed && !updated_wall.Save(ui_->gallery_path))) {
     main->set_gallery_settings_error(UiText(
         localization_language_index_ == 0 ? "保存失败，请重试"
-        : localization_language_index_ == 2 ? "Не удалось сохранить"
+        : localization_language_index_ == 2 ? "Не удалось сохранить. Повторите попытку"
                                             : "Could not save; try again"));
     main->set_settings_tab(1);
     return false;
@@ -4564,9 +4564,9 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
     if (wall_changed && !ui_->gallery.Save(ui_->gallery_path))
       LOG_ERROR("Failed to restore DeskHub settings after IP direct save failure");
     main->set_settings_save_error(UiText(
-        localization_language_index_ == 0 ? "无法保存 IP 直连设置，请重试。"
-        : localization_language_index_ == 2 ? "Не удалось сохранить настройки IP. Повторите попытку."
-                                            : "Could not save direct IP settings. Try again."));
+        localization_language_index_ == 0 ? "无法保存 IP 连接设置，请重试。"
+        : localization_language_index_ == 2 ? "Не удалось сохранить настройки подключения по IP. Повторите попытку."
+                                            : "Could not save IP connection settings. Try again."));
     return false;
   }
 #if defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__OHOS__))
@@ -4575,8 +4575,8 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
       LOG_ERROR("Failed to restore DeskHub settings after lock preference save failure");
     main->set_settings_save_error(UiText(
         localization_language_index_ == 0 ? "无法保存断开后锁屏设置，请重试。"
-        : localization_language_index_ == 2 ? "Не удалось сохранить настройку блокировки. Повторите попытку."
-                                            : "Could not save lock screen settings. Try again."));
+        : localization_language_index_ == 2 ? "Не удалось сохранить настройку блокировки при отключении. Повторите попытку."
+                                            : "Could not save lock-on-disconnect settings. Try again."));
     return false;
   }
 #endif
@@ -5311,8 +5311,8 @@ bool GuiApplication::AddGalleryDevice(const std::string& input,
       password.find_first_not_of(
           "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") !=
           std::string::npos)
-    return error("请输入不超过 6 位的字母或数字密码",
-                 "Use a password of 1–6 letters or digits",
+    return error("请输入 1–6 位英文字母或数字密码",
+                 "Use 1–6 letters (A–Z, a–z) or digits (0–9)",
                  "Пароль: 1–6 латинских букв или цифр");
   if (!signal_connected_)
     return error("尚未连接服务器，请稍后重试",
@@ -5330,7 +5330,7 @@ bool GuiApplication::AddGalleryDevice(const std::string& input,
   updated.Add(id, Trim(group));
   if (!updated.Save(ui_->gallery_path))
     return error("保存失败，请重试", "Could not save; try again",
-                 "Не удалось сохранить");
+                 "Не удалось сохранить. Повторите попытку");
   ui_->gallery = std::move(updated);
   ui_->gallery_hidden_active_ids.erase(id);
   if (auto props = FindRemoteSession(id)) {
@@ -5373,7 +5373,7 @@ bool GuiApplication::ImportGalleryRecent(const std::string& input_group) {
   if (!updated.Save(ui_->gallery_path)) {
     ui_->wall->set_gallery_notice(UiText(
         localization_language_index_ == 0 ? "保存失败，请重试"
-        : localization_language_index_ == 2 ? "Не удалось сохранить"
+        : localization_language_index_ == 2 ? "Не удалось сохранить. Повторите попытку"
                                             : "Could not save; try again"));
     return false;
   }
@@ -5455,7 +5455,7 @@ bool GuiApplication::SaveDeviceGroups(const std::string& new_group,
   if (!updated.SetGroups(id, names) || !updated.Save(ui_->gallery_path)) {
     main->set_device_group_error(UiText(
         localization_language_index_ == 0 ? "保存失败，请重试"
-        : localization_language_index_ == 2 ? "Не удалось сохранить"
+        : localization_language_index_ == 2 ? "Не удалось сохранить. Повторите попытку"
                                             : "Could not save; try again"));
     return false;
   }
@@ -5715,7 +5715,7 @@ void GuiApplication::GalleryAction(const std::string& action,
       SyncGallery();
     };
     if (action == "file") {
-      OpenFileDialog(std::string(tr("选择分发文件", "Select a file", "Выберите файл")),
+      OpenFileDialog(std::string(tr("选择分发文件", "Select a file to send", "Выберите файл для отправки")),
           [enqueue](std::string file) {
             if (!file.empty()) enqueue(file);
           });
@@ -6036,9 +6036,9 @@ void GuiApplication::SyncGallery() {
       device.id = UiText(FormatPeerId(id.c_str()));
       const auto mode = props->traversal_mode_.load();
       device.mode = UiText(mode == TraversalMode::P2P
-          ? tr("直连", "Direct", "Напрямую")
+          ? tr("直连", "Direct", "Прямой")
           : mode == TraversalMode::UnknownMode
-              ? tr("等待统计", "Awaiting stats", "Ждём данные")
+              ? tr("等待统计", "Awaiting stats", "Ожидание статистики")
               : tr("中继", "Relay", "Ретрансляция"));
       device.inbound = device.outbound = device.loss = "—";
       device.video_latency = "—";
@@ -6301,7 +6301,7 @@ void GuiApplication::SyncGallery() {
         });
     // A queued retry takes precedence over errors from the previous session.
     if (queued)
-      tile.status = UiText(tr("排队中", "Queued", "В очереди"));
+      tile.status = UiText(tr("队列中", "Queued", "В очереди"));
     else if (props && props->connection_auth_.Get().password_required)
       tile.status = UiText(tr("需要密码", "Password required", "Нужен пароль"));
     else if (props && !tile.connected)

@@ -43,6 +43,8 @@ enum CopyFeedback { idle, success, failed }
 enum SponsorPlatform { afdian, kofi, github }
 
 export global UiStrings {
+    in-out property <string> window-minimize: "Minimize";
+    in-out property <string> window-close: "Close window";
     in-out property <string> local-desktop: "Local Desktop";
     in-out property <string> remote-desktop: "Remote Desktop";
     in-out property <string> recent-connections: "Recent Connections";
@@ -65,7 +67,7 @@ export global UiStrings {
     in-out property <string> cancel: "Cancel";
     in-out property <string> save: "Save";
     in-out property <string> new-password: "New password (6 characters)";
-    in-out property <string> invalid-password: "Password must contain exactly 6 characters";
+    in-out property <string> invalid-password: "Use exactly 6 letters (A–Z, a–z) or digits (0–9).";
     in-out property <string> edit-alias: "Connection alias";
     in-out property <string> delete-connection: "Delete connection";
     in-out property <string> confirm-delete: "Delete this recent connection?";
@@ -86,7 +88,7 @@ export global UiStrings {
     in-out property <string> server-host: "Server host";
     in-out property <string> server-port: "Signal port";
     in-out property <string> version: "Version";
-    in-out property <string> copyright: "© 2026 by JUNKUN DI. All right reserved.";
+    in-out property <string> copyright: "© 2026 by JUNKUN DI. All rights reserved.";
     in-out property <string> license: "Licensed under GNU GPL v3.";
     in-out property <string> signal-connected: "Signal server connected";
     in-out property <string> signal-disconnected: "Signal server disconnected";
@@ -122,7 +124,7 @@ export global UiStrings {
     in-out property <string> wayland-notice-acknowledge: "Got it";
     in-out property <string> service-setup-title: "Install CrossDesk Service";
     in-out property <string> service-setup-message: "Administrator permission is required to control this device while it is locked.";
-    in-out property <string> service-settings-label: "Lock Screen Service:";
+    in-out property <string> service-settings-label: "Lock-screen control service:";
     in-out property <string> install-service: "Install";
     in-out property <string> service-installed: "Installed";
     in-out property <string> do-not-remind: "Do not remind again";
@@ -898,7 +900,7 @@ export component MainWindow inherits Window {
                           : root.window-active ? #e6e6e6
                                                : transparent;
                 accessible-role: button;
-                accessible-label: "Minimize";
+                accessible-label: UiStrings.window-minimize;
                 accessible-action-default => { wayland-minimize-touch.clicked(); }
                 Rectangle {
                     x: 8px;
@@ -924,7 +926,7 @@ export component MainWindow inherits Window {
                           : root.window-active ? #e6e6e6
                                                : transparent;
                 accessible-role: button;
-                accessible-label: "Close";
+                accessible-label: UiStrings.window-close;
                 accessible-action-default => { wayland-close-touch.clicked(); }
                 Path {
                     width: parent.width;
@@ -992,7 +994,7 @@ export component MainWindow inherits Window {
                       : minimize-touch.has-hover ? #e5e5e5
                                                  : transparent;
             accessible-role: button;
-            accessible-label: "Minimize";
+            accessible-label: UiStrings.window-minimize;
             accessible-action-default => { minimize-touch.clicked(); }
             Text {
                 text: FontAwesomeIcons.minus;
@@ -1014,7 +1016,7 @@ export component MainWindow inherits Window {
                       : close-touch.has-hover ? #c42b1c
                                               : transparent;
             accessible-role: button;
-            accessible-label: "Close";
+            accessible-label: UiStrings.window-close;
             accessible-action-default => { close-touch.clicked(); }
             Text {
                 text: FontAwesomeIcons.xmark;
@@ -1111,9 +1113,9 @@ export component MainWindow inherits Window {
             width: 136px; height: 28px;
             background: WorkbenchStyle.field-surface;
             enabled: !root.connection-pending && !root.lan-connecting;
-            tooltip: root.lan-mode ? GalleryStrings.tr("切换到 ID 连接模式", "Switch to ID mode", "Переключить в режим ID") : GalleryStrings.tr("切换到 IP 直连模式", "Switch to direct IP mode", "Переключить в режим IP");
+            tooltip: root.lan-mode ? GalleryStrings.tr("切换到 ID 连接模式", "Switch to ID connection mode", "Переключить в режим ID") : GalleryStrings.tr("切换到 IP 连接模式", "Switch to IP connection mode", "Переключить в режим IP");
             accessible-role: switch;
-            accessible-label: GalleryStrings.tr("IP 直连模式", "Direct IP mode", "Режим IP");
+            accessible-label: GalleryStrings.tr("IP 连接模式", "IP connection mode", "Режим IP");
             accessible-checked: root.lan-mode;
             z: 8;
             clicked => {
@@ -1135,7 +1137,7 @@ export component MainWindow inherits Window {
                 y: 2px;
                 width: (parent.width - 6px) / 2;
                 height: parent.height - 4px;
-                text: lan ? GalleryStrings.tr("IP 直连", "Direct IP", "Режим IP") : GalleryStrings.tr("ID 连接", "ID mode", "Режим ID");
+                text: lan ? GalleryStrings.tr("IP 连接", "IP mode", "Режим IP") : GalleryStrings.tr("ID 连接", "ID mode", "Режим ID");
                 font-size: 12px;
                 font-weight: 500;
                 color: root.lan-mode == lan ? white : WorkbenchStyle.muted;
@@ -1244,7 +1246,7 @@ export component MainWindow inherits Window {
                 x: 0px; y: 0px;
                 width: (parent.width - 16px) / 2; height: parent.height;
                 Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.local-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
-                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("将 IP 和密码分享给连接方", "Share your IP and password to get connected", "Передайте IP и пароль для управления") : GalleryStrings.tr("将 ID 和密码分享给连接方", "Share your ID and password to get connected", "Передайте ID и пароль для подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("将 IP 和密码分享给连接方", "Share your IP and password to get connected", "Передайте IP и пароль для подключения") : GalleryStrings.tr("将 ID 和密码分享给连接方", "Share your ID and password to get connected", "Передайте ID и пароль для подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
                 local-address-label := Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("本机 IP / 端口", "Local IP / Port", "IP / Порт") : UiStrings.local-id; font-size: 12px; color: WorkbenchStyle.muted; vertical-alignment: top; }
                 lan-switch-ip-metrics := Text {
                     visible: false; accessible-role: none;
@@ -1382,7 +1384,7 @@ export component MainWindow inherits Window {
                                     font-size: 18px * local-address-field.lan-font-scale; font-weight: 600;
                                     input-type: InputType.number; color: WorkbenchStyle.text;
                                     enabled: root.lan-mode && !root.lan-password-pending;
-                                    accessible-label: GalleryStrings.tr("局域网端口", "LAN port", "Порт ЛВС");
+                                    accessible-label: GalleryStrings.tr("局域网端口", "LAN port", "Порт LAN");
                                     vertical-alignment: center; horizontal-alignment: left;
                                     selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
                                     changed has-focus => {
@@ -1567,7 +1569,7 @@ export component MainWindow inherits Window {
                     Text {
                         x: 84px; y: 36px; width: parent.width - 104px; height: 24px;
                         text: root.lan-mode
-                            ? GalleryStrings.tr("暂无 IP 直连设备", "No recent IP connections", "Нет недавних IP-подключений")
+                            ? GalleryStrings.tr("暂无近期 IP 连接", "No recent IP connections", "Нет недавних IP-подключений")
                             : root.recent-group-index == 0
                             ? GalleryStrings.tr("暂无近期连接", "No recent connections", "Нет недавних подключений")
                             : GalleryStrings.tr("该分组暂无近期连接", "No recent connections in this group", "В этой группе нет недавних подключений");
@@ -1886,7 +1888,7 @@ export component MainWindow inherits Window {
                     height: parent.height;
                     width: parent.width - 160px;
                     overflow: elide;
-                    text: root.lan-mode ? (root.lan-message != "" ? LanStrings.error-message(root.lan-message) : root.lan-listener-error != "" ? (root.lan-listener-address == "" ? "" : root.lan-listener-address + " · ") + LanStrings.error-message(root.lan-listener-error) : root.lan-listening ? GalleryStrings.tr("局域网模式已启用", "LAN mode enabled", "Режим LAN включён") : root.lan-password-pending ? GalleryStrings.tr("局域网模式准备中…", "Preparing LAN mode…", "Подготовка режима LAN…") : GalleryStrings.tr("局域网模式未就绪", "LAN mode not ready", "Режим LAN не готов"))
+                    text: root.lan-mode ? (root.lan-message != "" ? LanStrings.error-message(root.lan-message) : root.lan-listener-error != "" ? (root.lan-listener-address == "" ? "" : root.lan-listener-address + " · ") + LanStrings.error-message(root.lan-listener-error) : root.lan-listening ? GalleryStrings.tr("IP 连接已启用", "IP connections enabled", "Подключения по IP включены") : root.lan-password-pending ? GalleryStrings.tr("IP 连接准备中…", "Preparing IP connections…", "Подготовка подключений по IP…") : GalleryStrings.tr("IP 连接未就绪", "IP connections not ready", "Подключения по IP не готовы"))
                           : root.signal-tls-error ? UiStrings.tls-error
                           : root.signal-connected ? UiStrings.signal-connected
                           : root.signal-reconnecting ? UiStrings.signal-reconnecting
@@ -2412,7 +2414,7 @@ export component MainWindow inherits Window {
                         }
                     }
                     Text {
-                        text: GalleryStrings.tr("当前远程控制会话将结束。", "The current remote session will end.", "Текущий сеанс удалённого управления завершится.");
+                        text: GalleryStrings.tr("当前远程控制会话将结束。", "The current remote session will end.", "Текущий сеанс удалённого управления будет завершён.");
                         color: WorkbenchStyle.muted;
                         font-size: 13px;
                         wrap: word-wrap;
@@ -2626,6 +2628,7 @@ export component MainWindow inherits Window {
             // Center every content section; the scrollbar sits in the right margin.
             private property <length> content-inset: 26px;
             private property <length> scrollbar-gutter: 22px;
+            private property <length> shadow-gutter: 6px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             width: min(400px, parent.width - 40px);
@@ -2638,31 +2641,28 @@ export component MainWindow inherits Window {
                 width: parent.width - 2 * settings-dialog.content-inset; height: 27px;
                 text: UiStrings.settings; font-size: 20px; font-weight: 600; color: #22324a;
             }
+            // Match the compact connection-mode switch, centered in the tab row.
             ShadowSurface {
-                x: settings-dialog.content-inset; y: 56px;
-                width: parent.width - 2 * settings-dialog.content-inset; height: 40px;
-                background: #dfe7f2; border-radius: UiRadius.menu;
-                shadow-color: UiShadow.edge;
-                ShadowSurface {
-                    x: 4px + root.settings-tab * (parent.width - 4px) / 2;
-                    y: 4px; width: (parent.width - 12px) / 2; height: parent.height - 8px;
-                    background: WorkbenchStyle.surface; border-radius: UiRadius.control;
-                    shadow-color: UiShadow.edge;
-                    animate x { duration: 140ms; easing: ease-out; }
+                x: settings-dialog.content-inset; y: 62px;
+                width: parent.width - 2 * settings-dialog.content-inset; height: 28px;
+                background: WorkbenchStyle.field-surface; border-radius: UiRadius.control;
+                border-width: 1px; border-color: WorkbenchStyle.accent;
+                shadow-compact: true; shadow-color: UiShadow.edge;
+                Rectangle {
+                    x: root.settings-tab == 1 ? parent.width / 2 + 1px : 2px;
+                    y: 2px; width: (parent.width - 6px) / 2; height: parent.height - 4px;
+                    background: WorkbenchStyle.accent; border-radius: UiRadius.control;
+                    animate x { duration: 180ms; easing: ease-in-out; }
                 }
                 for label[index] in [GalleryStrings.tr("常规", "General", "Общие"), GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub")]: Rectangle {
-                    x: 4px + index * (parent.width - 4px) / 2;
-                    y: 4px; width: (parent.width - 12px) / 2; height: parent.height - 8px;
-                    border-radius: UiRadius.control;
-                    background: root.settings-tab == index ? transparent
-                        : tab-touch.pressed ? WorkbenchStyle.pressed-surface
-                        : tab-touch.has-hover ? WorkbenchStyle.hover-surface : transparent;
-                    animate background { duration: 100ms; }
+                    x: index == 1 ? parent.width / 2 + 1px : 2px;
+                    y: 2px; width: (parent.width - 6px) / 2; height: parent.height - 4px;
                     accessible-role: button; accessible-label: label;
                     accessible-action-default => { tab-touch.clicked(); }
                     Text {
-                        text: label; font-size: 12px; font-weight: root.settings-tab == index ? 600 : 500;
-                        color: root.settings-tab == index ? WorkbenchStyle.accent : WorkbenchStyle.muted;
+                        text: label; font-size: 12px; font-weight: 500;
+                        color: root.settings-tab == index ? white : WorkbenchStyle.muted;
+                        animate color { duration: 180ms; }
                         horizontal-alignment: center; vertical-alignment: center;
                     }
                     tab-touch := TouchArea {
@@ -2672,8 +2672,9 @@ export component MainWindow inherits Window {
                 }
             }
             if root.settings-tab == 0: settings-scroll := ScrollView {
-                x: settings-dialog.content-inset; y: 108px;
-                width: parent.width - 2 * settings-dialog.content-inset + settings-dialog.scrollbar-gutter;
+                x: settings-dialog.content-inset - settings-dialog.shadow-gutter; y: 108px;
+                width: parent.width - 2 * settings-dialog.content-inset
+                    + settings-dialog.scrollbar-gutter + settings-dialog.shadow-gutter;
                 height: parent.height - 174px - (root.settings-save-error == "" ? 0px : 28px);
                 viewport-width: self.visible-width;
                 viewport-height: settings-content.preferred-height;
@@ -2687,7 +2688,10 @@ export component MainWindow inherits Window {
                     width: settings-scroll.viewport-width;
                     height: settings-scroll.viewport-height;
                     settings-content := VerticalLayout {
-                        padding: 0px; padding-right: settings-dialog.scrollbar-gutter; padding-bottom: 4px;
+                        // Keep the six outer shadow layers inside the scroll clip
+                        // without moving or narrowing the settings cards.
+                        padding: 0px; padding-left: settings-dialog.shadow-gutter;
+                        padding-right: settings-dialog.scrollbar-gutter; padding-bottom: 4px;
                         spacing: 14px;
                         SettingsGroup {
                             title: GalleryStrings.tr("界面", "Interface", "Интерфейс"); rows: 1;
@@ -2711,7 +2715,7 @@ export component MainWindow inherits Window {
                         SettingsGroup {
                             title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 3;
                             SettingsToggleRow {
-                                label: GalleryStrings.tr("启用 IP 直连", "Enable direct IP", "Прямое IP-подключение");
+                                label: GalleryStrings.tr("启用 IP 连接", "Enable IP connections", "Подключение по IP");
                                 checked <=> root.ip-direct-enabled-draft;
                             }
                             SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: !root.settings-session-active; }
@@ -2733,7 +2737,7 @@ export component MainWindow inherits Window {
                             }
                         }
                         Text {
-                            text: GalleryStrings.tr("关闭 IP 直连将隐藏模式按钮，并断开 IP 直连会话。", "Disabling direct IP hides the mode button and disconnects direct IP sessions.", "Отключение скроет кнопку режима и завершит прямые IP-сеансы.");
+                            text: GalleryStrings.tr("关闭 IP 连接将隐藏模式按钮，并断开 IP 连接会话。", "Disabling IP connections hides the mode button and ends IP sessions.", "Отключение подключений по IP скроет кнопку режима и завершит IP-сеансы.");
                             font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {
@@ -2829,7 +2833,7 @@ export component MainWindow inherits Window {
                         text: root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.tr(
                             "当前设备不支持开机自启动。", "This device does not support auto start.", "Это устройство не поддерживает автозапуск.") :
                             root.autostart-status == AutostartStatus.failed ? GalleryStrings.tr(
-                            "无法读取系统状态。请刷新重试，或在系统设置中核对。", "Could not read the system status. Retry or check it in Settings.", "Не удалось прочитать состояние. Повторите попытку или проверьте настройки системы.") :
+                            "无法读取系统状态。请刷新重试，或在系统设置中核对。", "Could not read the system status. Refresh to retry, or check System Settings.", "Не удалось прочитать состояние. Повторите попытку или проверьте настройки системы.") :
                             GalleryStrings.tr("请在系统设置中添加或移除本应用，返回后会自动刷新状态。", "Add or remove this app in system Settings. The status refreshes when you return.", "Добавьте или удалите приложение в настройках системы. После возвращения статус обновится.");
                         color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
                     }
@@ -2844,7 +2848,7 @@ export component MainWindow inherits Window {
             }
             SettingsButton {
                 x: 24px; y: parent.height - 48px; width: 112px;
-                text: GalleryStrings.tr("刷新状态", "Refresh status", "Обновить");
+                text: GalleryStrings.tr("刷新状态", "Refresh status", "Обновить статус");
                 enabled: root.autostart-status != AutostartStatus.checking;
                 clicked => { root.refresh-autostart-status(); }
             }

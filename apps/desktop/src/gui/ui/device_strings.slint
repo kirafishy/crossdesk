@@ -3,4 +3,16 @@ export global GalleryStrings {
     public pure function tr(zh: string, en: string, ru: string) -> string {
         return self.language == 0 ? zh : self.language == 2 ? ru : en;
     }
+    public pure function device-count(count: int) -> string {
+        if self.language == 0 { return count + " 台设备"; }
+        if self.language == 2 {
+            let last-two = mod(count, 100);
+            let last = mod(count, 10);
+            if last-two >= 11 && last-two <= 14 { return count + " устройств"; }
+            if last == 1 { return count + " устройство"; }
+            if last >= 2 && last <= 4 { return count + " устройства"; }
+            return count + " устройств";
+        }
+        return count + (count == 1 ? " device" : " devices");
+    }
 }

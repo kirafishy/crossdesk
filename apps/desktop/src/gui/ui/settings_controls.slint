@@ -1,6 +1,6 @@
 import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
 import { UiRadius } from "ui_radius.slint";
-import { CompactComboBox, ToggleSwitch, DialogSurface, IconButton, FontAwesomeIcons, ControlStyle } from "common.slint";
+import { CompactComboBox, ToggleSwitch, DialogSurface, IconButton, FontAwesomeIcons, ControlStyle, ButtonStyle } from "common.slint";
 import { WorkbenchStyle } from "workbench_controls.slint";
 
 // Shared visual treatment for the global settings pages.
@@ -18,12 +18,18 @@ export component SettingsButton inherits ShadowSurface {
     width: 88px; height: 32px; border-radius: UiRadius.control;
     background: !root.enabled ? ControlStyle.disabled
         : root.primary ? (touch.pressed ? #1e4fa3 : touch.has-hover ? #2866c9 : #3275dc)
-        : touch.pressed ? ControlStyle.pressed : touch.has-hover ? ControlStyle.hover
-        : root.quiet ? transparent : ControlStyle.surface;
-    shadow-enabled: !root.quiet && !root.primary;
-    shadow-color: !root.enabled ? UiShadow.edge
+        : touch.pressed ? ButtonStyle.pressed : touch.has-hover ? ButtonStyle.hover
+        : root.quiet ? transparent : ButtonStyle.surface;
+    border-width: root.quiet || root.primary ? 0px : 1px;
+    border-color: !root.enabled ? ButtonStyle.disabled-border
+        : touch.pressed ? ButtonStyle.pressed-border
+        : touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
+    shadow-enabled: root.enabled && !root.quiet && !touch.pressed;
+    shadow-color: root.primary ? UiShadow.focus
         : touch.has-hover ? UiShadow.hover : UiShadow.edge;
+    animate background, border-color { duration: 120ms; }
     accessible-role: button; accessible-label: root.text;
+    accessible-enabled: root.enabled;
     accessible-action-default => { if root.enabled { root.clicked(); } }
     Rectangle {
         x: root.align-left ? root.content-padding : (parent.width - self.width) / 2;
@@ -113,7 +119,7 @@ export component SettingsDialog inherits DialogSurface {
 
 export component SettingsSelect inherits CompactComboBox {
     subtle: true;
-    show-arrow: false;
+    show-arrow: true;
     normal-shadow-color: UiShadow.edge;
     hover-shadow-color: UiShadow.hover;
     height: 28px;
