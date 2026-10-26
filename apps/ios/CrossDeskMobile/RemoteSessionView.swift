@@ -1249,7 +1249,7 @@ private struct FloatingSessionMenu: View {
                     if session.privacyScreen.desktopAvailable {
                         FloatingControlButton(
                             title: session.privacyScreen.buttonTitle(at: session.privacyClock),
-                            symbol: "eye.slash",
+                            symbol: session.privacyScreen.enabled(at: session.privacyClock) ? "eye.slash" : "eye",
                             selected: session.privacyScreen.enabled(at: session.privacyClock),
                             action: session.togglePrivacyScreen
                         )

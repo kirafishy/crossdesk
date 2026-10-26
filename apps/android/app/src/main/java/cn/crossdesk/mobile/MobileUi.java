@@ -59,7 +59,7 @@ final class MobileUi {
         Icon glyph=new Icon(context,icon,INK);FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(dp(22),dp(22),Gravity.CENTER);box.addView(glyph,p);
         box.setContentDescription(label);box.setClickable(true);box.setFocusable(true);box.setOnClickListener(v->click.run());return box;
     }
-    View icon(String name,int color) { return new Icon(context,name,color); }
+    Icon icon(String name,int color) { return new Icon(context,name,color); }
     void gap(LinearLayout parent,int height){parent.addView(new View(context),new LinearLayout.LayoutParams(1,dp(height)));}
     void divider(LinearLayout parent){View line=new View(context);line.setBackgroundColor(LINE);parent.addView(line,new LinearLayout.LayoutParams(-1,dp(.5f)));}
     LinearLayout.LayoutParams size(int width,int height){return new LinearLayout.LayoutParams(width<0?width:dp(width),height<0?height:dp(height));}
@@ -93,8 +93,9 @@ final class MobileUi {
     }
     @android.annotation.SuppressLint("ViewConstructor") // Programmatic icon primitive, not inflated from XML.
     static final class Icon extends View {
-        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG); private final String name;
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG); private String name;
         Icon(Context context,String name,int color){super(context);this.name=name;paint.setColor(color);setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);}
+        void setName(String value){if(name.equals(value))return;name=value;invalidate();}
         @Override protected void onDraw(Canvas c){
             c.save();c.scale(getWidth()/24f,getHeight()/24f);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.7f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
             switch(name){
@@ -136,6 +137,14 @@ final class MobileUi {
                 case "unlock":c.drawRoundRect(5,10,19,22,2,2,paint);c.drawArc(8,2,16,15,180,150,false,paint);c.drawPoint(12,16,paint);break;
                 case "clipboard":c.drawRoundRect(4,4,20,22,2,2,paint);c.drawRoundRect(8,2,16,7,2,2,paint);break;
                 case "eye":path(c,2,12,6,7,12,5,18,7,22,12,18,17,12,19,6,17,2,12);c.drawCircle(12,12,3,paint);break;
+                case "eye_off":
+                    Path hiddenEye=new Path();
+                    hiddenEye.moveTo(10,5);hiddenEye.cubicTo(15,4,19,8,22,12);
+                    hiddenEye.quadTo(20.4f,14.7f,18,17);
+                    hiddenEye.moveTo(6,6);hiddenEye.quadTo(3.5f,8.5f,2,12);
+                    hiddenEye.cubicTo(7,20,13,21,18,17);
+                    hiddenEye.moveTo(10,10);hiddenEye.cubicTo(8,13,11,16,14,14);
+                    c.drawPath(hiddenEye,paint);path(c,3,3,21,21);break;
                 default:c.drawCircle(12,12,9,paint);path(c,12,10,12,17);c.drawPoint(12,6,paint);
             }c.restore();
         }

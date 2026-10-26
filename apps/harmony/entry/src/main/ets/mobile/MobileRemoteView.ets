@@ -142,7 +142,7 @@ export struct MobileRemoteView {
     return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter((index: number) =>
       (index !== 8 || this.state.platform === 'windows') && (index !== 10 || this.state.privacyVisible));
   }
-  private icons(): string[] { return ['keyboard', 'mouse', 'mouse', 'display', 'sliders', this.state.muted ? 'muted' : 'audio', 'folder', 'chart', 'lock', 'clipboard', 'lock']; }
+  private icons(): string[] { return ['keyboard', 'mouse', 'mouse', 'display', 'sliders', this.state.muted ? 'muted' : 'audio', 'folder', 'chart', 'lock', 'clipboard', this.state.privacyEnabled ? 'eye_off' : 'eye']; }
   private columns(): number { return this.viewHeight < 400 && this.viewWidth >= 400 ? 4 : 3; }
   private menuWidth(): number { return Math.max(1, Math.min(this.viewWidth - 16, this.columns() === 4 ? 380 : Math.max(280, Math.min(340, this.viewWidth - 160)))); }
   private menuX(): number { return clamp(this.orbX > this.viewWidth / 2 ? this.orbX - this.menuWidth() - 12 : this.orbX + 66, 8, this.viewWidth - this.menuWidth() - 8); }
