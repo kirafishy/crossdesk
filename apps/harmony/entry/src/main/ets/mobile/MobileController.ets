@@ -26,7 +26,8 @@ export interface RemoteDisplay { name: string; }
 interface HostInfo { host_name: string; platform: string; app_version: string; supports_video_settings: boolean; displays: RemoteDisplay[]; }
 interface SettingAck { quality: number; frame_rate: number; preference: number; request_id: number; accepted: boolean; }
 interface ServiceStatus { available: boolean; interactive_stage?: string; }
-interface ControlData { type: number; host_info?: HostInfo; video_settings?: SettingAck; service_status?: ServiceStatus; privacy_status?: PrivacyStatus; }
+interface VideoCodecStatus { encoder: string; }
+interface ControlData { type: number; host_info?: HostInfo; video_settings?: SettingAck; service_status?: ServiceStatus; privacy_status?: PrivacyStatus; video_codec?: VideoCodecStatus; }
 interface PresenceRequest { type: string; devices: string[]; subscribe: boolean; }
 interface SignalType { type: string; }
 
@@ -465,6 +466,7 @@ export class MobileController {
     if (this.receivedHostInfo) this.checkRemote(this.remoteVersion);
   }
   private data(message: ControlData): void {
+    if (message.type === 14 && message.video_codec) { this.network.remoteEncoder = message.video_codec.encoder; return; }
     if (message.type === 10 && message.privacy_status) { this.privacyScreen.receive(message.privacy_status, this.now()); this.syncPrivacy(); return; }
     if (message.type === 5) {
       this.serviceAvailable = message.service_status?.available === true;

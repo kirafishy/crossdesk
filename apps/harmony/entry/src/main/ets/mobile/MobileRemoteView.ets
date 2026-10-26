@@ -198,6 +198,15 @@ export struct MobileRemoteView {
     }.width('100%').constraintSize({ minHeight: 21 })
   }
   @Builder
+  NetworkCodec(label: string, value: string) {
+    Row({ space: 8 }) {
+      Text(label).fontSize(12).fontColor(MobileTheme.secondary).maxLines(1)
+      Text(value).fontSize(12).fontColor(MobileTheme.ink).textAlign(TextAlign.End).layoutWeight(1)
+        .maxLines(1).textOverflow({ overflow: TextOverflow.MARQUEE })
+        .marqueeOptions({ start: true, step: 0.5, loop: -1, fromStart: true })
+    }.width('100%').constraintSize({ minHeight: 21 })
+  }
+  @Builder
   Menu() {
     Column({ space: 10 }) {
       Row({ space: 6 }) {
@@ -266,7 +275,8 @@ export struct MobileRemoteView {
             this.NetworkDetail('连接延时（RTT）', NetworkStatistics.delay(this.state.networkTime - (this.controller?.network.rttTime ?? 0) < 3000 ? this.controller?.network.rtt ?? -1 : -1))
             this.NetworkDetail('连接方式', this.controller?.network.mode(this.state.networkTime) ?? '—')
             this.NetworkDetail('媒体加密', this.controller?.network.current(this.state.networkTime) === undefined ? '—' : this.controller?.network.report?.srtp ? 'SRTP 已启用' : '未启用', this.controller?.network.current(this.state.networkTime)?.srtp === true)
-
+            this.NetworkCodec('被控端编码器', this.controller?.network.remoteEncoder || '—')
+            this.NetworkCodec('控制端解码器', this.controller?.network.report?.decoder || '—')
           }
         }.width('100%')
       }.constraintSize({ maxHeight: Math.max(48, this.viewHeight - 132) }).width('100%').scrollBar(BarState.Off)

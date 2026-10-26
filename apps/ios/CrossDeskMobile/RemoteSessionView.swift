@@ -1327,6 +1327,47 @@ private struct FloatingSessionMenu: View {
     }
 }
 
+private struct ScrollingCodecName: View {
+    let value: String
+    @State private var textWidth: CGFloat = 0
+    @State private var startedAt = Date()
+    @ScaledMetric(relativeTo: .caption) private var lineHeight = 16.0
+
+    var body: some View {
+        GeometryReader { bounds in
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: textWidth <= bounds.size.width)) { context in
+                Text(value)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .background {
+                        GeometryReader { text in
+                            Color.clear
+                                .onAppear { textWidth = text.size.width }
+                                .onChange(of: text.size.width) { textWidth = $0; startedAt = Date() }
+                        }
+                    }
+                    .offset(x: offset(in: bounds.size.width, at: context.date))
+                    .frame(width: bounds.size.width, height: bounds.size.height, alignment: .leading)
+                    .clipped()
+            }
+            .onAppear { startedAt = Date() }
+            .onChange(of: value) { _ in startedAt = Date() }
+            .onChange(of: bounds.size.width) { _ in startedAt = Date() }
+        }
+        .frame(height: lineHeight)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(value)
+    }
+
+    private func offset(in width: CGFloat, at time: Date) -> CGFloat {
+        let distance = max(0, textWidth - width)
+        guard distance > 0 else { return width - textWidth }
+        // Pause for one second at each end, then repeat at 30 points/second.
+        let phase = max(0, time.timeIntervalSince(startedAt)).truncatingRemainder(dividingBy: Double(distance) / 30 + 2)
+        return -min(distance, CGFloat(max(0, phase - 1) * 30))
+    }
+}
+
 private struct FloatingNetworkStatistics: View {
     let snapshot: RemoteNetworkSnapshot
     let frameSize: CGSize
@@ -1366,6 +1407,8 @@ private struct FloatingNetworkStatistics: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
+                codec("被控端编码器", value: snapshot.remoteVideoEncoder)
+                codec("控制端解码器", value: snapshot.localVideoDecoder)
             }
             .font(.caption.monospacedDigit())
         }
@@ -1382,6 +1425,14 @@ private struct FloatingNetworkStatistics: View {
             Text(title).foregroundStyle(.secondary)
             Spacer(minLength: 8)
             Text(value)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func codec(_ title: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Text(title).foregroundStyle(.secondary).fixedSize()
+            ScrollingCodecName(value: value.isEmpty ? "—" : value)
         }
         .accessibilityElement(children: .combine)
     }

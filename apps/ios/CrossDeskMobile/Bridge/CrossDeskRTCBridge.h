@@ -136,7 +136,10 @@ typedef struct {
     didReceiveFileAtURL:(NSURL *)fileURL;
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge
     didUpdateNetworkStats:(CrossDeskNetworkStats)stats
-    NS_SWIFT_NAME(rtcBridge(_:didUpdateNetworkStats:));
+             localDecoder:(NSString *)decoder
+    NS_SWIFT_NAME(rtcBridge(_:didUpdateNetworkStats:localDecoder:));
+- (void)rtcBridge:(CrossDeskRTCBridge *)bridge
+    didUpdateRemoteVideoEncoder:(NSString *)encoder;
 @end
 
 /// Objective-C++ boundary around the native MiniRTC C API.

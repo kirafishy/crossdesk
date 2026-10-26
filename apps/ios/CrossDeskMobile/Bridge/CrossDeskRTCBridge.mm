@@ -1434,6 +1434,7 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
       action.type = ControlType::host_infomation;
       action.i.platform = crossdesk::HostPlatform::IOS;
       action.i.supports_privacy_screen = true;
+      action.i.supports_video_codec_status = true;
       CopyCString(action.i.host_name, sizeof(action.i.host_name),
                   controller_name);
       action.i.host_name_size = std::strlen(action.i.host_name);
@@ -1719,6 +1720,16 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
   if (source == kControlStream) {
     RemoteAction action{};
     if (!action.from_json(std::string(data, size))) return;
+    if (action.type == ControlType::video_codec_status) {
+      NSString *encoder = [NSString stringWithUTF8String:action.vcs.encoder];
+      DispatchMain(^{
+        if (![self isControllerGenerationActive:generation]) return;
+        id<CrossDeskRTCBridgeDelegate> delegate = self.delegate;
+        if ([delegate respondsToSelector:@selector(rtcBridge:didUpdateRemoteVideoEncoder:)])
+          [delegate rtcBridge:self didUpdateRemoteVideoEncoder:encoder ?: @""];
+      });
+      return;
+    }
     if (action.type == ControlType::privacy_status) {
       const auto message = action.to_json();
       NSData *status = [NSData dataWithBytes:message.data() length:message.size()];
@@ -2034,13 +2045,17 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
       mode == TraversalMode::P2P ? CrossDeskTraversalModeDirect
       : mode == TraversalMode::Relay ? CrossDeskTraversalModeRelay
                                     : CrossDeskTraversalModeUnknown};
+  NSString *decoder = [[NSString alloc]
+      initWithBytes:stats->video_decoder
+             length:strnlen(stats->video_decoder, sizeof(stats->video_decoder))
+           encoding:NSUTF8StringEncoding];
   DispatchMain(^{
     // Disconnect/reconnect can happen while this report waits on the UI queue.
     if (![self isControllerGenerationActive:generation]) return;
     id<CrossDeskRTCBridgeDelegate> delegate = self.delegate;
     if ([delegate respondsToSelector:
-            @selector(rtcBridge:didUpdateNetworkStats:)]) {
-      [delegate rtcBridge:self didUpdateNetworkStats:snapshot];
+            @selector(rtcBridge:didUpdateNetworkStats:localDecoder:)]) {
+      [delegate rtcBridge:self didUpdateNetworkStats:snapshot localDecoder:decoder ?: @""];
     }
   });
 }

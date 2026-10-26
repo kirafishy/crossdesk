@@ -48,6 +48,8 @@ int main() {
   auto& adapter = *backend->adapter;
   stream->window().dispatch_resize_event(slint::LogicalSize({1280, 720}));
   stream->show();
+  stream->set_secure_attention_supported(false);
+  stream->set_privacy_visible(true);
   auto rows = std::make_shared<slint::VectorModel<crossdesk::ui::NetworkStatsRow>>();
   stream->set_stats_rows(rows);
   std::vector<crossdesk::ui::NetworkStatsRow> stats(4);
@@ -75,6 +77,13 @@ int main() {
   };
   settle();
   const float top = stream->get_video_area_top();
+  // The initial control is only the logo. Wait for the toolbar reveal before
+  // clicking network status, just as a user does in a new session.
+  const slint::LogicalPosition logo({19, top + 19});
+  stream->window().dispatch_pointer_move_event(logo);
+  stream->window().dispatch_pointer_press_event(logo, slint::PointerEventButton::Left);
+  stream->window().dispatch_pointer_release_event(logo, slint::PointerEventButton::Left);
+  settle(20);
   for (bool dock_right : {false, true}) {
     if (dock_right) {
       stream->invoke_begin_control_drag(5, 20);
@@ -82,19 +91,26 @@ int main() {
       stream->invoke_end_control_drag();
       settle();
     }
-    const int control_x = dock_right ? 916 : 0;
-    const slint::LogicalPosition button({float(control_x + (dock_right ? 278 : 245)), top + 19});
+    // With privacy visible and no Windows shortcuts, the toolbar is 344 px.
+    // Its logo moves to the trailing edge when docked on the right.
+    const int control_x = dock_right ? int(stream->get_video_area_width()) - 344 : 0;
+    const slint::LogicalPosition button({float(control_x + (dock_right ? 214 : 250)), top + 19});
     stream->window().dispatch_pointer_move_event(button);
     settle(35); // Include the tooltip that appears before the click.
     for (bool expanded : {true, false, true, false}) {
       stream->window().dispatch_pointer_press_event(button, slint::PointerEventButton::Left);
       stream->window().dispatch_pointer_release_event(button, slint::PointerEventButton::Left);
       settle(); // No pointer movement: animation must finish on its own.
+      if (stats_visible != expanded) {
+        std::cerr << "Network status button did not toggle the panel; dock_right="
+                  << dock_right << '\n';
+        return 1;
+      }
       for (int y : {65, 195}) {
         const auto pixel = adapter.pixels[(int(top) + y) * 1280 + control_x + 4];
         const bool painted = pixel.r >= 240 && pixel.g >= 240 && pixel.b >= 240;
         const bool cleared = pixel.r == 0 && pixel.g == 0 && pixel.b == 0;
-        if (stats_visible != expanded || (expanded ? !painted : !cleared)) {
+        if (expanded ? !painted : !cleared) {
           std::cerr << "Stats must fully " << (expanded ? "expand" : "collapse")
                     << " without pointer movement; dock_right=" << dock_right
                     << ", y=" << y << ", pixel=" << int(pixel.r) << ','

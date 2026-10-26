@@ -107,7 +107,7 @@ final class SessionControls extends FrameLayout {
     }
     void setMuted(boolean value){muted=value;if(menu!=null&&menuPage.equals("controls"))openMenu("controls");}
     void videoSize(int width,int height){waiting.setVisibility(GONE);positionMouse();}
-    void resetVideoStatistics(){statistics(new RemoteNetworkStatistics.Snapshot(network.report,0,0,0,Double.NaN,network.rtt));}
+    void resetVideoStatistics(){statistics(new RemoteNetworkStatistics.Snapshot(network.report,0,0,0,Double.NaN,network.rtt,network.remoteEncoder,network.localDecoder));}
     void statistics(RemoteNetworkStatistics.Snapshot value){network=value;renderNetwork();}
     void videoSettings(RemoteVideoSettings value){settings=value;renderVideoSettings();}
     void privacyScreen(RemotePrivacyScreen value){privacy=value;renderPrivacy();}
@@ -200,10 +200,12 @@ final class SessionControls extends FrameLayout {
         for(int i=0;i<heading.getChildCount();i++)((TextView)heading.getChildAt(i)).setTextColor(SECONDARY);
         for(int i=0;i<4;i++)trafficRows[i]=trafficRow(body,names[i],trafficCells[i],i==3);
         ui.gap(body,10);ui.divider(body);ui.gap(body,10);
-        String[] titles={"帧率","分辨率","画面延时","连接延时（RTT）","连接方式","媒体加密"};networkDetails=new TextView[titles.length];
-        for(int i=0;i<titles.length;i++){LinearLayout row=ui.row();TextView title=ui.text(titles[i],12,false);title.setTextColor(SECONDARY);row.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        String[] titles={"帧率","分辨率","画面延时","连接延时（RTT）","连接方式","媒体加密","被控端编码器","控制端解码器"};networkDetails=new TextView[titles.length];
+        for(int i=0;i<titles.length;i++){LinearLayout row=ui.row();TextView title=ui.text(titles[i],12,false);title.setTextColor(SECONDARY);row.addView(title,i>=6?new LinearLayout.LayoutParams(-2,-2):new LinearLayout.LayoutParams(0,-2,1));
             if(i==5){encryptionLock=ui.icon("lock",GREEN);encryptionOpen=ui.icon("unlock",SECONDARY);for(View icon:new View[]{encryptionLock,encryptionOpen}){LinearLayout.LayoutParams p=ui.size(14,14);p.rightMargin=ui.dp(4);row.addView(icon,p);}}
-            TextView value=ui.text("—",12,false);value.setFontFeatureSettings("tnum");row.addView(value);networkDetails[i]=value;body.addView(row);if(i<titles.length-1)ui.gap(body,7);}
+            TextView value=ui.text("—",12,false);value.setFontFeatureSettings("tnum");
+            if(i>=6){value.setGravity(Gravity.END);value.setSingleLine();value.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);value.setMarqueeRepeatLimit(-1);value.setSelected(true);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1);p.leftMargin=ui.dp(8);row.addView(value,p);}else row.addView(value);
+            networkDetails[i]=value;body.addView(row);if(i<titles.length-1)ui.gap(body,7);}
         renderNetwork();
     }
     private LinearLayout trafficRow(LinearLayout body,String title,TextView[] cells,boolean total){
@@ -222,8 +224,9 @@ final class SessionControls extends FrameLayout {
             String in=RemoteNetworkStatistics.bitrate(traffic==null?-1:traffic.inbound),out=RemoteNetworkStatistics.bitrate(traffic==null?-1:traffic.outbound),loss=RemoteNetworkStatistics.loss(traffic==null?Double.NaN:traffic.loss);
             trafficCells[i][0].setText(in);trafficCells[i][1].setText(out);trafficCells[i][2].setText(loss);trafficRows[i].setContentDescription(names[i]+"，接收 "+in+"，发送 "+out+"，丢包率 "+loss);
         }
-        String[] values={network.fps+" FPS",network.resolution(),RemoteNetworkStatistics.latency(network.latency),RemoteNetworkStatistics.latency(network.rtt),network.mode(),network.report==null?"—":network.report.srtp?"SRTP 已启用":"未启用"};
-        for(int i=0;i<values.length;i++)networkDetails[i].setText(values[i]);networkDetails[5].setTextColor(network.report!=null&&network.report.srtp?GREEN:SECONDARY);
+        String[] values={network.fps+" FPS",network.resolution(),RemoteNetworkStatistics.latency(network.latency),RemoteNetworkStatistics.latency(network.rtt),network.mode(),network.report==null?"—":network.report.srtp?"SRTP 已启用":"未启用",network.remoteEncoder.isEmpty()?"—":network.remoteEncoder,network.localDecoder.isEmpty()?"—":network.localDecoder};
+        // Reassigning identical text every statistics tick restarts the marquee.
+        for(int i=0;i<values.length;i++)if(!android.text.TextUtils.equals(networkDetails[i].getText(),values[i]))networkDetails[i].setText(values[i]);networkDetails[5].setTextColor(network.report!=null&&network.report.srtp?GREEN:SECONDARY);
         encryptionLock.setVisibility(network.report!=null&&network.report.srtp?VISIBLE:GONE);encryptionOpen.setVisibility(network.report!=null&&!network.report.srtp?VISIBLE:GONE);
     }
     private int controlColumns(){return getMeasuredHeight()<ui.dp(400)&&getMeasuredWidth()>=ui.dp(400)?4:3;}

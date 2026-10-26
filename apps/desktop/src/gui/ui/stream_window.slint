@@ -2,7 +2,7 @@ import { SurfaceSeparator, FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ComboBox, ScrollView } from "std-widgets.slint";
 import { RemoteCursor } from "remote_cursor.slint";
-import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiFontStyle, ControlStyle, ButtonStyle } from "common.slint";
+import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiFontStyle, ControlStyle, ButtonStyle, ScrollingText } from "common.slint";
 
 export struct StreamTab {
     remote-id: string,
@@ -1458,13 +1458,12 @@ export component StreamWindow inherits Window {
                                 color: #667085; font-size: ImGuiFontStyle.small;
                                 vertical-alignment: center;
                             }
-                            Text {
+                            ScrollingText {
                                 x: codec-label-width-probe.preferred-width + 8px; y: 0px;
                                 width: parent.width - self.x; height: parent.height;
-                                text: codec.value; color: #344054;
+                                text: codec.value; text-color: #344054;
                                 font-size: ImGuiFontStyle.body; font-weight: 500;
-                                horizontal-alignment: right;
-                                vertical-alignment: center; overflow: elide;
+                                align-right: true;
                             }
                         }
                     }

@@ -1,7 +1,7 @@
 import { SurfaceSeparator, FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { GalleryStrings } from "device_strings.slint";
-import { CompactButton } from "common.slint";
+import { CompactButton, ScrollingText } from "common.slint";
 import { ScrollView } from "std-widgets.slint";
 
 export struct GalleryNetworkDevice {
@@ -153,18 +153,26 @@ component NetworkRow inherits Rectangle {
         spacing: 12px;
         Rectangle {
             width: (parent.width - 12px) / 2;
-            Text {
-                width: parent.width; height: parent.height;
-                text: GalleryStrings.tr("被控端编码器  ", "Remote encoder  ", "Удалённый кодер  ") + root.device.encoder;
-                font-size: 10px; color: #586f87; vertical-alignment: center; overflow: elide;
+            encoder-label := Text {
+                height: parent.height; width: self.preferred-width;
+                text: GalleryStrings.tr("被控端编码器  ", "Remote encoder  ", "Удалённый кодер  ");
+                font-size: 10px; color: #586f87; vertical-alignment: center;
+            }
+            ScrollingText {
+                x: encoder-label.width; width: max(0px, parent.width - self.x); height: parent.height;
+                text: root.device.encoder; font-size: 10px; text-color: #586f87;
             }
         }
         Rectangle {
             width: (parent.width - 12px) / 2;
-            Text {
-                width: parent.width; height: parent.height;
-                text: GalleryStrings.tr("控制端解码器  ", "Local decoder  ", "Локальный декодер  ") + root.device.decoder;
-                font-size: 10px; color: #586f87; vertical-alignment: center; overflow: elide;
+            decoder-label := Text {
+                height: parent.height; width: self.preferred-width;
+                text: GalleryStrings.tr("控制端解码器  ", "Local decoder  ", "Локальный декодер  ");
+                font-size: 10px; color: #586f87; vertical-alignment: center;
+            }
+            ScrollingText {
+                x: decoder-label.width; width: max(0px, parent.width - self.x); height: parent.height;
+                text: root.device.decoder; font-size: 10px; text-color: #586f87;
             }
         }
     }

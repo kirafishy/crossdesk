@@ -16,6 +16,7 @@ struct RemoteNetworkReport {
     var mode: Mode = .unknown
     var srtpActive = false
     var rttMilliseconds: Double = -1
+    var localVideoDecoder = ""
 }
 
 struct RemoteNetworkSnapshot {
@@ -23,6 +24,8 @@ struct RemoteNetworkSnapshot {
     var framesPerSecond = 0
     var videoLatencyMilliseconds: Double?
     var rttMilliseconds: Double?
+    var remoteVideoEncoder = ""
+    var localVideoDecoder = ""
 
     var connectionMode: String {
         switch report?.mode {
@@ -66,6 +69,11 @@ struct RemoteNetworkStatistics {
     private var frames: [(time: TimeInterval, latency: Double?)] = []
     private var displayedSnapshot = RemoteNetworkSnapshot()
     private var displayTime: TimeInterval?
+    private var remoteVideoEncoder = ""
+
+    mutating func receiveRemoteVideoEncoder(_ encoder: String) {
+        remoteVideoEncoder = encoder
+    }
 
     mutating func receive(_ report: RemoteNetworkReport, at now: TimeInterval) {
         self.report = report
@@ -117,7 +125,9 @@ struct RemoteNetworkStatistics {
             report: now - reportTime < 3 ? report : nil,
             framesPerSecond: recentFrames.count,
             videoLatencyMilliseconds: delays.isEmpty ? nil : delays.reduce(0, +) / Double(delays.count),
-            rttMilliseconds: now - rttTime < 3 ? averageRTT : nil
+            rttMilliseconds: now - rttTime < 3 ? averageRTT : nil,
+            remoteVideoEncoder: remoteVideoEncoder,
+            localVideoDecoder: report?.localVideoDecoder ?? ""
         )
     }
 }

@@ -1,5 +1,37 @@
 import { FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
+
+// Keep codec names readable in narrow status panels without changing row height.
+export component ScrollingText inherits Rectangle {
+    in property <string> text;
+    in property <color> text-color;
+    in property <length> font-size: 11px;
+    in property <int> font-weight: 400;
+    in property <bool> align-right: false;
+    private property <length> distance: max(0px, label.preferred-width - root.width);
+    private property <float> phase: 0;
+    min-width: 0px;
+    clip: true;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+    changed text => { root.phase = 0; }
+    changed width => { root.phase = 0; }
+    Timer {
+        interval: 16ms;
+        running: root.visible && root.width > 0px && root.distance > 0px;
+        // 30 logical pixels/second, with a one-second pause at each end.
+        triggered => { root.phase = mod(root.phase + 0.48, root.distance / 1px + 60); }
+    }
+    label := Text {
+        x: root.distance > 0px ? -min(root.distance, max(0, root.phase - 30) * 1px)
+            : root.align-right ? root.width - self.preferred-width : 0px;
+        width: self.preferred-width; height: root.height;
+        text: root.text; color: root.text-color;
+        font-size: root.font-size; font-weight: root.font-weight;
+        wrap: no-wrap; vertical-alignment: center;
+    }
+}
+
 export global FloatingBarStyle {
     out property <length> corner-radius: UiRadius.menu;
 }

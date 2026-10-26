@@ -12,15 +12,18 @@ final class RemoteNetworkStatistics {
     }
     static final class Report {
         final Traffic[] traffic=new Traffic[4];final int mode;final boolean srtp;final double rtt;
+        final String decoder;
         Report(JSONObject json){
             String[] keys={"video","audio","data","total"};
             for(int i=0;i<keys.length;i++){JSONObject item=json.optJSONObject(keys[i]);traffic[i]=item==null?null:new Traffic(item);}
             mode=json.optInt("mode",2);srtp=json.optBoolean("srtp");rtt=json.optDouble("rtt",Double.NaN);
+            decoder=json.optString("decoder","");
         }
     }
     static final class Snapshot {
         final Report report;final int fps,width,height;final double latency,rtt;
-        Snapshot(Report report,int fps,int width,int height,double latency,double rtt){this.report=report;this.fps=fps;this.width=width;this.height=height;this.latency=latency;this.rtt=rtt;}
+        final String remoteEncoder,localDecoder;
+        Snapshot(Report report,int fps,int width,int height,double latency,double rtt,String remoteEncoder,String localDecoder){this.report=report;this.fps=fps;this.width=width;this.height=height;this.latency=latency;this.rtt=rtt;this.remoteEncoder=remoteEncoder;this.localDecoder=localDecoder;}
         String mode(){return report==null?"—":report.mode==0?"P2P 直连":report.mode==1?"TURN 中继":"—";}
         String resolution(){return width>0&&height>0?width+" × "+height:"—";}
         String summary(){
@@ -32,11 +35,13 @@ final class RemoteNetworkStatistics {
         final double time,latency;Frame(double time,double latency){this.time=time;this.latency=latency;}
     }
     private Report report;
+    private String remoteEncoder="";
     private double reportTime,rttTime,averageRtt=Double.NaN;
     private long lastFrameId;
     private int width,height;
     private final ArrayDeque<Frame> frames=new ArrayDeque<>();
     static double now(){return System.nanoTime()/1_000_000_000.0;}
+    synchronized void receiveRemoteEncoder(String encoder){remoteEncoder=encoder;}
     synchronized void receive(Report value,double now){
         report=value;reportTime=now;
         if(!Double.isFinite(value.rtt)||value.rtt<0||value.rtt>2000)return;
@@ -53,7 +58,7 @@ final class RemoteNetworkStatistics {
     synchronized Snapshot snapshot(double now){
         prune(now);double total=0;int count=0;
         for(Frame frame:frames)if(Double.isFinite(frame.latency)){total+=frame.latency;count++;}
-        return new Snapshot(now-reportTime<3?report:null,frames.size(),width,height,count==0?Double.NaN:total/count,now-rttTime<3?averageRtt:Double.NaN);
+        return new Snapshot(now-reportTime<3?report:null,frames.size(),width,height,count==0?Double.NaN:total/count,now-rttTime<3?averageRtt:Double.NaN,remoteEncoder,report==null?"":report.decoder);
     }
     private void prune(double now){while(!frames.isEmpty()&&now-frames.peekFirst().time>=1)frames.removeFirst();}
     static String bitrate(long value){return value<0?"—":value>=1_000_000?String.format(Locale.ROOT,"%.1f Mbps",value/1_000_000.0):value>=1000?String.format(Locale.ROOT,"%.0f Kbps",value/1000.0):value+" bps";}

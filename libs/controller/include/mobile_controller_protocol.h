@@ -10,6 +10,7 @@
 #include <minirtc.h>
 #include <nlohmann/json.hpp>
 #include <remote_action.h>
+#include <cstring>
 
 namespace crossdesk::mobile_controller {
 inline std::string PrivacyMessage(int flag, bool block_local_input) {
@@ -38,6 +39,7 @@ inline nlohmann::json NetworkReport(const MiniRtcNetTrafficStats& stats, Travers
     return nlohmann::json{{"inbound", in.bitrate}, {"outbound", out.bitrate}, {"loss", in.loss_rate}};
   };
   return {{"rtt", stats.rtt_ms}, {"mode", mode}, {"srtp", stats.srtp_active},
+    {"decoder", std::string(stats.video_decoder, strnlen(stats.video_decoder, sizeof(stats.video_decoder)))},
     {"video", traffic(stats.video_inbound_stats, stats.video_outbound_stats)},
     {"audio", traffic(stats.audio_inbound_stats, stats.audio_outbound_stats)},
     {"data", traffic(stats.data_inbound_stats, stats.data_outbound_stats)},

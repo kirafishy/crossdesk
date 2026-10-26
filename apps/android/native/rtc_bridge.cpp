@@ -371,6 +371,7 @@ extern "C" JNIEXPORT jboolean JNICALL JNI_METHOD(nConnect)(
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nReady)(JNIEnv*, jclass, jlong handle) {
   auto* s = From(handle); if (!s || !s->controller) return;
   auto action = MakeHostInformation("CrossDesk Android", {}, true, "1.6.0", HostPlatform::Android);
+  action.i.supports_video_codec_status = true;
   s->Send(kControlStream, action.to_json()); FreeRemoteAction(action);
 }
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nPointer)(

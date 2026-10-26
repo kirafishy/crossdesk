@@ -195,6 +195,10 @@ final class NativeSession implements AutoCloseable {
                         fail(status >= 0 && status < reasons.length ? reasons[status] : "连接已结束");
                     }
                 } else if (type == 4) {
+                    if(event.optInt("type",-1)==14){
+                        networkStatistics.receiveRemoteEncoder(event.getJSONObject("video_codec").getString("encoder"));
+                        return;
+                    }
                     JSONObject info=event.optJSONObject("host_info");
                     if(info!=null)supportsTextInput=info.optBoolean("supports_text_input",false);
                     ui(() -> {

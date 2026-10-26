@@ -1473,7 +1473,14 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     }
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge,
-                   didUpdateNetworkStats stats: CrossDeskNetworkStats) {
+                   didUpdateRemoteVideoEncoder encoder: String) {
+        guard hasNetworkConsent, isConnected else { return }
+        networkStatistics.receiveRemoteVideoEncoder(encoder)
+    }
+
+    func rtcBridge(_ bridge: CrossDeskRTCBridge,
+                   didUpdateNetworkStats stats: CrossDeskNetworkStats,
+                   localDecoder: String) {
         guard hasNetworkConsent, isConnected else { return }
         func traffic(_ value: CrossDeskTrafficStats) -> RemoteTrafficStatistics {
             RemoteTrafficStatistics(inboundBitrate: value.inboundBitrate,
@@ -1489,7 +1496,8 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         networkStatistics.receive(RemoteNetworkReport(
             video: traffic(stats.video), audio: traffic(stats.audio),
             data: traffic(stats.data), total: traffic(stats.total), mode: mode,
-            srtpActive: stats.srtpActive.boolValue, rttMilliseconds: stats.rttMilliseconds
+            srtpActive: stats.srtpActive.boolValue, rttMilliseconds: stats.rttMilliseconds,
+            localVideoDecoder: localDecoder
         ), at: ProcessInfo.processInfo.systemUptime)
     }
 

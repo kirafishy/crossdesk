@@ -144,6 +144,7 @@ class MobileSession {
       if (status == Connected && !s->connected_) {
         s->connecting_ = false; s->connected_ = true;
         auto info = MakeHostInformation("CrossDesk HarmonyOS Mobile", {}, true, s->version_, HostPlatform::HarmonyOS);
+        info.i.supports_video_codec_status = true;
         s->Send(info); FreeRemoteAction(info);
         RemoteAction audio{}; audio.type = audio_capture; audio.a = !s->muted_; s->Send(audio);
         s->audio_.Start();

@@ -779,7 +779,8 @@ bool VerifyWorkbenchActions() {
   if (window->get_settings_tab() != 0) return false;
   window->set_gallery_settings_error("");
   window->set_settings_open(false);
-  click(60, 20);
+  // DeskHub follows the ID/IP mode switch when direct IP connections are enabled.
+  click(window->get_ip_direct_enabled() ? 204 : 60, 20);
   if (!gallery_opened) return false;
   crossdesk::ui::RecentConnection device{};
   device.remote_id = "987654321";
@@ -850,24 +851,45 @@ bool VerifyWorkbenchActions() {
 bool VerifySystemShortcutMenu() {
   auto stream = crossdesk::ui::StreamWindow::create();
   stream->window().set_size(slint::LogicalSize(slint::Size<float>{1280, 720}));
+  stream->show();
   std::vector<std::string> commands;
   stream->on_send_shortcut([&](slint::SharedString command) { commands.emplace_back(command); });
-  const auto click = [&](float y) {
-    const slint::LogicalPosition point({55, stream->get_video_area_top() + y});
+  const auto settle = [] {
+    for (int i = 0; i < 20; ++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(16));
+      slint::platform::update_timers_and_animations();
+    }
+  };
+  const auto click = [&](float x, float y) {
+    const slint::LogicalPosition point({x, stream->get_video_area_top() + y});
     stream->window().dispatch_pointer_move_event(point);
     stream->window().dispatch_pointer_press_event(point, slint::PointerEventButton::Left);
     stream->window().dispatch_pointer_release_event(point, slint::PointerEventButton::Left);
   };
-  click(20);
-  if (!stream->invoke_is_local_control_area(55, 90)) return false;
-  click(58);
-  stream->set_secure_attention_supported(false);
-  click(20);
-  if (stream->invoke_is_local_control_area(55, 90)) return false;
-  click(58);
+  // The toolbar starts collapsed. Reveal it before targeting its buttons.
+  click(19, 19);
+  settle();
   stream->set_secure_attention_supported(true);
-  click(20); click(88);
-  return commands == std::vector<std::string>{"Ctrl+Alt+Del", "Win+L", "Win+L"};
+  settle();
+  click(90, 19);
+  if (!stream->invoke_is_local_control_area(90, 90)) return false;
+  click(90, 68);
+
+  // Switching away from a Windows host hides the entire shortcut entry and
+  // closes an open menu; its former rows must no longer dispatch commands.
+  click(90, 19);
+  if (!stream->invoke_is_local_control_area(90, 90)) return false;
+  stream->set_secure_attention_supported(false);
+  settle();
+  if (stream->invoke_is_local_control_area(90, 90)) return false;
+  click(90, 98);
+  if (commands != std::vector<std::string>{"Ctrl+Alt+Del"}) return false;
+
+  stream->set_secure_attention_supported(true);
+  settle();
+  click(90, 19);
+  click(90, 98);
+  return commands == std::vector<std::string>{"Ctrl+Alt+Del", "Win+L"};
 }
 
 bool VerifyRemoteIdEditing() {
@@ -905,7 +927,7 @@ bool VerifyRemoteIdEditing() {
 
 int main() {
   if (!VerifySystemShortcutMenu()) {
-    std::cerr << "Shortcut menu must omit unsupported SAS and resize its input area\n";
+    std::cerr << "Shortcut menu must dispatch Windows shortcuts and hide for unsupported hosts\n";
     return 13;
   }
   if (!VerifyRemoteIdEditing()) {
