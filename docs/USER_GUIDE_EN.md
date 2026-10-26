@@ -239,6 +239,26 @@ The installer registers an on-demand service by default. CrossDesk tries to star
 
 On Windows, **Auto Start** launches the client after the current user signs in. Installed release builds use a logon scheduled task with highest privileges, so subsequent logons need no UAC confirmation; portable and Debug builds use a normal per-user startup entry. Upgrading the installed build or launching the new version manually migrates a legacy startup entry pointing to that executable. Turning Auto Start off removes its registration. Remote access before sign-in requires the separate unattended mode below.
 
+<a id="windows-service-development-update"></a>
+
+### Updating the service for a development build
+
+Launching a newly compiled client only tries to start the registered service. It does not change the service executable path or restart an older running service. If the computer keyboard works but the system IME fails in both Notepad and the lock screen, and the log contains `Secure desktop text injection failed: error=unknown_command`, update the service binaries and registration first.
+
+Open an **administrator PowerShell** in the complete new build directory containing `CrossDesk.exe`, `crossdesk_service.exe` and `crossdesk_session_helper.exe`, then run:
+
+```powershell
+$crossdeskExe = (Resolve-Path .\CrossDesk.exe).Path;
+foreach ($serviceAction in '--service-stop', '--service-install', '--service-start') {
+    $serviceProcess = Start-Process -FilePath $crossdeskExe -ArgumentList $serviceAction -Wait -PassThru;
+    if ($serviceProcess.ExitCode -ne 0) {
+        throw "$serviceAction failed: $($serviceProcess.ExitCode)"
+    }
+}
+```
+
+Remote control may briefly disconnect while the service restarts. Reconnect and test text input on both the ordinary desktop and lock screen. Keep this build directory in place because the service now uses its binaries. Reinstall the complete installer package to return to the installed release's service registration.
+
 ### Remote access before Windows sign-in
 
 The installed release supports a separate unattended host. Open an **administrator PowerShell** in the complete installation directory and enable it once:

@@ -239,6 +239,26 @@ CrossDesk 已支持鸿蒙 PC、手机和平板，PC 与移动端分别构建 HAP
 
 Windows 的“开机自启”在当前用户登录后启动客户端。安装版使用以最高权限运行的登录计划任务，后续登录无需再次确认 UAC；便携版和 Debug 构建使用当前用户的普通启动项。升级安装版或手动启动新版时，会自动迁移指向该程序的旧启动项。关闭自启会删除相应注册。登录前远控需要另外启用下面的无人值守模式。
 
+<a id="windows-service-development-update"></a>
+
+### 使用开发构建更新服务
+
+直接运行新编译的客户端只会尝试启动已经注册的服务，不会修改服务的程序路径，也不会重启正在运行的旧服务。若电脑键盘可用，但系统输入法在记事本与锁屏中均不可用，且日志显示 `Secure desktop text injection failed: error=unknown_command`，请先更新服务程序及其注册路径。
+
+在包含新版 `CrossDesk.exe`、`crossdesk_service.exe` 和 `crossdesk_session_helper.exe` 的完整构建目录中打开**管理员 PowerShell**，执行：
+
+```powershell
+$crossdeskExe = (Resolve-Path .\CrossDesk.exe).Path;
+foreach ($serviceAction in '--service-stop', '--service-install', '--service-start') {
+    $serviceProcess = Start-Process -FilePath $crossdeskExe -ArgumentList $serviceAction -Wait -PassThru;
+    if ($serviceProcess.ExitCode -ne 0) {
+        throw "$serviceAction failed: $($serviceProcess.ExitCode)"
+    }
+}
+```
+
+服务重启期间远控可能短暂中断。完成后重新连接，分别测试普通桌面和锁屏输入。服务将使用该构建目录中的程序，请保留该目录；恢复使用安装版时，重新安装完整安装包以恢复对应的服务注册。
+
 ### 开机后尚未登录时远控
 
 安装版支持独立的无人值守被控端。在完整安装目录中打开**管理员 PowerShell**，一次性启用：
