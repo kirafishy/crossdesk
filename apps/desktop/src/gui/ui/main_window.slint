@@ -432,10 +432,10 @@ export component MainWindow inherits Window {
         root.menu-open = false;
         focus-sink.focus();
     }
-    function switch-connection-mode() {
-        if !root.ip-direct-enabled { return; }
-        root.set-connection-mode(!root.lan-mode);
-        root.connection-mode-changed(root.lan-mode);
+    function select-connection-mode(lan: bool) {
+        if !root.ip-direct-enabled || root.connection-pending || root.lan-connecting || root.lan-mode == lan { return; }
+        root.set-connection-mode(lan);
+        root.connection-mode-changed(lan);
     }
     function submit-connection() {
         if root.connection-pending || root.lan-connecting { return; }
@@ -1101,21 +1101,50 @@ export component MainWindow inherits Window {
 
         // A compact application toolbar keeps global actions outside device cards.
         // Center the 28px buttons above the cards with 6px of space on each side.
-        connection-mode-button := WorkbenchButton {
+        connection-mode-switch := WorkbenchButton {
             visible: !root.gallery-mode && root.ip-direct-enabled;
             x: 20px; y: 6px;
-            width: 120px; height: 28px;
-            text: root.lan-mode ? GalleryStrings.tr("IP 直连模式", "Direct IP mode", "Режим IP") : GalleryStrings.tr("ID 连接模式", "ID mode", "Режим ID");
-            tooltip: root.lan-mode ? GalleryStrings.tr("切换到 ID 连接模式", "Switch to ID mode", "Переключить в режим ID") : GalleryStrings.tr("切换到 IP 直连模式", "Switch to direct IP mode", "Переключить в режим IP");
-            accessible-label: self.text + " · " + self.tooltip;
+            width: 136px; height: 28px;
+            background: WorkbenchStyle.field-surface;
             enabled: !root.connection-pending && !root.lan-connecting;
+            tooltip: root.lan-mode ? GalleryStrings.tr("切换到 ID 连接模式", "Switch to ID mode", "Переключить в режим ID") : GalleryStrings.tr("切换到 IP 直连模式", "Switch to direct IP mode", "Переключить в режим IP");
+            accessible-role: switch;
+            accessible-label: GalleryStrings.tr("IP 直连模式", "Direct IP mode", "Режим IP");
+            accessible-checked: root.lan-mode;
             z: 8;
-            clicked => { root.switch-connection-mode(); }
+            clicked => {
+                root.select-connection-mode(!root.lan-mode);
+                connection-mode-switch.focus();
+            }
+
+            Rectangle {
+                x: root.lan-mode ? parent.width / 2 + 1px : 2px;
+                y: 2px;
+                width: (parent.width - 6px) / 2;
+                height: parent.height - 4px;
+                border-radius: UiRadius.control;
+                background: WorkbenchStyle.accent;
+                animate x { duration: 180ms; easing: ease-in-out; }
+            }
+            for lan in [false, true]: Text {
+                x: lan ? parent.width / 2 + 1px : 2px;
+                y: 2px;
+                width: (parent.width - 6px) / 2;
+                height: parent.height - 4px;
+                text: lan ? GalleryStrings.tr("IP 直连", "Direct IP", "Режим IP") : GalleryStrings.tr("ID 连接", "ID mode", "Режим ID");
+                font-size: 12px;
+                font-weight: 500;
+                color: root.lan-mode == lan ? white : WorkbenchStyle.muted;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                accessible-role: none;
+                animate color { duration: 180ms; }
+            }
         }
         open-gallery-button := WorkbenchButton {
             visible: !root.gallery-mode;
-            x: root.ip-direct-enabled ? connection-mode-button.x + connection-mode-button.width + 8px : 20px;
-            y: connection-mode-button.y;
+            x: root.ip-direct-enabled ? connection-mode-switch.x + connection-mode-switch.width + 8px : 20px;
+            y: connection-mode-switch.y;
             width: 80px; height: 28px;
             text: GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub");
             z: 8;
