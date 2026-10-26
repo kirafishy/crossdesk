@@ -58,9 +58,8 @@ bool IsHex(const std::string& text, size_t size) {
            return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
          });
 }
-void PrivateWrite(const std::filesystem::path& path, const std::string& text) {
-  const auto temporary = path.parent_path() / (".write-" + RandomHex(16));
 #ifdef _WIN32
+std::vector<unsigned char> CurrentUser() {
   HANDLE token = nullptr;
   Require(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token),
           "Cannot open user token");
@@ -70,25 +69,39 @@ void PrivateWrite(const std::filesystem::path& path, const std::string& text) {
   bool ok = GetTokenInformation(token, TokenUser, data.data(), size, &size);
   CloseHandle(token);
   Require(ok, "Cannot read user token");
+  return data;
+}
+PSECURITY_DESCRIPTOR PrivateSecurityDescriptor(bool directory) {
+  auto user = CurrentUser();
   LPWSTR sid = nullptr;
   Require(ConvertSidToStringSidW(
-              reinterpret_cast<TOKEN_USER*>(data.data())->User.Sid, &sid),
+              reinterpret_cast<TOKEN_USER*>(user.data())->User.Sid, &sid),
           "Cannot read user SID");
-  std::wstring acl = L"D:P(A;;FA;;;" + std::wstring(sid) + L")";
+  // An elevated token can default to Administrators as the owner even when
+  // its DACL grants access only to TokenUser. Always set both explicitly.
+  const auto acl = L"O:" + std::wstring(sid) + L"D:P(A;" +
+                   (directory ? L"OICI" : L"") + L";FA;;;" + sid + L")";
   LocalFree(sid);
   PSECURITY_DESCRIPTOR descriptor = nullptr;
   Require(ConvertStringSecurityDescriptorToSecurityDescriptorW(
               acl.c_str(), SDDL_REVISION_1, &descriptor, nullptr),
           "Cannot protect LAN file");
+  return descriptor;
+}
+#endif
+void PrivateWrite(const std::filesystem::path& path, const std::string& text) {
+  const auto temporary = path.parent_path() / (".write-" + RandomHex(16));
+#ifdef _WIN32
+  auto descriptor = PrivateSecurityDescriptor(false);
   SECURITY_ATTRIBUTES security{sizeof(security), descriptor, FALSE};
   HANDLE file = CreateFileW(temporary.c_str(), GENERIC_WRITE, 0, &security,
                             CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
   LocalFree(descriptor);
   Require(file != INVALID_HANDLE_VALUE, "Cannot create LAN file");
   DWORD written = 0;
-  ok = WriteFile(file, text.data(), static_cast<DWORD>(text.size()), &written,
-                 nullptr) &&
-       written == text.size() && FlushFileBuffers(file);
+  bool ok = WriteFile(file, text.data(), static_cast<DWORD>(text.size()),
+                      &written, nullptr) &&
+            written == text.size() && FlushFileBuffers(file);
   CloseHandle(file);
   if (!ok || !MoveFileExW(temporary.c_str(), path.c_str(),
                           MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
@@ -114,34 +127,42 @@ void PrivateWrite(const std::filesystem::path& path, const std::string& text) {
 #endif
 }
 #ifdef _WIN32
-std::vector<unsigned char> CurrentUser() {
-  HANDLE token = nullptr;
-  Require(OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token),
-          "Cannot open user token");
-  DWORD size = 0;
-  GetTokenInformation(token, TokenUser, nullptr, 0, &size);
-  std::vector<unsigned char> data(size);
-  bool ok = GetTokenInformation(token, TokenUser, data.data(), size, &size);
-  CloseHandle(token);
-  Require(ok, "Cannot read user token");
-  return data;
+using FileHandle = std::unique_ptr<void, decltype(&CloseHandle)>;
+FileHandle OpenLanPath(const std::filesystem::path& path, DWORD access) {
+  // Keep the object open without FILE_SHARE_DELETE so validation and legacy
+  // owner repair cannot operate on a replacement at the same path.
+  HANDLE file = CreateFileW(
+      path.c_str(), access, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+      OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+      nullptr);
+  Require(file != INVALID_HANDLE_VALUE, "Cannot open LAN path");
+  return {file, CloseHandle};
 }
 void CheckPrivateWindowsPath(const std::filesystem::path& path) {
-  const auto attributes = GetFileAttributesW(path.c_str());
-  Require(attributes != INVALID_FILE_ATTRIBUTES &&
-              !(attributes & FILE_ATTRIBUTE_REPARSE_POINT),
+  auto file = OpenLanPath(path, READ_CONTROL);
+  BY_HANDLE_FILE_INFORMATION info{};
+  Require(GetFileInformationByHandle(file.get(), &info) &&
+              !(info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT),
           "LAN path cannot be a reparse point");
   auto user = CurrentUser();
   auto sid = reinterpret_cast<TOKEN_USER*>(user.data())->User.Sid;
   PSID owner = nullptr;
   PACL acl = nullptr;
   PSECURITY_DESCRIPTOR descriptor = nullptr;
-  Require(GetNamedSecurityInfoW(
-              const_cast<wchar_t*>(path.c_str()), SE_FILE_OBJECT,
+  Require(GetSecurityInfo(
+              file.get(), SE_FILE_OBJECT,
               OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION, &owner,
               nullptr, &acl, nullptr, &descriptor) == ERROR_SUCCESS,
           "Cannot read LAN file permissions");
-  bool ok = owner && EqualSid(owner, sid) && acl && acl->AceCount > 0;
+  std::unique_ptr<void, decltype(&LocalFree)> security(descriptor, LocalFree);
+  bool ok = acl && acl->AceCount > 0;
+  // Only the exact protected, full-access DACL written by older versions is
+  // eligible for owner repair. Never adopt a shared or foreign-user profile.
+  SECURITY_DESCRIPTOR_CONTROL control{};
+  DWORD revision = 0;
+  bool legacy = owner && IsWellKnownSid(owner, WinBuiltinAdministratorsSid) &&
+                GetSecurityDescriptorControl(descriptor, &control, &revision) &&
+                (control & SE_DACL_PROTECTED) && acl && acl->AceCount == 1;
   for (DWORD i = 0; ok && i < acl->AceCount; ++i) {
     void* raw = nullptr;
     if (!GetAce(acl, i, &raw)) {
@@ -151,23 +172,30 @@ void CheckPrivateWindowsPath(const std::filesystem::path& path) {
     const auto* ace = static_cast<ACCESS_ALLOWED_ACE*>(raw);
     ok = ace->Header.AceType == ACCESS_ALLOWED_ACE_TYPE &&
          EqualSid(const_cast<DWORD*>(&ace->SidStart), sid);
+    const BYTE flags = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                           ? OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE
+                           : 0;
+    legacy =
+        legacy && ace->Mask == FILE_ALL_ACCESS && ace->Header.AceFlags == flags;
   }
-  LocalFree(descriptor);
-  Require(ok, "LAN files must be accessible only by the current user");
+  Require(ok && owner && (EqualSid(owner, sid) || legacy),
+          "LAN files must be accessible only by the current user");
+  if (legacy) {
+    auto writable = OpenLanPath(path, WRITE_OWNER);
+    BY_HANDLE_FILE_INFORMATION current{};
+    Require(GetFileInformationByHandle(writable.get(), &current) &&
+                current.dwVolumeSerialNumber == info.dwVolumeSerialNumber &&
+                current.nFileIndexHigh == info.nFileIndexHigh &&
+                current.nFileIndexLow == info.nFileIndexLow &&
+                SetSecurityInfo(writable.get(), SE_FILE_OBJECT,
+                                OWNER_SECURITY_INFORMATION, sid, nullptr,
+                                nullptr, nullptr) == ERROR_SUCCESS,
+            "Cannot repair LAN file owner");
+  }
 }
 void CreatePrivateDirectory(const std::filesystem::path& path) {
   if (!std::filesystem::exists(path)) {
-    auto user = CurrentUser();
-    LPWSTR sid = nullptr;
-    Require(ConvertSidToStringSidW(
-                reinterpret_cast<TOKEN_USER*>(user.data())->User.Sid, &sid),
-            "Cannot read user SID");
-    const auto acl = L"D:P(A;OICI;FA;;;" + std::wstring(sid) + L")";
-    LocalFree(sid);
-    PSECURITY_DESCRIPTOR descriptor = nullptr;
-    Require(ConvertStringSecurityDescriptorToSecurityDescriptorW(
-                acl.c_str(), SDDL_REVISION_1, &descriptor, nullptr),
-            "Cannot protect LAN directory");
+    auto descriptor = PrivateSecurityDescriptor(true);
     SECURITY_ATTRIBUTES security{sizeof(security), descriptor, FALSE};
     bool ok = CreateDirectoryW(path.c_str(), &security);
     LocalFree(descriptor);
