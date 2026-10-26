@@ -145,7 +145,7 @@ workflow on branch/tag pushes and manual runs, and waits for its result before
 publishing a version-tag release.
 
 The workflow builds with the minimum supported Xmake version (3.1.1) and retains
-the pinned Xcode/SDK, dependency cache, license catalog validation, unsigned arm64
+the pinned Xcode/SDK, dependency cache, native input validation, unsigned arm64
 Release build, and app-bundle verification. Unit tests run locally as needed.
 It uploads
 `crossdesk-ios-arm64-unsigned-v<version>-<date>.zip`,
@@ -366,16 +366,16 @@ collected from the reviewed runtime source directories; the catalog is an
 attribution superset, not a claim that every source file survives linker
 dead stripping.
 
-Normal Xcode builds verify the checked-in resource, local license files and
-package recipes offline before compiling native code. After compilation they
-also compare all resolved dependency versions (including header-only packages)
-with the catalog and check the merged archive's input hashes and pinned
-toolchain. A missing, stale or altered catalog fails the build. Ordinary MiniRTC
-code changes do not require changing the notice-review revision or regenerating
-the catalog. Changes to dependencies, license texts or embedded third-party
-notices still require reviewing and updating the affected catalog entries;
-regeneration alone does not select a new dependency version.
-`MINIRTC_ENABLE_AOM=true` also requires a reviewed AOM entry.
+Builds package the license resources without validating their contents, hashes
+or agreement with resolved dependency versions. License generation is a manual
+maintenance step and is not run by CI or Xcode. Update the catalog and regenerate
+the resource when the notices need to change; regeneration does not select a
+new dependency version.
+
+`scripts/verify_native_build.py` independently checks the native archive input
+hashes and pinned Xmake toolchain after compilation. These checks do not read
+the license catalog. Downloaded source archives retain their SHA-256 checks
+when manually regenerating notices.
 
 The source screen links to the exact application tag/commit, MiniRTC commit,
 and custom dependency recipes/patches. `SourceMetadata.json` is generated in
@@ -395,8 +395,8 @@ archives available for recipients of that release.
 To change a library, edit MiniRTC in its submodule, or modify the relevant
 package recipe/patch under `deps/submodules/minirtc/thirdparty`. If a package
 recipe changes, change its package configuration revision (or rebuild that
-package) so Xmake does not reuse a previous binary. Review affected notices,
-update recipe hashes, and commit MiniRTC. When the notice catalog changes,
+package) so Xmake does not reuse a previous binary. Update affected notices
+and commit MiniRTC. When the notice catalog changes,
 record the reviewed revision in `sources.json` and regenerate the catalog.
 Build the application again to relink it with
 the modified library. Use your own team and bundle identifier to install the

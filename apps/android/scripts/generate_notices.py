@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Package existing reviewed notices for the Android runtime dependency set."""
 import json
-import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -70,8 +69,7 @@ def write_pages(output, catalog, additional, revision, minirtc):
             target = output / asset
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(document['text'], encoding='utf-8')
-            documents.append({'title': document['title'], 'asset': asset,
-                              'sha256': hashlib.sha256(document['text'].encode('utf-8')).hexdigest()})
+            documents.append({'title': document['title'], 'asset': asset})
         component['documents'] = documents
     (output / 'ThirdPartyLicenses.json').write_text(json.dumps(
         {'schemaVersion': 1, 'components': components}, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')

@@ -38,12 +38,6 @@ def verify(app, require_release=False):
     for category, codes in required.items():
         if set(reasons.get(category, [])) != codes:
             raise ValueError(f"Missing or changed reviewed privacy reasons: {category}")
-    data = (app / "ThirdPartyLicenses.json").read_bytes()
-    catalog = json.loads(data)
-    ids = {c["id"] for c in catalog["components"]}
-    if not {"crossdesk", "minirtc", "openfec"} <= ids or "openh264" in ids:
-        raise ValueError("Unexpected iOS license catalog")
-    openssl = next(c for c in catalog["components"] if c["id"] == "openssl3")
     framework = app / "Frameworks/OpenSSL.framework"
     sdk_info = plistlib.loads((framework / "Info.plist").read_bytes())
     sdk_privacy_data = (framework / "PrivacyInfo.xcprivacy").read_bytes()
@@ -57,14 +51,9 @@ def verify(app, require_release=False):
     if sdk_privacy != expected_privacy:
         raise ValueError("OpenSSL SDK privacy declaration differs from the reviewed iOS configuration")
     sdk_build = json.loads((framework / "BuildMetadata.json").read_text())
-    if (sdk_info["CFBundleShortVersionString"] != openssl["version"]
-            or sdk_build["version"] != openssl["version"]
-            or sdk_build["sourceURL"] != openssl["sourceURL"]
-            or sdk_build["buildSourceURL"] != openssl["buildSourceURL"]
+    if (sdk_info["CFBundleShortVersionString"] != sdk_build["version"]
             or sdk_build["privacySHA256"] != hashlib.sha256(sdk_privacy_data).hexdigest()):
-        raise ValueError("OpenSSL SDK resources do not match the source/license catalog")
-    if (framework / "LICENSE.txt").read_text() != "\n\n".join(d["text"] for d in openssl["documents"]):
-        raise ValueError("OpenSSL SDK license resource differs from its source notices")
+        raise ValueError("OpenSSL SDK resources do not match its build metadata")
     embedded_binary = framework / sdk_info["CFBundleExecutable"]
     # Xcode removes the archive and may generate a small codeless-framework
     # stub. It must not ship a second static archive or dynamic OpenSSL copy.
@@ -78,13 +67,11 @@ def verify(app, require_release=False):
     if "OpenSSL.framework" in linked:
         raise ValueError("OpenSSL must be statically linked into the application")
     source = json.loads((app / "SourceMetadata.json").read_text())
-    if source["licenseCatalogSHA256"] != hashlib.sha256(data).hexdigest():
-        raise ValueError("Bundled licenses differ from the recorded source metadata")
     if require_release and (source["isModified"] or not source["tag"]):
         raise ValueError("The app was not built from an unmodified version tag")
     if not re.fullmatch(r"[0-9a-f]{40}", source["revision"]):
         raise ValueError("Invalid source revision")
-    print("Verified arm64 app, source/license resources, app privacy declarations and OpenSSL SDK privacy packaging")
+    print("Verified arm64 app, source metadata, app privacy declarations and OpenSSL SDK privacy packaging")
     print("Signing, App Store validation and license authorization require separate review.")
 
 

@@ -246,4 +246,4 @@ AV1 硬件路径尚无对应实机验证；Retroid 上使用 dav1d 软件解码�
 
 设置 → 关于使用与 iOS 相同的分组及入口：版本、软件许可、开源组件、源码与构建说明。软件许可中可分别阅读 GNU GPL 第 3 版及开源软件权利说明；开源组件页单独展示 OpenFEC 告知，其余组件列出名称和许可证，详情包含版本、源码、适用的构建配方和每一份许可文档。内容按 Android 构建生成，不显示未使用的 iOS 依赖，Android 签名说明替换 Apple 签名说明。
 
-APK 保留完整 `THIRD_PARTY_NOTICES.txt`，并生成轻量的 `ThirdPartyLicenses.json` 索引、72 份独立许可文档及 `SourceMetadata.json`。打开文档时才读取正文，长文按有限长度分块显示，支持文本选择、复制与网页链接；打包验证核对每份正文的 SHA-256。源码页面显示标签或提交版本及未发布修改提示，源码链接指向基础提交。当前 Android 构建说明、构建脚本、MiniRTC、OpenSSL 及 SVT-AV1 配方随 APK 离线提供，避免开发版链接指向基础提交中尚不存在的 Android 文件。
+APK 保留完整 `THIRD_PARTY_NOTICES.txt`，并生成轻量的 `ThirdPartyLicenses.json` 索引、72 份独立许可文档及 `SourceMetadata.json`。打开文档时才读取正文，长文按有限长度分块显示，支持文本选择、复制与网页链接。构建继续生成并打包许可资料，CI 和 APK 验证不再检查许可证内容、哈希或组件清单。源码页面显示标签或提交版本及未发布修改提示，源码链接指向基础提交。当前 Android 构建说明、构建脚本、MiniRTC、OpenSSL 及 SVT-AV1 配方随 APK 离线提供，避免开发版链接指向基础提交中尚不存在的 Android 文件。

@@ -14,15 +14,12 @@
       },
       "documents": [
         {
-          "path": "asio/COPYING",
-          "sha256": "5cc69ca9afd3417ed8e58bcd9c0bb730375e9e3e92b5aaf6483b93a2837e0cac"
+          "path": "asio/COPYING"
         },
         {
-          "path": "asio/LICENSE_1_0.txt",
-          "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566"
+          "path": "asio/LICENSE_1_0.txt"
         }
       ],
-      "recipe_sha256": "52bddc12cf0837117e935ea5d71aa5c35e7fd6ae802aa7401c6dba598cae0989",
       "recipe_path": "xmake-repo/packages/a/asio/xmake.lua",
       "package": "asio",
       "notice_prefixes": [
@@ -41,11 +38,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE.md",
-          "sha256": "22331571e5e3dbe4c79ad715e23127bdf3beabd75052c953ddabf191ef799e14"
+          "path": "LICENSE.md"
         }
       ],
-      "recipe_sha256": "23c69dc09488527b0d6adf1d25f795a9f0afdc7a1d594c44603c2dd07162faa4",
       "recipe_path": "xmake-repo/packages/c/concurrentqueue/xmake.lua",
       "package": "concurrentqueue",
       "notice_prefixes": [
@@ -66,12 +61,10 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+          "path": "LICENSE"
         },
         {
-          "path": "apps/ios/licenses/OPEN_SOURCE_NOTICE.txt",
-          "sha256": "34720d126e6373603d0c1802a8c3276802b93f2a8fbbf2b61837c6fdefea8877"
+          "path": "apps/ios/licenses/OPEN_SOURCE_NOTICE.txt"
         }
       ]
     },
@@ -88,12 +81,10 @@
       },
       "documents": [
         {
-          "path": "COPYING",
-          "sha256": "b327887de263238deaa80c34cdd2ff3e0ba1d35db585ce14a37ce3e74ee389e9"
+          "path": "COPYING"
         },
         {
-          "path": "doc/PATENTS",
-          "sha256": "335eca574598bf4ca181b12f708d6669e5a5e78c8e1513e5b35fa1f03901484b"
+          "path": "doc/PATENTS"
         }
       ],
       "package": "dav1d",
@@ -114,39 +105,30 @@
       },
       "documents": [
         {
-          "path": "COPYING",
-          "sha256": "fa6f36630bb1e0c571d34b2bbdf188d08495c9dbf58f28cac112f303fc1f58fb"
+          "path": "COPYING"
         },
         {
-          "path": "LICENSES/Apache-2.0.txt",
-          "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff"
+          "path": "LICENSES/Apache-2.0.txt"
         },
         {
-          "path": "LICENSES/CC0-1.0.txt",
-          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499"
+          "path": "LICENSES/CC0-1.0.txt"
         },
         {
-          "path": "LICENSES/LGPL-2.1-only.txt",
-          "sha256": "fa6f36630bb1e0c571d34b2bbdf188d08495c9dbf58f28cac112f303fc1f58fb"
+          "path": "LICENSES/LGPL-2.1-only.txt"
         },
         {
-          "path": "LICENSES/LLVM-exception.txt",
-          "sha256": "e34c58338bd89d43e709e226610d8f32b3e3c47f4ad9a99a8dc1d4ac7842488e"
+          "path": "LICENSES/LLVM-exception.txt"
         },
         {
-          "path": "LICENSES/MIT.txt",
-          "sha256": "b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0"
+          "path": "LICENSES/MIT.txt"
         },
         {
-          "path": "LICENSES/MPL-1.1.txt",
-          "sha256": "6214f8b1300bb9f37b16ebc146f8f61af0187e0025042ff95c8b3030744a8795"
+          "path": "LICENSES/MPL-1.1.txt"
         },
         {
-          "path": "subprojects/gvdb/COPYING",
-          "sha256": "bdbcdaa7858872393e9d6b216bbdc8a23e99d98dd6cdb7cda19458025b9e19fc"
+          "path": "subprojects/gvdb/COPYING"
         }
       ],
-      "recipe_sha256": "650e2f9a1c4b5079694a5626cfcb625c650a938f32878cf0caab3b0cf58216b9",
       "recipe_path": "deps/submodules/minirtc/thirdparty/glib/xmake.lua",
       "package": "glib",
       "notice_prefixes": [
@@ -169,8 +151,7 @@
       },
       "documents": [
         {
-          "path": "deps/submodules/minirtc/src/inih/LICENSE",
-          "sha256": "bd2a675a5a26fbff77f171f3a15afb1a9c7855be1a01c7e3fd16b8d2617acdda"
+          "path": "deps/submodules/minirtc/src/inih/LICENSE"
         }
       ]
     },
@@ -186,11 +167,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE.MIT",
-          "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+          "path": "LICENSE.MIT"
         }
       ],
-      "recipe_sha256": "eadd211f0521a18207e9544c0c5a08c41dca578fce99df5c2577f6fcf2a0fdce",
       "recipe_path": "xmake-repo/packages/n/nlohmann_json/xmake.lua",
       "package": "nlohmann_json",
       "notice_prefixes": [
@@ -209,11 +188,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "6587fd02a924b97dbd6758b0573ddec056fb494a84f3709c5aaa33ce1f7f029c"
+          "path": "LICENSE"
         }
       ],
-      "recipe_sha256": "f86cac2c4b884f3347a39a59f3dd8de566c257c7fd481c6e49b05f4730f12c4f",
       "recipe_path": "xmake-repo/packages/k/kcp/xmake.lua",
       "package": "kcp",
       "notice_prefixes": [
@@ -233,11 +210,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "fab3dd6bdab226f1c08630b1dd917e11fcb4ec5e1e020e2c16f83a0a13863e85"
+          "path": "LICENSE"
         }
       ],
-      "recipe_sha256": "b3ec15652a47d65e0a1f85f62d02c098c5cf5b8d8c3cf7b03ff099efa7016326",
       "recipe_path": "deps/submodules/minirtc/thirdparty/libdatachannel/xmake.lua",
       "package": "libdatachannel",
       "notice_prefixes": [
@@ -257,11 +232,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "67894089811f93fca47a76f85e017da6f8582d4ba0905963c6e0f1ad6df7a195"
+          "path": "LICENSE"
         }
       ],
-      "recipe_sha256": "de19ac4e3e91ef5715ac582c75e0d10404dc14ec4e33b2e764dc2637a78d24e9",
       "recipe_path": "xmake-repo/packages/l/libffi/xmake.lua",
       "package": "libffi",
       "notice_prefixes": [
@@ -281,23 +254,18 @@
       },
       "documents": [
         {
-          "path": "COPYING",
-          "sha256": "e5504e5ffe894870ea1a652df957a120ead9c3f9a5e9d314ca41ba06f2d72024"
+          "path": "COPYING"
         },
         {
-          "path": "COPYING.LGPL",
-          "sha256": "a9bdde5616ecdd1e980b44f360600ee8783b1f99b8cc83a2beb163a0a390e861"
+          "path": "COPYING.LGPL"
         },
         {
-          "path": "COPYING.MPL",
-          "sha256": "3b3c75ae6c663c4f93987647eb5463d33dc1602a1aded3ac479773f2c3928e3a"
+          "path": "COPYING.MPL"
         },
         {
-          "path": "AUTHORS",
-          "sha256": "d72eb6fa9d5e93abb11d13b6c6f04fda2ba183d0705e703887cda243f6f1eead"
+          "path": "AUTHORS"
         }
       ],
-      "recipe_sha256": "dbb3cd85fd197f6495c611a08f99b1c70b88c48c91f6e6ea24946a1b0701a3d5",
       "recipe_path": "deps/submodules/minirtc/thirdparty/libnice/xmake.lua",
       "package": "libnice",
       "notice_prefixes": [
@@ -320,11 +288,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "8e19d42a1eec9561f3f347253ddf2e385c55f392f025bb0fd41b88dbf38db5ae"
+          "path": "LICENSE"
         }
       ],
-      "recipe_sha256": "9629edb8d395ea3017af1702cafea57173ca0a6a1ea305a6174b1936598faec6",
       "recipe_path": "deps/submodules/minirtc/thirdparty/libsrtp/xmake.lua",
       "package": "libsrtp",
       "notice_prefixes": [
@@ -346,16 +312,13 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f"
+          "path": "LICENSE"
         },
         {
-          "path": "PATENTS",
-          "sha256": "4da84211f947c6f9f7dd8fbce513e1522e01833407ae732b8c9a2bbb75fed495"
+          "path": "PATENTS"
         },
         {
-          "path": "AUTHORS",
-          "sha256": "0c4a51c72a06b3431bb2b750e3b04dbe3694b22e2fcae6e370216424eec56d52"
+          "path": "AUTHORS"
         }
       ],
       "package": "libyuv",
@@ -376,8 +339,7 @@
       },
       "documents": [
         {
-          "path": "deps/submodules/minirtc/LICENSE",
-          "sha256": "ea8af5e789cb2d4e9b10bce3874982ade163b749b6bfbdb32e2df21c4d106de1"
+          "path": "deps/submodules/minirtc/LICENSE"
         }
       ]
     },
@@ -394,11 +356,9 @@
       "documents": [
         {
           "path": "LICENCE_CeCILL-C_V1-en.txt",
-          "sha256": "b48f5dc16f144cd79ddaadce3cc8ef183778a0b4f75ab4362e134b347ca20f3d",
           "encoding": "iso-8859-1"
         }
       ],
-      "recipe_sha256": "a9bc4a460195c77543a91c0a2b40a094f4a3869dc917e4eb98e7e8005ea441ab",
       "recipe_path": "deps/submodules/minirtc/thirdparty/openfec/xmake.lua",
       "package": "openfec",
       "notice_prefixes": [
@@ -422,11 +382,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE.txt",
-          "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+          "path": "LICENSE.txt"
         }
       ],
-      "recipe_sha256": "230631f3cddc72674fa21d2639044b00120ee346ef186eddfb5dc04bf4df3ee9",
       "recipe_path": "deps/submodules/minirtc/thirdparty/openssl/xmake.lua",
       "package": "openssl3",
       "notice_prefixes": [
@@ -448,11 +406,9 @@
       },
       "documents": [
         {
-          "path": "COPYING",
-          "sha256": "01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551"
+          "path": "COPYING"
         }
       ],
-      "recipe_sha256": "c965643eb4e093858c27c402e6cde544620460f2169c89d8ff2bab01111d022b",
       "recipe_path": "xmake-repo/packages/l/libopus/xmake.lua",
       "package": "libopus",
       "notice_prefixes": [
@@ -475,19 +431,15 @@
       },
       "documents": [
         {
-          "path": "LICENCE.md",
-          "sha256": "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811"
+          "path": "LICENCE.md"
         },
         {
-          "path": "COPYING",
-          "sha256": "99272c55f3dcfa07a8a7e15a5c1a33096e4727de74241d65fa049fccfdd59507"
+          "path": "COPYING"
         },
         {
-          "path": "deps/sljit/LICENSE",
-          "sha256": "5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb"
+          "path": "deps/sljit/LICENSE"
         }
       ],
-      "recipe_sha256": "821f1fbc91434f4324be88eeea754db09c5d7be31446242764861ca2aee136b7",
       "recipe_path": "xmake-repo/packages/p/pcre2/xmake.lua",
       "package": "pcre2",
       "notice_prefixes": [
@@ -508,11 +460,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "e4d01796524cbc13b1571a1f0914823c6a23b316ba039e7014f47a4eef7fd4c3"
+          "path": "LICENSE"
         }
       ],
-      "recipe_sha256": "deb525d09b5b79351eeb524ab3bc6a3009e434974e585e5e8852c491d7fa07c8",
       "recipe_path": "xmake-repo/packages/p/plog/xmake.lua",
       "package": "plog",
       "notice_prefixes": [
@@ -532,8 +482,7 @@
       },
       "documents": [
         {
-          "path": "COPYING",
-          "sha256": "d245807f90032872d1438d741ed21e2490e1175dc8aa3afa5ddb6c8e529b58e5"
+          "path": "COPYING"
         }
       ],
       "bundled_by": "glib",
@@ -555,11 +504,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "4ccecab18d1ff0b61174fe3d6c430541625d3ddb865b0d5887db296f883c76e7"
+          "path": "LICENSE"
         }
       ],
-      "recipe_sha256": "5b299effb366420b4920c5b89e6535b76173136d91ee01f8f7d3423486a93549",
       "recipe_path": "xmake-repo/packages/s/spdlog/xmake.lua",
       "package": "spdlog",
       "notice_prefixes": [
@@ -579,24 +526,19 @@
       },
       "documents": [
         {
-          "path": "LICENSE.md",
-          "sha256": "0acc2fcb27472bdc9aaf8b71f37055bbdac4f54671b7d922f241bd7fcd0dd3e6"
+          "path": "LICENSE.md"
         },
         {
-          "path": "LICENSE-BSD2.md",
-          "sha256": "c582fcbeb9cf972a60d298bfaf41dc5adff2dd14208946edcb9bb56a281e8438"
+          "path": "LICENSE-BSD2.md"
         },
         {
-          "path": "PATENTS.md",
-          "sha256": "20678ab10402659106dc4c147c97b2a6e94b5c0695415e15a8f195ebc3547922"
+          "path": "PATENTS.md"
         },
         {
-          "path": "third_party/fastfeat/LICENSE",
-          "sha256": "043dcfd059386f9facd376351b2bd79325778744aa442177390cdfcca54babed"
+          "path": "third_party/fastfeat/LICENSE"
         },
         {
-          "path": "third_party/safestringlib/LICENSE",
-          "sha256": "c0f99a208799ca20c9ccf31a30533d49334eb458dca5a3d14f9afe3e884e5d7d"
+          "path": "third_party/safestringlib/LICENSE"
         }
       ],
       "package": "svt-av1",
@@ -618,11 +560,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE.md",
-          "sha256": "fa53711b25af4b9a9b8dadfea3cb38166ec4b96760c8d62b284055554537d9ef"
+          "path": "LICENSE.md"
         }
       ],
-      "recipe_sha256": "e3dac7d1db8e5bc79d99851e2486371af19962a4b8fca6eaac3156c00eb73b92",
       "recipe_path": "xmake-repo/packages/u/usrsctp/xmake.lua",
       "package": "usrsctp",
       "notice_prefixes": [
@@ -641,12 +581,10 @@
       },
       "documents": [
         {
-          "path": "deps/submodules/minirtc/thirdparty/webrtc/LICENSE",
-          "sha256": "ab00a482b6a3902e40211b43c5d0441962ea99b6cc7c25c0f243fa270b78d482"
+          "path": "deps/submodules/minirtc/thirdparty/webrtc/LICENSE"
         },
         {
-          "path": "deps/submodules/minirtc/thirdparty/webrtc/PATENTS",
-          "sha256": "01462e2068d1a04c2274f3389773014c14ed9bc3446b28303543bd3e3c064145"
+          "path": "deps/submodules/minirtc/thirdparty/webrtc/PATENTS"
         }
       ]
     },
@@ -662,11 +600,9 @@
       },
       "documents": [
         {
-          "path": "COPYING",
-          "sha256": "b31e597bc777d884a39663c11d0557a0af40780e1f451de11ea5103924a69667"
+          "path": "COPYING"
         }
       ],
-      "recipe_sha256": "beac245a717c2bc3bc8d17265d9fc9b54f699f3833b11513f8723c4dbaffd539",
       "recipe_path": "deps/submodules/minirtc/thirdparty/websocketpp/xmake.lua",
       "package": "websocketpp",
       "notice_prefixes": [
@@ -685,11 +621,9 @@
       },
       "documents": [
         {
-          "path": "LICENSE",
-          "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2"
+          "path": "LICENSE"
         }
       ],
-      "recipe_sha256": "7832bcb086709a0739ae1abeff035f7a103c7169dc8af61ebf91dd887fcbd054",
       "recipe_path": "xmake-repo/packages/z/zlib/xmake.lua",
       "package": "zlib",
       "notice_prefixes": [
@@ -697,7 +631,6 @@
       ]
     }
   ],
-  "bundle_sha256": "a27c89beaaee2397a306417ff133d7f48c74fe6db9041e145fc08f18ec69a080",
   "toolchain": {
     "xmake_min_version": "3.1.1",
     "xmake_repository_revision": "121109352da272cd1a3d4ed52f2dcda34f839955"

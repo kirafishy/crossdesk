@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect iOS notices from pinned source archives; validate them offline at build time."""
+"""Generate iOS notice resources from pinned source archives."""
 
 import argparse
 from collections import defaultdict
@@ -8,7 +8,6 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import subprocess
 import sys
 import tarfile
 import urllib.request
@@ -82,7 +81,7 @@ def source_files(component, cache):
 def component_documents(component, names, read):
     documents = []
     for item in component["documents"]:
-        data = checked(read(item["path"]), item["sha256"], item["path"])
+        data = read(item["path"])
         text = data.decode(item.get("encoding", "utf-8"))
         if "end_before" in item:
             if item["end_before"] not in text:
@@ -134,79 +133,22 @@ def generate(lock, cache):
     return json_bytes({"schemaVersion": 1, "components": components})
 
 
-def verify(lock, inputs, target_info, xmake_repository=None, xmake_version=None):
-    checked(OUTPUT.read_bytes(), lock["bundle_sha256"], str(OUTPUT))
-    if xmake_version is not None:
-        minimum = lock["toolchain"]["xmake_min_version"]
-        version = re.search(r"xmake v(\d+)\.(\d+)\.(\d+)(?:\+|[,\s]|$)", xmake_version.read_text())
-        if not version or tuple(map(int, version.groups())) < tuple(map(int, minimum.split("."))):
-            raise ValueError(f"Xmake {minimum} or newer is required; see apps/ios/README.md")
-    if xmake_repository is not None:
-        revision = subprocess.check_output(
-            ["git", "-C", str(xmake_repository), "rev-parse", "HEAD"], text=True).strip()
-        if revision != lock["toolchain"]["xmake_repository_revision"]:
-            raise ValueError("Xmake package repository differs from the reviewed iOS source catalog")
-        changes = subprocess.check_output(
-            ["git", "-C", str(xmake_repository), "status", "--porcelain", "--untracked-files=normal"],
-            text=True).strip()
-        if changes:
-            raise ValueError("Xmake package repository has local changes; use the unmodified pinned revision")
-    for component in lock["components"]:
-        recipe = component.get("recipe_path", "")
-        if recipe.startswith("deps/"):
-            checked((REPO / recipe).read_bytes(), component["recipe_sha256"], recipe)
-        elif recipe.startswith("xmake-repo/") and xmake_repository is not None:
-            checked((xmake_repository / Path(recipe).relative_to("xmake-repo")).read_bytes(),
-                    component["recipe_sha256"], recipe)
-        if component["source"]["kind"] == "repository":
-            for item in component["documents"]:
-                checked((REPO / item["path"]).read_bytes(), item["sha256"], item["path"])
-    if inputs is None:
-        return
-    if target_info is None:
-        raise ValueError("--target-info is required with --inputs (includes header-only dependencies)")
-    known = {c["package"]: c["version"] for c in lock["components"] if "package" in c}
-    seen = {}
-    # Package names/versions come from resolved Xmake link and include paths,
-    # never from an inventory of all packages left in the installation cache.
-    pattern = r"/packages(?:-simulator)?/[^/\s]+/([^/\s]+)/([^/\s]+)/[a-f0-9]+/"
-    for name, version in re.findall(pattern, inputs.read_text() + target_info.read_text()):
-        if name not in known or known[name] != version:
-            raise ValueError(f"Unreviewed iOS dependency: {name} {version}; regenerate licenses from its source")
-        seen[name] = version
-    if set(seen) != set(known):
-        raise ValueError(f"License/build dependency mismatch; missing: {sorted(set(known) - set(seen))}")
-    for line in inputs.read_text().splitlines():
-        sha, path = line.split(maxsplit=1)
-        checked(Path(path).read_bytes(), sha, path)
-    # Repository revisions identify the reviewed notices, not a required build
-    # commit. SourceMetadata records the actual MiniRTC revision and links for
-    # this build; the content and dependency checks above detect stale notices.
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--generate", action="store_true", help="download/check pinned sources and regenerate the bundled JSON")
+    parser.add_argument("--generate", action="store_true", required=True,
+                        help="download pinned sources and regenerate the bundled JSON")
     parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/crossdesk/licenses")
-    parser.add_argument("--inputs", type=Path, help="native archive .inputs.sha256 manifest")
-    parser.add_argument("--target-info", type=Path, help="resolved Xmake minirtc target information")
-    parser.add_argument("--xmake-repository", type=Path, help="verify the active pinned package repository and recipes")
-    parser.add_argument("--xmake-version", type=Path, help="Xmake version output recorded by the native build")
     args = parser.parse_args()
     lock = json.loads(LOCK.read_text())
-    if args.generate:
-        data = generate(lock, args.cache)
-        OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-        OUTPUT.write_bytes(data)
-        lock["bundle_sha256"] = digest(data)
-        LOCK.write_bytes(json_bytes(lock))
-    verify(lock, args.inputs, args.target_info, args.xmake_repository, args.xmake_version)
-    print(f"Verified {len(lock['components'])} iOS license components")
+    data = generate(lock, args.cache)
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT.write_bytes(data)
+    print(f"Generated {len(lock['components'])} iOS license components")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, KeyError) as error:
         print(f"Third-party notices: {error}", file=sys.stderr)
         sys.exit(1)

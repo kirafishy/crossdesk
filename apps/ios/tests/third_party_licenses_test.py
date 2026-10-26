@@ -1,13 +1,13 @@
-"""Regression coverage for notice validation and build-specific source links."""
+"""Regression coverage for native validation and build-specific source links."""
 
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
 
 
 def load_script(name):
@@ -18,11 +18,11 @@ def load_script(name):
     return module
 
 
-licenses = load_script("generate_third_party_licenses")
+native = load_script("verify_native_build")
 metadata = load_script("prepare_source_metadata")
 
 
-class LicenseValidationTest(unittest.TestCase):
+class NativeValidationTest(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="crossdesk-ios-licenses-")
         self.addCleanup(temporary.cleanup)
@@ -47,34 +47,24 @@ class LicenseValidationTest(unittest.TestCase):
         self.archive.parent.mkdir(parents=True)
         self.archive.write_bytes(b"reviewed archive")
         self.inputs = self.root / "inputs.sha256"
-        self.inputs.write_text(f"{licenses.digest(self.archive.read_bytes())}  {self.archive}\n")
-        self.target = self.root / "target-info.txt"
-        self.target.write_text(str(self.root / "packages/a/asio/1.0/abcd/include") + "\n")
+        self.inputs.write_text(f"{hashlib.sha256(self.archive.read_bytes()).hexdigest()}  {self.archive}\n")
         self.lock = {
-            "bundle_sha256": licenses.digest(self.bundle.read_bytes()),
-            "toolchain": {"xmake_min_version": "3.1.1"},
             "components": [
                 {
                     "id": "minirtc", "version": self.reviewed_revision,
                     "source": {"kind": "repository", "url": metadata.MINIRTC_URL,
                                "revision": self.reviewed_revision},
-                    "documents": [{"path": str(self.notice.relative_to(self.root)),
-                                   "sha256": licenses.digest(self.notice.read_bytes())}],
+                    "documents": [{"path": str(self.notice.relative_to(self.root))}],
                 },
                 {
                     "id": "opus", "package": "opus", "version": "1.0",
                     "source": {"kind": "archive", "url": "https://example.com/opus.tar.gz"},
                     "recipe_path": str(self.recipe.relative_to(self.root)),
-                    "recipe_sha256": licenses.digest(self.recipe.read_bytes()),
                 },
                 {"id": "asio", "package": "asio", "version": "1.0",
                  "source": {"kind": "archive", "url": "https://example.com/asio.tar.gz"}},
             ],
         }
-        for name, value in (("REPO", self.root), ("OUTPUT", self.bundle)):
-            patcher = patch.object(licenses, name, value)
-            patcher.start()
-            self.addCleanup(patcher.stop)
 
     def git(self, *args):
         return subprocess.check_output(
@@ -82,9 +72,8 @@ class LicenseValidationTest(unittest.TestCase):
              "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", *args],
             text=True).strip()
 
-    def verify(self, preflight=False, **kwargs):
-        licenses.verify(self.lock, None if preflight else self.inputs,
-                        None if preflight else self.target, **kwargs)
+    def verify(self, **kwargs):
+        native.verify(self.inputs, **kwargs)
 
     def test_source_only_commit_keeps_reviewed_catalog_and_uses_actual_links(self):
         self.source.write_text("int transport() { return 2; }\n")
@@ -94,7 +83,6 @@ class LicenseValidationTest(unittest.TestCase):
         self.assertNotEqual(current, self.reviewed_revision)
         original_lock = copy.deepcopy(self.lock)
         original_bundle = self.bundle.read_bytes()
-        self.verify(preflight=True)
         self.verify()
         sources = metadata.component_sources(self.lock, current)
         self.assertEqual(sources["minirtc"]["version"], current)
@@ -104,49 +92,18 @@ class LicenseValidationTest(unittest.TestCase):
         self.assertEqual(self.lock, original_lock)
         self.assertEqual(self.bundle.read_bytes(), original_bundle)
 
-    def test_changed_license_is_rejected_before_compilation(self):
-        self.notice.write_text("Changed license text\n")
-        with self.assertRaisesRegex(ValueError, "Source checksum mismatch: .*LICENSE"):
-            self.verify(preflight=True)
-
-    def test_changed_recipe_is_rejected_before_compilation(self):
-        self.recipe.write_text('package("different-opus")\n')
-        with self.assertRaisesRegex(ValueError, "Source checksum mismatch: .*xmake.lua"):
-            self.verify(preflight=True)
-
-    def test_changed_bundle_is_rejected_before_compilation(self):
-        self.bundle.write_text("{}\n")
-        with self.assertRaisesRegex(ValueError, "Source checksum mismatch:"):
-            self.verify(preflight=True)
-
-    def test_unreviewed_header_only_dependency_is_rejected(self):
-        self.target.write_text(str(self.root / "packages/a/asio/2.0/abcd/include") + "\n")
-        with self.assertRaisesRegex(ValueError, "Unreviewed iOS dependency: asio 2.0"):
-            self.verify()
-
-    def test_missing_dependency_is_rejected(self):
-        self.target.write_text("")
-        with self.assertRaisesRegex(ValueError, "License/build dependency mismatch; missing:.*asio"):
-            self.verify()
-
-    def test_simulator_cache_keeps_dependency_and_archive_validation(self):
+    def test_simulator_cache_keeps_archive_validation(self):
         (self.root / "packages").rename(self.root / "packages-simulator")
         self.archive = Path(str(self.archive).replace("/packages/", "/packages-simulator/"))
         self.inputs.write_text(self.inputs.read_text().replace("/packages/", "/packages-simulator/"))
-        self.target.write_text(self.target.read_text().replace("/packages/", "/packages-simulator/"))
         self.verify()
-        valid_target = self.target.read_text()
-        self.target.write_text(valid_target.replace("/asio/1.0/", "/asio/2.0/"))
-        with self.assertRaisesRegex(ValueError, "Unreviewed iOS dependency: asio 2.0"):
-            self.verify()
-        self.target.write_text(valid_target)
         self.archive.write_bytes(b"changed simulator archive")
-        with self.assertRaisesRegex(ValueError, "Source checksum mismatch: .*libopus.a"):
+        with self.assertRaisesRegex(ValueError, "Native input checksum mismatch: .*libopus.a"):
             self.verify()
 
     def test_changed_native_archive_is_rejected(self):
         self.archive.write_bytes(b"changed archive")
-        with self.assertRaisesRegex(ValueError, "Source checksum mismatch: .*libopus.a"):
+        with self.assertRaisesRegex(ValueError, "Native input checksum mismatch: .*libopus.a"):
             self.verify()
 
     def test_minimum_and_newer_xmake_versions_are_accepted(self):

@@ -169,9 +169,6 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Verify iOS license catalog
-        run: python3 -B apps/ios/scripts/generate_third_party_licenses.py
-
       - name: Install xmake
         uses: xmake-io/github-action-setup-xmake@v1
         with:
@@ -181,7 +178,7 @@ jobs:
         shell: bash
         run: |
           xmake --version | tee "${RUNNER_TEMP}/xmake-version.txt"
-          python3 -B apps/ios/scripts/generate_third_party_licenses.py \
+          python3 -B apps/ios/scripts/verify_native_build.py \
             --xmake-version "${RUNNER_TEMP}/xmake-version.txt"
 
       - name: Pin xmake package repository

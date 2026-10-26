@@ -2,7 +2,6 @@
 """Record the source corresponding to an iOS build without changing the checkout."""
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -66,8 +65,6 @@ def source_metadata(require_release=False, tag=None):
         "miniRTCRevision": mini_revision,
         "miniRTCSourceURL": f"{MINIRTC_URL}/tree/{mini_revision}",
         "componentSources": component_sources(lock, mini_revision),
-        "licenseCatalogSHA256": lock["bundle_sha256"],
-        "sourceCatalogSHA256": hashlib.sha256(lock_path.read_bytes()).hexdigest(),
         "toolchain": lock["toolchain"],
     }
 

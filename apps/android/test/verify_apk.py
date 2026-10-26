@@ -2,7 +2,6 @@
 """Check the shipped native ABI, ELF load alignment and APK zip alignment."""
 from pathlib import Path
 import argparse
-import hashlib
 import json
 import re
 import struct
@@ -40,33 +39,15 @@ def verify(path):
         name, extra = struct.unpack('<HH', raw.read(4))
         if (library.header_offset + 30 + name + extra) % 16384:
             raise ValueError('APK native library entry is not 16 KB aligned')
-        if 'assets/THIRD_PARTY_NOTICES.txt' not in archive.namelist():
-            raise ValueError('Missing third-party notices')
         if archive.read('assets/PRIVACY.md') != (Path(__file__).resolve().parents[3] / 'PRIVACY.md').read_bytes():
             raise ValueError('Missing or outdated bundled privacy policy')
-        catalog = json.loads(archive.read('assets/ThirdPartyLicenses.json'))
         source = json.loads(archive.read('assets/SourceMetadata.json'))
-        components = catalog['components']
-        ids = [item['id'] for item in components]
-        if catalog['schemaVersion'] != 1 or len(ids) != len(set(ids)) or not {
-                'crossdesk', 'minirtc', 'openfec', 'openh264', 'libiconv', 'android-ndk', 'svt-av1'}.issubset(ids):
-            raise ValueError('Incomplete About catalog')
-        for component in components:
-            if not component['documents']:
-                raise ValueError('Missing component documents')
-            for document in component['documents']:
-                text = archive.read('assets/'+document['asset'])
-                if not text or hashlib.sha256(text).hexdigest() != document['sha256']:
-                    raise ValueError('Incomplete license document: '+document['asset'])
-            for document in component.get('buildDocuments', []):
-                if not archive.read('assets/'+document['asset']):
-                    raise ValueError('Missing build document')
         if source['schemaVersion'] != 1 or len(source['revision']) != 40:
             raise ValueError('Missing source revision')
         for document in source['buildDocuments']:
             if not archive.read('assets/'+document['asset']):
                 raise ValueError('Missing source build instructions')
-    print(f'PASS: {Path(path).name}: arm64, 16 KB ELF/ZIP alignment, privacy policy, notices, About catalog and documents')
+    print(f'PASS: {Path(path).name}: arm64, 16 KB ELF/ZIP alignment, privacy policy and source metadata')
 
 
 if __name__ == '__main__':

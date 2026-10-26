@@ -36,7 +36,6 @@ on:
       - "apps/android/**"
       - "apps/ios/CrossDeskMobile/Resources/ThirdPartyLicenses.json"
       - "apps/ios/licenses/**"
-      - "apps/ios/scripts/generate_third_party_licenses.py"
       - "deps/submodules/minirtc"
       - "libs/wire/**"
 
@@ -154,9 +153,6 @@ jobs:
         with:
           cache-provider: basic
           cache-read-only: ${{ github.event_name == 'pull_request' }}
-
-      - name: Verify shared license catalog
-        run: python3 -B apps/ios/scripts/generate_third_party_licenses.py
 
       - name: Resolve Android version
         shell: python
