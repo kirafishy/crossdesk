@@ -1,6 +1,5 @@
 <div align="center">
-  <img src="apps/desktop/resources/linux/crossdesk_128x128.png" width="80" alt="CrossDesk logo" />
-  <h1>CrossDesk</h1>
+  <img src="docs/images/crossdesk-banner.svg" width="420" alt="CrossDesk logo with the icon on the left and a two-tone wordmark on the right" />
   <p>A lightweight, cross-platform remote desktop for computers, browsers, and mobile devices, with DeskHub for viewing and controlling multiple desktops.</p>
   <p><a href="https://www.crossdesk.cn/">Website</a> · <a href="https://github.com/kunkundi/crossdesk/releases">Download</a> · <a href="https://web.crossdesk.cn/">Open Web Client</a> · <a href="README.md">中文</a></p>
 </div>

@@ -1,6 +1,5 @@
 <div align="center">
-  <img src="apps/desktop/resources/linux/crossdesk_128x128.png" width="80" alt="CrossDesk 标志" />
-  <h1>CrossDesk</h1>
+  <img src="docs/images/crossdesk-banner.svg" width="420" alt="CrossDesk 标志：图标在左，双色文字在右" />
   <p>轻量、跨平台的远程桌面，支持电脑、浏览器和移动端连接，用桌面墙集中查看与操控多台设备。</p>
   <p><a href="https://www.crossdesk.cn/">官方网站</a> · <a href="https://github.com/kunkundi/crossdesk/releases">下载客户端</a> · <a href="https://web.crossdesk.cn/">打开 Web 客户端</a> · <a href="README_EN.md">English</a></p>
 </div>
