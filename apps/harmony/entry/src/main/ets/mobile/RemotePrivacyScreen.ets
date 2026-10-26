@@ -5,6 +5,7 @@ export interface PrivacyStatus {
 }
 
 export class RemotePrivacyScreen {
+  desktopAvailable: boolean = true;
   snapshot?: PrivacyStatus;
   pending: boolean = false;
   requestId: number = 0;
@@ -12,6 +13,10 @@ export class RemotePrivacyScreen {
   private receivedAt: number = 0;
   private requestedAt: number = 0;
   private failure: string = '';
+
+  setInteractiveStage(stage: string): void {
+    this.desktopAvailable = stage !== 'lock-screen' && stage !== 'credential-ui' && stage !== 'secure-desktop';
+  }
 
   receive(s: PrivacyStatus, now: number): void {
     if (!Number.isInteger(s.state) || s.state < 0 || s.state > 5 ||
@@ -40,6 +45,7 @@ export class RemotePrivacyScreen {
     return '隐私屏';
   }
   feedback(now: number): string {
+    if (!this.desktopAvailable) return '';
     const s = this.snapshot;
     if (!this.failure && (this.pending || this.fresh(now) && (s?.state === 2 || s?.state === 4))) return '';
     if (!this.failure && !this.pending && this.fresh(now) && s?.supported &&
@@ -49,7 +55,7 @@ export class RemotePrivacyScreen {
   }
   canToggle(now: number): boolean {
     const s = this.snapshot;
-    return s !== undefined && !this.pending && this.fresh(now) && s.state !== 4 && (this.active() || s.supported && s.state === 1);
+    return this.desktopAvailable && s !== undefined && !this.pending && this.fresh(now) && s.state !== 4 && (this.active() || s.supported && s.state === 1);
   }
   begin(now: number): number {
     this.tick(now);

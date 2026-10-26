@@ -4,10 +4,16 @@ import org.json.JSONObject;
 
 /** Host-confirmed privacy state; all access belongs to the main thread. */
 final class RemotePrivacyScreen {
+    boolean desktopAvailable = true;
     boolean received, supported, inputBlockSupported, overlay, inputBlocked, remotePaused, pending;
     int state;
     long revision, requestRevision, requestId, receivedAt, requestedAt;
     String reason = "", failure = "";
+
+    void setInteractiveStage(String stage) {
+        desktopAvailable = !"lock-screen".equals(stage) &&
+                !"credential-ui".equals(stage) && !"secure-desktop".equals(stage);
+    }
 
     void receive(JSONObject message, long now) {
         try {
@@ -37,6 +43,7 @@ final class RemotePrivacyScreen {
         return "隐私屏";
     }
     String feedback(long now) {
+        if (!desktopAvailable) return "";
         if (failure.isEmpty() && (pending || fresh(now) && (state == 2 || state == 4))) return "";
         if (failure.isEmpty() && !pending && fresh(now) && supported &&
                 (enabled(now) || state == 1 && !active())) return "";
@@ -44,7 +51,7 @@ final class RemotePrivacyScreen {
         return status(now) + (detail.isEmpty() ? "" : "：" + detail);
     }
     boolean canToggle(long now) {
-        return !pending && fresh(now) && state != 4 && (active() || supported && state == 1);
+        return desktopAvailable && !pending && fresh(now) && state != 4 && (active() || supported && state == 1);
     }
     long begin(long now) {
         tick(now);

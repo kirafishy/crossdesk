@@ -25,7 +25,7 @@ interface NativeEvent {
 export interface RemoteDisplay { name: string; }
 interface HostInfo { host_name: string; platform: string; app_version: string; supports_video_settings: boolean; displays: RemoteDisplay[]; }
 interface SettingAck { quality: number; frame_rate: number; preference: number; request_id: number; accepted: boolean; }
-interface ServiceStatus { available: boolean; }
+interface ServiceStatus { available: boolean; interactive_stage?: string; }
 interface ControlData { type: number; host_info?: HostInfo; video_settings?: SettingAck; service_status?: ServiceStatus; privacy_status?: PrivacyStatus; }
 interface PresenceRequest { type: string; devices: string[]; subscribe: boolean; }
 interface SignalType { type: string; }
@@ -80,6 +80,7 @@ export class MobileState {
   privacyEnabled: boolean = false;
   privacyActive: boolean = false;
   privacyCanToggle: boolean = false;
+  privacyVisible: boolean = true;
   networkTime: number = 0;
   unread: number = 0;
   announcements: AnnouncementItem[] = [];
@@ -361,6 +362,7 @@ export class MobileController {
     const now = this.now(); this.privacyScreen.tick(now);
     this.state.privacyStatus = this.privacyScreen.status(now); this.state.privacyFeedback = this.privacyScreen.feedback(now);
     this.state.privacyButtonTitle = this.privacyScreen.buttonTitle(now);
+    this.state.privacyVisible = this.privacyScreen.desktopAvailable;
     this.state.privacyEnabled = this.privacyScreen.enabled(now);
     this.state.privacyActive = this.privacyScreen.active(); this.state.privacyCanToggle = this.privacyScreen.canToggle(now);
   }
@@ -463,7 +465,11 @@ export class MobileController {
   }
   private data(message: ControlData): void {
     if (message.type === 10 && message.privacy_status) { this.privacyScreen.receive(message.privacy_status, this.now()); this.syncPrivacy(); return; }
-    if (message.type === 5) { this.serviceAvailable = message.service_status?.available === true; return; }
+    if (message.type === 5) {
+      this.serviceAvailable = message.service_status?.available === true;
+      this.privacyScreen.setInteractiveStage(message.service_status?.interactive_stage ?? '');
+      this.syncPrivacy(); return;
+    }
     if (message.type === 12 && message.video_settings) {
       const v = message.video_settings;
       this.video.receive({ quality: v.quality, frameRate: v.frame_rate, preference: v.preference }, v.request_id, v.accepted === true);

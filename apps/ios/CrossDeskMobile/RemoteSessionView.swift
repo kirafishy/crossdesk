@@ -1250,17 +1250,19 @@ private struct FloatingSessionMenu: View {
                                           action: session.sendSecureAttention)
                     FloatingControlButton(title: "剪贴板", symbol: "doc.on.clipboard",
                                           action: session.sendClipboard)
-                    FloatingControlButton(
-                        title: session.privacyScreen.buttonTitle(at: session.privacyClock),
-                        symbol: "eye.slash",
-                        selected: session.privacyScreen.enabled(at: session.privacyClock),
-                        action: session.togglePrivacyScreen
-                    )
-                    .disabled(!session.isConnected || !session.privacyScreen.canToggle(at: session.privacyClock))
-                    .opacity(session.isConnected && session.privacyScreen.canToggle(at: session.privacyClock) ? 1 : 0.45)
-                    .accessibilityLabel("隐私屏")
-                    .accessibilityValue(session.privacyScreen.status(at: session.privacyClock))
-                    .accessibilityHint(session.privacyScreen.active ? "关闭隐私屏" : "开启隐私屏")
+                    if session.privacyScreen.desktopAvailable {
+                        FloatingControlButton(
+                            title: session.privacyScreen.buttonTitle(at: session.privacyClock),
+                            symbol: "eye.slash",
+                            selected: session.privacyScreen.enabled(at: session.privacyClock),
+                            action: session.togglePrivacyScreen
+                        )
+                        .disabled(!session.isConnected || !session.privacyScreen.canToggle(at: session.privacyClock))
+                        .opacity(session.isConnected && session.privacyScreen.canToggle(at: session.privacyClock) ? 1 : 0.45)
+                        .accessibilityLabel("隐私屏")
+                        .accessibilityValue(session.privacyScreen.status(at: session.privacyClock))
+                        .accessibilityHint(session.privacyScreen.active ? "关闭隐私屏" : "开启隐私屏")
+                    }
                 }
 
                 let privacyFeedback = session.privacyScreen.feedback(at: session.privacyClock)

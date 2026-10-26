@@ -201,6 +201,10 @@ final class NativeSession implements AutoCloseable {
                         if(event.optInt("type",-1)==10){
                             privacyScreen.receive(event,android.os.SystemClock.elapsedRealtime());
                             listener.privacyChanged();
+                        } else if(event.optInt("type",-1)==5){
+                            JSONObject service=event.optJSONObject("service_status");
+                            privacyScreen.setInteractiveStage(service==null?"":service.optString("interactive_stage",""));
+                            listener.privacyChanged();
                         }
                         listener.data(event);
                     });

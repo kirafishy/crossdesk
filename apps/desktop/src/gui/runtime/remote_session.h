@@ -193,6 +193,7 @@ struct RemoteSession {
   std::mutex privacy_status_mutex_;
   PrivacyStatus privacy_status_{};
   bool privacy_status_received_ = false;
+  bool privacy_desktop_available_ = true;
   bool privacy_command_pending_ = false;
   uint64_t privacy_command_tick_ = 0;
   uint32_t privacy_request_revision_ = 0;

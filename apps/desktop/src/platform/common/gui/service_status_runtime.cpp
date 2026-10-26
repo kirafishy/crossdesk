@@ -7,6 +7,7 @@ void GuiRuntime::ResetRemoteServiceStatus(RemoteSession& props) {
     std::lock_guard lock(props.privacy_status_mutex_);
     props.privacy_status_ = {};
     props.privacy_status_received_ = false;
+    props.privacy_desktop_available_ = true;
     props.privacy_command_pending_ = false;
     props.privacy_status_tick_ = 0;
   }
@@ -17,6 +18,12 @@ void GuiRuntime::ResetRemoteServiceStatus(RemoteSession& props) {
 
 void GuiRuntime::ApplyRemoteServiceStatus(RemoteSession& props,
                                           const ServiceStatus& status) {
+  {
+    std::lock_guard lock(props.privacy_status_mutex_);
+    const std::string stage = status.interactive_stage;
+    props.privacy_desktop_available_ = stage != "lock-screen" &&
+        stage != "credential-ui" && stage != "secure-desktop";
+  }
   props.remote_service_status_received_ = true;
   props.remote_service_available_ = status.available;
   props.remote_interactive_stage_ = status.interactive_stage;

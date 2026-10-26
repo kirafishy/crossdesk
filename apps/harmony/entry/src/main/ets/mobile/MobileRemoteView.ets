@@ -135,7 +135,11 @@ export struct MobileRemoteView {
     if (index === 9) { this.state.modal = 'clipboard'; this.menu = ''; }
     if (index === 10) this.controller?.togglePrivacy();
   }
-  private labels(): string[] { return ['键盘', this.state.relative ? '相对鼠标' : '绝对鼠标', this.mouseVisible ? '收起鼠标' : '虚拟鼠标', '显示器', '画面设置', this.state.muted ? '静音' : '声音', '发送文件', '网络状态', 'Ctrl+Alt+Del', '剪贴板', this.state.privacyButtonTitle]; }
+  private labels(): string[] {
+    const labels: string[] = ['键盘', this.state.relative ? '相对鼠标' : '绝对鼠标', this.mouseVisible ? '收起鼠标' : '虚拟鼠标', '显示器', '画面设置', this.state.muted ? '静音' : '声音', '发送文件', '网络状态', 'Ctrl+Alt+Del', '剪贴板'];
+    if (this.state.privacyVisible) labels.push(this.state.privacyButtonTitle);
+    return labels;
+  }
   private icons(): string[] { return ['keyboard', 'mouse', 'mouse', 'display', 'sliders', this.state.muted ? 'muted' : 'audio', 'folder', 'chart', 'lock', 'clipboard', 'lock']; }
   private columns(): number { return this.viewHeight < 400 && this.viewWidth >= 400 ? 4 : 3; }
   private menuWidth(): number { return Math.max(1, Math.min(this.viewWidth - 16, this.columns() === 4 ? 380 : Math.max(280, Math.min(340, this.viewWidth - 160)))); }

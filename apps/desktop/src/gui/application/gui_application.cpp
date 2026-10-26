@@ -2168,7 +2168,7 @@ void GuiApplication::BindStreamCallbacks() {
       const auto controls = GetPrivacyControlState(
           status, props->privacy_status_received_, props->privacy_command_pending_,
           now - props->privacy_status_tick_, now - props->privacy_command_tick_);
-      if (!controls.can_toggle) return;
+      if (!props->privacy_desktop_available_ || !controls.can_toggle) return;
       action.pc.flag = controls.active ? PrivacyCommandFlag::disable
                                       : PrivacyCommandFlag::enable;
       action.pc.block_local_input = true;
@@ -3831,8 +3831,10 @@ void GuiApplication::SyncStreamWindow() {
     (*ui_->stream)->set_privacy_active(controls.active);
     (*ui_->stream)->set_privacy_off(connected && controls.off);
     (*ui_->stream)->set_privacy_unsupported(controls.unsupported);
+    (*ui_->stream)->set_privacy_visible(props->privacy_desktop_available_);
     (*ui_->stream)->set_privacy_can_toggle(
-        props->control_mouse_ && connected && controls.can_toggle);
+        props->privacy_desktop_available_ && props->control_mouse_ &&
+        connected && controls.can_toggle);
     const int language = localization_language_index_;
     std::string text = !connected || !props->privacy_status_received_
         ? localization::privacy_screen[language]

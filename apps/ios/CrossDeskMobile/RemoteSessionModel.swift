@@ -1439,9 +1439,11 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         clipboardStatus = "已接收远端剪贴板"
     }
 
-    func rtcBridge(_ bridge: CrossDeskRTCBridge, didReceiveServiceAvailable available: Bool) {
+    func rtcBridge(_ bridge: CrossDeskRTCBridge, didReceiveServiceAvailable available: Bool,
+                   interactiveStage stage: String) {
         guard hasNetworkConsent, isConnecting || isConnected else { return }
         remoteServiceAvailable = available
+        privacyScreen.setInteractiveStage(stage)
     }
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didSendSecureAttention success: Bool) {

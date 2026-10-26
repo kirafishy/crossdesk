@@ -130,10 +130,11 @@ final class SessionControls extends FrameLayout {
             String[] icons={"keyboard","mouse","mouse","display","sliders","audio","folder","chart","lock","clipboard","lock"};
             Runnable[] clicks={()->{closeMenu();toggleKeyboard();},this::toggleMouse,actions::mouse,actions::display,()->openMenu("video"),actions::mute,actions::sendFile,()->openMenu("network"),actions::secureAttention,actions::clipboard,actions::togglePrivacy};
             menuColumns=controlColumns();
-            for(int row=0;row<(labels.length+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int index=row*menuColumns+col;if(index>=labels.length){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));control.addView(ui.icon(icons[index],INK),ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setSingleLine();caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
+            int controlCount=privacy.desktopAvailable?labels.length:labels.length-1;
+            for(int row=0;row<(controlCount+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int index=row*menuColumns+col;if(index>=controlCount){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));control.addView(ui.icon(icons[index],INK),ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setSingleLine();caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
                     if(index==10){privacyButton=control;privacyCaption=caption;}
                     LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(control,p);
-                }body.addView(line);if((row+1)*menuColumns<labels.length)ui.gap(body,7);}
+                }body.addView(line);if((row+1)*menuColumns<controlCount)ui.gap(body,7);}
             privacyFeedback=ui.text("",11,false);privacyFeedback.setTextColor(SECONDARY);privacyFeedback.setPadding(0,ui.dp(7),0,0);privacyFeedback.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(privacyFeedback);renderPrivacy();
             ui.gap(body,7);transferLabel=ui.text(transferStatus,11,false);transferLabel.setTextColor(SECONDARY);transferLabel.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(transferLabel);
             saveFileButton=ui.action("保存收到的文件",BLUE,actions::saveFile);body.addView(saveFileButton);renderFileStatus();
@@ -149,14 +150,17 @@ final class SessionControls extends FrameLayout {
         positionMouse();
     }
     private void renderPrivacy(){
-        if(privacyButton==null)return;
+        if(menu!=null&&menuPage.equals("controls")&&(privacyButton!=null)!=privacy.desktopAvailable){
+            openMenu("controls");return;
+        }
         long now=android.os.SystemClock.elapsedRealtime();privacy.tick(now);
+        if(privacyFeedback!=null){String feedback=privacy.feedback(now);privacyFeedback.setText(feedback);privacyFeedback.setVisibility(feedback.isEmpty()?GONE:VISIBLE);}
+        if(privacyButton==null)return;
         boolean enabled=privacy.enabled(now);String action=privacy.active()?"关闭隐私屏":"开启隐私屏";
         privacyCaption.setText(privacy.buttonTitle(now));
         privacyButton.setSelected(enabled);
         privacyButton.setContentDescription(action+"，"+privacy.status(now));
         privacyButton.setEnabled(privacy.canToggle(now));privacyButton.setAlpha(privacyButton.isEnabled()?1f:.45f);
-        String feedback=privacy.feedback(now);privacyFeedback.setText(feedback);privacyFeedback.setVisibility(feedback.isEmpty()?GONE:VISIBLE);
     }
     private final class SettingRow {
         final int field;final int[] values;final SegmentedControl group;

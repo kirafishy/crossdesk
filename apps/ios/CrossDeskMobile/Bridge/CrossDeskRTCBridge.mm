@@ -1736,11 +1736,12 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
     }
     if (action.type == ControlType::service_status) {
       const BOOL available = action.ss.available;
+      NSString *stage = [NSString stringWithUTF8String:action.ss.interactive_stage];
       DispatchMain(^{
         if (![self isControllerGenerationActive:generation]) return;
         id<CrossDeskRTCBridgeDelegate> delegate = self.delegate;
-        if ([delegate respondsToSelector:@selector(rtcBridge:didReceiveServiceAvailable:)]) {
-          [delegate rtcBridge:self didReceiveServiceAvailable:available];
+        if ([delegate respondsToSelector:@selector(rtcBridge:didReceiveServiceAvailable:interactiveStage:)]) {
+          [delegate rtcBridge:self didReceiveServiceAvailable:available interactiveStage:stage ?: @""];
         }
       });
       return;

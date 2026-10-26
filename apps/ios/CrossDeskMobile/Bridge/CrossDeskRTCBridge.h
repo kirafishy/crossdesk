@@ -120,7 +120,8 @@ typedef struct {
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge
     didReceiveClipboardText:(NSString *)text;
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge
-    didReceiveServiceAvailable:(BOOL)available;
+    didReceiveServiceAvailable:(BOOL)available
+              interactiveStage:(NSString *)stage;
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge
     didSendSecureAttention:(BOOL)success;
 - (void)rtcBridge:(CrossDeskRTCBridge *)bridge

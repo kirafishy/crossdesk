@@ -12,6 +12,7 @@ struct RemotePrivacyStatus: Decodable {
 }
 
 struct RemotePrivacyScreen {
+    private(set) var desktopAvailable = true
     private(set) var snapshot: RemotePrivacyStatus?
     private(set) var pending = false
     private(set) var requestID: UInt32 = 0
@@ -19,6 +20,10 @@ struct RemotePrivacyScreen {
     private var receivedAt: TimeInterval = 0
     private var requestedAt: TimeInterval = 0
     private var failure = ""
+
+    mutating func setInteractiveStage(_ stage: String) {
+        desktopAvailable = !["lock-screen", "credential-ui", "secure-desktop"].contains(stage)
+    }
 
     var active: Bool {
         guard let s = snapshot else { return false }
@@ -37,6 +42,7 @@ struct RemotePrivacyScreen {
         return "隐私屏"
     }
     func feedback(at now: TimeInterval) -> String {
+        if !desktopAvailable { return "" }
         if failure.isEmpty && (pending || fresh(at: now) && [2, 4].contains(snapshot?.state ?? -1)) {
             return ""
         }
@@ -47,7 +53,7 @@ struct RemotePrivacyScreen {
     }
     func canToggle(at now: TimeInterval) -> Bool {
         guard let s = snapshot else { return false }
-        return !pending && fresh(at: now) && s.state != 4 && (active || s.supported && s.state == 1)
+        return desktopAvailable && !pending && fresh(at: now) && s.state != 4 && (active || s.supported && s.state == 1)
     }
     mutating func receive(_ data: Data, at now: TimeInterval) {
         struct Envelope: Decodable { let type: Int; let privacyStatus: RemotePrivacyStatus }
