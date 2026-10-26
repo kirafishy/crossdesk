@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       version:
-        description: "Android artifact version, for example v1.6.0-20261002."
+        description: "Android artifact version, for example v1.7.3-20261026 or v1.7.3-1-20261026."
         required: true
         type: string
     secrets:
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       source_tag:
-        description: "Existing Android release to sign without rebuilding, for example android-v1.6.0-20261002."
+        description: "Existing Android release to sign without rebuilding, for example android-v1.7.3-1-20261026."
         required: true
         type: string
 
@@ -61,11 +61,11 @@ jobs:
           if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch" and not version:
               tag = os.environ["SOURCE_TAG"]
               if not tag.startswith("android-v"):
-                  raise ValueError("Use an existing android-v<app-version>-YYYYMMDD release")
+                  raise ValueError("Use an existing android-v<app-version>[-<patch>]-YYYYMMDD release")
               version = tag.removeprefix("android-")
-          match = re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+-([0-9]{8})", version)
+          match = re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9]+)?-([0-9]{8})", version)
           if not match:
-              raise ValueError("Invalid Android artifact version")
+              raise ValueError("Invalid Android artifact version; expected v<app-version>[-<patch>]-YYYYMMDD")
           datetime.datetime.strptime(match[1], "%Y%m%d")
           with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
               stream.write(f"version={version}\n")
