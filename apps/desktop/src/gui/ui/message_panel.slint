@@ -1,4 +1,4 @@
-import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
+import { SurfaceSeparator, FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ScrollView } from "std-widgets.slint";
 import { IconButton, FontAwesomeIcons, ControlStyle } from "common.slint";
@@ -91,11 +91,11 @@ export component MessagePanel inherits SettingsDialog {
             text: root.notice-text; font-size: 12px; wrap: word-wrap; color: #b3261e;
         }
     }
-    message-content := ShadowSurface {
+    message-content := FlatSurface {
         x: 24px; y: root.content-top + (root.notice-text == "" ? 0px : notice.height + 12px);
         width: parent.width - 48px; height: parent.height - self.y - 24px;
         background: WorkbenchStyle.surface;
-        border-radius: UiRadius.surface; shadow-color: UiShadow.edge;
+        border-radius: UiRadius.surface; outline-color: UiSurface.edge;
         if root.items.length > 0 || root.selected-id != "": Rectangle {
             x: 1px; y: 1px; width: content-divider.x - 1px; height: parent.height - 2px;
             background: WorkbenchStyle.field-surface;
@@ -113,14 +113,14 @@ export component MessagePanel inherits SettingsDialog {
                 announcement-entries := VerticalLayout {
                     width: announcements-scroll.viewport-width; spacing: 10px; padding: 0px;
                     alignment: start;
-                    for item in root.items: ShadowSurface {
+                    for item in root.items: FlatSurface {
                         height: 64px;
                         background: root.selected-id == item.id
                             ? (entry-touch.pressed ? ControlStyle.selected-pressed : entry-touch.has-hover ? ControlStyle.selected-hover : ControlStyle.selected)
                             : entry-touch.pressed ? WorkbenchStyle.pressed-surface
                             : entry-touch.has-hover ? WorkbenchStyle.hover-surface : WorkbenchStyle.surface;
                         border-radius: UiRadius.control;
-                        shadow-color: root.selected-id == item.id ? UiShadow.focus : UiShadow.edge;
+                        outline-color: root.selected-id == item.id ? UiSurface.focus : UiSurface.edge;
                         Text {
                             x: 10px; y: 9px; width: parent.width - 30px; height: 20px;
                             text: item.title; overflow: elide; font-size: 13px;
@@ -155,10 +155,10 @@ export component MessagePanel inherits SettingsDialog {
             color: WorkbenchStyle.muted; font-size: 13px;
             horizontal-alignment: center; vertical-alignment: center;
         }
-        content-divider := ShadowSeparator {
+        content-divider := SurfaceSeparator {
             x: announcement-list.x + announcement-list.width + 8px;
             y: 1px; width: 1px; height: parent.height - 2px;
-            vertical: true; shadow-color: UiShadow.separator;
+            vertical: true; outline-color: UiSurface.separator;
             visible: root.items.length > 0 || root.selected-id != "";
             accessible-role: none;
         }
@@ -207,7 +207,7 @@ export component MessagePanel inherits SettingsDialog {
                             clicked => { root.request-delete(root.selected-id, root.selected-revision); }
                         }
                     }
-                    ShadowSeparator { height: 1px; shadow-color: UiShadow.separator; }
+                    SurfaceSeparator { height: 1px; outline-color: UiSurface.separator; }
                     StyledText {
                         vertical-stretch: 0;
                         text: root.selected-body;

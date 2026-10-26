@@ -1,4 +1,4 @@
-import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
+import { SurfaceSeparator, FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { CompactButton, FontAwesomeIcons, ControlStyle } from "common.slint";
 
@@ -89,11 +89,11 @@ export component GalleryMenuButton inherits Rectangle {
             color: root.enabled ? #62666d : #8e9298;
             horizontal-alignment: center; vertical-alignment: center;
         }
-        if root.compact-trigger: ShadowSurface {
+        if root.compact-trigger: FlatSurface {
             background: more-touch.pressed || popup.is-open ? ControlStyle.selected : more-touch.has-hover ? ControlStyle.hover : white;
             border-radius: UiRadius.menu;
-            shadow-color: trigger-focus.has-focus ? UiShadow.focus : UiShadow.edge;
-            animate background, shadow-color { duration: 120ms; }
+            outline-color: trigger-focus.has-focus ? UiSurface.focus : UiSurface.edge;
+            animate background, outline-color { duration: 120ms; }
             for dot in 3: Rectangle {
                 x: parent.width / 2 - 6px + dot * 5px;
                 y: (parent.height - self.height) / 2;
@@ -117,12 +117,12 @@ export component GalleryMenuButton inherits Rectangle {
         forward-focus: popup-focus;
         popup-focus := FocusScope {
             key-pressed(event) => { return root.handle-key(event); }
-            ShadowSurface {
-                background: white; shadow-color: UiShadow.edge; border-radius: UiRadius.menu;
+            FlatSurface {
+                background: white; outline-color: UiSurface.edge; border-radius: UiRadius.menu;
                 clip: true;
-                if root.destructive-index > 0: ShadowSeparator {
+                if root.destructive-index > 0: SurfaceSeparator {
                     x: 10px; y: root.menu-padding + root.destructive-index * root.row-height + (root.divider-spacing - 1px) / 2;
-                    width: parent.width - 20px; height: 1px; shadow-color: UiShadow.separator;
+                    width: parent.width - 20px; height: 1px; outline-color: UiSurface.separator;
                 }
                 for item[index] in root.items: Rectangle {
                     private property <bool> destructive: index == root.destructive-index;

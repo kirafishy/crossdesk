@@ -1,4 +1,4 @@
-import { ShadowSurface, UiShadow } from "ui_shadow.slint";
+import { FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ControlStyle, ButtonStyle } from "common.slint";
 // Colors and spacing for the connection workbench; shapes are shared app-wide.
@@ -15,12 +15,11 @@ export global WorkbenchStyle {
     out property <color> success: #18835a;
 }
 
-export component WorkbenchButton inherits ShadowSurface {
-    shadow-compact: true;
+export component WorkbenchButton inherits FlatSurface {
     in property <string> text;
     in property <length> text-size: 13px;
     in property <color> text-color: root.destructive || root.primary ? white : WorkbenchStyle.text;
-    in property <color> normal-shadow-color: UiShadow.edge;
+    in property <color> normal-outline-color: ButtonStyle.border;
     in property <color> normal-background: ButtonStyle.surface;
     in property <string> icon;
     in property <string> tooltip;
@@ -46,17 +45,12 @@ export component WorkbenchButton inherits ShadowSurface {
     width: 112px;
     height: 36px;
     border-radius: UiRadius.control;
-    border-width: root.show-focus || (!root.quiet && !root.soft && !root.primary && !root.destructive) ? 1px : 0px;
-    border-color: !root.enabled ? ButtonStyle.disabled-border
+    outline-enabled: root.show-focus || (!root.quiet && !root.soft && !root.primary && !root.destructive);
+    outline-focused: root.show-focus;
+    outline-color: !root.enabled ? ButtonStyle.disabled-border
         : root.show-focus ? WorkbenchStyle.accent
         : touch.pressed ? ButtonStyle.pressed-border
-        : touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
-    shadow-enabled: root.enabled && (root.show-focus || (!root.soft && !root.quiet && !touch.pressed));
-    shadow-focused: root.show-focus;
-    shadow-color: root.destructive ? UiShadow.error
-        : root.show-focus || root.primary ? UiShadow.focus
-        : touch.has-hover ? UiShadow.hover
-        : root.quiet ? transparent : root.normal-shadow-color;
+        : touch.has-hover ? ButtonStyle.hover-border : root.normal-outline-color;
     background: root.destructive
         ? (touch.pressed ? #912018 : touch.has-hover ? #b42318 : #d92d20)
         : root.soft
@@ -67,7 +61,7 @@ export component WorkbenchButton inherits ShadowSurface {
         ? (touch.pressed ? #254cc0 : touch.has-hover ? #4574f0 : WorkbenchStyle.accent)
         : (touch.pressed ? ButtonStyle.pressed : touch.has-hover ? ButtonStyle.hover : root.quiet ? transparent : root.normal-background);
     opacity: root.enabled ? 1 : 0.45;
-    animate background, border-color, shadow-color { duration: 120ms; }
+    animate background, outline-color { duration: 120ms; }
     forward-focus: button-focus;
     accessible-role: button;
     accessible-label: root.tooltip != "" ? root.tooltip : root.text;
@@ -96,6 +90,11 @@ export component WorkbenchButton inherits ShadowSurface {
             vertical-alignment: center;
             accessible-role: none;
         }
+    }
+    if root.show-focus && (root.primary || root.destructive): Rectangle {
+        x: 3px; y: 3px; width: parent.width - 6px; height: parent.height - 6px;
+        border-radius: max(0px, root.border-radius - 3px);
+        border-width: 1px; border-color: white;
     }
     button-focus := FocusScope {
         enabled: root.enabled;
@@ -155,7 +154,7 @@ export component WorkbenchButton inherits ShadowSurface {
 }
 
 // A raised surface keeps transient action feedback distinct from the workbench.
-export component WorkbenchNotice inherits ShadowSurface {
+export component WorkbenchNotice inherits FlatSurface {
     in property <string> text;
     in property <string> icon;
     in property <bool> error: false;
@@ -164,11 +163,8 @@ export component WorkbenchNotice inherits ShadowSurface {
     width: min(root.width-limit, max(280px, message.preferred-width + 64px));
     height: 64px;
     background: root.error ? #fff1f0 : #e9f6ef;
-    shadow-color: root.error ? UiShadow.error : UiShadow.edge;
+    outline-color: root.error ? UiSurface.error : UiSurface.edge;
     border-radius: UiRadius.surface;
-    drop-shadow-color: #14294424;
-    drop-shadow-blur: 24px;
-    drop-shadow-offset-y: 6px;
     accessible-role: AccessibleRole.text;
     accessible-label: root.text;
     Text {
@@ -196,8 +192,8 @@ export component WorkbenchNotice inherits ShadowSurface {
     }
 }
 
-export component WorkbenchCard inherits ShadowSurface {
+export component WorkbenchCard inherits FlatSurface {
     background: WorkbenchStyle.surface;
-    shadow-color: UiShadow.edge;
+    outline-color: UiSurface.edge;
     border-radius: UiRadius.surface;
 }

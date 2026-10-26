@@ -1,4 +1,4 @@
-import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
+import { SurfaceSeparator, FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ComboBox, ScrollView } from "std-widgets.slint";
 import { RemoteCursor } from "remote_cursor.slint";
@@ -85,13 +85,10 @@ struct ControlBarTooltip {
 }
 
 // Shared surface treatment for the capsule and its detached detail cards.
-component StreamControlSurface inherits ShadowSurface {
+component StreamControlSurface inherits FlatSurface {
     background: white;
-    shadow-color: UiShadow.edge;
+    outline-color: UiSurface.edge;
     border-radius: 16px;
-    drop-shadow-color: #1d35571a;
-    drop-shadow-blur: 10px;
-    drop-shadow-offset-y: 2px;
 }
 
 // Keep the compact 16px icons inside roomier circular targets. This remains
@@ -246,22 +243,18 @@ component VideoSettingRow inherits VerticalLayout {
     Text { text: root.label; color: #5c626c; font-size: 11px; height: 18px; }
     HorizontalLayout {
         spacing: 4px;
-        for option[index] in root.options: ShadowSurface {
+        for option[index] in root.options: FlatSurface {
             height: 27px;
             background: !root.enabled ? ControlStyle.disabled
                 : root.selected == index ? (option-touch.pressed ? ButtonStyle.selected-pressed : option-touch.has-hover ? ButtonStyle.selected-hover : ButtonStyle.selected)
                 : option-touch.pressed ? ButtonStyle.pressed
                 : option-touch.has-hover ? ButtonStyle.hover : ButtonStyle.surface;
             border-radius: UiRadius.control;
-            border-width: 1px;
-            border-color: !root.enabled ? ButtonStyle.disabled-border
+            outline-color: !root.enabled ? ButtonStyle.disabled-border
                 : root.selected == index ? ButtonStyle.selected-pressed
                 : option-touch.pressed ? ButtonStyle.pressed-border
                 : option-touch.has-hover ? ButtonStyle.hover-border : ButtonStyle.border;
-            shadow-compact: true;
-            shadow-enabled: root.enabled && !option-touch.pressed;
-            shadow-color: root.enabled && root.selected == index ? UiShadow.focus : UiShadow.edge;
-            animate background, border-color { duration: 120ms; }
+            animate background, outline-color { duration: 120ms; }
             Text { text: option; color: !root.enabled ? #8b8f95
                     : root.selected == index ? white : #30343b;
                 font-weight: root.selected == index ? 600 : 400;
@@ -914,10 +907,10 @@ export component StreamWindow inherits Window {
                     clicked => { root.close-stream-window(); }
                 }
             }
-            ShadowSeparator {
+            SurfaceSeparator {
                 y: parent.height - 1px;
                 height: 1px;
-                shadow-color: UiShadow.separator;
+                outline-color: UiSurface.separator;
             }
         }
 
@@ -937,11 +930,11 @@ export component StreamWindow inherits Window {
             z: 10;
             HorizontalLayout {
                 spacing: 1px;
-                for tab[index] in root.tabs: tab-item := ShadowSurface {
+                for tab[index] in root.tabs: tab-item := FlatSurface {
                     width: min(190px, max(110px, (parent.width - 12px) / root.tabs.length));
                     background: index == root.selected-tab ? white : tab-touch.has-hover || root.dragging-tab == index ? #e5e7eb : #d8dbe0;
-                    shadow-enabled: root.dragging-tab == index;
-                    shadow-color: UiShadow.focus;
+                    outline-enabled: root.dragging-tab == index;
+                    outline-color: UiSurface.focus;
                     Rectangle {
                         width: parent.width - 27px;
                         height: parent.height;
@@ -1214,11 +1207,11 @@ export component StreamWindow inherits Window {
                     tooltip: root.fullscreen-enabled ? StreamStrings.exit-fullscreen : StreamStrings.fullscreen;
                     clicked => { root.close-control-menus(); root.toggle-fullscreen(); }
                 }
-                if root.control-content-visible: ShadowSeparator {
+                if root.control-content-visible: SurfaceSeparator {
                     opacity: root.control-content-progress;
                     x: close-button.x - 6px; y: 12px;
                     width: 1px; height: 14px;
-                    vertical: true; shadow-color: UiShadow.separator;
+                    vertical: true; outline-color: UiSurface.separator;
                 }
                 close-button := ControlBarButton {
                     reveal-progress: root.control-content-progress;
@@ -1423,12 +1416,12 @@ export component StreamWindow inherits Window {
                             vertical-alignment: center;
                             overflow: elide;
                         }
-                        if index < root.stats-rows.length - 2: ShadowSeparator {
+                        if index < root.stats-rows.length - 2: SurfaceSeparator {
                             x: 4px;
                             y: parent.height - 1px;
                             width: parent.width - 8px;
                             height: 1px;
-                            shadow-color: UiShadow.separator;
+                            outline-color: UiSurface.separator;
                         }
                     }
 
@@ -1437,16 +1430,16 @@ export component StreamWindow inherits Window {
                         text: StreamStrings.stats-encoder + "\n" + StreamStrings.stats-decoder;
                         font-size: ImGuiFontStyle.small;
                     }
-                    ShadowSurface {
+                    FlatSurface {
                         x: 0px;
                         y: root.stats-header-height + root.stats-rows.length * stats-table.row-height
                             + 70px;
                         width: parent.width; height: 44px;
                         background: #f7f9fc; border-radius: UiRadius.control;
-                        shadow-color: UiShadow.edge;
-                        ShadowSeparator {
+                        outline-color: UiSurface.edge;
+                        SurfaceSeparator {
                             x: 8px; y: 22px; width: parent.width - 16px; height: 1px;
-                            shadow-color: UiShadow.separator;
+                            outline-color: UiSurface.separator;
                         }
                         for codec[index] in [
                             { label: StreamStrings.stats-encoder, value: root.stats-encoder },
@@ -1762,11 +1755,8 @@ export component StreamWindow inherits Window {
                 y: min(max(64px, parent.height * 0.18), max(16px, parent.height - self.height - 16px));
                 width: min(400px, parent.width - 48px);
                 height: remote-update-message.y + remote-update-message.height + 84px;
-                shadow-color: UiShadow.edge;
+                outline-color: UiSurface.edge;
                 border-radius: UiRadius.surface;
-                drop-shadow-color: #07142b30;
-                drop-shadow-blur: 32px;
-                drop-shadow-offset-y: 12px;
                 z: 14;
                 TouchArea {
                     mouse-cursor: default;
@@ -1806,10 +1796,10 @@ export component StreamWindow inherits Window {
             }
 
             // Transfer progress overlay at bottom-left.
-            if root.file-transfer-visible: ShadowSurface {
+            if root.file-transfer-visible: FlatSurface {
                 x: root.file-panel-x; y: root.file-panel-y;
                 width: root.file-panel-width; height: root.file-panel-height;
-                background: #fffffff0; shadow-color: UiShadow.edge; border-radius: UiRadius.surface; z: 7;
+                background: white; outline-color: UiSurface.edge; border-radius: UiRadius.surface; z: 7;
                 // Header/padding and drags leaving the panel belong to local UI.
                 TouchArea {
                     mouse-cursor: default;
@@ -1858,11 +1848,11 @@ export component StreamWindow inherits Window {
         }
         }
 
-        if root.custom-titlebar && !root.fullscreen-enabled: ShadowSurface {
+        if root.custom-titlebar && !root.fullscreen-enabled: FlatSurface {
             width: parent.width;
             height: parent.height;
             background: transparent;
-            shadow-color: UiShadow.edge;
+            outline-color: UiSurface.edge;
             border-radius:
                 root.window-maximized ? 0px : root.window-corner-radius;
             z: 200;

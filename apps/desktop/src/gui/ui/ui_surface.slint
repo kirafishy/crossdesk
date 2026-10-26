@@ -1,0 +1,35 @@
+// Flat surfaces share solid outlines in software and GPU renderers.
+// Interaction states use their actual colors, including focus and validation.
+export global UiSurface {
+    out property <color> edge: #d7dfe9;
+    out property <color> hover: #8eabd2;
+    out property <color> focus: #3564e3;
+    out property <color> error: #d65252;
+    out property <color> separator: #e1e7ef;
+}
+
+export component FlatSurface inherits Rectangle {
+    in property <color> outline-color: UiSurface.edge;
+    in property <bool> outline-enabled: true;
+    in property <bool> outline-focused: false;
+    border-width: !root.outline-enabled ? 0px : root.outline-focused ? 2px : 1px;
+    border-color: root.outline-color;
+    border-top-left-radius: root.border-radius;
+    border-top-right-radius: root.border-radius;
+    border-bottom-left-radius: root.border-radius;
+    border-bottom-right-radius: root.border-radius;
+
+    @children
+}
+
+export component SurfaceSeparator inherits Rectangle {
+    in property <bool> vertical: false;
+    in property <color> outline-color: UiSurface.separator;
+    height: 1px;
+
+    Rectangle {
+        width: root.vertical ? 1px : root.width;
+        height: root.vertical ? root.height : 1px;
+        background: root.outline-color;
+    }
+}

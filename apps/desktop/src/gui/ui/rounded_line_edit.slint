@@ -1,4 +1,4 @@
-import { ShadowSurface, UiShadow } from "ui_shadow.slint";
+import { FlatSurface, UiSurface } from "ui_surface.slint";
 import { LineEdit } from "std-widgets.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ControlStyle } from "common.slint";
@@ -11,7 +11,7 @@ export component RoundedLineEdit inherits Rectangle {
     in property <InputType> input-type: InputType.text;
     in property <bool> enabled: true;
     in property <length> font-size: 12px;
-    in property <color> normal-shadow-color: UiShadow.edge;
+    in property <color> normal-outline-color: UiSurface.edge;
     in property <brush> surrounding-background: white;
     callback accepted();
     callback edited();
@@ -40,7 +40,7 @@ export component RoundedLineEdit inherits Rectangle {
             : editor.has-focus ? ControlStyle.input-focus-tint : ControlStyle.input-tint;
     }
     // The software renderer clips children to rectangular bounds. Mask the
-    // standard editor's corners before drawing our soft focus edge on top.
+    // standard editor's corners before drawing the focus outline on top.
     Rectangle {
         x: -root.border-radius; y: -root.border-radius;
         width: parent.width + 2 * root.border-radius;
@@ -49,13 +49,12 @@ export component RoundedLineEdit inherits Rectangle {
         border-radius: 2 * root.border-radius;
         border-color: root.surrounding-background;
     }
-    ShadowSurface {
+    FlatSurface {
         width: parent.width; height: parent.height;
         border-radius: root.border-radius;
         clip: true;
-        shadow-color: editor.has-focus ? UiShadow.focus : root.normal-shadow-color;
-        shadow-focused: editor.has-focus;
-        shadow-compact: true;
+        outline-color: editor.has-focus ? UiSurface.focus : root.normal-outline-color;
+        outline-focused: editor.has-focus;
         background: transparent;
     }
 }

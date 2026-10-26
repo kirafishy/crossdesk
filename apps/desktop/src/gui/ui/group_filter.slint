@@ -1,14 +1,14 @@
-import { ShadowSeparator, ShadowSurface, UiShadow } from "ui_shadow.slint";
+import { SurfaceSeparator, FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ScrollView } from "std-widgets.slint";
 import { FontAwesomeIcons, ControlStyle } from "common.slint";
 
 // Shared by history and DeskHub; system choices precede the named groups.
-export component GroupFilter inherits ShadowSurface {
+export component GroupFilter inherits FlatSurface {
     in property <[string]> model;
     in property <int> system-count: 2;
     in property <bool> enabled: true;
-    // An embedded picker shares its enclosing field's shadow and focus glow.
+    // An embedded picker shares its enclosing field's outline and focus state.
     in property <bool> embedded: false;
     in property <bool> show-indicator: true;
     in property <length> popup-min-width: 0px;
@@ -16,9 +16,9 @@ export component GroupFilter inherits ShadowSurface {
     in property <int> text-weight: 400;
     in property <color> text-color: #30343b;
     in property <color> normal-background: ControlStyle.surface;
-    in property <color> normal-shadow-color: UiShadow.edge;
-    in property <color> hover-shadow-color: UiShadow.hover;
-    in property <color> focus-shadow-color: UiShadow.focus;
+    in property <color> normal-outline-color: UiSurface.edge;
+    in property <color> hover-outline-color: UiSurface.hover;
+    in property <color> focus-outline-color: UiSurface.focus;
     in-out property <int> current-index: 0;
     out property <bool> has-focus: trigger-focus.has-focus || popup.is-open;
     out property <bool> has-hover: root.enabled && trigger-touch.has-hover && !popup.is-open;
@@ -40,12 +40,12 @@ export component GroupFilter inherits ShadowSurface {
         : !root.enabled ? ControlStyle.disabled
         : trigger-touch.pressed || popup.is-open ? ControlStyle.pressed
         : trigger-touch.has-hover ? ControlStyle.hover : root.normal-background;
-    shadow-enabled: !root.embedded;
-    shadow-focused: popup.is-open || trigger-focus.has-focus;
-    shadow-color: popup.is-open || trigger-focus.has-focus ? root.focus-shadow-color
-        : trigger-touch.has-hover ? root.hover-shadow-color : root.normal-shadow-color;
+    outline-enabled: !root.embedded;
+    outline-focused: popup.is-open || trigger-focus.has-focus;
+    outline-color: popup.is-open || trigger-focus.has-focus ? root.focus-outline-color
+        : trigger-touch.has-hover ? root.hover-outline-color : root.normal-outline-color;
     border-radius: UiRadius.control;
-    animate background, shadow-color { duration: 100ms; easing: ease-out; }
+    animate background, outline-color { duration: 100ms; easing: ease-out; }
     forward-focus: trigger-focus;
     accessible-role: combobox;
     accessible-enabled: root.enabled;
@@ -140,13 +140,13 @@ export component GroupFilter inherits ShadowSurface {
         forward-focus: popup-focus;
         popup-focus := FocusScope {
             key-pressed(event) => { return root.handle-key(event); }
-            ShadowSurface {
+            FlatSurface {
                 y: (1 - root.popup-progress) * -4px;
                 width: parent.width; height: parent.height;
                 opacity: root.popup-progress;
                 background: white;
                 clip: true;
-                shadow-color: root.normal-shadow-color; border-radius: UiRadius.menu;
+                outline-color: root.normal-outline-color; border-radius: UiRadius.menu;
                 ScrollView {
                     x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
                     viewport-width: self.width;
@@ -154,9 +154,9 @@ export component GroupFilter inherits ShadowSurface {
                     viewport-y <=> root.scroll-y;
                     Rectangle {
                         width: parent.width; height: root.list-height;
-                        if root.has-divider: ShadowSeparator {
+                        if root.has-divider: SurfaceSeparator {
                             x: 6px; y: root.system-count * 26px + 3px;
-                            width: parent.width - 12px; height: 1px; shadow-color: UiShadow.separator;
+                            width: parent.width - 12px; height: 1px; outline-color: UiSurface.separator;
                         }
                         for choice[index] in root.model: Rectangle {
                             y: index * 26px + (root.has-divider && index >= root.system-count ? 6px : 0px);

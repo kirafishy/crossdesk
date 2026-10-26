@@ -1,4 +1,4 @@
-import { ShadowSurface, UiShadow } from "ui_shadow.slint";
+import { FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ScrollView } from "std-widgets.slint";
 import { RoundedLineEdit } from "rounded_line_edit.slint";
@@ -21,13 +21,13 @@ export component DeviceGroupDialog inherits Rectangle {
     callback cancel();
     background: #00000040;
     TouchArea {}
-    dialog := ShadowSurface {
+    dialog := FlatSurface {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         width: min(360px, parent.width - 40px);
         height: 208px + group-list.height + (root.error == "" ? 0px : 32px);
         background: white; border-radius: UiRadius.surface;
-        shadow-color: UiShadow.edge;
+        outline-color: UiSurface.edge;
         TouchArea {}
         Text {
             x: 18px; y: 16px; height: 24px;
@@ -42,10 +42,10 @@ export component DeviceGroupDialog inherits Rectangle {
             x: 18px; y: 67px; width: parent.width - 36px; height: 16px;
             text: "ID  " + root.device-id; color: #858c97; font-size: 11px;
         }
-        group-list := ShadowSurface {
+        group-list := FlatSurface {
             x: 18px; y: 95px; width: parent.width - 36px;
             height: min(5, max(1, root.options.length)) * 32px + 2px;
-            background: #fbfcfd; shadow-color: UiShadow.edge; border-radius: UiRadius.surface;
+            background: #fbfcfd; outline-color: UiSurface.edge; border-radius: UiRadius.surface;
             clip: true;
             ScrollView {
                 x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px;
@@ -81,10 +81,10 @@ export component DeviceGroupDialog inherits Rectangle {
                 border-width: UiRadius.surface; border-radius: 2 * UiRadius.surface;
                 border-color: white;
             }
-            ShadowSurface {
+            FlatSurface {
                 width: parent.width; height: parent.height;
                  border-radius: UiRadius.surface;
-                shadow-color: UiShadow.edge;
+                outline-color: UiSurface.edge;
             }
         }
         RoundedLineEdit {
