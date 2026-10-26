@@ -36,7 +36,7 @@ final class SessionControls extends FrameLayout {
         int height=Math.max(0,getRootView().getHeight()-visible.bottom);
         keyboardInsets(height,height>ui.dp(80),0);
     }
-    private TextView networkLabel,videoFeedback;
+    private TextView videoFeedback;
     private RemotePrivacyScreen privacy=new RemotePrivacyScreen();
     private View privacyButton;
     private TextView privacyFeedback,privacyCaption;
@@ -116,15 +116,15 @@ final class SessionControls extends FrameLayout {
         if(transferLabel!=null){transferLabel.setText(transferStatus);transferLabel.setVisibility(transferStatus.isEmpty()?GONE:VISIBLE);}
         if(saveFileButton!=null)saveFileButton.setVisibility(hasReceivedFile?VISIBLE:GONE);
     }
-    private void closeMenu(){if(menu!=null){removeView(menu);menu=null;menuScroll=null;}if(shield!=null){removeView(shield);shield=null;}networkLabel=videoFeedback=transferLabel=saveFileButton=null;privacyFeedback=privacyCaption=null;privacyButton=null;trafficCells=null;trafficRows=null;networkDetails=null;encryptionLock=encryptionOpen=null;settingRows.clear();orb.setContentDescription("展开远程控制菜单");positionMouse();}
+    private void closeMenu(){if(menu!=null){removeView(menu);menu=null;menuScroll=null;}if(shield!=null){removeView(shield);shield=null;}videoFeedback=transferLabel=saveFileButton=null;privacyFeedback=privacyCaption=null;privacyButton=null;trafficCells=null;trafficRows=null;networkDetails=null;encryptionLock=encryptionOpen=null;settingRows.clear();orb.setContentDescription("展开远程控制菜单");positionMouse();}
     private void openMenu(String page){
         cancelMouseInput();
         closeMenu();menuPage=page;shield=new View(getContext());shield.setOnClickListener(v->closeMenu());addView(shield,new LayoutParams(-1,-1));
         menu=ui.column();menu.setPadding(ui.dp(12),ui.dp(12),ui.dp(12),ui.dp(12));ui.card(menu,18);menu.setElevation(ui.dp(12));
         LinearLayout header=ui.row();
         if(!page.equals("controls"))header.addView(ui.iconButton("back","返回控制栏",()->openMenu("controls")),ui.size(28,32));
-        LinearLayout titles=ui.column();TextView title=ui.text(page.equals("controls")?"●  已连接":page.equals("video")?"画面设置":"网络状态",14,true);titles.addView(title);
-        if(page.equals("controls")){ui.gap(titles,3);networkLabel=ui.text(network.summary(),10,false);networkLabel.setFontFeatureSettings("tnum");networkLabel.setTextColor(SECONDARY);titles.addView(networkLabel);}header.addView(titles,new LinearLayout.LayoutParams(0,-2,1));header.addView(ui.iconButton("close","关闭控制栏",this::closeMenu),ui.size(30,32));menu.addView(header);ui.gap(menu,9);
+        TextView title=ui.text(page.equals("controls")?"●  已连接":page.equals("video")?"画面设置":"网络状态",14,true);
+        header.addView(title,new LinearLayout.LayoutParams(0,-2,1));header.addView(ui.iconButton("close","关闭控制栏",this::closeMenu),ui.size(30,32));menu.addView(header);ui.gap(menu,9);
         if(page.equals("video")){videoFeedback=ui.text("",12,false);videoFeedback.setTextColor(SECONDARY);videoFeedback.setPadding(0,0,0,ui.dp(9));menu.addView(videoFeedback);}
         ScrollView scroll=new ScrollView(getContext());menuScroll=scroll;menu.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=ui.column();scroll.addView(body);
         if(page.equals("network")){
@@ -216,7 +216,6 @@ final class SessionControls extends FrameLayout {
         return row;
     }
     private void renderNetwork(){
-        if(networkLabel!=null)networkLabel.setText(network.summary());
         if(trafficCells==null)return;
         String[] names={"视频","音频","数据","合计"};
         for(int i=0;i<4;i++){

@@ -211,14 +211,9 @@ export struct MobileRemoteView {
     Column({ space: 10 }) {
       Row({ space: 6 }) {
         if (this.menu !== 'controls') { MobileIconButton({ icon: 'back', label: '返回控制栏', iconExtent: 30, iconSize: 19, action: () => this.menu = 'controls' }) }
-        Column({ space: 3 }) {
-          Row({ space: 6 }) {
-            if (this.menu === 'controls') { Row() {}.width(6).height(6).borderRadius(3).backgroundColor(MobileTheme.green) }
-            Text(this.menu === 'controls' ? '已连接' : this.menu === 'video' ? '画面设置' : '网络状态').fontSize(14).fontWeight(600).fontColor(MobileTheme.ink)
-          }.width('100%')
-          if (this.menu === 'controls') {
-            Text(`${this.controller?.network.mode(this.state.networkTime) ?? '—'} · ${this.state.width}×${this.state.height}`).fontSize(10).fontColor(MobileTheme.secondary).width('100%')
-          }
+        Row({ space: 6 }) {
+          if (this.menu === 'controls') { Row() {}.width(6).height(6).borderRadius(3).backgroundColor(MobileTheme.green) }
+          Text(this.menu === 'controls' ? '已连接' : this.menu === 'video' ? '画面设置' : '网络状态').fontSize(14).fontWeight(600).fontColor(MobileTheme.ink)
         }.layoutWeight(1)
         MobileIconButton({ icon: 'close', label: '关闭控制栏', iconExtent: 30, iconSize: 20, action: () => this.menu = '' })
       }.width('100%')

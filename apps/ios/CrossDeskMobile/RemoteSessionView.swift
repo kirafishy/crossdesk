@@ -1163,15 +1163,9 @@ private struct FloatingSessionMenu: View {
                 Circle()
                     .fill(session.isConnected ? Color.green : Color.orange)
                     .frame(width: 9, height: 9)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(session.connectionStatus)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    Text(statusDetail)
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                Text(session.connectionStatus)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
             }
             Spacer()
             Button(action: close) {
@@ -1310,20 +1304,6 @@ private struct FloatingSessionMenu: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(.red)
-    }
-
-    private var statusDetail: String {
-        let snapshot = displayedNetworkSnapshot
-        var components = [snapshot.connectionMode]
-        let frameSize = displayedFrameSize
-        if frameSize.width > 0 && frameSize.height > 0 {
-            components.append("\(Int(frameSize.width))×\(Int(frameSize.height))")
-        }
-        components.append(RemoteNetworkSnapshot.bitrate(snapshot.report?.total.inboundBitrate))
-        if let loss = snapshot.report?.video.lossRate, loss > 0 {
-            components.append("丢包 \(RemoteNetworkSnapshot.lossRate(loss))")
-        }
-        return components.joined(separator: " · ")
     }
 }
 
