@@ -311,7 +311,8 @@ export class MobileController {
     catch { this.toast('复制失败，请重试'); }
   }
   sas(): void {
-    if (!this.serviceAvailable) { this.toast(this.state.platform === 'windows' ? '请在远端启用 CrossDesk 系统服务后重试' : 'Ctrl+Alt+Del 需要远端 Windows 系统服务支持'); return; }
+    if (this.state.platform !== 'windows') return;
+    if (!this.serviceAvailable) { this.toast('请在远端启用 CrossDesk 系统服务后重试'); return; }
     this.send({ op: 'sas' });
   }
   async chooseFile(): Promise<void> {

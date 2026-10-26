@@ -1125,7 +1125,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     }
 
     func sendSecureAttention() {
-        guard hasNetworkConsent, isConnected else { return }
+        guard hasNetworkConsent, isConnected, remotePlatform == .windows else { return }
         guard remoteServiceAvailable else {
             controlStatus = "Ctrl+Alt+Del 需要远端启用 Windows 系统服务"
             return

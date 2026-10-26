@@ -51,7 +51,7 @@ final class SessionControls extends FrameLayout {
     private LinearLayout[] trafficRows;
     private TextView[] networkDetails;
     private View encryptionLock,encryptionOpen;
-    private boolean muted,relative=true,orbPositioned;
+    private boolean muted,relative=true,orbPositioned,secureAttentionVisible;
     SessionControls(Context context,MobileUi ui,Actions actions){
         super(context);this.ui=ui;this.actions=actions;
         keyboard=new RemoteKeyboard(context,ui,actions,()->{requestLayout();positionMouse();});
@@ -66,6 +66,12 @@ final class SessionControls extends FrameLayout {
         drag(orb,orb,()->{if(menu==null)openMenu("controls");else closeMenu();});
     }
     void setRelative(boolean value){relative=value;if(menu!=null&&menuPage.equals("controls"))openMenu("controls");}
+    void setHostPlatform(String platform){
+        boolean visible="windows".equals(platform);
+        if(secureAttentionVisible==visible)return;
+        secureAttentionVisible=visible;
+        if(menu!=null&&menuPage.equals("controls"))openMenu("controls");
+    }
     void attachMouseBar(FrameLayout host, VirtualMouseBar bar) {
         mouseHost=host;mouseBar=bar;
         // A direct, tightly bounded sibling of the video is essential: otherwise
@@ -130,8 +136,13 @@ final class SessionControls extends FrameLayout {
             String[] icons={"keyboard","mouse","mouse","display","sliders","audio","folder","chart","lock","clipboard","lock"};
             Runnable[] clicks={()->{closeMenu();toggleKeyboard();},this::toggleMouse,actions::mouse,actions::display,()->openMenu("video"),actions::mute,actions::sendFile,()->openMenu("network"),actions::secureAttention,actions::clipboard,actions::togglePrivacy};
             menuColumns=controlColumns();
-            int controlCount=privacy.desktopAvailable?labels.length:labels.length-1;
-            for(int row=0;row<(controlCount+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int index=row*menuColumns+col;if(index>=controlCount){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));control.addView(ui.icon(icons[index],INK),ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setSingleLine();caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
+            java.util.List<Integer> visibleControls=new java.util.ArrayList<>();
+            for(int index=0;index<labels.length;index++){
+                if(index==8&&!secureAttentionVisible||index==10&&!privacy.desktopAvailable)continue;
+                visibleControls.add(index);
+            }
+            int controlCount=visibleControls.size();
+            for(int row=0;row<(controlCount+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int position=row*menuColumns+col;if(position>=controlCount){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}int index=visibleControls.get(position);LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));control.addView(ui.icon(icons[index],INK),ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setSingleLine();caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
                     if(index==10){privacyButton=control;privacyCaption=caption;}
                     LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(control,p);
                 }body.addView(line);if((row+1)*menuColumns<controlCount)ui.gap(body,7);}

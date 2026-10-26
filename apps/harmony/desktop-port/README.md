@@ -86,7 +86,7 @@ python3 apps/harmony/scripts/build_slint_desktop.py --desktop --reuse-runtime \
 
 `--desktop-permissions` 生成权限声明、用途说明和授权流程开关；`--signing-config` 生成签名配置并选择 `entry-default-signed.hap` 安装。生成的配置仅位于忽略的 `.native` 缓存，文件权限为 `0600`。无签名参数时仍输出普通 `entry-default-unsigned.hap`。可单独用 `--desktop-permissions` 做带权限声明的编译检查，不能据此认为已获得权限或可安装到真机。
 
-远程 `lock_workstation` 命令已接到经过采集/输入授权检查的 Meta+L 路径，先释放残留键鼠，发送后配对释放，失败保留待清理状态。Windows `send_sas` 没有等价的鸿蒙公开接口，明确返回不支持；所有 PC 客户端共用的 Slint 快捷键菜单在目标为鸿蒙时不显示 Ctrl+Alt+Del，仍保留 Win+L。普通 Ctrl/Alt/Meta 组合键由原生钩子按原顺序转发，系统最终允许拦截哪些保留键仍需授权后的真机验证。
+远程 `lock_workstation` 命令已接到经过采集/输入授权检查的 Meta+L 路径，先释放残留键鼠，发送后配对释放，失败保留待清理状态。Windows `send_sas` 没有等价的鸿蒙公开接口，明确返回不支持；PC 和移动端仅在被控端为 Windows 时显示系统组合键按钮，目标为鸿蒙或其他系统时隐藏。普通 Ctrl/Alt/Meta 组合键由原生钩子按原顺序转发，系统最终允许拦截哪些保留键仍需授权后的真机验证。
 
 本轮验证：普通 HAP 与带权限声明的 HAP 构建通过；普通 HAP 安装本机 2in1 模拟器后，全局钩子实际返回 `201`，无授权弹窗循环，仍收到共享窗口回退发送的 `keyboard` 数据流。真实 Ctrl+A/C、End、Ctrl+V 把 `246` 复制为 `246 246`。生产 C++/ArkTS 的模拟 SDK 回归覆盖 Alt+Tab、Meta+L、重复键、小键盘 Enter、取消、失焦、撤权、重复注册、卸载失败、后台通知、缓存失效、读取中变更/撤权，以及权限拒绝后不重复引导。macOS 公共 Slint 冒烟测试新增快捷键菜单的真实点击回归，验证移除 SAS 后首项为锁屏、弹层命中范围随菜单缩小、切回 Windows 菜单仍正常。成功授权的钩子和后台跨应用读取没有在无 ACL 包中冒充验证通过。
 

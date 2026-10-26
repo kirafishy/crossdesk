@@ -136,9 +136,11 @@ export struct MobileRemoteView {
     if (index === 10) this.controller?.togglePrivacy();
   }
   private labels(): string[] {
-    const labels: string[] = ['键盘', this.state.relative ? '相对鼠标' : '绝对鼠标', this.mouseVisible ? '收起鼠标' : '虚拟鼠标', '显示器', '画面设置', this.state.muted ? '静音' : '声音', '发送文件', '网络状态', 'Ctrl+Alt+Del', '剪贴板'];
-    if (this.state.privacyVisible) labels.push(this.state.privacyButtonTitle);
-    return labels;
+    return ['键盘', this.state.relative ? '相对鼠标' : '绝对鼠标', this.mouseVisible ? '收起鼠标' : '虚拟鼠标', '显示器', '画面设置', this.state.muted ? '静音' : '声音', '发送文件', '网络状态', 'Ctrl+Alt+Del', '剪贴板', this.state.privacyButtonTitle];
+  }
+  private controlIds(): number[] {
+    return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter((index: number) =>
+      (index !== 8 || this.state.platform === 'windows') && (index !== 10 || this.state.privacyVisible));
   }
   private icons(): string[] { return ['keyboard', 'mouse', 'mouse', 'display', 'sliders', this.state.muted ? 'muted' : 'audio', 'folder', 'chart', 'lock', 'clipboard', 'lock']; }
   private columns(): number { return this.viewHeight < 400 && this.viewWidth >= 400 ? 4 : 3; }
@@ -215,20 +217,20 @@ export struct MobileRemoteView {
         Column({ space: 8 }) {
           if (this.menu === 'controls') {
             GridRow({ columns: this.columns(), gutter: 7 }) {
-              ForEach(this.labels(), (label: string, index: number) => {
+              ForEach(this.controlIds(), (index: number) => {
                 GridCol() {
                   Column({ space: 4 }) {
                     MobileIcon({ name: this.icons()[index], iconExtent: 19 })
-                    Text(label).fontSize(10).fontColor(MobileTheme.ink).maxLines(1)
+                    Text(this.labels()[index]).fontSize(10).fontColor(MobileTheme.ink).maxLines(1)
                   }
                     .height(52).width('100%').justifyContent(FlexAlign.Center)
                     .backgroundColor('#F0F0F2').borderRadius(10)
                     .enabled(index !== 10 || this.state.ready && this.state.privacyCanToggle)
                     .opacity(index === 10 && (!this.state.ready || !this.state.privacyCanToggle) ? 0.45 : 1)
                     .accessibilitySelected(index === 10 && this.state.privacyEnabled)
-                    .accessibilityText(index === 10 ? `${label}，${this.state.privacyStatus}` : label).accessibilityLevel('yes').onClick(() => this.action(index))
+                    .accessibilityText(index === 10 ? `${this.labels()[index]}，${this.state.privacyStatus}` : this.labels()[index]).accessibilityLevel('yes').onClick(() => this.action(index))
                 }
-              }, (label: string) => label)
+              }, (index: number) => index.toString())
             }
             if (this.state.privacyFeedback) { Text(this.state.privacyFeedback).fontSize(11).fontColor(MobileTheme.secondary).width('100%') }
             if (this.state.transfer) { Text(this.state.transfer).fontSize(11).fontColor(MobileTheme.secondary).width('100%') }

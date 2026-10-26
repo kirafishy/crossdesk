@@ -338,7 +338,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             public void mute(){muted=!muted;if(session!=null)session.control(2,muted?0:1);controls.setMuted(muted);}
             public void mouse(){boolean relative=!preferences.getBoolean("relativeMouse",true);preferences.edit().putBoolean("relativeMouse",relative).apply();video.setRelative(relative);controls.setRelative(relative);}
             public void videoSettings(int field,int value){RemoteVideoSettings.Values old=MainActivity.this.videoSettings.selection;updateVideoSettings(new RemoteVideoSettings.Values(field==0?value:old.quality,field==1?value:old.frameRate,field==2?value:old.preference));}
-        });controls.setRelative(preferences.getBoolean("relativeMouse",true));controls.setMuted(muted);controls.videoSettings(videoSettings);root.addView(controls,new LinearLayout.LayoutParams(-1,-1));getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        });controls.setHostPlatform(hostPlatform);controls.setRelative(preferences.getBoolean("relativeMouse",true));controls.setMuted(muted);controls.videoSettings(videoSettings);root.addView(controls,new LinearLayout.LayoutParams(-1,-1));getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         controls.attachMouseBar(canvas,new VirtualMouseBar(ui,video.mouseInput));
         privacyChanged();
         video.remoteFocusChanged=()->{if(controls!=null)controls.resetKeyboardContext();};
@@ -496,8 +496,8 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         if(!ready)return;int count=Math.min(displays.length(),8);if(count==0){toast("等待远端屏幕信息");return;}String[] labels=new String[count];for(int i=0;i<count;i++){JSONObject display=displays.optJSONObject(i);labels[i]=(i+1)+" · "+(display==null?"显示器":display.optString("name","显示器"));}new AlertDialog.Builder(this).setTitle("显示器").setItems(labels,(d,w)->{if(session!=null){if(w!=selectedDisplay&&video!=null)video.resetViewport();selectedDisplay=w;session.control(4,w);if(controls!=null)controls.resetVideoStatistics();}}).show();
     }
     private void secureAttention(){
-        if(!ready||session==null)return;
-        if(!remoteServiceAvailable){controlFeedback(hostPlatform.equals("windows")?"请在远端启用 CrossDesk 系统服务后重试":"Ctrl+Alt+Del 需要远端 Windows 系统服务支持");return;}
+        if(!ready||session==null||!hostPlatform.equals("windows"))return;
+        if(!remoteServiceAvailable){controlFeedback("请在远端启用 CrossDesk 系统服务后重试");return;}
         session.secureAttention();
     }
     private void chooseFile(){
@@ -650,6 +650,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         JSONObject info=message.optJSONObject("host_info");
         if(info!=null){
             hostPlatform=info.optString("platform","");JSONArray list=info.optJSONArray("displays");if(list!=null)displays=list;history.metadata(serverKey(),connectedRemote,info.optString("host_name",connectedRemote),hostPlatform);
+            if(controls!=null)controls.setHostPlatform(hostPlatform);
             boolean wasSupported=videoSettings.supported;videoSettings.setSupported(info.optBoolean("supports_video_settings",false));
             if(!videoSettings.supported)cancelVideoSettingsTimeout();
             if(controls!=null)controls.videoSettings(videoSettings);
@@ -739,7 +740,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         videoSettings=retained.videoSettings;ready=true;retained.attach(this);
         if(rebuild)sessionScreen(retained.autoLandscape);
         if(retained.width>0&&retained.height>0)videoSize(retained.width,retained.height);
-        if(controls!=null){controls.setMuted(muted);controls.videoSettings(videoSettings);controls.fileStatus(retained.fileStatus,receivedFile!=null);}
+        if(controls!=null){controls.setHostPlatform(hostPlatform);controls.setMuted(muted);controls.videoSettings(videoSettings);controls.fileStatus(retained.fileStatus,receivedFile!=null);}
         retained.setBackground(false);signaling(signalState,localIdentity);
         return true;
     }

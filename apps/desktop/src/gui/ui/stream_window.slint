@@ -335,10 +335,8 @@ export component StreamWindow inherits Window {
     callback reorder-tab(int, length, length);
     callback close-tab(string);
     callback switch-display(int);
-    in property <bool> secure-attention-supported: true;
-    private property <[string]> secure-shortcut-items: ["Ctrl+Alt+Del", "Win+L"];
-    private property <[string]> ordinary-shortcut-items: ["Win+L"];
-    private property <[string]> shortcut-items: root.secure-attention-supported ? root.secure-shortcut-items : root.ordinary-shortcut-items;
+    in property <bool> secure-attention-supported: false;
+    private property <[string]> shortcut-items: ["Ctrl+Alt+Del", "Win+L"];
     private property <length> shortcut-menu-height: root.shortcut-items.length * 30px + 16px;
     callback send-shortcut(string);
     callback toggle-mouse-control;
@@ -364,6 +362,7 @@ export component StreamWindow inherits Window {
     private property <bool> control-visual-expanded: false;
     private property <length> control-toolbar-height: 38px;
     private property <length> control-button-step: 32px;
+    private property <length> control-shortcut-width: root.secure-attention-supported ? root.control-button-step : 0px;
     private property <length> control-privacy-width: root.privacy-visible ? root.control-button-step : 0px;
     private property <length> control-disconnect-gap: 8px;
     private property <length> control-buttons-x: root.control-docked-left ? 43px : 7px;
@@ -415,6 +414,9 @@ export component StreamWindow inherits Window {
     changed selected-tab => {
         root.close-control-menus();
         root.cancel-remote-pointer();
+    }
+    changed secure-attention-supported => {
+        if !root.secure-attention-supported { root.shortcut-menu-open = false; }
     }
     changed control-expanded => {
         control-reveal-timer.running = false;
@@ -517,7 +519,7 @@ export component StreamWindow inherits Window {
             if logo-button.has-hover { return logo-button.tooltip-info; }
             if root.control-expanded && root.control-content-visible {
                 if display-button.has-hover { return display-button.tooltip-info; }
-                if shortcut-button.has-hover { return shortcut-button.tooltip-info; }
+                if root.secure-attention-supported && shortcut-button.has-hover { return shortcut-button.tooltip-info; }
                 if mouse-button.has-hover { return mouse-button.tooltip-info; }
                 if root.privacy-visible && privacy-button.has-hover { return privacy-button.tooltip-info; }
                 if video-button.has-hover { return video-button.tooltip-info; }
@@ -715,7 +717,7 @@ export component StreamWindow inherits Window {
             && pointer-y >= root.display-menu-y
             && pointer-y <= root.display-menu-y + root.display-menu-height;
         let shortcut-menu-x = control.x + shortcut-button.x;
-        let over-shortcut-menu = root.shortcut-menu-open
+        let over-shortcut-menu = root.secure-attention-supported && root.shortcut-menu-open
             && pointer-x >= shortcut-menu-x
             && pointer-x <= shortcut-menu-x + 180px
             && pointer-y >= root.shortcut-menu-y
@@ -1085,7 +1087,7 @@ export component StreamWindow inherits Window {
             control := Rectangle {
                 x: root.control-dragging ? root.control-drag-x : root.control-docked-left ? 0px : parent.width - self.width;
                 y: min(max(0px, root.control-pos-y), parent.height - self.height);
-                width: root.control-visual-expanded ? min(80px + 8 * root.control-button-step + root.control-privacy-width + root.control-disconnect-gap, parent.width) : root.control-toolbar-height;
+                width: root.control-visual-expanded ? min(80px + 7 * root.control-button-step + root.control-shortcut-width + root.control-privacy-width + root.control-disconnect-gap, parent.width) : root.control-toolbar-height;
                 height: root.control-toolbar-height;
                 z: 10;
 
@@ -1130,8 +1132,8 @@ export component StreamWindow inherits Window {
                 }
                 shortcut-button := ControlBarButton {
                     reveal-progress: root.control-content-progress;
-                    visible: root.control-content-visible;
-                    action-enabled: root.control-expanded;
+                    visible: root.control-content-visible && root.secure-attention-supported;
+                    action-enabled: root.control-expanded && root.secure-attention-supported;
                     x: root.control-buttons-x + root.control-button-step;
                     y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.keyboard; tooltip: StreamStrings.send-shortcut;
@@ -1149,7 +1151,7 @@ export component StreamWindow inherits Window {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible;
                     action-enabled: root.control-expanded;
-                    x: root.control-buttons-x + 2 * root.control-button-step;
+                    x: root.control-buttons-x + root.control-button-step + root.control-shortcut-width;
                     y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.computer-mouse; slashed: !root.mouse-control-enabled;
                     tooltip: root.mouse-control-enabled ? StreamStrings.release-mouse : StreamStrings.control-mouse;
@@ -1159,7 +1161,7 @@ export component StreamWindow inherits Window {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible;
                     action-enabled: root.control-expanded;
-                    x: root.control-buttons-x + 3 * root.control-button-step + root.control-privacy-width;
+                    x: root.control-buttons-x + 2 * root.control-button-step + root.control-shortcut-width + root.control-privacy-width;
                     y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.volume-high; slashed: !root.audio-enabled;
                     tooltip: root.audio-enabled ? StreamStrings.mute : StreamStrings.audio;
@@ -1169,7 +1171,7 @@ export component StreamWindow inherits Window {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible;
                     action-enabled: root.control-expanded;
-                    x: root.control-buttons-x + 4 * root.control-button-step + root.control-privacy-width;
+                    x: root.control-buttons-x + 3 * root.control-button-step + root.control-shortcut-width + root.control-privacy-width;
                     y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.folder-open; tooltip: StreamStrings.select-file;
                     clicked => { root.close-control-menus(); root.select-file(); }
@@ -1178,7 +1180,7 @@ export component StreamWindow inherits Window {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible;
                     action-enabled: root.control-expanded;
-                    x: root.control-buttons-x + 5 * root.control-button-step + root.control-privacy-width;
+                    x: root.control-buttons-x + 4 * root.control-button-step + root.control-shortcut-width + root.control-privacy-width;
                     y: (parent.height - self.height) / 2;
                     icon: "\u{f1de}"; selected: root.video-menu-open;
                     tooltip: StreamStrings.video-settings;
@@ -1193,7 +1195,7 @@ export component StreamWindow inherits Window {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible;
                     action-enabled: root.control-expanded;
-                    x: root.control-buttons-x + 6 * root.control-button-step + root.control-privacy-width;
+                    x: root.control-buttons-x + 5 * root.control-button-step + root.control-shortcut-width + root.control-privacy-width;
                     y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.signal; selected: root.stats-visible;
                     tooltip: root.stats-visible ? StreamStrings.hide-stats : StreamStrings.show-stats;
@@ -1203,7 +1205,7 @@ export component StreamWindow inherits Window {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible;
                     action-enabled: root.control-expanded;
-                    x: root.control-buttons-x + 7 * root.control-button-step + root.control-privacy-width;
+                    x: root.control-buttons-x + 6 * root.control-button-step + root.control-shortcut-width + root.control-privacy-width;
                     y: (parent.height - self.height) / 2;
                     icon: root.fullscreen-enabled ? FontAwesomeIcons.compress : FontAwesomeIcons.expand;
                     tooltip: root.fullscreen-enabled ? StreamStrings.exit-fullscreen : StreamStrings.fullscreen;
@@ -1219,7 +1221,7 @@ export component StreamWindow inherits Window {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible;
                     action-enabled: root.control-expanded;
-                    x: root.control-buttons-x + 8 * root.control-button-step + root.control-privacy-width + root.control-disconnect-gap;
+                    x: root.control-buttons-x + 7 * root.control-button-step + root.control-shortcut-width + root.control-privacy-width + root.control-disconnect-gap;
                     y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.xmark; tooltip: StreamStrings.disconnect;
                     danger: true;
@@ -1255,7 +1257,7 @@ export component StreamWindow inherits Window {
                 privacy-button := ControlBarButton {
                     reveal-progress: root.control-content-progress;
                     visible: root.control-content-visible && root.privacy-visible;
-                    x: root.control-buttons-x + 3 * root.control-button-step;
+                    x: root.control-buttons-x + 2 * root.control-button-step + root.control-shortcut-width;
                     y: (parent.height - self.height) / 2;
                     icon: FontAwesomeIcons.user-secret;
                     slashed: root.privacy-off && !root.privacy-unsupported;
@@ -1698,7 +1700,7 @@ export component StreamWindow inherits Window {
                 }
             }
 
-            if root.shortcut-menu-open: StreamControlSurface {
+            if root.secure-attention-supported && root.shortcut-menu-open: StreamControlSurface {
                 x: control.x + shortcut-button.x; y: root.shortcut-menu-y;
                 width: 180px; height: root.shortcut-menu-height; z: 11;
                 TouchArea { mouse-cursor: default; scroll-event(event) => { accept } }

@@ -1245,9 +1245,11 @@ private struct FloatingSessionMenu: View {
                     FloatingControlButton(title: "网络状态", symbol: "chart.bar.xaxis") {
                         page = .networkStats
                     }
-                    FloatingControlButton(title: "Ctrl+Alt+Del",
-                                          symbol: "lock.trianglebadge.exclamationmark",
-                                          action: session.sendSecureAttention)
+                    if session.remotePlatform == .windows {
+                        FloatingControlButton(title: "Ctrl+Alt+Del",
+                                              symbol: "lock.trianglebadge.exclamationmark",
+                                              action: session.sendSecureAttention)
+                    }
                     FloatingControlButton(title: "剪贴板", symbol: "doc.on.clipboard",
                                           action: session.sendClipboard)
                     if session.privacyScreen.desktopAvailable {

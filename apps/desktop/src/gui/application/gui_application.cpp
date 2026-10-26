@@ -2144,7 +2144,7 @@ void GuiApplication::BindStreamCallbacks() {
     if (name != "Ctrl+Alt+Del" && name != "Win+L") return;
     {
       std::lock_guard lock(props->remote_version_mutex_);
-      if (name == "Ctrl+Alt+Del" && props->remote_platform_ == HostPlatform::HarmonyOS) return;
+      if (props->remote_platform_ != HostPlatform::Windows) return;
     }
     RemoteAction action{};
     action.type = ControlType::service_command;
@@ -3796,9 +3796,7 @@ void GuiApplication::SyncStreamWindow() {
     }
   }
   (*ui_->stream)->set_remote_update_visible(remote_update_available);
-  // All desktop clients use the same menu for a Harmony host. Windows SAS is
-  // not an ordinary key chord and has no public Harmony implementation.
-  (*ui_->stream)->set_secure_attention_supported(remote_platform != HostPlatform::HarmonyOS);
+  (*ui_->stream)->set_secure_attention_supported(remote_platform == HostPlatform::Windows);
   if (remote_update_available) {
     SetStreamKeyboardFocus(false);
   }
