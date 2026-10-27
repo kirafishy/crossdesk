@@ -168,6 +168,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install Python build tools
+        shell: bash
+        run: |
+          # Xmake only accepts the host Python when all three modules exist;
+          # otherwise it falls back to compiling another Python from source.
+          python3 -m pip install --upgrade pip setuptools wheel
+
       - name: Install xmake
         uses: xmake-io/github-action-setup-xmake@v1
         with:
