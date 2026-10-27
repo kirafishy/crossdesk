@@ -98,7 +98,7 @@ struct TranslationRow {
   X(console_setting_files, u8"文件保存目录", "Received file directory", u8"Каталог получаемых файлов") \
   X(console_setting_autostart, u8"登录桌面时自启", "Start at desktop login", u8"Запуск при входе в систему") \
   X(console_setting_daemon, u8"守护进程（无头控制台中不生效）", "Daemon (inactive in headless console)", u8"Фоновый режим (не действует в консоли)") \
-  X(save_remote_previews, u8"保存远程画面预览:", "Save remote screen previews:", u8"Сохранять превью удалённого экрана:") \
+  X(save_remote_previews, u8"保存远程画面预览", "Save remote screen previews", u8"Сохранять превью удалённого экрана") \
   X(unknown_platform, u8"未知平台", "Unknown platform", u8"Неизвестная платформа") \
   X(privacy_screen, u8"隐私屏", "Privacy screen", u8"Приватный экран") \
   X(privacy_enable, u8"开启隐私屏", "Enable privacy screen", u8"Включить приватный экран") \
@@ -174,7 +174,7 @@ struct TranslationRow {
     u8"нормально; будет недоступно только управление этим компьютером на "     \
     u8"экране блокировки.")                                                    \
   X(install_windows_service, u8"安装", "Install", u8"Установить")              \
-  X(windows_service_settings_label, u8"锁屏控制服务:", "Lock-screen control service:", u8"Служба управления при блокировке:")                     \
+  X(windows_service_settings_label, u8"锁屏控制服务", "Lock-screen control service", u8"Служба управления при блокировке")                     \
   X(windows_service_installed, u8"已安装", "Installed", u8"Установлена")       \
   X(do_not_remind_again, u8"不再提醒", "Do not remind again",                  \
     u8"Больше не напоминать")                                                  \
@@ -205,9 +205,9 @@ struct TranslationRow {
     u8"По-прежнему нужен отдельный захват/ввод для защищенного рабочего "      \
     u8"стола")                                                                 \
   X(settings, u8"设置", "Settings", u8"Настройки")                             \
-  X(language, u8"语言:", "Language:", u8"Язык:")                               \
-  X(screen_capture_method, u8"采集方式:", "Capture Method:",                  \
-    u8"Способ захвата:")                                                      \
+  X(language, u8"语言", "Language", u8"Язык")                               \
+  X(screen_capture_method, u8"采集方式", "Capture Method",                  \
+    u8"Способ захвата")                                                      \
   X(screen_capture_method_auto, u8"自动", "Auto", u8"Авто")                 \
   X(video_settings, u8"画面设置", "Video settings", u8"Настройки видео") \
   X(remote_update_title, u8"建议升级被控端", "Remote update recommended", u8"Рекомендуем обновить удалённое устройство") \
@@ -216,11 +216,11 @@ struct TranslationRow {
   X(video_settings_pending, u8"正在应用…", "Applying…", u8"Применение…") \
   X(video_settings_failed, u8"调整失败，请重试。", "Could not apply settings. Try again.", u8"Не удалось применить настройки. Повторите попытку.") \
   X(video_settings_unavailable, u8"连接建立后可调整，需被控端支持。", "Available when connected to a supported remote device.", u8"Доступно при подключении к поддерживаемому устройству.") \
-  X(video_quality, u8"画面质量:", "Video Quality:", u8"Качество видео:")       \
-  X(video_frame_rate, u8"画面采集帧率:",                                       \
-    "Video Capture Frame Rate:", u8"Частота захвата видео:")                   \
-  X(video_adaptation_policy, u8"画面偏好:", "Video Preference:",              \
-    u8"Режим видео:")                                                           \
+  X(video_quality, u8"画面质量", "Video Quality", u8"Качество видео")       \
+  X(video_frame_rate, u8"画面采集帧率",                                       \
+    "Video Capture Frame Rate", u8"Частота захвата видео")                   \
+  X(video_adaptation_policy, u8"画面偏好", "Video Preference",              \
+    u8"Режим видео")                                                           \
   X(video_priority_frame_rate, u8"帧率优先", "Frame Rate",                   \
     u8"Частота кадров")                                                         \
   X(video_priority_quality, u8"画质优先", "Quality", u8"Качество")          \
@@ -228,15 +228,15 @@ struct TranslationRow {
   X(video_quality_high, u8"高", "High", u8"Высокое")                           \
   X(video_quality_medium, u8"中", "Medium", u8"Среднее")                       \
   X(video_quality_low, u8"低", "Low", u8"Низкое")                              \
-  X(video_encode_format, u8"视频编码格式:", "Video codec:", u8"Видеокодек:")                          \
+  X(video_encode_format, u8"视频编码格式", "Video codec", u8"Видеокодек")                          \
   X(av1, u8"AV1", "AV1", "AV1")                                                \
   X(h264, u8"H.264", "H.264", "H.264")                                         \
-  X(force_relay, u8"强制中继连接:", "Force relay connection:", u8"Только через ретранслятор:")   \
+  X(force_relay, u8"强制中继连接", "Force relay connection", u8"Только через ретранслятор")   \
   X(self_hosted_server_config, u8"自托管配置", "Self-hosted server", u8"Собственный сервер")                                              \
   X(self_hosted_server_settings, u8"自托管设置", "Self-hosted server settings", u8"Настройки своего сервера")                                                 \
-  X(self_hosted_server_address, u8"服务器地址:",                               \
-    "Server Address:", u8"Адрес сервера:")                                     \
-  X(self_hosted_server_port, u8"信令服务端口:", "Signaling port:", u8"Порт сигнализации:")                     \
+  X(self_hosted_server_address, u8"服务器地址",                               \
+    "Server Address", u8"Адрес сервера")                                     \
+  X(self_hosted_server_port, u8"信令服务端口", "Signaling port", u8"Порт сигнализации")                     \
   X(self_hosted_address_invalid, u8"请输入有效的主机名、IP 或 HTTPS/WSS 信令地址，可包含路径。", "Enter a valid host, IP, or HTTPS/WSS signaling URL. Paths are supported.", u8"Введите имя хоста, IP или HTTPS/WSS-адрес сигнального сервиса. Путь допустим.") \
   X(self_hosted_port_invalid, u8"请输入 1–65535 范围内的信令端口。", "Enter a signaling port between 1 and 65535.", u8"Введите порт сигнального сервиса от 1 до 65535.") \
   X(self_hosted_save_failed, u8"配置保存失败，请检查配置目录是否可写后重试。", "Could not save settings. Check that the configuration directory is writable and retry.", u8"Не удалось сохранить настройки. Проверьте доступ на запись в каталог конфигурации и повторите попытку.") \
@@ -315,11 +315,11 @@ struct TranslationRow {
   X(input_connection_alias, u8"请输入连接名称:",                               \
     "Please input connection name:", u8"Введите имя подключения:")             \
   X(confirm_delete_connection, u8"确认删除此连接", "Delete this connection?", u8"Удалить это подключение?")         \
-  X(enable_autostart, u8"开机自启:", "Auto Start:", u8"Автозапуск:")           \
-  X(enable_daemon, u8"启用守护进程:", "Enable Daemon:", u8"Включить демон:")   \
-  X(privacy_on_connect, u8"被连接时开启隐私屏:", "Privacy screen on incoming connection:", u8"Приватный экран при подключении:")                                       \
-  X(lock_on_disconnect, u8"连接断开后锁屏:", "Lock screen on disconnect:", \
-    u8"Блокировка при отключении:")                                         \
+  X(enable_autostart, u8"开机自启", "Auto Start", u8"Автозапуск")           \
+  X(enable_daemon, u8"启用守护进程", "Enable Daemon", u8"Включить демон")   \
+  X(privacy_on_connect, u8"被连接时开启隐私屏", "Privacy screen on incoming connection", u8"Приватный экран при подключении")                                       \
+  X(lock_on_disconnect, u8"连接断开后锁屏", "Lock screen on disconnect", \
+    u8"Блокировка при отключении")                                         \
   X(takes_effect_after_restart, u8"重启后生效", "Takes effect after restart",  \
     u8"Вступит в силу после перезапуска")                                      \
   X(select_file, u8"选择文件发送", "Select File to Send",                      \
@@ -348,8 +348,8 @@ struct TranslationRow {
   X(file_transfer, u8"文件传输:", "File Transfer:", u8"Передача файлов:")      \
   X(connection_status, u8"连接状态:",                                          \
     "Connection Status:", u8"Состояние соединения:")                           \
-  X(file_transfer_save_path, u8"文件接收保存路径:",                            \
-    "File Transfer Save Path:", u8"Путь сохранения файлов:")                   \
+  X(file_transfer_save_path, u8"文件接收保存路径",                            \
+    "File Transfer Save Path", u8"Путь сохранения файлов")                   \
   X(default_desktop, u8"桌面", "Desktop", u8"Рабочий стол")                    \
   X(resolution, u8"分辨率", "Res", u8"Разрешение")                             \
   X(video_latency, u8"视频延时", "Video latency", u8"Задержка видео") \
@@ -404,7 +404,7 @@ struct TranslationRow {
   X(wayland_notice_acknowledge, u8"我知道了", "Got it", u8"Понятно")            \
   X(show_main_window, u8"显示主界面", "Show Main Window",                    \
     u8"Показать главное окно")                                                \
-  X(privacy_local_unlock, u8"允许被控时解锁隐私屏:", "Allow privacy screen unlock while controlled:", u8"Разрешить разблокировку приватного экрана при удалённом управлении:") \
+  X(privacy_local_unlock, u8"允许被控时解锁隐私屏", "Allow privacy screen unlock while controlled", u8"Разрешить разблокировку приватного экрана при удалённом управлении") \
   X(privacy_screen_locked_hint, u8"隐私屏已开启，本机解锁已禁用", "Privacy screen is on. Local unlocking is disabled.", u8"Приватный экран включён. Локальная разблокировка отключена.") \
   X(privacy_unlocked_title, u8"隐私屏已被解锁", "Privacy screen unlocked", u8"Приватный экран разблокирован") \
   X(privacy_unlocked_message, u8"被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。", "The remote privacy screen was unlocked using the local shortcut. Lock it again to restore privacy and disable local shortcut unlocking.", u8"Приватный экран отключён локальным сочетанием клавиш. Заблокируйте его снова, чтобы восстановить защиту и запретить локальную разблокировку.") \
