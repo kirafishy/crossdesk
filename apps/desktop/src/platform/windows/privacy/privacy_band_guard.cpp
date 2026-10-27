@@ -305,7 +305,10 @@ bool PrivacyBandGuard::Windows(std::vector<PrivacyBandWindow>& windows,
 }
 
 void PrivacyBandGuard::SetLocalUnlockAllowed(bool allowed) {
-  if (!shared_ || InterlockedExchange(&shared_->allow_local_unlock, allowed) == allowed) return;
+  const LONG value = allowed ? 1 : 0;
+  if (!shared_ ||
+      InterlockedExchange(&shared_->allow_local_unlock, value) == value)
+    return;
   std::vector<PrivacyBandWindow> windows;
   std::string error;
   if (Windows(windows, error))

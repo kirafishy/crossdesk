@@ -66,6 +66,15 @@ fi
 # pass the iOS target exclusively through its command-line configuration.
 XMAKE_DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 XMAKE_TOOLCHAIN_BIN="${XMAKE_DEVELOPER_DIR}/Toolchains/XcodeDefault.xctoolchain/usr/bin"
+# Xcode also prepends Developer/usr/bin, whose Python 3.9 shadows the host
+# Python selected by setup-python or the caller. Keep Apple's compiler first,
+# but let host tools resolve from the original non-Xcode PATH entries.
+XMAKE_HOST_PATH="${XMAKE_TOOLCHAIN_BIN}"
+for host_bin in "${(@s/:/)PATH}"; do
+  if [[ "${host_bin}" != "${XMAKE_DEVELOPER_DIR}/"* ]]; then
+    XMAKE_HOST_PATH+=":${host_bin}"
+  fi
+done
 run_xmake() {
   # Match desktop repository selection: use Xmake defaults unless explicitly
   # overridden by the caller. Only compiled iOS packages use a separate cache.
@@ -78,7 +87,7 @@ run_xmake() {
   fi
   /usr/bin/env -i \
     HOME="${HOME}" \
-    PATH="${XMAKE_TOOLCHAIN_BIN}:${PATH}" \
+    PATH="${XMAKE_HOST_PATH}" \
     TMPDIR="${TMPDIR:-/tmp}" \
     USER="${USER:-}" \
     LOGNAME="${LOGNAME:-${USER:-}}" \
@@ -96,7 +105,7 @@ OUTPUT_DIR="${IOS_DIR}/Vendor/${SDK_NAME}/${CONFIG_NAME}"
 OUTPUT_LIBRARY="${OUTPUT_DIR}/libCrossDeskMiniRTC.a"
 mkdir -p "${OUTPUT_DIR}"
 run_xmake --version > "${OUTPUT_DIR}/xmake-version.txt"
-python3 -B "${SCRIPT_DIR}/verify_native_build.py" \
+PATH="${XMAKE_HOST_PATH}" python3 -B "${SCRIPT_DIR}/verify_native_build.py" \
   --xmake-version "${OUTPUT_DIR}/xmake-version.txt"
 MINIRTC_BUILD_DIR="${IOS_DIR}/.xmake/minirtc-build${CACHE_SUFFIX}"
 MINIRTC_LIBRARY="${MINIRTC_BUILD_DIR}/iphoneos/arm64/${MODE}/libminirtc.a"
@@ -114,6 +123,7 @@ fi
 # Still configure on every invocation: Xmake must see manifest edits and restore
 # the iOS configuration if MiniRTC was built standalone for another platform.
 CONFIG_SIGNATURE="$(print -r -- "${XMAKE_BIN}" "${XMAKE_DEVELOPER_DIR}" \
+  "${XMAKE_HOST_PATH}" \
   "${MODE}" "${ARCH_NAME}" "${SDK_NAME}" "${APPLE_DEVICE}" "16.0" "${XMAKE_PKG_INSTALLDIR}" "${MINIRTC_ENABLE_AOM}" "${XMAKE_GLOBALDIR:-}" "${XMAKE_MAIN_REPO:-}"
   run_xmake --version | sed -n '1p'
   DEVELOPER_DIR="${XMAKE_DEVELOPER_DIR}" xcodebuild -version
