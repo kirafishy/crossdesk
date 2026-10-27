@@ -180,7 +180,37 @@ jobs:
           python3 -B apps/ios/scripts/verify_native_build.py \
             --xmake-version "${RUNNER_TEMP}/xmake-version.txt"
 
+      # Xcode buffers Run Script output until the phase finishes. Build the
+      # native archives here so dependency downloads and compiler commands are
+      # streamed to Actions; the Xcode phase then reuses the same build products.
+      - name: Build iOS native dependencies
+        timeout-minutes: 60
+        shell: bash
+        env:
+          CONFIGURATION: Release
+          PLATFORM_NAME: iphoneos
+          CURRENT_ARCH: arm64
+          CROSSDESK_NATIVE_VERBOSE: "1"
+        run: |
+          set -o pipefail
+          (
+            trap 'kill "${SLEEP_PID:-}" 2>/dev/null || true; exit 0' TERM INT
+            while true; do
+              sleep 60 &
+              SLEEP_PID=$!
+              wait "${SLEEP_PID}" || exit 0
+              echo "iOS native build still running at $(date -u +%FT%TZ)"
+              ps -axo pid,ppid,state,etime,pcpu,comm | \
+                awk 'NR == 1 || /xmake|clang|cmake|ninja|meson|python|git|curl|make|zsh/'
+            done
+          ) &
+          MONITOR_PID=$!
+          trap 'kill "${MONITOR_PID}" 2>/dev/null || true; wait "${MONITOR_PID}" 2>/dev/null || true' EXIT
+          apps/ios/scripts/build_minirtc_ios.sh 2>&1 | \
+            tee "${RUNNER_TEMP}/ios-native-build.log"
+
       - name: Build CrossDesk Mobile
+        timeout-minutes: 30
         shell: bash
         run: |
           DERIVED_DATA="${RUNNER_TEMP}/CrossDeskMobileDerivedData"
@@ -196,7 +226,20 @@ jobs:
             COMPILER_INDEX_STORE_ENABLE=NO \
             MARKETING_VERSION="${IOS_VERSION_BASE}" \
             IPHONEOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}" \
-            build
+            build 2>&1 | tee "${RUNNER_TEMP}/ios-app-build.log"
+
+      - name: Upload iOS build diagnostics
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-build-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ios-native-build.log
+            ${{ runner.temp }}/ios-app-build.log
+            ~/.xmake/cache/packages/**/logs/*.txt
+            ~/.xmake/cache/packages/**/meson-logs/meson-log.txt
+          include-hidden-files: true
+          if-no-files-found: ignore
 
       - name: Verify CrossDesk Mobile
         shell: bash

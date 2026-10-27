@@ -9,6 +9,10 @@ MINIRTC_DIR="${REPO_DIR}/deps/submodules/minirtc"
 CONFIG_NAME="${CONFIGURATION:-Debug}"
 MODE="${CONFIG_NAME:l}"
 MINIRTC_ENABLE_AOM="${MINIRTC_ENABLE_AOM:-false}"
+XMAKE_LOG_FLAGS=()
+if [[ "${CROSSDESK_NATIVE_VERBOSE:-0}" == "1" ]]; then
+  XMAKE_LOG_FLAGS=(-vD)
+fi
 if [[ "${MINIRTC_ENABLE_AOM}" != "true" && "${MINIRTC_ENABLE_AOM}" != "false" ]]; then
   print -u2 "MINIRTC_ENABLE_AOM must be true or false."
   exit 64
@@ -139,7 +143,8 @@ configure_xmake() {
   if [[ ! -f "${stamp}" || "$(<"${stamp}")" != "${CONFIG_SIGNATURE}" ]]; then
     clean_flags=(-c)
   fi
-  run_xmake f -P "${project_dir}" "${clean_flags[@]}" -o "${build_dir}" \
+  print "Configuring iOS native project: ${project_dir}"
+  run_xmake f -P "${project_dir}" "${clean_flags[@]}" "${XMAKE_LOG_FLAGS[@]}" -o "${build_dir}" \
     -p iphoneos -a arm64 --appledev="${APPLE_DEVICE}" -m "${MODE}" --target_minver=16.0 \
     --policies=package.precompiled:n -y "$@"
   mkdir -p "${build_dir}"
@@ -154,7 +159,8 @@ configure_xmake() {
   configure_xmake "${MINIRTC_DIR}" "${MINIRTC_BUILD_DIR}" \
     --as="${XMAKE_TOOLCHAIN_BIN}/clang" --USE_CUDA=false \
     --MINIRTC_ENABLE_AOM="${MINIRTC_ENABLE_AOM}"
-  run_xmake b -P "${MINIRTC_DIR}" minirtc
+  print "Building MiniRTC for ${SDK_NAME} (${MODE})"
+  run_xmake b -P "${MINIRTC_DIR}" "${XMAKE_LOG_FLAGS[@]}" minirtc
 )
 
 if [[ ! -f "${MINIRTC_LIBRARY}" ]]; then
@@ -168,7 +174,8 @@ fi
 (
   cd "${WIRE_WORK_DIR}"
   configure_xmake "${WIRE_WORK_DIR}" "${WIRE_BUILD_DIR}"
-  run_xmake b -P "${WIRE_WORK_DIR}" crossdesk_wire
+  print "Building CrossDesk wire for ${SDK_NAME} (${MODE})"
+  run_xmake b -P "${WIRE_WORK_DIR}" "${XMAKE_LOG_FLAGS[@]}" crossdesk_wire
 )
 
 if [[ ! -f "${WIRE_LIBRARY}" ]]; then
