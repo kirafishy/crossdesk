@@ -71,6 +71,7 @@
 #elif (defined(__linux__) && !defined(__OHOS__))
 #include <GL/gl.h>
 #include <X11/Xatom.h>
+#include <X11/Xcursor/Xcursor.h>
 #include <X11/Xlib.h>
 #include <unistd.h>
 
@@ -99,6 +100,41 @@ namespace crossdesk {
 namespace {
 
 using namespace std::chrono_literals;
+
+bool SupportsControlHandCursor([[maybe_unused]] const slint::Window& window) {
+#if defined(_WIN32)
+  return LoadCursorW(nullptr, IDC_HAND) != nullptr;
+#elif defined(__linux__) && !defined(__OHOS__)
+  // Match winit's pointer aliases, without using any move/grab fallback.
+  constexpr const char* names[] = {"pointer", "hand2", "hand1", "hand",
+                                  "pointing_hand"};
+  if (window.wayland_surface()) {
+    const char* theme = std::getenv("XCURSOR_THEME");
+    for (const char* name : names) {
+      if (auto* images = XcursorLibraryLoadImages(name, theme, 24)) {
+        const bool available = images->nimage > 0;
+        XcursorImagesDestroy(images);
+        if (available) return true;
+      }
+    }
+    return false;
+  }
+  std::unique_ptr<Display, decltype(&XCloseDisplay)> display{
+      XOpenDisplay(nullptr), XCloseDisplay};
+  if (!display) return false;
+  for (const char* name : names) {
+    const Cursor cursor = XcursorLibraryLoadCursor(display.get(), name);
+    if (cursor != None) {
+      XFreeCursor(display.get(), cursor);
+      return true;
+    }
+  }
+  return false;
+#else
+  // AppKit supplies pointingHandCursor; other adapters resolve pointer.
+  return true;
+#endif
+}
 
 std::optional<std::string> GenerateRandomPassword(std::string_view current) {
   constexpr std::string_view alphabet =
@@ -3640,6 +3676,8 @@ void GuiApplication::SyncStreamWindow() {
   if (!has_sessions) need_to_create_stream_window_ = false;
   if (need_to_create_stream_window_ && !ui_->stream) {
     ui_->stream.emplace(ui::StreamWindow::create());
+    (*ui_->stream)->set_control_hand_cursor_supported(
+        SupportsControlHandCursor(ui_->main->window()));
 #if (defined(__linux__) && !defined(__OHOS__))
     (*ui_->stream)->set_custom_titlebar(use_xwayland_gui_);
 #endif

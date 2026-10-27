@@ -102,6 +102,7 @@ component ControlBarButton inherits Rectangle {
     in property <bool> show-logo: false;
     in property <bool> logo-pressed: false;
     in property <bool> logo-dragging: false;
+    in property <bool> hand-cursor-supported: true;
     in property <float> reveal-progress: 1;
     in property <string> badge: "";
     in property <string> tooltip: "";
@@ -227,7 +228,7 @@ component ControlBarButton inherits Rectangle {
     }
 
     touch := TouchArea {
-        mouse-cursor: !root.action-enabled ? default : root.show-logo ? (root.logo-pressed ? grabbing : grab) : pointer;
+        mouse-cursor: root.action-enabled && root.hand-cursor-supported ? pointer : default;
         scroll-event(event) => { accept }
         pointer-event(event) => {
             root.pointer-input(event.button, event.kind, self.mouse-x, self.mouse-y);
@@ -285,6 +286,7 @@ export component StreamWindow inherits Window {
     default-font-size: ImGuiFontStyle.base;
 
     in property <bool> custom-titlebar: false;
+    in property <bool> control-hand-cursor-supported: true;
     in property <bool> native-video-enabled: false;
     // Export the actual input surface in logical pixels. Native rendering and
     // input mapping must follow the same layout, including title and tab bars.
@@ -1073,7 +1075,8 @@ export component StreamWindow inherits Window {
             // The logo also retains a stable owner if another button is used.
             if root.remote-pointer-active || root.control-drag-pending: TouchArea {
                 z: 15;
-                mouse-cursor: root.control-drag-pending ? MouseCursor.grabbing
+                mouse-cursor: root.control-drag-pending
+                    ? (root.control-hand-cursor-supported ? MouseCursor.pointer : MouseCursor.default)
                     : root.remote-cursor-active ? RemoteCursor.shape(root.remote-cursor-shape)
                     : MouseCursor.default;
                 pointer-event(event) => {
@@ -1249,6 +1252,7 @@ export component StreamWindow inherits Window {
                     width: root.control-toolbar-height;
                     height: root.control-toolbar-height;
                     show-logo: true;
+                    hand-cursor-supported: root.control-hand-cursor-supported;
                     logo-pressed: root.control-drag-pending;
                     logo-dragging: self.logo-pressed && root.control-dragging;
                     tooltip: root.control-expanded ? StreamStrings.collapse-control : StreamStrings.expand-control;
