@@ -773,6 +773,8 @@ export component MainWindow inherits Window {
     private property <CopyFeedback> copy-feedback: idle;
     private property <bool> compact-language: GalleryStrings.language == 0 || GalleryStrings.language == 3 || GalleryStrings.language == 4 || GalleryStrings.language == 5;
     private property <bool> recent-tooltip-visible: false;
+    private property <int> recent-tooltip-index: -1;
+    private property <length> recent-tooltip-card-x: 0px;
     private property <string> recent-tooltip-name: "";
     private property <string> recent-tooltip-host: "";
     private property <string> recent-tooltip-id: "";
@@ -1527,9 +1529,24 @@ export component MainWindow inherits Window {
         }
 
         // Recent connections: previews, presence badges, and separate primary/overflow actions.
-        recent-panel := Rectangle {
+        recent-panel := TouchArea {
             y: 260px;
             height: parent.height - self.y;
+            // This observer survives model resets that destroy hovered cards
+            // before their has-hover changed handler can dismiss the details.
+            private property <bool> preview-hovered: root.window-active && self.has-hover
+                && root.recent-tooltip-index >= 0
+                && root.recent-tooltip-index < root.recent-connections.length
+                && root.recent-connections[root.recent-tooltip-index].remote-id == root.recent-tooltip-id
+                && self.mouse-x >= max(recent-list.x + recent-scroll.x,
+                    recent-list.x + recent-scroll.x + recent-scroll.viewport-x + root.recent-tooltip-card-x)
+                && self.mouse-x < min(recent-list.x + recent-scroll.x + recent-scroll.width,
+                    recent-list.x + recent-scroll.x + recent-scroll.viewport-x + root.recent-tooltip-card-x + root.recent-preview-width)
+                && self.mouse-y >= recent-list.y + recent-scroll.y
+                && self.mouse-y < recent-list.y + recent-scroll.y + root.recent-preview-height;
+            changed preview-hovered => {
+                if !self.preview-hovered { root.recent-tooltip-visible = false; }
+            }
 
             Text { x: 20px; y: 0px; width: recent-group-filter.x - self.x - 12px; height: 32px; text: UiStrings.recent-connections; font-size: 15px; font-weight: 600; color: WorkbenchStyle.text; vertical-alignment: center; }
             recent-group-filter := GroupFilter {
@@ -1725,7 +1742,7 @@ export component MainWindow inherits Window {
                                 }
                                 clicked => { root.copy-feedback = CopyFeedback.idle; root.recent-connect(connection.remote-id); }
                                 function show-details() {
-                                    if !self.has-hover { return; }
+                                    if !root.window-active || !self.has-hover { return; }
                                     // Leave the menu trigger and its popup free of device details.
                                     if card-menu.menu-open || (self.mouse-x >= card-menu.x - 4px
                                         && self.mouse-y <= card-menu.y + card-menu.height + 4px) {
@@ -1733,6 +1750,8 @@ export component MainWindow inherits Window {
                                         return;
                                     }
                                     root.recent-tooltip-name = connection.display-name;
+                                    root.recent-tooltip-index = index;
+                                    root.recent-tooltip-card-x = connection-card.x;
                                     root.recent-tooltip-host = connection.host-name;
                                     root.recent-tooltip-id = connection.remote-id;
                                     root.recent-tooltip-groups = self.group-names;
@@ -1923,7 +1942,7 @@ export component MainWindow inherits Window {
 
     // Shared device details sit outside the clipped recent list and wall rail,
     // below the modal layer (z >= 39).
-    if (root.gallery-mode ? gallery.hovered-device.id != "" : root.recent-tooltip-visible)
+    if (root.gallery-mode ? gallery.hovered-device.id != "" : root.recent-tooltip-visible && recent-panel.preview-hovered)
         && !root.connection-dialog-open && !root.lan-open: device-tip := FlatSurface {
         private property <string> device-name: root.gallery-mode ? gallery.hovered-device.name : root.recent-tooltip-name;
         private property <string> host-name: root.gallery-mode ? gallery.hovered-device.host-name : root.recent-tooltip-host;

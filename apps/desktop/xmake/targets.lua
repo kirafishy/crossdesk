@@ -253,7 +253,7 @@ function setup_targets()
         end
         add_packages("slint")
         add_deps("crossdesk_ui")
-        add_includedirs("apps/desktop/src/gui")
+        add_includedirs("apps/desktop/src/gui", "apps/desktop/src/gui/assets/localization")
         add_files("apps/desktop/tests/slint_popup_render_test.cpp")
         add_rules("crossdesk.slint_runtime")
 

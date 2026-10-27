@@ -1,6 +1,7 @@
 #include "crossdesk_ui.h"
 #include "slint_render_test_platform.h"
 #include "ui/model_update.h"
+#include "ui/ui_localization.h"
 
 #include <iostream>
 #include <fstream>
@@ -15,11 +16,23 @@ bool Check(bool value, const char* message) {
   return value;
 }
 
+auto CreateMainWindow() {
+  auto main = crossdesk::ui::MainWindow::create();
+  // Text and language options now come from the application. Load them before
+  // measuring or clicking layouts whose geometry depends on their labels.
+  crossdesk::ui_localization::ApplyMainWindowStrings(main, 0);
+  main->set_language_index(0);
+  return main;
+}
+
 bool VerifyStreamPopups(RenderTestPlatform& platform) {
   auto stream = crossdesk::ui::StreamWindow::create();
   auto& screen = *platform.adapter;
   stream->window().set_size(slint::LogicalSize({1280, 720}));
   stream->set_video_settings_enabled(true);
+  // Exercise the Windows toolbar, including shortcuts and privacy controls.
+  stream->set_secure_attention_supported(true);
+  stream->set_privacy_visible(true);
   stream->show();
   const int top = int(stream->get_video_area_top());
   auto displays = std::make_shared<slint::VectorModel<slint::SharedString>>();
@@ -63,28 +76,32 @@ bool VerifyStreamPopups(RenderTestPlatform& platform) {
     if (close_synchronously) stream->set_file_transfer_visible(false);
   });
   screen.Settle();
+  // New sessions start with only the logo. Reveal the toolbar through its
+  // normal gesture before testing the buttons to the right of the logo.
+  screen.Click(19, top + 19);
+  constexpr int display_x = 43, shortcut_x = 75, file_x = 203, video_x = 235;
   for (int repeat = 0; repeat < 2; ++repeat) {
-    screen.Click(21, top + 19);
-    if (!Check(screen.Light(12, top + 128), "Display menu must fully open without pointer movement")) return false;
-    screen.Click(60, top + 86, 4);
-    if (!Check(selected_display == 1 && screen.Black(12, top + 128),
+    screen.Click(display_x + 14, top + 19);
+    if (!Check(screen.Light(display_x + 5, top + 128), "Display menu must fully open without pointer movement")) return false;
+    screen.Click(display_x + 53, top + 94, 4);
+    if (!Check(selected_display == 1 && screen.Black(display_x + 5, top + 128),
                "Display selection must survive live refresh and close the menu")) return false;
-    screen.Click(53, top + 19);
-    if (!Check(screen.Light(44, top + 102), "Shortcut menu must open without pointer movement")) return false;
-    screen.Click(70, top + 88, 4);
-    if (!Check(shortcut == "Win+L" && screen.Black(44, top + 102),
+    screen.Click(shortcut_x + 14, top + 19);
+    if (!Check(screen.Light(shortcut_x + 5, top + 102), "Shortcut menu must open without pointer movement")) return false;
+    screen.Click(shortcut_x + 31, top + 94, 4);
+    if (!Check(shortcut == "Win+L" && screen.Black(shortcut_x + 5, top + 102),
                "Shortcut selection must close the menu immediately")) return false;
-    screen.Click(213, top + 19);
-    if (!Check(stream->get_video_menu_open() && screen.Light(203, top + 210),
+    screen.Click(video_x + 14, top + 19);
+    if (!Check(stream->get_video_menu_open() && screen.Light(video_x + 4, top + 210),
                "Video settings menu must fully open without pointer movement")) return false;
-    screen.Click(240, top + 80, 4);
+    screen.Click(video_x + 41, top + 80, 4);
     screen.Click(900, top + 300);
     if (!Check(!stream->get_video_menu_open() && video_changes == repeat + 1,
                "Video selection and outside dismissal must respond immediately")) return false;
   }
   if (!Check(remote_presses == 0 && remote_releases == 0 && remote_scrolls == 0,
              "Menu gestures must not be forwarded to the peer")) return false;
-  screen.Click(181, top + 19);
+  screen.Click(file_x + 14, top + 19);
   const int panel_y = top + int(stream->get_video_area_height()) - 210;
   if (!Check(file_visible && screen.Light(20, panel_y + 25),
              "File progress must appear without pointer movement")) return false;
@@ -110,7 +127,7 @@ bool VerifyStreamPopups(RenderTestPlatform& platform) {
   if (!Check(remote_presses == 0 && remote_releases == 0,
              "Closing file progress must not send an orphan pointer release")) return false;
   close_synchronously = true;
-  screen.Click(181, top + 19);
+  screen.Click(file_x + 14, top + 19);
   screen.Click(430, panel_y + 16, 4);
   if (!Check(!file_visible && screen.Black(20, panel_y + 25) && remote_releases == 0,
              "Synchronous file panel dismissal must consume its closing release")) return false;
@@ -120,7 +137,7 @@ bool VerifyStreamPopups(RenderTestPlatform& platform) {
 }
 
 bool VerifyWorkbenchPopups(RenderTestPlatform& platform) {
-  auto main = crossdesk::ui::MainWindow::create();
+  auto main = CreateMainWindow();
   auto& screen = *platform.adapter;
   const float width = main->get_minimum_window_width();
   const float height = main->get_minimum_window_height();
@@ -190,7 +207,7 @@ bool VerifyWorkbenchPopups(RenderTestPlatform& platform) {
 }
 
 bool VerifyAutostartSettings(RenderTestPlatform& platform) {
-  auto main = crossdesk::ui::MainWindow::create();
+  auto main = CreateMainWindow();
   auto& screen = *platform.adapter;
   using Status = crossdesk::ui::AutostartStatus;
   const float width = main->get_minimum_window_width();
@@ -271,7 +288,7 @@ bool VerifyAutostartSettings(RenderTestPlatform& platform) {
 }
 
 bool VerifyGalleryPopups(RenderTestPlatform& platform) {
-  auto wall = crossdesk::ui::MainWindow::create();
+  auto wall = CreateMainWindow();
   auto& screen = *platform.adapter;
   wall->set_gallery_mode(true);
   wall->window().set_size(slint::LogicalSize({900, 600}));
@@ -296,7 +313,8 @@ bool VerifyGalleryPopups(RenderTestPlatform& platform) {
     screen.Click(160, 578);
     if (!Check(wall->get_gallery_network_open() && screen.Region(75, 100, 740, 400) != baseline,
                "DeskHub network dialog must paint immediately during live refresh")) return false;
-    if (repeat == 0) screen.Click(780, 102, 4);
+    // Eight rows fill the available height, placing the dialog 16 px from the top.
+    if (repeat == 0) screen.Click(780, 46, 4);
     else screen.Key(slint::platform::key_codes::Escape);
     if (!Check(!wall->get_gallery_network_open() && screen.Region(75, 100, 740, 400) == baseline,
                "DeskHub network dialog must close completely without pointer movement")) return false;
@@ -308,7 +326,7 @@ bool VerifyGalleryPopups(RenderTestPlatform& platform) {
              "DeskHub add menu must appear without pointer movement")) return false;
   screen.Click(600, 55, 4);
   if (!Check(wall->get_gallery_adding(), "Add menu must open the device dialog")) return false;
-  screen.Click(458, 421, 4);
+  screen.Click(422, 421, 4);
   return Check(!wall->get_gallery_adding(), "Add dialog Cancel must respond immediately");
 }
 
