@@ -46,7 +46,7 @@ final class BackgroundSession implements NativeSession.Listener {
         if (listener != null) listener.ended(reason);
     }
     @Override public void ended(String reason) { finish(reason); }
-    @Override public void passwordRejected() { finish("远端访问密码已失效，请重新连接"); }
+    @Override public void passwordRejected() { finish(L10n.tr("远端访问密码已失效，请重新连接")); }
     @Override public void connected() { /* Already connected before the service takes ownership. */ }
     @Override public void status(String message) { if (view != null) view.status(message); }
     @Override public void signaling(int state, String id) {
@@ -75,8 +75,8 @@ final class BackgroundSession implements NativeSession.Listener {
     @Override public void statistics(RemoteNetworkStatistics.Snapshot value) { if (view != null) view.statistics(value); }
     @Override public void fileTransfer(String name, double progress, boolean sending, File received) {
         if (received != null) receivedFile = received;
-        fileStatus = progress < 0 ? name + " 传输失败" : (sending ? "发送 " : "接收 ") + name
-                + (progress >= 1 ? " · 已完成" : " · " + (int)(progress * 100) + "%");
+        fileStatus = progress < 0 ? L10n.format("{0} 传输失败", name) : (sending ? L10n.tr("发送 ") : L10n.tr("接收 ")) + name
+                + (progress >= 1 ? L10n.tr(" · 已完成") : " · " + (int)(progress * 100) + "%");
         if (view != null) view.fileTransfer(name, progress, sending, received);
     }
     @Override public void controlFeedback(String text) { if (view != null) view.controlFeedback(text); }

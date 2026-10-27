@@ -321,13 +321,13 @@ final class RemoteKeyboardInputBar: UIView {
         heightConstraint.isActive = true
 
         let computerButton = UIButton(type: .system)
-        computerButton.setTitle("电脑键盘", for: .normal)
+        computerButton.setTitle(NSLocalizedString("电脑键盘", comment: ""), for: .normal)
         computerButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
-        computerButton.accessibilityLabel = "切换到电脑键盘"
+        computerButton.accessibilityLabel = NSLocalizedString("切换到电脑键盘", comment: "")
         computerButton.addTarget(self, action: #selector(switchToComputer), for: .touchUpInside)
 
         let dismissButton = RemoteKeyboardDismissButton.makeButton()
-        dismissButton.accessibilityLabel = "收起系统键盘"
+        dismissButton.accessibilityLabel = NSLocalizedString("收起系统键盘", comment: "")
         dismissButton.addTarget(self, action: #selector(hideKeyboard), for: .touchUpInside)
 
         row.axis = .horizontal

@@ -52,6 +52,7 @@ final class MobileUi {
     }
     TextView primary(String title,Runnable click) {
         TextView v=action(title,Color.WHITE,click);
+        v.setMaxLines(2);v.setAutoSizeTextTypeUniformWithConfiguration(11,16,1,android.util.TypedValue.COMPLEX_UNIT_SP);
         GradientDrawable gradient=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{BLUE,0xFF1F61C7});gradient.setCornerRadius(dp(12));v.setBackground(gradient);return v;
     }
     View iconButton(String icon,String label,Runnable click) {

@@ -26,18 +26,18 @@ final class AboutPages {
         LicenseCatalog loaded;try{loaded=new LicenseCatalog(activity);}catch(Exception error){loaded=null;}catalog=loaded;
     }
     void show(){
-        LinearLayout content=activity.formPage("about","关于 CrossDesk",settings);
-        LinearLayout version=activity.section(content,"");value(version,"版本",applicationVersion());
+        LinearLayout content=activity.formPage("about",L10n.tr("关于 CrossDesk"),settings);
+        LinearLayout version=activity.section(content,"");value(version,L10n.tr("版本"),applicationVersion());
         updateRow=ui.row();updateRow.setPadding(ui.dp(16),0,ui.dp(16),0);updateRow.addView(activity.updateDot(),ui.size(8,8));
         updateLink=ui.action("",BLUE,()->open("https://crossdesk.cn"));updateLink.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);updateLink.setPadding(ui.dp(8),ui.dp(12),0,ui.dp(12));updateRow.addView(updateLink,new LinearLayout.LayoutParams(0,-2,1));version.addView(updateRow);
         updateStatus=ui.text("",13,false);updateStatus.setPadding(ui.dp(16),ui.dp(8),ui.dp(16),ui.dp(8));version.addView(updateStatus);
-        checkButton=ui.action("检查更新",BLUE,activity::checkAppUpdates);version.addView(checkButton);renderUpdates();ui.gap(content,28);
+        checkButton=ui.action(L10n.tr("检查更新"),BLUE,activity::checkAppUpdates);version.addView(checkButton);renderUpdates();ui.gap(content,28);
         if(catalog==null){unavailable(content);return;}
         LinearLayout links=activity.section(content,"");
-        activity.link(links,"软件许可","",()->component(catalog.find("crossdesk"),this::show));ui.divider(links);
-        activity.link(links,"开源组件","",this::components);ui.divider(links);
-        activity.link(links,"源码与构建说明","",this::source);
-        activity.footer(content,"许可与版权声明可离线查阅。");
+        activity.link(links,L10n.tr("软件许可"),"",()->component(catalog.find("crossdesk"),this::show));ui.divider(links);
+        activity.link(links,L10n.tr("开源组件"),"",this::components);ui.divider(links);
+        activity.link(links,L10n.tr("源码与构建说明"),"",this::source);
+        activity.footer(content,L10n.tr("许可与版权声明可离线查阅。"));
     }
     private String applicationVersion(){
         return activity.applicationVersion();
@@ -45,11 +45,11 @@ final class AboutPages {
     void renderUpdates(){
         if(updateStatus==null)return;
         updateRow.setVisibility(updates.updateAvailable()?View.VISIBLE:View.GONE);
-        updateLink.setText("新版本可用：v"+updates.availableVersion);
-        String status=!activity.hasNetworkConsent()?"完成隐私授权后可检查更新":switch(updates.status){
-            case CHECKING -> "正在检查更新…";
-            case UP_TO_DATE -> "当前已是最新版本";
-            case FAILED -> "检查失败，请稍后重试";
+        updateLink.setText(L10n.format("新版本可用：v{0}",updates.availableVersion));
+        String status=!activity.hasNetworkConsent()?L10n.tr("完成隐私授权后可检查更新"):switch(updates.status){
+            case CHECKING -> L10n.tr("正在检查更新…");
+            case UP_TO_DATE -> L10n.tr("当前已是最新版本");
+            case FAILED -> L10n.tr("检查失败，请稍后重试");
             default -> "";
         };
         updateStatus.setText(status);updateStatus.setVisibility(status.isEmpty()?View.GONE:View.VISIBLE);
@@ -58,11 +58,11 @@ final class AboutPages {
         checkButton.setAlpha(checkButton.isEnabled()?1f:.5f);
     }
     private void components(){
-        LinearLayout content=activity.formPage("open-source","开源组件",this::show);
-        LinearLayout notice=activity.section(content,"OpenFEC 告知");
-        paragraph(notice,"本应用使用 OpenFEC 提供前向纠错功能，遵循 CeCILL-C 1.0 许可。该许可规定了有限保证及责任限制，详情见许可全文。",SECONDARY);
+        LinearLayout content=activity.formPage("open-source",L10n.tr("开源组件"),this::show);
+        LinearLayout notice=activity.section(content,L10n.tr("OpenFEC 告知"));
+        paragraph(notice,L10n.tr("本应用使用 OpenFEC 提供前向纠错功能，遵循 CeCILL-C 1.0 许可。该许可规定了有限保证及责任限制，详情见许可全文。"),SECONDARY);
         ui.divider(notice);paragraph(notice,"(c) Copyright 2009 - 2012 INRIA - All rights reserved",INK);ui.divider(notice);
-        activity.link(notice,"OpenFEC 许可与源码","",()->component(catalog.find("openfec"),this::components));ui.gap(content,28);
+        activity.link(notice,L10n.tr("OpenFEC 许可与源码"),"",()->component(catalog.find("openfec"),this::components));ui.gap(content,28);
         LinearLayout list=activity.section(content,"");boolean first=true;
         for(LicenseCatalog.Component item:catalog.components){
             if(item.id.equals("crossdesk")||item.id.equals("openfec"))continue;
@@ -73,41 +73,41 @@ final class AboutPages {
             row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));TextView chevron=ui.text(" ›",23,false);chevron.setTextColor(0xFFB7B7BD);row.addView(chevron);
             row.setContentDescription(item.name+"，"+item.license);row.setClickable(true);row.setFocusable(true);row.setOnClickListener(v->component(item,this::components));list.addView(row);
         }
-        activity.footer(content,"各组件遵循所列开源许可证，其授予的权利不受本应用普通使用条款限制。查看源码需要网络连接。");
+        activity.footer(content,L10n.tr("各组件遵循所列开源许可证，其授予的权利不受本应用普通使用条款限制。查看源码需要网络连接。"));
     }
     private void component(LicenseCatalog.Component item,Runnable back){
         LinearLayout content=activity.formPage("license:"+item.id,item.name,back);LinearLayout info=activity.section(content,"");
         String version=item.id.equals("crossdesk")?applicationVersion():item.version.length()==40?item.version.substring(0,12):item.version;
-        value(info,"版本",version);ui.divider(info);value(info,"许可",item.license);ui.divider(info);
-        external(info,"查看源码",item.sourceURL);
+        value(info,L10n.tr("版本"),version);ui.divider(info);value(info,L10n.tr("许可"),item.license);ui.divider(info);
+        external(info,L10n.tr("查看源码"),item.sourceURL);
         if(!item.buildDocuments.isEmpty()||!item.buildSourceURL.isEmpty()){
             ui.divider(info);
-            if(!item.buildDocuments.isEmpty())activity.link(info,"构建配方与项目补丁","",()->buildSources(item,back));
-            else external(info,"构建配方与项目补丁",item.buildSourceURL);
+            if(!item.buildDocuments.isEmpty())activity.link(info,L10n.tr("构建配方与项目补丁"),"",()->buildSources(item,back));
+            else external(info,L10n.tr("构建配方与项目补丁"),item.buildSourceURL);
         }
-        ui.gap(content,16);LinearLayout docs=activity.section(content,"许可与版权声明");
+        ui.gap(content,16);LinearLayout docs=activity.section(content,L10n.tr("许可与版权声明"));
         for(int i=0;i<item.documents.size();i++){
             if(i>0)ui.divider(docs);LicenseCatalog.Document document=item.documents.get(i);
             activity.link(docs,item.documentTitle(document),"",()->document(item.documentTitle(document),document,()->component(item,back)));
         }
     }
     private void source(){
-        LinearLayout content=activity.formPage("source","源码与构建说明",this::show);
-        LinearLayout info=activity.section(content,"本版本源码与构建说明");
-        if(catalog.source==null){paragraph(info,"本版本源码信息暂不可用。",SECONDARY);ui.divider(info);external(info,"项目主页","https://github.com/kunkundi/crossdesk");return;}
+        LinearLayout content=activity.formPage("source",L10n.tr("源码与构建说明"),this::show);
+        LinearLayout info=activity.section(content,L10n.tr("本版本源码与构建说明"));
+        if(catalog.source==null){paragraph(info,L10n.tr("本版本源码信息暂不可用。"),SECONDARY);ui.divider(info);external(info,L10n.tr("项目主页"),"https://github.com/kunkundi/crossdesk");return;}
         String revision=catalog.source.optString("revision","");String tag=catalog.source.isNull("tag")?"":catalog.source.optString("tag","");
-        value(info,"源码版本",tag.isEmpty()?revision.substring(0,Math.min(12,revision.length())):tag);ui.divider(info);
-        if(catalog.source.optBoolean("isModified")){paragraph(info,"开发版本包含尚未发布的修改，以下链接为基础版本源码。",SECONDARY);ui.divider(info);}
-        external(info,"查看源码",catalog.source.optString("sourceURL",catalog.find("crossdesk").sourceURL));ui.divider(info);
+        value(info,L10n.tr("源码版本"),tag.isEmpty()?revision.substring(0,Math.min(12,revision.length())):tag);ui.divider(info);
+        if(catalog.source.optBoolean("isModified")){paragraph(info,L10n.tr("开发版本包含尚未发布的修改，以下链接为基础版本源码。"),SECONDARY);ui.divider(info);}
+        external(info,L10n.tr("查看源码"),catalog.source.optString("sourceURL",catalog.find("crossdesk").sourceURL));ui.divider(info);
         try{
             List<LicenseCatalog.Document> documents=LicenseCatalog.documents(catalog.source.optJSONArray("buildDocuments"));
-            if(!documents.isEmpty())actionLink(info,"构建说明",()->document("构建说明",documents.get(0),this::source));
-            else external(info,"构建说明",catalog.source.optString("buildInstructionsURL","https://github.com/kunkundi/crossdesk"));
-        }catch(org.json.JSONException error){paragraph(info,"本版本源码信息暂不可用。",SECONDARY);}
+            if(!documents.isEmpty())actionLink(info,L10n.tr("构建说明"),()->document(L10n.tr("构建说明"),documents.get(0),this::source));
+            else external(info,L10n.tr("构建说明"),catalog.source.optString("buildInstructionsURL","https://github.com/kunkundi/crossdesk"));
+        }catch(org.json.JSONException error){paragraph(info,L10n.tr("本版本源码信息暂不可用。"),SECONDARY);}
     }
     private void buildSources(LicenseCatalog.Component item,Runnable back){
-        LinearLayout content=activity.formPage("build:"+item.id,"构建配方与项目补丁",()->component(item,back));
-        if(!item.buildSourceURL.isEmpty()){LinearLayout upstream=activity.section(content,"");external(upstream,"查看源码",item.buildSourceURL);ui.gap(content,28);}
+        LinearLayout content=activity.formPage("build:"+item.id,L10n.tr("构建配方与项目补丁"),()->component(item,back));
+        if(!item.buildSourceURL.isEmpty()){LinearLayout upstream=activity.section(content,"");external(upstream,L10n.tr("查看源码"),item.buildSourceURL);ui.gap(content,28);}
         LinearLayout docs=activity.section(content,"");
         for(int i=0;i<item.buildDocuments.size();i++){
             if(i>0)ui.divider(docs);LicenseCatalog.Document document=item.buildDocuments.get(i);
@@ -129,10 +129,10 @@ final class AboutPages {
     private void actionLink(LinearLayout parent,String title,Runnable action){TextView link=ui.action(title,BLUE,action);link.setTypeface(android.graphics.Typeface.DEFAULT);link.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);link.setPadding(ui.dp(16),ui.dp(12),ui.dp(16),ui.dp(12));parent.addView(link);}
     private void open(String url){
         Uri uri=Uri.parse(url);if(!"https".equals(uri.getScheme())&&!"http".equals(uri.getScheme()))return;
-        try{activity.startActivity(new Intent(Intent.ACTION_VIEW,uri).addCategory(Intent.CATEGORY_BROWSABLE));}catch(ActivityNotFoundException error){Toast.makeText(activity,"未找到可打开链接的浏览器",Toast.LENGTH_SHORT).show();}
+        try{activity.startActivity(new Intent(Intent.ACTION_VIEW,uri).addCategory(Intent.CATEGORY_BROWSABLE));}catch(ActivityNotFoundException error){Toast.makeText(activity,L10n.tr("未找到可打开链接的浏览器"),Toast.LENGTH_SHORT).show();}
     }
     private void unavailable(LinearLayout content){
         content.setGravity(Gravity.CENTER);ui.gap(content,32);TextView icon=ui.text("▤",36,false);icon.setTextColor(SECONDARY);content.addView(icon);ui.gap(content,12);
-        content.addView(ui.text("无法读取开源许可",17,true));TextView message=ui.text("应用中的许可文件缺失或损坏，请重新安装应用。",14,false);message.setGravity(Gravity.CENTER);message.setTextColor(SECONDARY);content.addView(message);
+        content.addView(ui.text(L10n.tr("无法读取开源许可"),17,true));TextView message=ui.text(L10n.tr("应用中的许可文件缺失或损坏，请重新安装应用。"),14,false);message.setGravity(Gravity.CENTER);message.setTextColor(SECONDARY);content.addView(message);
     }
 }

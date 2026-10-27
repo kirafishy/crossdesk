@@ -189,11 +189,11 @@ struct RemoteSessionView: View {
                     .zIndex(50)
             }
         }
-        .alert("升级提示", isPresented: Binding(
+        .alert(NSLocalizedString("升级提示", comment: ""), isPresented: Binding(
             get: { !session.privacyScreen.unlockNotice && session.remoteUpdateMessage != nil },
             set: { if !$0 && !session.privacyScreen.unlockNotice { session.dismissRemoteUpdate() } }
         )) {
-            Button("知道了", role: .cancel) { session.dismissRemoteUpdate() }
+            Button(NSLocalizedString("知道了", comment: ""), role: .cancel) { session.dismissRemoteUpdate() }
         } message: {
             Text(session.remoteUpdateMessage ?? "")
         }
@@ -282,18 +282,18 @@ struct RemoteSessionView: View {
             Color.black.opacity(0.28).ignoresSafeArea().contentShape(Rectangle()).onTapGesture { }
             VStack(spacing: 0) {
                 VStack(spacing: 12) {
-                    Text("隐私屏已被解锁").font(.headline)
-                    Text("被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。")
+                    Text(NSLocalizedString("隐私屏已被解锁", comment: "")).font(.headline)
+                    Text(NSLocalizedString("被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。", comment: ""))
                         .font(.subheadline).foregroundStyle(.secondary)
                     let feedback = session.privacyScreen.feedback(at: session.privacyClock)
                     if !feedback.isEmpty { Text(feedback).font(.caption).foregroundStyle(.secondary) }
                 }.padding(24)
                 Divider()
                 HStack(spacing: 0) {
-                    Button("确认") { session.privacyScreen.unlockNotice = false }
+                    Button(NSLocalizedString("确认", comment: "")) { session.privacyScreen.unlockNotice = false }
                         .frame(maxWidth: .infinity, minHeight: 48)
                     Divider().frame(height: 48)
-                    Button("锁定") { session.lockPrivacyScreen() }
+                    Button(NSLocalizedString("锁定", comment: "")) { session.lockPrivacyScreen() }
                         .fontWeight(.semibold).frame(maxWidth: .infinity, minHeight: 48)
                         .disabled(!session.privacyScreen.canLock(at: session.privacyClock))
                 }
@@ -320,11 +320,11 @@ struct RemoteSessionView: View {
 
                 VStack(spacing: 0) {
                     VStack(spacing: 4) {
-                        Text("断开远程连接？")
+                        Text(NSLocalizedString("断开远程连接？", comment: ""))
                             .font(.headline)
                             .foregroundStyle(Color.black.opacity(0.9))
 
-                        Text("断开后将返回首页")
+                        Text(NSLocalizedString("断开后将返回首页", comment: ""))
                             .font(.subheadline)
                             .foregroundStyle(Color.black.opacity(0.55))
                     }
@@ -337,7 +337,7 @@ struct RemoteSessionView: View {
                         disconnectConfirmationVisible = false
                         session.disconnect()
                     } label: {
-                        Text("断开连接")
+                        Text(NSLocalizedString("断开连接", comment: ""))
                             .font(.body.weight(.semibold))
                             .foregroundStyle(Color.red)
                             .frame(maxWidth: .infinity)
@@ -351,7 +351,7 @@ struct RemoteSessionView: View {
                             disconnectConfirmationVisible = false
                         }
                     } label: {
-                        Text("取消")
+                        Text(NSLocalizedString("取消", comment: ""))
                             .font(.body.weight(.semibold))
                             .foregroundStyle(Color.blue)
                             .frame(maxWidth: .infinity)
@@ -765,8 +765,8 @@ private struct RemoteComputerKey {
         if let title { return title.replacingOccurrences(of: "\n", with: " ") }
         switch symbol {
         case "shift": return "Shift"
-        case "delete.left": return "退格"
-        default: return "键盘操作"
+        case "delete.left": return NSLocalizedString("退格", comment: "")
+        default: return NSLocalizedString("键盘操作", comment: "")
         }
     }
 
@@ -842,27 +842,27 @@ private struct RemoteComputerKeyboard: View {
         .init("Ctrl", 0x11, isModifier: true),
         .init("Win", 0x5B, isModifier: true),
         .init("Alt", 0x12, isModifier: true),
-        .init("空格", 0x20, width: 2.6),
-        .init("回车", 0x0D, width: 1.4, style: .special)
+        .init(NSLocalizedString("空格", comment: ""), 0x20, width: 2.6),
+        .init(NSLocalizedString("回车", comment: ""), 0x0D, width: 1.4, style: .special)
     ]
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
-                Button("系统键盘") {
+                Button(NSLocalizedString("系统键盘", comment: "")) {
                     feedback.keyPressed()
                     releaseModifiers()
                     switchKeyboard()
                 }
                 .font(.system(size: 15, weight: .medium))
                 .frame(width: 80, height: 44)
-                .accessibilityLabel("切换到系统键盘")
+                .accessibilityLabel(NSLocalizedString("切换到系统键盘", comment: ""))
                 if verticalSizeClass == .compact {
                     pageTabs
                 } else {
                     Spacer(minLength: 0)
                 }
-                RemoteKeyboardDismissButton(accessibilityLabel: "收起电脑键盘") {
+                RemoteKeyboardDismissButton(accessibilityLabel: NSLocalizedString("收起电脑键盘", comment: "")) {
                     feedback.keyPressed()
                     releaseModifiers()
                     dismiss()
@@ -943,14 +943,14 @@ private struct RemoteComputerKeyboard: View {
                     feedback.keyPressed()
                     page = item
                 } label: {
-                    Text(item.rawValue)
+                    Text(NSLocalizedString(item.rawValue, comment: ""))
                         .font(.system(size: 14, weight: page == item ? .semibold : .regular))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background(page == item ? RemoteKeyboardPalette.specialKey : .clear,
                                     in: RoundedRectangle(cornerRadius: 6))
                         .contentShape(Rectangle())
                 }
-                .accessibilityLabel("\(item.rawValue)键盘页")
+                .accessibilityLabel(String(format: NSLocalizedString("%1$@键盘页", comment: ""), NSLocalizedString(item.rawValue, comment: "")))
                 .accessibilityAddTraits(page == item ? .isSelected : [])
             }
         }
@@ -1066,7 +1066,7 @@ private struct CrossDeskStatusOrb: View {
                         lineWidth: isExpanded ? 2 : 1)
         }
         .compositingGroup()
-        .accessibilityLabel(isExpanded ? "收起远程控制菜单" : "展开远程控制菜单")
+        .accessibilityLabel(isExpanded ? NSLocalizedString("收起远程控制菜单", comment: "") : NSLocalizedString("展开远程控制菜单", comment: ""))
     }
 }
 
@@ -1194,8 +1194,8 @@ private struct FloatingSessionMenu: View {
                         .frame(width: 28, height: 32)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("返回控制栏")
-                Text(page == .videoSettings ? "画面设置" : "网络状态")
+                .accessibilityLabel(NSLocalizedString("返回控制栏", comment: ""))
+                Text(page == .videoSettings ? NSLocalizedString("画面设置", comment: "") : NSLocalizedString("网络状态", comment: ""))
                     .font(.subheadline.weight(.semibold))
             } else {
                 Circle()
@@ -1212,7 +1212,7 @@ private struct FloatingSessionMenu: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("关闭控制栏")
+            .accessibilityLabel(NSLocalizedString("关闭控制栏", comment: ""))
         }
 
         if page == .videoSettings, !session.videoSettingsFeedback.isEmpty {
@@ -1232,12 +1232,12 @@ private struct FloatingSessionMenu: View {
         } else {
             VStack(spacing: 9) {
                 LazyVGrid(columns: columns, spacing: 7) {
-                    FloatingControlButton(title: "键盘", symbol: "keyboard",
+                    FloatingControlButton(title: NSLocalizedString("键盘", comment: ""), symbol: "keyboard",
                                           action: showKeyboard)
-                    FloatingControlButton(title: virtualMouseVisible ? "收起鼠标" : "虚拟鼠标",
+                    FloatingControlButton(title: virtualMouseVisible ? NSLocalizedString("收起鼠标", comment: "") : NSLocalizedString("虚拟鼠标", comment: ""),
                                           symbol: "computermouse", action: toggleMouse)
                     FloatingControlButton(
-                        title: session.mouseControlMode == .relative ? "相对鼠标" : "绝对鼠标",
+                        title: session.mouseControlMode == .relative ? NSLocalizedString("相对鼠标", comment: "") : NSLocalizedString("绝对鼠标", comment: ""),
                         symbol: "computermouse",
                         action: {
                             session.mouseControlMode = session.mouseControlMode == .relative
@@ -1259,22 +1259,22 @@ private struct FloatingSessionMenu: View {
                             }
                         }
                     } label: {
-                        FloatingControlLabel(title: "显示器", symbol: "display")
+                        FloatingControlLabel(title: NSLocalizedString("显示器", comment: ""), symbol: "display")
                     }
                     .buttonStyle(.plain)
 
-                    FloatingControlButton(title: "画面设置", symbol: "slider.horizontal.3") {
+                    FloatingControlButton(title: NSLocalizedString("画面设置", comment: ""), symbol: "slider.horizontal.3") {
                         page = .videoSettings
                     }
                     FloatingControlButton(
-                        title: session.audioEnabled ? "声音" : "静音",
+                        title: session.audioEnabled ? NSLocalizedString("声音", comment: "") : NSLocalizedString("静音", comment: ""),
                         symbol: session.audioEnabled ? "speaker.wave.2" : "speaker.slash",
                         action: session.toggleAudio
                     )
-                    FloatingControlButton(title: "发送文件",
+                    FloatingControlButton(title: NSLocalizedString("发送文件", comment: ""),
                                           symbol: "folder.badge.plus",
                                           action: chooseFile)
-                    FloatingControlButton(title: "网络状态", symbol: "chart.bar.xaxis") {
+                    FloatingControlButton(title: NSLocalizedString("网络状态", comment: ""), symbol: "chart.bar.xaxis") {
                         page = .networkStats
                     }
                     if session.remotePlatform == .windows {
@@ -1282,7 +1282,7 @@ private struct FloatingSessionMenu: View {
                                               symbol: "lock.trianglebadge.exclamationmark",
                                               action: session.sendSecureAttention)
                     }
-                    FloatingControlButton(title: "剪贴板", symbol: "doc.on.clipboard",
+                    FloatingControlButton(title: NSLocalizedString("剪贴板", comment: ""), symbol: "doc.on.clipboard",
                                           action: session.sendClipboard)
                     if session.privacyScreen.desktopAvailable {
                         FloatingControlButton(
@@ -1293,9 +1293,9 @@ private struct FloatingSessionMenu: View {
                         )
                         .disabled(!session.isConnected || !session.privacyScreen.canToggle(at: session.privacyClock))
                         .opacity(session.isConnected && session.privacyScreen.canToggle(at: session.privacyClock) ? 1 : 0.45)
-                        .accessibilityLabel("隐私屏")
+                        .accessibilityLabel(NSLocalizedString("隐私屏", comment: ""))
                         .accessibilityValue(session.privacyScreen.status(at: session.privacyClock))
-                        .accessibilityHint(session.privacyScreen.active ? "关闭隐私屏" : "开启隐私屏")
+                        .accessibilityHint(session.privacyScreen.active ? NSLocalizedString("关闭隐私屏", comment: "") : NSLocalizedString("开启隐私屏", comment: ""))
                     }
                 }
 
@@ -1335,7 +1335,7 @@ private struct FloatingSessionMenu: View {
 
     private var disconnectButton: some View {
         Button(role: .destructive, action: disconnect) {
-            Text("断开连接")
+            Text(NSLocalizedString("断开连接", comment: ""))
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
                 .frame(height: 34)
@@ -1393,12 +1393,12 @@ private struct FloatingNetworkStatistics: View {
     var body: some View {
         VStack(spacing: 10) {
             VStack(spacing: 0) {
-                trafficRow("", inbound: "接收", outbound: "发送", loss: "丢包率")
+                trafficRow("", inbound: NSLocalizedString("接收", comment: ""), outbound: NSLocalizedString("发送", comment: ""), loss: NSLocalizedString("丢包率", comment: ""))
                     .foregroundStyle(.secondary)
-                trafficRow("视频", statistics: snapshot.report?.video)
-                trafficRow("音频", statistics: snapshot.report?.audio)
-                trafficRow("数据", statistics: snapshot.report?.data)
-                trafficRow("合计", statistics: snapshot.report?.total)
+                trafficRow(NSLocalizedString("视频", comment: ""), statistics: snapshot.report?.video)
+                trafficRow(NSLocalizedString("音频", comment: ""), statistics: snapshot.report?.audio)
+                trafficRow(NSLocalizedString("数据", comment: ""), statistics: snapshot.report?.data)
+                trafficRow(NSLocalizedString("合计", comment: ""), statistics: snapshot.report?.total)
                     .fontWeight(.semibold)
                     .background(Color.blue.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
             }
@@ -1407,17 +1407,17 @@ private struct FloatingNetworkStatistics: View {
             Divider()
 
             VStack(spacing: 7) {
-                detail("帧率", value: "\(snapshot.framesPerSecond) FPS")
-                detail("分辨率", value: resolution)
-                detail("画面延时", value: RemoteNetworkSnapshot.latency(snapshot.videoLatencyMilliseconds))
-                detail("连接延时（RTT）", value: RemoteNetworkSnapshot.latency(snapshot.rttMilliseconds))
-                detail("连接方式", value: snapshot.connectionMode)
+                detail(NSLocalizedString("帧率", comment: ""), value: "\(snapshot.framesPerSecond) FPS")
+                detail(NSLocalizedString("分辨率", comment: ""), value: resolution)
+                detail(NSLocalizedString("画面延时", comment: ""), value: RemoteNetworkSnapshot.latency(snapshot.videoLatencyMilliseconds))
+                detail(NSLocalizedString("连接延时（RTT）", comment: ""), value: RemoteNetworkSnapshot.latency(snapshot.rttMilliseconds))
+                detail(NSLocalizedString("连接方式", comment: ""), value: snapshot.connectionMode)
                 HStack {
-                    Text("媒体加密")
+                    Text(NSLocalizedString("媒体加密", comment: ""))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 8)
                     if let report = snapshot.report {
-                        Label(report.srtpActive ? "SRTP 已启用" : "未启用",
+                        Label(report.srtpActive ? NSLocalizedString("SRTP 已启用", comment: "") : NSLocalizedString("未启用", comment: ""),
                               systemImage: report.srtpActive ? "lock.shield" : "lock.open")
                             .foregroundStyle(report.srtpActive ? Color.green : Color.secondary)
                     } else {
@@ -1425,8 +1425,8 @@ private struct FloatingNetworkStatistics: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
-                codec("被控端编码器", value: snapshot.remoteVideoEncoder)
-                codec("控制端解码器", value: snapshot.localVideoDecoder)
+                codec(NSLocalizedString("被控端编码器", comment: ""), value: snapshot.remoteVideoEncoder)
+                codec(NSLocalizedString("控制端解码器", comment: ""), value: snapshot.localVideoDecoder)
             }
             .font(.caption.monospacedDigit())
         }
@@ -1460,13 +1460,13 @@ private struct FloatingNetworkStatistics: View {
                    inbound: RemoteNetworkSnapshot.bitrate(statistics?.inboundBitrate),
                    outbound: RemoteNetworkSnapshot.bitrate(statistics?.outboundBitrate),
                    loss: RemoteNetworkSnapshot.lossRate(statistics?.lossRate))
-            .accessibilityLabel("\(title)，接收 \(RemoteNetworkSnapshot.bitrate(statistics?.inboundBitrate))，发送 \(RemoteNetworkSnapshot.bitrate(statistics?.outboundBitrate))，丢包率 \(RemoteNetworkSnapshot.lossRate(statistics?.lossRate))")
+            .accessibilityLabel(String(format: NSLocalizedString("%1$@，接收 %2$@，发送 %3$@，丢包率 %4$@", comment: ""), String(describing: title), String(describing: RemoteNetworkSnapshot.bitrate(statistics?.inboundBitrate)), String(describing: RemoteNetworkSnapshot.bitrate(statistics?.outboundBitrate)), String(describing: RemoteNetworkSnapshot.lossRate(statistics?.lossRate))))
     }
 
     private func trafficRow(_ title: String, inbound: String,
                             outbound: String, loss: String) -> some View {
         HStack(spacing: 4) {
-            Text(title).frame(width: 28, alignment: .leading)
+            Text(title).frame(width: 48, alignment: .leading)
             Text(inbound).frame(maxWidth: .infinity, alignment: .trailing)
             Text(outbound).frame(maxWidth: .infinity, alignment: .trailing)
             Text(loss).frame(width: 46, alignment: .trailing)
@@ -1484,17 +1484,17 @@ private struct FloatingVideoSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            settingRow("画面质量", options: ["低", "中", "高"],
+            settingRow(NSLocalizedString("画面质量", comment: ""), options: [NSLocalizedString("低", comment: ""), NSLocalizedString("中", comment: ""), NSLocalizedString("高", comment: "")],
                        values: [0, 1, 2], selection: Binding(
                         get: { session.videoSettings.selection.quality },
                         set: { session.updateVideoSettings(quality: $0) }
                        ))
-            settingRow("画面采集帧率", options: ["30 fps", "60 fps"],
+            settingRow(NSLocalizedString("画面采集帧率", comment: ""), options: ["30 fps", "60 fps"],
                        values: [30, 60], selection: Binding(
                         get: { session.videoSettings.selection.frameRate },
                         set: { session.updateVideoSettings(frameRate: $0) }
                        ))
-            settingRow("画面偏好", options: VideoAdaptationPolicy.allCases.map(\.title),
+            settingRow(NSLocalizedString("画面偏好", comment: ""), options: VideoAdaptationPolicy.allCases.map(\.title),
                        values: VideoAdaptationPolicy.allCases.map { $0.bridgeValue.rawValue },
                        selection: Binding(
                         get: { session.videoSettings.selection.preference },
@@ -1546,7 +1546,8 @@ private struct FloatingControlLabel: View {
                 .font(.system(size: 16, weight: .semibold))
             Text(title)
                 .font(.system(size: 9.5, weight: .medium))
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
                 .minimumScaleFactor(0.72)
         }
         .foregroundStyle(.primary)

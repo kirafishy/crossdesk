@@ -1,3 +1,4 @@
+import { tr } from './Localization';
 import { MobileController, MobileState } from './MobileController';
 import { RemoteViewport, MouseInput, TouchInput, TouchPoint, clamp, NetworkStatistics, Traffic, asciiKey } from './ControllerModels';
 import { MobileTheme, MobileSegment, MobileIcon, MobileIconButton } from './MobileWidgets';
@@ -136,7 +137,7 @@ export struct MobileRemoteView {
     if (index === 10) this.controller?.togglePrivacy();
   }
   private labels(): string[] {
-    return ['键盘', this.state.relative ? '相对鼠标' : '绝对鼠标', this.mouseVisible ? '收起鼠标' : '虚拟鼠标', '显示器', '画面设置', this.state.muted ? '静音' : '声音', '发送文件', '网络状态', 'Ctrl+Alt+Del', '剪贴板', this.state.privacyButtonTitle];
+    return [tr("键盘"), this.state.relative ? tr("相对鼠标") : tr("绝对鼠标"), this.mouseVisible ? tr("收起鼠标") : tr("虚拟鼠标"), tr("显示器"), tr("画面设置"), this.state.muted ? tr("静音") : tr("声音"), tr("发送文件"), tr("网络状态"), 'Ctrl+Alt+Del', tr("剪贴板"), this.state.privacyButtonTitle];
   }
   private controlIds(): number[] {
     return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter((index: number) =>
@@ -155,22 +156,33 @@ export struct MobileRemoteView {
     return { x: clamp(x, 8, this.viewWidth - 148), y: clamp(y, 8, this.viewHeight - 56) };
   }
   private keyboardWidth(): number { return Math.max(1, Math.min(this.computerKeyboard ? 520 : 440, this.viewWidth - 16)); }
+  private keyboardTitle(key: string): string {
+    switch (key) {
+      case 'copy': return tr("复制");
+      case 'paste': return tr("粘贴");
+      case 'select_all': return tr("全选");
+      case 'space': return tr("空格");
+      case 'computer': return tr("电脑");
+      case 'clipboard': return tr("剪贴板");
+      default: return this.shift && key.length === 1 ? key.toUpperCase() : key;
+    }
+  }
   private keyboardRows(): KeyRow[] {
     return this.computerKeyboard ? [
       { keys: ['Esc', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6'] }, { keys: ['Tab', 'Ctrl', 'Alt', 'Win', '↑', '⌫'] },
-      { keys: ['复制', '粘贴', '全选', '←', '↓', '→'] }, { keys: ['ABC', '空格', 'Enter'] }
+      { keys: ['copy', 'paste', 'select_all', '←', '↓', '→'] }, { keys: ['ABC', 'space', 'Enter'] }
     ] : [{ keys: ['1','2','3','4','5','6','7','8','9','0'] }, { keys: ['q','w','e','r','t','y','u','i','o','p'] },
       { keys: ['a','s','d','f','g','h','j','k','l'] }, { keys: ['⇧','z','x','c','v','b','n','m','⌫'] },
-      { keys: ['电脑','剪贴板','空格','.','Enter'] }];
+      { keys: ['computer','clipboard','space','.','Enter'] }];
   }
   private keyboardKey(value: string): void {
     if (value === '⇧') { this.shift = !this.shift; return; }
-    if (value === '电脑' || value === 'ABC') { this.computerKeyboard = value === '电脑'; return; }
-    if (value === '剪贴板') { this.state.modal = 'clipboard'; return; }
+    if (value === 'computer' || value === 'ABC') { this.computerKeyboard = value === 'computer'; return; }
+    if (value === 'clipboard') { this.state.modal = 'clipboard'; return; }
     const modifier = value === 'Ctrl' ? 17 : value === 'Alt' ? 18 : value === 'Win' ? 91 : 0;
     if (modifier) { this.modifiers = this.modifiers.includes(modifier) ? this.modifiers.filter((m: number) => m !== modifier) : [...this.modifiers, modifier]; return; }
-    if (value === '复制' || value === '粘贴' || value === '全选') { this.controller?.shortcut(value === '复制' ? 67 : value === '粘贴' ? 86 : 65); return; }
-    const names = ['空格','⌫','Enter','Esc','Tab','↑','↓','←','→']; const codes = [32,8,13,27,9,38,40,37,39];
+    if (value === 'copy' || value === 'paste' || value === 'select_all') { this.controller?.shortcut(value === 'copy' ? 67 : value === 'paste' ? 86 : 65); return; }
+    const names = ['space','⌫','Enter','Esc','Tab','↑','↓','←','→']; const codes = [32,8,13,27,9,38,40,37,39];
     let code = names.includes(value) ? codes[names.indexOf(value)] : /^F[1-6]$/.test(value) ? 111 + Number(value.substring(1)) : 0;
     if (!code && this.modifiers.length) { const key = asciiKey(this.shift ? value.toUpperCase() : value); code = key & 255; if (key & 256) this.modifiers = [...this.modifiers, 16]; }
     if (code) { this.controller?.chord(code, this.modifiers); this.modifiers = []; }
@@ -183,11 +195,11 @@ export struct MobileRemoteView {
   @Builder
   NetworkRow(title: string, traffic: Traffic | undefined) {
     Row({ space: 4 }) {
-      Text(title).fontSize(11).fontWeight(title === '合计' ? 600 : 400).fontColor(MobileTheme.ink).width(28)
+      Text(title).fontSize(11).minFontSize(8).maxFontSize(11).maxLines(1).fontWeight(title === tr("合计") ? 600 : 400).fontColor(MobileTheme.ink).width(48)
       Text(NetworkStatistics.rate(traffic?.inbound ?? -1)).fontSize(11).minFontSize(8).maxLines(1).layoutWeight(1).textAlign(TextAlign.End)
       Text(NetworkStatistics.rate(traffic?.outbound ?? -1)).fontSize(11).minFontSize(8).maxLines(1).layoutWeight(1).textAlign(TextAlign.End)
       Text(NetworkStatistics.loss(traffic?.loss ?? -1)).fontSize(11).width(46).textAlign(TextAlign.End)
-    }.padding({ left: 4, right: 4 }).height(26).width('100%').borderRadius(5).backgroundColor(title === '合计' ? '#122E7ADB' : Color.Transparent)
+    }.padding({ left: 4, right: 4 }).height(26).width('100%').borderRadius(5).backgroundColor(title === tr("合计") ? '#122E7ADB' : Color.Transparent)
   }
   @Builder
   NetworkDetail(label: string, value: string, encrypted: boolean = false) {
@@ -210,12 +222,12 @@ export struct MobileRemoteView {
   Menu() {
     Column({ space: 10 }) {
       Row({ space: 6 }) {
-        if (this.menu !== 'controls') { MobileIconButton({ icon: 'back', label: '返回控制栏', iconExtent: 30, iconSize: 19, action: () => this.menu = 'controls' }) }
+        if (this.menu !== 'controls') { MobileIconButton({ icon: 'back', label: tr("返回控制栏"), iconExtent: 30, iconSize: 19, action: () => this.menu = 'controls' }) }
         Row({ space: 6 }) {
           if (this.menu === 'controls') { Row() {}.width(6).height(6).borderRadius(3).backgroundColor(MobileTheme.green) }
-          Text(this.menu === 'controls' ? '已连接' : this.menu === 'video' ? '画面设置' : '网络状态').fontSize(14).fontWeight(600).fontColor(MobileTheme.ink)
+          Text(this.menu === 'controls' ? tr("已连接") : this.menu === 'video' ? tr("画面设置") : tr("网络状态")).fontSize(14).fontWeight(600).fontColor(MobileTheme.ink)
         }.layoutWeight(1)
-        MobileIconButton({ icon: 'close', label: '关闭控制栏', iconExtent: 30, iconSize: 20, action: () => this.menu = '' })
+        MobileIconButton({ icon: 'close', label: tr("关闭控制栏"), iconExtent: 30, iconSize: 20, action: () => this.menu = '' })
       }.width('100%')
       Scroll() {
         Column({ space: 8 }) {
@@ -225,7 +237,7 @@ export struct MobileRemoteView {
                 GridCol() {
                   Column({ space: 4 }) {
                     MobileIcon({ name: this.icons()[index], iconExtent: 19 })
-                    Text(this.labels()[index]).fontSize(10).fontColor(MobileTheme.ink).maxLines(1)
+                    Text(this.labels()[index]).fontSize(10).minFontSize(8).maxFontSize(10).fontColor(MobileTheme.ink).maxLines(2).textAlign(TextAlign.Center)
                   }
                     .height(52).width('100%').justifyContent(FlexAlign.Center)
                     .backgroundColor('#F0F0F2').borderRadius(10)
@@ -238,44 +250,44 @@ export struct MobileRemoteView {
             }
             if (this.state.privacyFeedback) { Text(this.state.privacyFeedback).fontSize(11).fontColor(MobileTheme.secondary).width('100%') }
             if (this.state.transfer) { Text(this.state.transfer).fontSize(11).fontColor(MobileTheme.secondary).width('100%') }
-            if (this.state.receivedPath) { Button('保存收到的文件', { type: ButtonType.Normal }).fontSize(14).fontColor(MobileTheme.blue).backgroundColor(Color.White).height(42).width('100%').onClick(() => this.controller?.saveFile()) }
+            if (this.state.receivedPath) { Button(tr("保存收到的文件"), { type: ButtonType.Normal }).fontSize(14).fontColor(MobileTheme.blue).backgroundColor(Color.White).height(42).width('100%').onClick(() => this.controller?.saveFile()) }
           } else if (this.menu === 'video') {
             Text(this.state.videoFeedback).fontSize(12).fontColor(MobileTheme.secondary).width('100%')
-            Text('画面质量').fontSize(12).width('100%')
-            MobileSegment({ labels: ['低', '中', '高'], selection: this.state.videoQuality,
+            Text(tr("画面质量")).fontSize(12).width('100%')
+            MobileSegment({ labels: [tr("低"), tr("中"), tr("高")], selection: this.state.videoQuality,
               available: this.state.videoSupported, changed: (i: number) => this.controller?.updateVideo(0, i) })
-            Text('画面采集帧率').fontSize(12).width('100%')
+            Text(tr("画面采集帧率")).fontSize(12).width('100%')
             MobileSegment({ labels: ['30 fps', '60 fps'], selection: this.state.videoRate === 60 ? 1 : 0,
               available: this.state.videoSupported, changed: (i: number) => this.controller?.updateVideo(1, i ? 60 : 30) })
-            Text('画面偏好').fontSize(12).width('100%')
-            MobileSegment({ labels: ['帧率优先', '画质优先', '平衡'], selection: this.state.videoSelectedPreference,
+            Text(tr("画面偏好")).fontSize(12).width('100%')
+            MobileSegment({ labels: [tr("帧率优先"), tr("画质优先"), tr("平衡")], selection: this.state.videoSelectedPreference,
               available: this.state.videoSupported, changed: (i: number) => this.controller?.updateVideo(2, i) })
           } else {
             Row({ space: 4 }) {
-              Text('').width(28)
-              Text('接收').fontSize(11).fontColor(MobileTheme.secondary).layoutWeight(1).textAlign(TextAlign.End)
-              Text('发送').fontSize(11).fontColor(MobileTheme.secondary).layoutWeight(1).textAlign(TextAlign.End)
-              Text('丢包率').fontSize(11).fontColor(MobileTheme.secondary).width(46).textAlign(TextAlign.End)
+              Text('').width(48)
+              Text(tr("接收")).fontSize(11).fontColor(MobileTheme.secondary).layoutWeight(1).textAlign(TextAlign.End)
+              Text(tr("发送")).fontSize(11).fontColor(MobileTheme.secondary).layoutWeight(1).textAlign(TextAlign.End)
+              Text(tr("丢包率")).fontSize(11).minFontSize(8).maxFontSize(11).maxLines(2).fontColor(MobileTheme.secondary).width(46).textAlign(TextAlign.End)
             }.padding({ left: 4, right: 4 }).height(24).width('100%')
             Column() {
-              this.NetworkRow('视频', this.controller?.network.current(this.state.networkTime)?.video)
-              this.NetworkRow('音频', this.controller?.network.current(this.state.networkTime)?.audio)
-              this.NetworkRow('数据', this.controller?.network.current(this.state.networkTime)?.data)
-              this.NetworkRow('合计', this.controller?.network.current(this.state.networkTime)?.total)
+              this.NetworkRow(tr("视频"), this.controller?.network.current(this.state.networkTime)?.video)
+              this.NetworkRow(tr("音频"), this.controller?.network.current(this.state.networkTime)?.audio)
+              this.NetworkRow(tr("数据"), this.controller?.network.current(this.state.networkTime)?.data)
+              this.NetworkRow(tr("合计"), this.controller?.network.current(this.state.networkTime)?.total)
             }.width('100%')
             Divider().strokeWidth(0.5).color(MobileTheme.line).margin({ top: 2, bottom: 2 })
-            this.NetworkDetail('帧率', `${this.controller?.network.fps(this.state.networkTime) ?? '—'} FPS`)
-            this.NetworkDetail('分辨率', this.state.hasFrame ? `${this.state.width} × ${this.state.height}` : '—')
-            this.NetworkDetail('画面延时', NetworkStatistics.delay(this.controller?.network.latency(this.state.networkTime) ?? -1))
-            this.NetworkDetail('连接延时（RTT）', NetworkStatistics.delay(this.state.networkTime - (this.controller?.network.rttTime ?? 0) < 3000 ? this.controller?.network.rtt ?? -1 : -1))
-            this.NetworkDetail('连接方式', this.controller?.network.mode(this.state.networkTime) ?? '—')
-            this.NetworkDetail('媒体加密', this.controller?.network.current(this.state.networkTime) === undefined ? '—' : this.controller?.network.report?.srtp ? 'SRTP 已启用' : '未启用', this.controller?.network.current(this.state.networkTime)?.srtp === true)
-            this.NetworkCodec('被控端编码器', this.controller?.network.remoteEncoder || '—')
-            this.NetworkCodec('控制端解码器', this.controller?.network.report?.decoder || '—')
+            this.NetworkDetail(tr("帧率"), `${this.controller?.network.fps(this.state.networkTime) ?? '—'} FPS`)
+            this.NetworkDetail(tr("分辨率"), this.state.hasFrame ? `${this.state.width} × ${this.state.height}` : '—')
+            this.NetworkDetail(tr("画面延时"), NetworkStatistics.delay(this.controller?.network.latency(this.state.networkTime) ?? -1))
+            this.NetworkDetail(tr("连接延时（RTT）"), NetworkStatistics.delay(this.state.networkTime - (this.controller?.network.rttTime ?? 0) < 3000 ? this.controller?.network.rtt ?? -1 : -1))
+            this.NetworkDetail(tr("连接方式"), this.controller?.network.mode(this.state.networkTime) ?? '—')
+            this.NetworkDetail(tr("媒体加密"), this.controller?.network.current(this.state.networkTime) === undefined ? '—' : this.controller?.network.report?.srtp ? tr("SRTP 已启用") : tr("未启用"), this.controller?.network.current(this.state.networkTime)?.srtp === true)
+            this.NetworkCodec(tr("被控端编码器"), this.controller?.network.remoteEncoder || '—')
+            this.NetworkCodec(tr("控制端解码器"), this.controller?.network.report?.decoder || '—')
           }
         }.width('100%')
       }.constraintSize({ maxHeight: Math.max(48, this.viewHeight - 132) }).width('100%').scrollBar(BarState.Off)
-      Button('断开连接', { type: ButtonType.Normal }).fontSize(14).fontColor(Color.White).width('100%').height(34).borderRadius(8).backgroundColor(MobileTheme.red)
+      Button(tr("断开连接"), { type: ButtonType.Normal }).fontSize(14).fontColor(Color.White).width('100%').height(34).borderRadius(8).backgroundColor(MobileTheme.red)
         .onClick(() => { this.release(); this.state.modal = 'disconnect'; this.menu = ''; this.keyboard = false; })
     }.padding(12).width(this.menuWidth()).backgroundColor(Color.White).borderRadius(18)
       .border({ width: 0.5, color: MobileTheme.line }).shadow({ radius: 24, color: '#33000000', offsetY: 6 })
@@ -286,21 +298,21 @@ export struct MobileRemoteView {
   Keyboard() {
     Column({ space: 3 }) {
       Row() {
-        Stack() { Row() {}.width(32).height(4).backgroundColor(MobileTheme.secondary).borderRadius(2) }.layoutWeight(1).height(28).accessibilityText('拖动键盘')
+        Stack() { Row() {}.width(32).height(4).backgroundColor(MobileTheme.secondary).borderRadius(2) }.layoutWeight(1).height(28).accessibilityText(tr("拖动键盘"))
           .gesture(PanGesture().onActionStart(() => { this.keyboardOriginX = this.keyboardX; this.keyboardOriginY = this.keyboardY; })
             .onActionUpdate((e: GestureEvent) => this.keyboardDrag(e)))
-        MobileIconButton({ icon: 'close', label: '收起键盘', iconExtent: 28, iconSize: 18, action: () => { this.keyboard = false; this.modifiers = []; } })
+        MobileIconButton({ icon: 'close', label: tr("收起键盘"), iconExtent: 28, iconSize: 18, action: () => { this.keyboard = false; this.modifiers = []; } })
       }.width('100%')
       Scroll() {
       Column({ space: 3 }) {
       ForEach(this.keyboardRows(), (row: KeyRow) => {
         Row({ space: 3 }) {
           ForEach(row.keys, (key: string) => {
-            Text(this.shift && key.length === 1 ? key.toUpperCase() : key).fontSize(key.length > 2 ? 11 : 14)
-              .height(31).layoutWeight(key === '空格' ? 3 : 1).textAlign(TextAlign.Center).borderRadius(5).fontColor(MobileTheme.ink)
+            Text(this.keyboardTitle(key)).fontSize(key.length > 2 ? 11 : 14).minFontSize(8).maxFontSize(key.length > 2 ? 11 : 14).maxLines(1)
+              .height(31).layoutWeight(key === 'space' ? 3 : 1).textAlign(TextAlign.Center).borderRadius(5).fontColor(MobileTheme.ink)
               .shadow({ radius: 0.5, color: '#33000000', offsetY: 1 })
               .backgroundColor((key === '⇧' && this.shift) || this.modifiers.includes(key === 'Ctrl' ? 17 : key === 'Alt' ? 18 : key === 'Win' ? 91 : -1) ? '#9BC7F7' : key.length > 1 || key === '⇧' ? '#AFB8C5' : '#FFFFFF')
-              .accessibilityText(key).accessibilityLevel('yes').onClick(() => this.keyboardKey(key))
+              .accessibilityText(this.keyboardTitle(key)).accessibilityLevel('yes').onClick(() => this.keyboardKey(key))
           }, (key: string) => key)
         }.width('100%')
       })
@@ -324,7 +336,7 @@ export struct MobileRemoteView {
           } else { MobileIcon({ name: button === 0 ? 'mouse_left' : 'mouse_right', iconExtent: 22 }) }
         }.width(44).height(44).borderRadius(7).clip(true)
           .backgroundColor(button === 0 && this.leftHeld || button === 2 && this.rightHeld ? '#9BC7F7' : '#E9E9EE')
-          .accessibilityText(button === 0 ? '鼠标左键，按住拖动' : button === 1 ? '滚轮，上下滑动' : '鼠标右键，按住拖动')
+          .accessibilityText(button === 0 ? tr("鼠标左键，按住拖动") : button === 1 ? tr("滚轮，上下滑动") : tr("鼠标右键，按住拖动"))
           .onTouch((event: TouchEvent) => this.barTouch(event, button))
       })
     }.padding(2).width(140).height(48).backgroundColor('#FFFFFF').borderRadius(10)
@@ -339,7 +351,7 @@ export struct MobileRemoteView {
       if (!this.state.hasFrame) {
         Column({ space: 12 }) {
           LoadingProgress().width(32).height(32).color(Color.White)
-          Text('等待远端画面…').fontSize(14).fontColor(Color.White)
+          Text(tr("等待远端画面…")).fontSize(14).fontColor(Color.White)
         }.padding(20).constraintSize({ minWidth: 200 }).backgroundColor('#B0202024').borderRadius(14)
           .position({ x: (this.viewWidth - 200) / 2, y: (this.viewHeight - 104) / 2 }).hitTestBehavior(HitTestMode.None)
       }
@@ -348,7 +360,7 @@ export struct MobileRemoteView {
         .onAxisEvent((event: AxisEvent) => { const delta = event.getVerticalAxisValue(); if (delta) this.mouse.scroll(-delta); })
         .onKeyEvent((e: KeyEvent) => { if (e.type === KeyType.Down || e.type === KeyType.Up) { this.controller?.physicalKey(e.keyCode, e.type === KeyType.Down); return true; } return false; })
         .onBlur(() => this.controller?.release())
-        .accessibilityText('远程桌面：轻触点击、长按右键、双指捏合缩放、放大后双指拖动画面，原始比例下双指滚动')
+        .accessibilityText(tr("远程桌面：轻触点击、长按右键、双指捏合缩放、放大后双指拖动画面，原始比例下双指滚动"))
       MobileIcon({ name: 'cursor', iconExtent: 24, color: '#000000' })
         .position({ x: this.cursorX - 1, y: this.cursorY - 1 }).hitTestBehavior(HitTestMode.None)
       if (this.menu) { Column() {}.width('100%').height('100%').onClick(() => this.menu = ''); this.Menu() }
@@ -357,7 +369,7 @@ export struct MobileRemoteView {
       Stack() {
         Image($r('app.media.mobile_brand')).width(46).height(46).objectFit(ImageFit.Cover).borderRadius(23).draggable(false).hitTestBehavior(HitTestMode.None)
       }.width(54).height(54).backgroundColor('#F5F5F7').borderRadius(27).shadow({ radius: 14, color: '#33000000', offsetY: 4 })
-        .position({ x: this.orbX, y: this.orbY }).accessibilityText('远程控制菜单，拖动可移动').accessibilityLevel('yes')
+        .position({ x: this.orbX, y: this.orbY }).accessibilityText(tr("远程控制菜单，拖动可移动")).accessibilityLevel('yes')
         .onTouch((e: TouchEvent) => this.orbTouch(e))
     }.width('100%').height('100%').backgroundColor(Color.Black).clip(true)
       .onAreaChange((_old: Area, next: Area) => {

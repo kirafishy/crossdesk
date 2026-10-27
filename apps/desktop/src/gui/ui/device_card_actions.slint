@@ -35,12 +35,12 @@ export component DeviceCardActions inherits Rectangle {
         spacing: 0px;
         CardAction {
             icon: FontAwesomeIcons.pen;
-            tooltip: GalleryStrings.tr("修改名称", "Rename", "Переименовать");
+            tooltip: GalleryStrings.texts[35];
             clicked => { root.edit-alias(); }
         }
         CardAction {
             icon: FontAwesomeIcons.tags;
-            tooltip: GalleryStrings.tr("修改分组", "Edit groups", "Изменить группы");
+            tooltip: GalleryStrings.texts[30];
             clicked => { root.edit-groups(); }
         }
         CardAction {
@@ -51,7 +51,7 @@ export component DeviceCardActions inherits Rectangle {
         CardAction {
             icon: root.connected ? FontAwesomeIcons.xmark : FontAwesomeIcons.arrow-right-long;
             icon-size: 13px;
-            tooltip: root.connected ? GalleryStrings.tr("断开", "Disconnect", "Отключить") : GalleryStrings.tr("连接", "Connect", "Подключить");
+            tooltip: root.connected ? GalleryStrings.texts[36] : GalleryStrings.texts[37];
             clicked => {
                 if root.connected { root.disconnect-device(); }
                 else { root.connect-device(); }

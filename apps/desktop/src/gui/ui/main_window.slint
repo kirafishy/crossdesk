@@ -265,7 +265,7 @@ component PasswordInput inherits FlatSurface {
 }
 
 export component MainWindow inherits Window {
-    title: root.gallery-mode ? "CrossDesk " + GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub") : "CrossDesk";
+    title: root.gallery-mode ? "CrossDesk " + GalleryStrings.texts[54] : "CrossDesk";
     icon: @image-url("../../../resources/linux/crossdesk_256x256.png");
     preferred-width: root.minimum-window-width;
     preferred-height: root.minimum-window-height;
@@ -455,7 +455,7 @@ export component MainWindow inherits Window {
         root.lan-remember-password = false;
         let error = root.lan-prepare-connect(address);
         root.connection-input-error = error == "Enter a numeric IPv4 address or IPv4:port"
-            ? GalleryStrings.tr("请输入有效的 IPv4 或 IPv4:端口", "Enter a valid IPv4 or IPv4:port", "Укажите IPv4 или IPv4:порт")
+            ? GalleryStrings.texts[55]
             : LanStrings.error-message(error);
         if error == "" {
             root.lan-open = true;
@@ -527,8 +527,8 @@ export component MainWindow inherits Window {
     private property <bool> prompt-validating: root.lan-open ? root.lan-connecting : root.connection-validating;
     private property <bool> prompt-pending: root.lan-open ? root.lan-connecting : root.connection-pending;
     private property <string> prompt-status-text: !root.lan-open ? root.connection-status-text
-        : root.lan-connecting ? GalleryStrings.tr("正在连接…", "Connecting…", "Подключение…")
-        : root.lan-retry-after > 0 ? GalleryStrings.tr("请在 " + root.lan-retry-after + " 秒后重试", "Try again in " + root.lan-retry-after + "s", "Повторите через " + root.lan-retry-after + " с")
+        : root.lan-connecting ? GalleryStrings.texts[56]
+        : root.lan-retry-after > 0 ? GalleryStrings.retry-after(root.lan-retry-after)
         : root.lan-message == "InvalidCredentials" ? UiStrings.reinput-password
         : root.lan-message == "" || root.lan-message == "AuthenticationRateLimited" ? UiStrings.input-password
         : LanStrings.error-message(root.lan-message);
@@ -556,7 +556,7 @@ export component MainWindow inherits Window {
     in property <[RecentConnection]> recent-connections;
     out property <length> recent-preview-width: max(1px, (recent-scroll.width - 24px) / 3);
     out property <length> recent-preview-height: 80px;
-    in property <[string]> recent-groups: [GalleryStrings.tr("全部设备", "All devices", "Все устройства"), GalleryStrings.tr("未分组", "Ungrouped", "Без группы")];
+    in property <[string]> recent-groups: [GalleryStrings.texts[57], GalleryStrings.texts[31]];
     in-out property <int> recent-group-index: 0;
     callback recent-group-selected(int);
     changed recent-group-index => {
@@ -628,7 +628,8 @@ export component MainWindow inherits Window {
     in property <string> portable-service-status: "";
     in-out property <bool> portable-service-do-not-remind: false;
 
-    in-out property <int> language-index: 0;
+    in-out property <int> language-index: 10;
+    in property <[string]> language-options;
     in property <bool> capture-method-visible: false;
     in-out property <int> capture-method-index: 0;
     in-out property <int> codec-index: 0;
@@ -640,11 +641,11 @@ export component MainWindow inherits Window {
     in property <bool> autostart-system-managed: false;
     in property <AutostartStatus> autostart-status: AutostartStatus.checking;
     out property <string> autostart-status-text:
-        root.autostart-status == AutostartStatus.checking ? GalleryStrings.tr("正在读取…", "Checking…", "Проверка…") :
-        root.autostart-status == AutostartStatus.enabled ? GalleryStrings.tr("已开启", "Enabled", "Включён") :
-        root.autostart-status == AutostartStatus.disabled ? GalleryStrings.tr("未开启", "Disabled", "Выключен") :
-        root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.tr("设备不支持", "Unsupported", "Не поддерживается") :
-        GalleryStrings.tr("读取失败", "Read failed", "Ошибка чтения");
+        root.autostart-status == AutostartStatus.checking ? GalleryStrings.texts[58] :
+        root.autostart-status == AutostartStatus.enabled ? GalleryStrings.texts[59] :
+        root.autostart-status == AutostartStatus.disabled ? GalleryStrings.texts[60] :
+        root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.texts[61] :
+        GalleryStrings.texts[62];
     in-out property <bool> autostart-guide-open: false;
     changed autostart-guide-open => { if root.autostart-guide-open { root.dialog-focus-pending = true; } }
     in-out property <bool> daemon-enabled: false;
@@ -770,7 +771,7 @@ export component MainWindow inherits Window {
         focus-sink.focus();
     }
     private property <CopyFeedback> copy-feedback: idle;
-    private property <bool> compact-language: root.language-index == 0;
+    private property <bool> compact-language: GalleryStrings.language == 0 || GalleryStrings.language == 3 || GalleryStrings.language == 4 || GalleryStrings.language == 5;
     private property <bool> recent-tooltip-visible: false;
     private property <string> recent-tooltip-name: "";
     private property <string> recent-tooltip-host: "";
@@ -1114,9 +1115,9 @@ export component MainWindow inherits Window {
             width: 136px; height: 28px;
             background: WorkbenchStyle.field-surface;
             enabled: !root.connection-pending && !root.lan-connecting;
-            tooltip: root.lan-mode ? GalleryStrings.tr("切换到 ID 连接模式", "Switch to ID connection mode", "Переключить в режим ID") : GalleryStrings.tr("切换到 IP 连接模式", "Switch to IP connection mode", "Переключить в режим IP");
+            tooltip: root.lan-mode ? GalleryStrings.texts[63] : GalleryStrings.texts[64];
             accessible-role: switch;
-            accessible-label: GalleryStrings.tr("IP 连接模式", "IP connection mode", "Режим IP");
+            accessible-label: GalleryStrings.texts[65];
             accessible-checked: root.lan-mode;
             z: 8;
             clicked => {
@@ -1138,7 +1139,7 @@ export component MainWindow inherits Window {
                 y: 2px;
                 width: (parent.width - 6px) / 2;
                 height: parent.height - 4px;
-                text: lan ? GalleryStrings.tr("IP 连接", "IP mode", "Режим IP") : GalleryStrings.tr("ID 连接", "ID mode", "Режим ID");
+                text: lan ? GalleryStrings.texts[66] : GalleryStrings.texts[67];
                 font-size: 12px;
                 font-weight: 500;
                 color: root.lan-mode == lan ? white : WorkbenchStyle.muted;
@@ -1154,7 +1155,7 @@ export component MainWindow inherits Window {
             y: connection-mode-switch.y;
             width: 80px; height: 28px;
             normal-background: white;
-            text: GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub");
+            text: GalleryStrings.texts[54];
             z: 8;
             clicked => { root.open-gallery(); }
         }
@@ -1164,7 +1165,7 @@ export component MainWindow inherits Window {
             width: 36px; height: 28px;
             normal-background: white;
             icon: FontAwesomeIcons.bars;
-            tooltip: GalleryStrings.tr("更多", "More", "Ещё");
+            tooltip: GalleryStrings.texts[68];
             z: 8;
             clicked => { root.gallery-action("release", ""); root.menu-open = !root.menu-open; }
         }
@@ -1247,16 +1248,16 @@ export component MainWindow inherits Window {
                 x: 0px; y: 0px;
                 width: (parent.width - 16px) / 2; height: parent.height;
                 Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.local-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
-                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("将 IP 和密码分享给连接方", "Share your IP and password to get connected", "Передайте IP и пароль для подключения") : GalleryStrings.tr("将 ID 和密码分享给连接方", "Share your ID and password to get connected", "Передайте ID и пароль для подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
-                local-address-label := Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("本机 IP / 端口", "Local IP / Port", "IP / Порт") : UiStrings.local-id; font-size: 12px; color: WorkbenchStyle.muted; vertical-alignment: top; }
+                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.texts[69] : GalleryStrings.texts[70]; font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                local-address-label := Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.texts[71] : UiStrings.local-id; font-size: 12px; color: WorkbenchStyle.muted; vertical-alignment: top; }
                 lan-switch-ip-metrics := Text {
                     visible: false; accessible-role: none;
-                    text: GalleryStrings.tr("切换 IP", "Switch IP", "Сменить IP");
+                    text: GalleryStrings.texts[72];
                     font-size: 12px; font-weight: 500;
                 }
                 lan-edit-port-metrics := Text {
                     visible: false; accessible-role: none;
-                    text: GalleryStrings.tr("修改端口", "Edit port", "Изменить порт");
+                    text: GalleryStrings.texts[73];
                     font-size: 12px; font-weight: 500;
                 }
                 lan-switch-ip-action := WorkbenchButton {
@@ -1328,7 +1329,7 @@ export component MainWindow inherits Window {
                         normal-outline-color: UiSurface.edge;
                         hover-outline-color: UiSurface.hover;
                         focus-outline-color: WorkbenchStyle.accent;
-                        accessible-label: GalleryStrings.tr("切换本机 IP", "Switch local IP", "Сменить локальный IP");
+                        accessible-label: GalleryStrings.texts[74];
                         selected(index) => {
                             root.copy-feedback = CopyFeedback.idle;
                             // Save the draft for its original IP before changing
@@ -1384,7 +1385,7 @@ export component MainWindow inherits Window {
                                     font-size: 18px * local-address-field.lan-font-scale; font-weight: 600;
                                     input-type: InputType.number; color: WorkbenchStyle.text;
                                     enabled: root.lan-mode && !root.lan-password-pending;
-                                    accessible-label: GalleryStrings.tr("局域网端口", "LAN port", "Порт LAN");
+                                    accessible-label: GalleryStrings.texts[75];
                                     vertical-alignment: center; horizontal-alignment: left;
                                     selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
                                     changed has-focus => {
@@ -1403,7 +1404,7 @@ export component MainWindow inherits Window {
                         x: parent.width - 42px; y: 2px; width: 36px; quiet: true;
                         icon: root.copy-feedback == CopyFeedback.success ? FontAwesomeIcons.check : FontAwesomeIcons.copy;
                         icon-color: root.copy-feedback == CopyFeedback.success ? WorkbenchStyle.success : WorkbenchStyle.muted;
-                        tooltip: root.lan-mode ? GalleryStrings.tr("复制 IP 和端口", "Copy IP and port", "Копировать IP и порт") : GalleryStrings.tr("复制本机 ID", "Copy local ID", "Копировать ID");
+                        tooltip: root.lan-mode ? GalleryStrings.texts[76] : GalleryStrings.texts[77];
                         enabled: !root.lan-mode || root.lan-listener-address != "";
                         tooltip-suppressed: root.copy-feedback != CopyFeedback.idle;
                         // Let other controls receive the original click; moving
@@ -1420,8 +1421,8 @@ export component MainWindow inherits Window {
                     }
                     private property <string> edit-hint: !root.lan-mode || !root.sponsorship-unobstructed
                         || root.lan-password-pending ? ""
-                        : lan-ip-picker.has-hover ? GalleryStrings.tr("点击切换本机 IP", "Click to switch the local IP", "Нажмите, чтобы сменить IP")
-                        : lan-port-hover.has-hover && !lan-port-editor.has-focus ? GalleryStrings.tr("点击修改端口", "Click to edit the port", "Нажмите, чтобы изменить порт") : "";
+                        : lan-ip-picker.has-hover ? GalleryStrings.texts[78]
+                        : lan-port-hover.has-hover && !lan-port-editor.has-focus ? GalleryStrings.texts[79] : "";
                     private property <bool> edit-hint-visible;
                     changed edit-hint => { local-address-field.edit-hint-visible = false; }
                     Timer {
@@ -1453,7 +1454,7 @@ export component MainWindow inherits Window {
                     WorkbenchButton {
                         x: parent.width - 112px; y: 0px; width: 36px; quiet: true;
                         icon: root.active-password-visible ? FontAwesomeIcons.eye : FontAwesomeIcons.eye-slash;
-                        tooltip: root.active-password-visible ? GalleryStrings.tr("隐藏密码", "Hide password", "Скрыть пароль") : GalleryStrings.tr("显示密码", "Show password", "Показать пароль");
+                        tooltip: root.active-password-visible ? GalleryStrings.texts[80] : GalleryStrings.texts[81];
                         clicked => { if root.lan-mode { root.lan-password-visible = !root.lan-password-visible; } else { root.toggle-password-visibility(); } }
                     }
                     WorkbenchButton {
@@ -1465,7 +1466,7 @@ export component MainWindow inherits Window {
                     WorkbenchButton {
                         x: parent.width - 36px; y: 0px; width: 36px; quiet: true;
                         icon: FontAwesomeIcons.pen;
-                        tooltip: GalleryStrings.tr("修改密码", "Change password", "Изменить пароль");
+                        tooltip: GalleryStrings.texts[82];
                         enabled: root.lan-mode ? !root.lan-password-pending : !root.password-change-pending;
                         clicked => { root.reset-password-open = true; }
                     }
@@ -1474,8 +1475,8 @@ export component MainWindow inherits Window {
             WorkbenchCard {
                 x: local-card.width + 16px; y: 0px; width: local-card.width; height: parent.height;
                 Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.remote-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
-                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("输入 IP:端口，通过局域网连接", "Enter IP:port to connect over LAN", "Введите IP:порт для подключения по LAN") : GalleryStrings.tr("输入设备 ID，连接远程桌面", "Enter a device ID to start a remote session", "Введите ID для удалённого подключения"); font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
-                Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.tr("远端 IP / 端口", "Remote IP / Port", "Удалённый IP / Порт") : UiStrings.remote-id; font-size: 12px; color: WorkbenchStyle.muted; }
+                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.texts[83] : GalleryStrings.texts[84]; font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.texts[85] : UiStrings.remote-id; font-size: 12px; color: WorkbenchStyle.muted; }
                 FlatSurface {
                     x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
                     background: remote-id-editor.has-focus ? ControlStyle.input-focused : ControlStyle.input-surface;
@@ -1485,14 +1486,14 @@ export component MainWindow inherits Window {
                     animate outline-color { duration: 120ms; }
                     if root.remote-id-input == "": Text {
                         x: 12px; width: parent.width - 24px; height: parent.height;
-                        text: root.lan-mode ? "192.168.1.20:52888" : GalleryStrings.tr("请输入 9 位设备 ID", "Enter a 9-digit device ID", "Введите ID из 9 цифр");
+                        text: root.lan-mode ? "192.168.1.20:52888" : GalleryStrings.texts[86];
                         font-size: 13px; color: ControlStyle.input-placeholder; vertical-alignment: center;
                     }
                     remote-id-editor := TextInput {
                         x: 12px; width: parent.width - 24px; height: parent.height;
                         text <=> root.remote-id-input; font-size: root.lan-mode ? 18px : 24px; font-weight: 600; letter-spacing: root.lan-mode ? 0px : 1px;
                         input-type: root.lan-mode ? InputType.text : InputType.number; color: WorkbenchStyle.text;
-                        accessible-label: root.lan-mode ? GalleryStrings.tr("远端 IP / 端口", "Remote IP / Port", "Удалённый IP / Порт") : UiStrings.remote-id;
+                        accessible-label: root.lan-mode ? GalleryStrings.texts[85] : UiStrings.remote-id;
                         enabled: !root.connection-pending && !root.lan-connecting;
                         vertical-alignment: center;
                         selection-foreground-color: white; selection-background-color: WorkbenchStyle.accent;
@@ -1512,13 +1513,13 @@ export component MainWindow inherits Window {
                 Text {
                     x: 16px; y: 133px; width: parent.width - 32px; height: 24px;
                     text: root.connection-input-error != "" ? root.connection-input-error
-                        : root.lan-mode ? GalleryStrings.tr("不填端口时，默认使用 52888", "Port defaults to 52888 if omitted", "Без порта используется 52888") : "";
+                        : root.lan-mode ? GalleryStrings.texts[87] : "";
                     font-size: 11px; color: root.connection-input-error != "" ? #be3d42 : WorkbenchStyle.muted; wrap: word-wrap;
                 }
                 WorkbenchButton {
                     x: 16px; y: 158px; width: parent.width - 32px; height: 36px;
                     primary: true; icon: FontAwesomeIcons.arrow-right-long;
-                    text: root.connection-pending || root.lan-connecting ? GalleryStrings.tr("正在连接…", "Connecting…", "Подключение…") : UiStrings.connect;
+                    text: root.connection-pending || root.lan-connecting ? GalleryStrings.texts[56] : UiStrings.connect;
                     enabled: !root.connection-pending && !root.lan-connecting;
                     clicked => { root.submit-connection(); }
                 }
@@ -1566,19 +1567,19 @@ export component MainWindow inherits Window {
                     Text {
                         x: 84px; y: 36px; width: parent.width - 104px; height: 24px;
                         text: root.lan-mode
-                            ? GalleryStrings.tr("暂无近期 IP 连接", "No recent IP connections", "Нет недавних IP-подключений")
+                            ? GalleryStrings.texts[88]
                             : root.recent-group-index == 0
-                            ? GalleryStrings.tr("暂无近期连接", "No recent connections", "Нет недавних подключений")
-                            : GalleryStrings.tr("该分组暂无近期连接", "No recent connections in this group", "В этой группе нет недавних подключений");
+                            ? GalleryStrings.texts[89]
+                            : GalleryStrings.texts[90];
                         color: WorkbenchStyle.text; font-size: 14px; font-weight: 600;
                     }
                     Text {
                         x: 84px; y: 68px; width: parent.width - 104px; height: 20px;
                         text: root.lan-mode
-                            ? GalleryStrings.tr("通过 IP 连接过的设备会显示在这里。", "Devices you connect to by IP will appear here.", "Здесь появятся устройства, подключённые по IP.")
+                            ? GalleryStrings.texts[91]
                             : root.recent-group-index == 0
-                            ? GalleryStrings.tr("连接过的设备会显示在这里，方便下次快速访问。", "Devices you connect to will appear here for quick access.", "Устройства появятся здесь после первого подключения.")
-                            : GalleryStrings.tr("切换设备分组，查看其他连接记录。", "Choose another group to see your other connections.", "Выберите другую группу для просмотра подключений.");
+                            ? GalleryStrings.texts[92]
+                            : GalleryStrings.texts[93];
                         color: WorkbenchStyle.muted; font-size: 12px;
                     }
                 }
@@ -1762,12 +1763,12 @@ export component MainWindow inherits Window {
                                 compact-trigger: true;
                                 compact-menu: true;
                                 enabled: !root.gallery-mode;
-                                text: GalleryStrings.tr("更多操作", "More actions", "Другие действия");
-                                menu-width: root.compact-language ? 116px : root.language-index == 2 ? 156px : 128px;
+                                text: GalleryStrings.texts[94];
+                                menu-width: root.compact-language ? 116px : 156px;
                                 items: [
-                                    {label: GalleryStrings.tr("修改名称", "Rename", "Переименовать"), enabled: true},
-                                    {label: GalleryStrings.tr("修改分组", "Edit groups", "Изменить группы"), enabled: !connection.lan},
-                                    {label: GalleryStrings.tr("删除记录", "Delete record", "Удалить запись"), enabled: true},
+                                    {label: GalleryStrings.texts[35], enabled: true},
+                                    {label: GalleryStrings.texts[30], enabled: !connection.lan},
+                                    {label: GalleryStrings.texts[95], enabled: true},
                                 ];
                                 item-icons: [FontAwesomeIcons.pen, FontAwesomeIcons.tags, FontAwesomeIcons.trash-can];
                                 destructive-index: 2;
@@ -1794,7 +1795,7 @@ export component MainWindow inherits Window {
                                 primary: !connection.connected;
                                 destructive: connection.connected;
                                 icon: connection.connected ? FontAwesomeIcons.xmark : FontAwesomeIcons.arrow-right-long;
-                                tooltip: connection.connected ? GalleryStrings.tr("断开连接", "Disconnect", "Отключить") : UiStrings.connect;
+                                tooltip: connection.connected ? GalleryStrings.texts[96] : UiStrings.connect;
                                 tooltip-above: true;
                                 clicked => {
                                     root.copy-feedback = CopyFeedback.idle;
@@ -1884,7 +1885,7 @@ export component MainWindow inherits Window {
                     height: parent.height;
                     width: parent.width - 160px;
                     overflow: elide;
-                    text: root.lan-mode ? (root.lan-message != "" ? LanStrings.error-message(root.lan-message) : root.lan-listener-error != "" ? (root.lan-listener-address == "" ? "" : root.lan-listener-address + " · ") + LanStrings.error-message(root.lan-listener-error) : root.lan-listening ? GalleryStrings.tr("IP 连接已启用", "IP connections enabled", "Подключения по IP включены") : root.lan-password-pending ? GalleryStrings.tr("IP 连接准备中…", "Preparing IP connections…", "Подготовка подключений по IP…") : GalleryStrings.tr("IP 连接未就绪", "IP connections not ready", "Подключения по IP не готовы"))
+                    text: root.lan-mode ? (root.lan-message != "" ? LanStrings.error-message(root.lan-message) : root.lan-listener-error != "" ? (root.lan-listener-address == "" ? "" : root.lan-listener-address + " · ") + LanStrings.error-message(root.lan-listener-error) : root.lan-listening ? GalleryStrings.texts[97] : root.lan-password-pending ? GalleryStrings.texts[98] : GalleryStrings.texts[99])
                           : root.signal-tls-error ? UiStrings.tls-error
                           : root.signal-connected ? UiStrings.signal-connected
                           : root.signal-reconnecting ? UiStrings.signal-reconnecting
@@ -1969,7 +1970,7 @@ export component MainWindow inherits Window {
             tooltip-status-text := Text {
                 x: 7px; width: parent.width - 14px; height: parent.height;
                 text: device-tip.online ? UiStrings.online : device-tip.presence-known ? UiStrings.offline
-                    : GalleryStrings.tr("未知", "Unknown", "Неизвестно");
+                    : GalleryStrings.texts[100];
                 color: device-tip.status-color; font-size: 10px; font-weight: 600;
                 vertical-alignment: center;
             }
@@ -2013,14 +2014,14 @@ export component MainWindow inherits Window {
         tooltip-group-label := Text {
             x: 12px; y: tooltip-groups.y;
             width: device-tip.label-width; height: 16px;
-            text: GalleryStrings.tr("分组", "Groups", "Группы");
+            text: GalleryStrings.texts[101];
             color: WorkbenchStyle.muted; font-size: 10px;
             vertical-alignment: center;
         }
         tooltip-groups := Text {
             x: 20px + device-tip.label-width; y: tooltip-id-label.y + tooltip-id-label.height + 4px;
             width: parent.width - self.x - 12px; height: max(16px, self.preferred-height);
-            text: device-tip.group-names == "" ? GalleryStrings.tr("未分组", "Ungrouped", "Без группы") : device-tip.group-names;
+            text: device-tip.group-names == "" ? GalleryStrings.texts[31] : device-tip.group-names;
             color: device-tip.group-names == "" ? WorkbenchStyle.muted : WorkbenchStyle.accent;
             font-size: 10px;
             wrap: word-wrap; horizontal-alignment: right; vertical-alignment: center;
@@ -2220,8 +2221,8 @@ export component MainWindow inherits Window {
         error: root.copy-feedback == CopyFeedback.failed;
         icon: self.error ? FontAwesomeIcons.xmark : FontAwesomeIcons.check;
         text: self.error
-            ? GalleryStrings.tr("复制失败，请重试", "Couldn’t copy. Try again", "Не удалось скопировать. Повторите попытку")
-            : root.lan-mode ? GalleryStrings.tr("IP 和端口已复制", "IP and port copied", "IP и порт скопированы") : UiStrings.copied;
+            ? GalleryStrings.texts[102]
+            : root.lan-mode ? GalleryStrings.texts[103] : UiStrings.copied;
         z: 30;
     }
 
@@ -2332,7 +2333,7 @@ export component MainWindow inherits Window {
             height: 140px;
             VerticalLayout {
                 padding: 20px; spacing: 18px;
-                DialogPromptText { prompt: root.delete-from-gallery ? (root.gallery-group-index > 0 ? GalleryStrings.tr("从当前分组移除此设备？", "Remove from this group?", "Убрать из этой группы?") : GalleryStrings.tr("从桌面墙移除此设备？", "Remove from DeskHub?", "Убрать из DeskHub?")) : UiStrings.confirm-delete; }
+                DialogPromptText { prompt: root.delete-from-gallery ? (root.gallery-group-index > 0 ? GalleryStrings.texts[104] : GalleryStrings.texts[105]) : UiStrings.confirm-delete; }
                 HorizontalLayout {
                     alignment: center; spacing: 8px;
                     PrimaryButton { text: UiStrings.ok; clicked => { if root.delete-from-gallery { root.gallery-action("remove", root.delete-remote-id); } else { root.recent-delete(root.delete-remote-id); } root.delete-open = false; } }
@@ -2385,7 +2386,7 @@ export component MainWindow inherits Window {
                     padding: 24px;
                     spacing: 16px;
                     Text {
-                        text: GalleryStrings.tr("确认断开连接？", "Disconnect this session?", "Отключить этот сеанс?");
+                        text: GalleryStrings.texts[106];
                         color: WorkbenchStyle.text;
                         font-size: 18px;
                         font-weight: 600;
@@ -2407,7 +2408,7 @@ export component MainWindow inherits Window {
                         }
                     }
                     Text {
-                        text: GalleryStrings.tr("当前远程控制会话将结束。", "The current remote session will end.", "Текущий сеанс удалённого управления будет завершён.");
+                        text: GalleryStrings.texts[107];
                         color: WorkbenchStyle.muted;
                         font-size: 13px;
                         wrap: word-wrap;
@@ -2420,7 +2421,7 @@ export component MainWindow inherits Window {
                             clicked => { root.dismiss-disconnect(); }
                         }
                         disconnect-confirm := WorkbenchButton {
-                            text: GalleryStrings.tr("断开连接", "Disconnect", "Отключить");
+                            text: GalleryStrings.texts[96];
                             destructive: true;
                             clicked => {
                                 let remote-id = root.disconnect-remote-id;
@@ -2548,9 +2549,9 @@ export component MainWindow inherits Window {
                     spacing: 12px;
                     for permission[index] in [
                         {label: UiStrings.accessibility-permission, granted: root.accessibility-granted,
-                         description: GalleryStrings.tr("允许远程键盘和鼠标控制", "Allow remote keyboard and mouse input", "Разрешить удалённый ввод с клавиатуры и мыши")},
+                         description: GalleryStrings.texts[108]},
                         {label: UiStrings.screen-recording-permission, granted: root.screen-recording-granted,
-                         description: GalleryStrings.tr("允许共享此 Mac 的屏幕画面", "Allow sharing this Mac’s screen", "Разрешить показ экрана этого Mac")},
+                         description: GalleryStrings.texts[109]},
                     ]: WorkbenchCard {
                         height: max(80px, permission-labels.preferred-height + 32px);
                         permission-labels := VerticalLayout {
@@ -2571,7 +2572,7 @@ export component MainWindow inherits Window {
                             height: 36px;
                             permission-action-metrics := Text {
                                 visible: false; font-size: 13px; font-weight: 600;
-                                text: GalleryStrings.tr("前往设置", "Open settings", "Настройки");
+                                text: GalleryStrings.texts[110];
                             }
                             if !permission.granted: WorkbenchButton {
                                 width: parent.width; height: parent.height; primary: true;
@@ -2590,7 +2591,7 @@ export component MainWindow inherits Window {
                                     vertical-alignment: center; accessible-role: none;
                                 }
                                 Text {
-                                    text: GalleryStrings.tr("已授权", "Granted", "Разрешено");
+                                    text: GalleryStrings.texts[111];
                                     font-size: 12px; color: WorkbenchStyle.success; vertical-alignment: center;
                                 }
                             }
@@ -2601,9 +2602,7 @@ export component MainWindow inherits Window {
                     spacing: 12px;
                     SurfaceSeparator { height: 1px; outline-color: UiSurface.separator; }
                     Text {
-                        text: GalleryStrings.tr("请在系统设置中允许 CrossDesk 访问。如系统提示重新打开应用，请按提示操作。",
-                            "Allow CrossDesk access in System Settings. Reopen the app if macOS asks you to.",
-                            "Разрешите доступ для CrossDesk в Системных настройках. Перезапустите приложение, если macOS попросит об этом.");
+                        text: GalleryStrings.texts[112];
                         font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                     }
                 }
@@ -2645,7 +2644,7 @@ export component MainWindow inherits Window {
                     background: WorkbenchStyle.accent; border-radius: UiRadius.control;
                     animate x { duration: 180ms; easing: ease-in-out; }
                 }
-                for label[index] in [GalleryStrings.tr("常规", "General", "Общие"), GalleryStrings.tr("桌面墙", "DeskHub", "DeskHub")]: Rectangle {
+                for label[index] in [GalleryStrings.texts[113], GalleryStrings.texts[54]]: Rectangle {
                     x: index == 1 ? parent.width / 2 + 1px : 2px;
                     y: 2px; width: (parent.width - 6px) / 2; height: parent.height - 4px;
                     accessible-role: button; accessible-label: label;
@@ -2683,14 +2682,14 @@ export component MainWindow inherits Window {
                         padding-right: settings-dialog.scrollbar-gutter; padding-bottom: 4px;
                         spacing: 14px;
                         SettingsGroup {
-                            title: GalleryStrings.tr("界面", "Interface", "Интерфейс"); rows: 1;
+                            title: GalleryStrings.texts[114]; rows: 1;
                             SettingsRow {
                                 label: UiStrings.language; divider: false;
-                                SettingsSelect { x: parent.width - 116px; y: 4px; width: 104px; model: ["中文", "English", "Русский"]; current-index <=> root.language-index; }
+                                SettingsSelect { x: parent.width - 192px; y: 4px; width: 180px; model: root.language-options; current-index <=> root.language-index; }
                             }
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("视频", "Video", "Видео");
+                            title: GalleryStrings.texts[115];
                             rows: root.capture-method-visible ? 2 : 1;
                             if root.capture-method-visible: SettingsRow {
                                 label: UiStrings.capture-method; enabled: !root.settings-session-active;
@@ -2702,9 +2701,9 @@ export component MainWindow inherits Window {
                             }
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("网络连接", "Network", "Сеть"); rows: 3;
+                            title: GalleryStrings.texts[116]; rows: 3;
                             SettingsToggleRow {
-                                label: GalleryStrings.tr("启用 IP 连接", "Enable IP connections", "Подключение по IP");
+                                label: GalleryStrings.texts[117];
                                 checked <=> root.ip-direct-enabled-draft;
                             }
                             SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: !root.settings-session-active; }
@@ -2715,7 +2714,7 @@ export component MainWindow inherits Window {
                                 self-host-edit := SettingsButton {
                                     x: parent.width - self.width - 60px; y: 4px;
                                     width: self-host-edit-metrics.preferred-width + 24px; height: 28px;
-                                    text: GalleryStrings.tr("编辑", "Edit", "Изменить");
+                                    text: GalleryStrings.texts[118];
                                     enabled: !root.settings-session-active;
                                     clicked => { root.self-host-settings-open = true; }
                                     self-host-edit-metrics := Text {
@@ -2726,21 +2725,21 @@ export component MainWindow inherits Window {
                             }
                         }
                         Text {
-                            text: GalleryStrings.tr("关闭 IP 连接将隐藏模式按钮，并断开 IP 连接会话。", "Disabling IP connections hides the mode button and ends IP sessions.", "Отключение подключений по IP скроет кнопку режима и завершит IP-сеансы.");
+                            text: GalleryStrings.texts[119];
                             font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 3;
+                            title: GalleryStrings.texts[120]; rows: 3;
                             SettingsToggleRow { label: UiStrings.privacy-on-connect; checked <=> root.privacy-on-connect-enabled; enabled: root.privacy-setting-available; }
                             SettingsToggleRow { label: UiStrings.privacy-local-unlock; checked <=> root.privacy-local-unlock-allowed; enabled: root.privacy-setting-available; }
                             SettingsToggleRow { label: UiStrings.lock-on-disconnect; checked <=> root.lock-on-disconnect-enabled; enabled: root.lock-on-disconnect-available; divider: false; }
                         }
                         Text {
-                            text: GalleryStrings.tr("最后一个远程控制端断开后，自动锁定本机。", "Lock this device when the last remote controller disconnects.", "Блокировать это устройство после отключения последнего управляющего клиента.");
+                            text: GalleryStrings.texts[121];
                             font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("本地存储", "Local storage", "Локальное хранение"); rows: 2;
+                            title: GalleryStrings.texts[122]; rows: 2;
                             SettingsToggleRow { label: UiStrings.save-remote-previews; checked <=> root.save-remote-previews; }
                             SettingsRow {
                                 label: UiStrings.file-save-path; enabled: !root.settings-session-active; divider: false;
@@ -2748,7 +2747,7 @@ export component MainWindow inherits Window {
                             }
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("启动与后台", "Startup & background", "Запуск и фоновая работа"); rows: 2;
+                            title: GalleryStrings.texts[123]; rows: 2;
                             if !root.autostart-system-managed: SettingsToggleRow { label: UiStrings.autostart; checked <=> root.autostart-enabled; enabled: !root.settings-session-active; }
                             if root.autostart-system-managed: SettingsToggleRow {
                                 label: UiStrings.autostart;
@@ -2784,12 +2783,12 @@ export component MainWindow inherits Window {
                 width: parent.width - 2 * settings-dialog.content-inset; height: 32px; spacing: 10px;
                 Rectangle { horizontal-stretch: 1; }
                 SettingsButton {
-                    width: 80px; text: UiStrings.cancel;
+                    width: max(80px, self.label-width); text: UiStrings.cancel;
                     clicked => { root.cancel-settings(); root.settings-open = false; root.self-host-settings-open = false; }
                 }
                 SettingsButton {
-                    width: 92px; primary: true;
-                    text: GalleryStrings.tr("保存", "Save", "Сохранить");
+                    width: max(92px, self.label-width); primary: true;
+                    text: GalleryStrings.texts[34];
                     clicked => { if root.save-settings() { root.settings-open = false; root.self-host-settings-open = false; } }
                 }
             }
@@ -2807,7 +2806,7 @@ export component MainWindow inherits Window {
             TouchArea { clicked => { focus-sink.focus(); } }
             Text {
                 x: 24px; y: 18px; width: parent.width - 48px; height: 26px;
-                text: GalleryStrings.tr("设置开机自启动", "Set up auto start", "Настройка автозапуска");
+                text: GalleryStrings.texts[124];
                 font-size: 18px; font-weight: 600; color: WorkbenchStyle.text;
             }
             ScrollView {
@@ -2819,25 +2818,20 @@ export component MainWindow inherits Window {
                     width: parent.width; padding: 0px; spacing: 12px;
                     Text { text: root.autostart-status-text; color: WorkbenchStyle.accent; font-size: 13px; wrap: word-wrap; }
                     Text {
-                        text: root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.tr(
-                            "当前设备不支持开机自启动。", "This device does not support auto start.", "Это устройство не поддерживает автозапуск.") :
-                            root.autostart-status == AutostartStatus.failed ? GalleryStrings.tr(
-                            "无法读取系统状态。请刷新重试，或在系统设置中核对。", "Could not read the system status. Refresh to retry, or check System Settings.", "Не удалось прочитать состояние. Повторите попытку или проверьте настройки системы.") :
-                            GalleryStrings.tr("请在系统设置中添加或移除本应用，返回后会自动刷新状态。", "Add or remove this app in system Settings. The status refreshes when you return.", "Добавьте или удалите приложение в настройках системы. После возвращения статус обновится.");
+                        text: root.autostart-status == AutostartStatus.unsupported ? GalleryStrings.texts[125] :
+                            root.autostart-status == AutostartStatus.failed ? GalleryStrings.texts[126] :
+                            GalleryStrings.texts[127];
                         color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
                     }
                     if root.autostart-status != AutostartStatus.unsupported: Text {
-                        text: GalleryStrings.tr(
-                            "设置 → 应用和元服务 → 应用启动管理\n\n开启：点击“添加应用”，选择 CrossDesk，然后点击“完成”。\n\n关闭：在自启动列表中找到本应用，点击“移除”。",
-                            "Settings → Apps & services → App startup management\n\nEnable: choose Add app, select CrossDesk, then choose Done.\n\nDisable: find this app in the startup list and choose Remove.",
-                            "Настройки → Приложения и сервисы → Управление запуском\n\nВключить: добавьте CrossDesk в список и подтвердите выбор.\n\nВыключить: удалите приложение из списка автозапуска.");
+                        text: GalleryStrings.texts[128];
                         color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
                     }
                 }
             }
             SettingsButton {
                 x: 24px; y: parent.height - 48px; width: 112px;
-                text: GalleryStrings.tr("刷新状态", "Refresh status", "Обновить статус");
+                text: GalleryStrings.texts[129];
                 enabled: root.autostart-status != AutostartStatus.checking;
                 clicked => { root.refresh-autostart-status(); }
             }
@@ -2882,7 +2876,7 @@ export component MainWindow inherits Window {
             }
             SurfaceSeparator { x: 18px; y: parent.height - 66px; width: parent.width - 36px; height: 1px; outline-color: UiSurface.separator; }
             SettingsButton { x: parent.width - 114px; y: parent.height - 50px; width: 92px; primary: true; text: UiStrings.ok; clicked => { if root.save-self-hosted-settings() { root.self-host-settings-open = false; } } }
-            SettingsButton { x: parent.width - 204px; y: parent.height - 50px; width: 80px; text: UiStrings.cancel; clicked => { root.cancel-self-hosted-settings(); root.self-host-settings-open = false; } }
+            SettingsButton { x: parent.width - 124px - self.width; y: parent.height - 50px; width: max(80px, self.label-width); text: UiStrings.cancel; clicked => { root.cancel-self-hosted-settings(); root.self-host-settings-open = false; } }
         }
     }
 

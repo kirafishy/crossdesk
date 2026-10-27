@@ -19,12 +19,12 @@ export struct AboutComponent {
 }
 
 export global AboutStrings {
-    out property <string> software-license: GalleryStrings.tr("软件许可", "Software license", "Лицензия программы");
-    out property <string> components: GalleryStrings.tr("开源组件", "Open-source components", "Компоненты с открытым кодом");
-    out property <string> source: GalleryStrings.tr("源码与构建说明", "Source code and build instructions", "Исходный код и сборка");
-    out property <string> notices: GalleryStrings.tr("许可与版权声明", "Licenses and copyright notices", "Лицензии и авторские права");
-    out property <string> view-source: GalleryStrings.tr("查看源码", "View source code", "Открыть исходный код");
-    out property <string> back: GalleryStrings.tr("返回", "Back", "Назад");
+    out property <string> software-license: GalleryStrings.texts[130];
+    out property <string> components: GalleryStrings.texts[131];
+    out property <string> source: GalleryStrings.texts[132];
+    out property <string> notices: GalleryStrings.texts[133];
+    out property <string> view-source: GalleryStrings.texts[134];
+    out property <string> back: GalleryStrings.texts[135];
 }
 
 export component AboutNavigationGroup inherits FlatSurface {
@@ -137,7 +137,7 @@ export component AboutPanel inherits SettingsDialog {
             if root.page == AboutPage.components: VerticalLayout {
                 padding: 0px; spacing: 10px;
                 Text {
-                    text: GalleryStrings.tr("以下列出本版本的主要开源组件。各组件遵循各自的开源许可。", "Main open-source components used in this build. Each component is covered by its own license.", "Основные открытые компоненты этой сборки. Каждый распространяется по своей лицензии.");
+                    text: GalleryStrings.texts[136];
                     color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
                 }
                 Rectangle {
@@ -146,9 +146,9 @@ export component AboutPanel inherits SettingsDialog {
                     notice := VerticalLayout {
                         x: 16px; y: 16px; width: parent.width - 32px;
                         height: self.preferred-height; spacing: 12px;
-                        Text { text: GalleryStrings.tr("OpenFEC 告知", "OpenFEC notice", "Уведомление OpenFEC"); color: WorkbenchStyle.text; font-size: 14px; font-weight: 600; }
+                        Text { text: GalleryStrings.texts[137]; color: WorkbenchStyle.text; font-size: 14px; font-weight: 600; }
                         Text {
-                            text: GalleryStrings.tr("本应用使用 OpenFEC 提供前向纠错功能，遵循 CeCILL-C 1.0 许可。该许可规定了有限保证及责任限制，详情见许可全文。", "This application uses OpenFEC for forward error correction under CeCILL-C 1.0, which provides limited warranties and limits liability. See the full license for details.", "Приложение использует OpenFEC для прямого исправления ошибок по лицензии CeCILL-C 1.0 с ограниченной гарантией и ответственностью. Подробности — в тексте лицензии.");
+                            text: GalleryStrings.texts[138];
                             color: WorkbenchStyle.muted; font-size: 13px; wrap: word-wrap;
                             font-family: "CrossDesk Message Spacing";
                         }
@@ -158,7 +158,7 @@ export component AboutPanel inherits SettingsDialog {
                             font-family: "CrossDesk Message Spacing";
                         }
                         if root.openfec-index >= 0: AboutNavigationRow {
-                            title: GalleryStrings.tr("OpenFEC 许可与源码", "OpenFEC license and source", "Лицензия и исходный код OpenFEC");
+                            title: GalleryStrings.texts[139];
                             clicked => { root.component-index = root.openfec-index; root.page = AboutPage.component; }
                         }
                     }
@@ -185,24 +185,24 @@ export component AboutPanel inherits SettingsDialog {
                     clicked => { root.document-index = index; root.page = AboutPage.document; }
                 }
                 if root.selected.documents.length == 0: Text {
-                    text: GalleryStrings.tr("本组件未内置许可文本，请通过“查看源码”查阅许可与版权声明。", "License text is not bundled for this component. Use View source code to read its license and copyright notices.", "Текст лицензии не включён. Откройте исходный код для просмотра лицензии и авторских прав.");
+                    text: GalleryStrings.texts[140];
                     color: WorkbenchStyle.muted; font-size: 12px; wrap: word-wrap;
                 }
             }
             if root.page == AboutPage.source: VerticalLayout {
                 padding: 0px; spacing: 12px;
                 Text {
-                    text: root.revision != "" ? GalleryStrings.tr("源码版本：", "Source revision: ", "Ревизия исходного кода: ") + root.revision
-                        : GalleryStrings.tr("本版本源码信息暂不可用。", "Source revision is unavailable for this build.", "Ревизия исходного кода этой сборки недоступна.");
+                    text: root.revision != "" ? GalleryStrings.texts[141] + root.revision
+                        : GalleryStrings.texts[142];
                     color: WorkbenchStyle.text; font-size: 13px; wrap: word-wrap;
                 }
                 AboutNavigationRow { title: AboutStrings.view-source; external: true; clicked => { root.open-link(root.source-url); } }
                 AboutNavigationRow {
-                    title: GalleryStrings.tr("构建说明", "Build instructions", "Инструкции по сборке"); external: true;
+                    title: GalleryStrings.texts[143]; external: true;
                     clicked => { root.open-link(root.build-url); }
                 }
                 AboutNavigationRow {
-                    title: GalleryStrings.tr("项目主页", "Project website", "Сайт проекта"); external: true;
+                    title: GalleryStrings.texts[144]; external: true;
                     clicked => { root.open-link("https://crossdesk.cn"); }
                 }
             }

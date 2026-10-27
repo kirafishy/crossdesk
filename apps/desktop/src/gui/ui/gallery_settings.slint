@@ -9,31 +9,31 @@ export component GallerySettings inherits Rectangle {
     in property <string> error;
     SettingsGroup {
         y: 0px; width: parent.width;
-        title: GalleryStrings.tr("画面传输", "Video transmission", "Передача видео"); rows: 3;
+        title: GalleryStrings.texts[145]; rows: 3;
         SettingsRow {
-            label: GalleryStrings.tr("分辨率上限", "Resolution limit", "Макс. разрешение");
+            label: GalleryStrings.texts[146];
             label-reserve: self.width - 112px;
             SettingsSelect {
                 border-radius: UiRadius.control;
                 x: 136px; y: 4px; width: parent.width - 150px;
                 current-index <=> root.resolution-index;
-                model: [GalleryStrings.tr("自动", "Auto", "Авто"),
+                model: [GalleryStrings.texts[147],
                     "320 × 180", "640 × 360", "1280 × 720", "1920 × 1080", "2560 × 1440", "3840 × 2160",
-                    GalleryStrings.tr("原始分辨率", "Original resolution", "Исходное разрешение")];
+                    GalleryStrings.texts[148]];
             }
         }
         SettingsRow {
-            label: GalleryStrings.tr("帧率", "Frame rate", "Частота кадров");
+            label: GalleryStrings.texts[149];
             label-reserve: self.width - 112px;
             SettingsSelect {
                 border-radius: UiRadius.control;
                 x: 136px; y: 4px; width: parent.width - 150px;
                 current-index <=> root.frame-rate-index;
-                model: [GalleryStrings.tr("跟随设备设置", "Follow device settings", "Настройки устройства"), "15 FPS", "30 FPS", "60 FPS"];
+                model: [GalleryStrings.texts[150], "15 FPS", "30 FPS", "60 FPS"];
             }
         }
         SettingsRow {
-            label: GalleryStrings.tr("视频总带宽", "Total bandwidth", "Общий битрейт");
+            label: GalleryStrings.texts[151];
             label-reserve: self.width - 112px; divider: false;
             SettingsSelect {
                 border-radius: UiRadius.control;

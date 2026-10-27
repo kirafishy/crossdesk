@@ -29,11 +29,11 @@ final class VirtualMouseBar extends LinearLayout {
         shell.setStroke(ui.dp(.5f), 0xFFD4DAE2);
         setBackground(shell);
         setMotionEventSplittingEnabled(true);
-        keys[0] = key("鼠标左键，按住并拖动，松开结束拖拽", 0);
-        keys[1] = key("鼠标滚轮，上下滑动，可滑出按键范围", 1);
-        keys[2] = key("鼠标右键，按住并拖动，松开结束拖拽", 2);
+        keys[0] = key(L10n.tr("鼠标左键，按住并拖动，松开结束拖拽"), 0);
+        keys[1] = key(L10n.tr("鼠标滚轮，上下滑动，可滑出按键范围"), 1);
+        keys[2] = key(L10n.tr("鼠标右键，按住并拖动，松开结束拖拽"), 2);
         input.didCancel = this::resetTouches;
-        setContentDescription("虚拟鼠标");
+        setContentDescription(L10n.tr("虚拟鼠标"));
     }
 
     @SuppressLint("ClickableViewAccessibility") // Touch sends real down/up; performClick serves accessibility only.

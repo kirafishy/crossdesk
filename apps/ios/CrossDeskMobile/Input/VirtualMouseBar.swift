@@ -64,8 +64,8 @@ private final class VirtualMouseKey: UIView {
         isMultipleTouchEnabled = false
         isAccessibilityElement = true
         accessibilityTraits = kind == .wheel ? [.adjustable] : [.button]
-        accessibilityLabel = kind == .left ? "鼠标左键" : kind == .right ? "鼠标右键" : "鼠标滚轮"
-        accessibilityHint = kind == .wheel ? "上下滑动，可滑出按键范围" : "按住并拖动，可滑出按键范围，松开结束拖拽"
+        accessibilityLabel = kind == .left ? NSLocalizedString("鼠标左键", comment: "") : kind == .right ? NSLocalizedString("鼠标右键", comment: "") : NSLocalizedString("鼠标滚轮", comment: "")
+        accessibilityHint = kind == .wheel ? NSLocalizedString("上下滑动，可滑出按键范围", comment: "") : NSLocalizedString("按住并拖动，可滑出按键范围，松开结束拖拽", comment: "")
         face.isUserInteractionEnabled = false
         face.layer.mask = faceMask
         addSubview(face)

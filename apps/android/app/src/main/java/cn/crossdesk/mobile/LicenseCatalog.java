@@ -28,9 +28,9 @@ final class LicenseCatalog {
             if(documents.isEmpty())throw new JSONException("Missing documents");
         }
         String documentTitle(Document document){
-            if(document.title.equals("Source copyright and license notices"))return "版权与许可声明";
-            if(document.title.equals("apps/android/licenses/OPEN_SOURCE_NOTICE.txt"))return "开源软件权利说明";
-            if(id.equals("crossdesk")&&document.title.equals("LICENSE"))return "GNU GPL 第 3 版";
+            if(document.title.equals("Source copyright and license notices"))return L10n.tr("版权与许可声明");
+            if(document.title.equals("apps/android/licenses/OPEN_SOURCE_NOTICE.txt"))return L10n.tr("开源软件权利说明");
+            if(id.equals("crossdesk")&&document.title.equals("LICENSE"))return L10n.tr("GNU GPL 第 3 版");
             return document.title;
         }
     }

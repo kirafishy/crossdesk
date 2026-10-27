@@ -65,11 +65,11 @@ struct ContentView: View {
                 .presentationDragIndicator(.hidden)
                 .interactiveDismissDisabled()
         }
-        .alert("连接提示", isPresented: Binding(
+        .alert(NSLocalizedString("连接提示", comment: ""), isPresented: Binding(
             get: { session.connectionFailureMessage != nil },
             set: { if !$0 { session.dismissConnectionFailure() } }
         )) {
-            Button("确定", role: .cancel) { session.dismissConnectionFailure() }
+            Button(NSLocalizedString("确定", comment: ""), role: .cancel) { session.dismissConnectionFailure() }
         } message: {
             Text(session.connectionFailureMessage ?? "")
         }
@@ -196,17 +196,8 @@ private struct ConnectionHomeView: View {
         )
     }
 
-    private var signalIsConnected: Bool {
-        session.signalStatus == "已连接服务器"
-    }
-
-    private var signalHasError: Bool {
-        session.signalStatus.contains("失败") ||
-            session.signalStatus.contains("无法") ||
-            session.signalStatus.contains("无效") ||
-            session.signalStatus.contains("关闭") ||
-            session.signalStatus.contains("未知")
-    }
+    private var signalIsConnected: Bool { session.signalConnected }
+    private var signalHasError: Bool { session.signalHasError }
 
     private var signalTint: Color {
         if signalIsConnected { return .green }
@@ -303,13 +294,13 @@ private struct ConnectionHomeView: View {
             .presentationDetents([.height(340)])
             .presentationDragIndicator(.visible)
         }
-        .alert("设备离线", isPresented: Binding(
+        .alert(NSLocalizedString("设备离线", comment: ""), isPresented: Binding(
             get: { session.deviceOfflineAlertVisible },
             set: { visible in
                 if !visible { session.dismissDeviceOfflineAlert() }
             }
         )) {
-            Button("确定") {
+            Button(NSLocalizedString("确定", comment: "")) {
                 session.dismissDeviceOfflineAlert()
             }
         }
@@ -337,7 +328,7 @@ private struct ConnectionHomeView: View {
                         .fixedSize(horizontal: true, vertical: false)
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("打开隐私政策")
+                .accessibilityHint(NSLocalizedString("打开隐私政策", comment: ""))
             }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -369,7 +360,7 @@ private struct ConnectionHomeView: View {
             }
             .foregroundStyle(.primary)
             .disabled(session.isConnecting)
-            .accessibilityLabel(appUpdates.updateAvailable ? "设置，有新版本" : "设置")
+            .accessibilityLabel(appUpdates.updateAvailable ? NSLocalizedString("设置，有新版本", comment: "") : NSLocalizedString("设置", comment: ""))
         }
     }
 
@@ -398,13 +389,13 @@ private struct ConnectionHomeView: View {
     private var remoteConnectionPanel: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("远程桌面")
+                Text(NSLocalizedString("远程桌面", comment: ""))
                     .font(.title3.weight(.bold))
                 Spacer()
             }
 
             HStack(spacing: 10) {
-                TextField("对端 ID", text: groupedRemoteID)
+                TextField(NSLocalizedString("对端 ID", comment: ""), text: groupedRemoteID)
                     .keyboardType(.numberPad)
                     .textContentType(.username)
                     .textInputAutocapitalization(.never)
@@ -431,8 +422,10 @@ private struct ConnectionHomeView: View {
                 Button {
                     presentPasswordPrompt(for: trimmedRemoteID)
                 } label: {
-                    Text("连接")
+                    Text(NSLocalizedString("连接", comment: ""))
                         .font(.system(size: 16, weight: .bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
                         .frame(width: 96, height: 54)
                         .foregroundStyle(.white)
                         .background(LinearGradient(colors: [
@@ -447,7 +440,7 @@ private struct ConnectionHomeView: View {
                 .buttonStyle(.plain)
                 .disabled(trimmedRemoteID.isEmpty || session.isConnecting)
                 .opacity(trimmedRemoteID.isEmpty || session.isConnecting ? 0.45 : 1)
-                .accessibilityLabel("连接")
+                .accessibilityLabel(NSLocalizedString("连接", comment: ""))
             }
         }
         .padding(18)
@@ -464,11 +457,11 @@ private struct ConnectionHomeView: View {
     private func recentConnectionsPanel(windowWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
-                Text("最近连接")
+                Text(NSLocalizedString("最近连接", comment: ""))
                     .font(.title3.bold())
                 Spacer()
                 if !session.recentConnections.isEmpty {
-                    Text("\(session.recentConnections.count) 台设备")
+                    Text(String(format: NSLocalizedString("%1$@ 台设备", comment: ""), String(describing: session.recentConnections.count)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -479,9 +472,9 @@ private struct ConnectionHomeView: View {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 30, weight: .medium))
                         .foregroundStyle(.tertiary)
-                    Text("还没有连接记录")
+                    Text(NSLocalizedString("还没有连接记录", comment: ""))
                         .font(.headline)
-                    Text("成功连接后，这里会显示远端桌面的缩略图。")
+                    Text(NSLocalizedString("成功连接后，这里会显示远端桌面的缩略图。", comment: ""))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -532,7 +525,7 @@ private struct ConnectionHomeView: View {
                         .tint(connectionAccent)
 
                     VStack(spacing: 6) {
-                        Text("正在连接")
+                        Text(NSLocalizedString("正在连接", comment: ""))
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.primary)
                         Text(session.connectionStatus)
@@ -550,7 +543,7 @@ private struct ConnectionHomeView: View {
                 Divider()
 
                 Button(role: .cancel, action: session.disconnect) {
-                    Text("取消连接")
+                    Text(NSLocalizedString("取消连接", comment: ""))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.red)
                         .frame(maxWidth: .infinity)
@@ -656,7 +649,7 @@ private struct RecentConnectionCard: View {
                             .minimumScaleFactor(0.8)
                             .foregroundStyle(.white)
                             .padding(8)
-                            .accessibilityLabel("被控端平台：\(connection.platform.displayName)")
+                            .accessibilityLabel(String(format: NSLocalizedString("被控端平台：%1$@", comment: ""), String(describing: connection.platform.displayName)))
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -678,12 +671,12 @@ private struct RecentConnectionCard: View {
                             Image(systemName: "key.fill")
                                 .font(.system(size: 9, weight: .semibold))
                                 .foregroundStyle(.secondary)
-                                .accessibilityLabel("已保存密码")
+                                .accessibilityLabel(NSLocalizedString("已保存密码", comment: ""))
                         }
-                        Text(online ? "在线" : "离线")
+                        Text(online ? NSLocalizedString("在线", comment: "") : NSLocalizedString("离线", comment: ""))
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(online ? Color.green : Color.secondary)
-                            .accessibilityLabel(online ? "在线" : "离线")
+                            .accessibilityLabel(online ? NSLocalizedString("在线", comment: "") : NSLocalizedString("离线", comment: ""))
                     }
                 }
                 .padding(9)
@@ -698,10 +691,10 @@ private struct RecentConnectionCard: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button(action: connect) {
-                Text("连接")
+                Text(NSLocalizedString("连接", comment: ""))
             }
             Button(role: .destructive, action: delete) {
-                Label("删除记录", systemImage: "trash")
+                Label(NSLocalizedString("删除记录", comment: ""), systemImage: "trash")
             }
         }
     }
@@ -722,9 +715,9 @@ private struct PasswordPromptView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("连接远程桌面")
+                    Text(NSLocalizedString("连接远程桌面", comment: ""))
                         .font(.title2.bold())
-                    Text("对端 ID  \(remoteID)")
+                    Text(String(format: NSLocalizedString("对端 ID  %1$@", comment: ""), String(describing: remoteID)))
                         .font(.subheadline.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -736,15 +729,15 @@ private struct PasswordPromptView: View {
                         .font(.title2)
                         .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel("关闭")
+                .accessibilityLabel(NSLocalizedString("关闭", comment: ""))
             }
 
             HStack(spacing: 10) {
                 Group {
                     if passwordVisible {
-                        TextField("访问密码", text: $password)
+                        TextField(NSLocalizedString("访问密码", comment: ""), text: $password)
                     } else {
-                        SecureField("访问密码", text: $password)
+                        SecureField(NSLocalizedString("访问密码", comment: ""), text: $password)
                     }
                 }
                 .keyboardType(.asciiCapable)
@@ -759,7 +752,7 @@ private struct PasswordPromptView: View {
                     Image(systemName: passwordVisible ? "eye.slash" : "eye")
                         .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel(passwordVisible ? "隐藏密码" : "显示密码")
+                .accessibilityLabel(passwordVisible ? NSLocalizedString("隐藏密码", comment: "") : NSLocalizedString("显示密码", comment: ""))
             }
             .padding(.horizontal, 13)
             .frame(height: 50)
@@ -773,16 +766,16 @@ private struct PasswordPromptView: View {
 
             Toggle(isOn: $rememberPassword) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("保存密码")
+                    Text(NSLocalizedString("保存密码", comment: ""))
                         .font(.subheadline.weight(.semibold))
-                    Text("密码将安全保存在本机 Keychain 中")
+                    Text(NSLocalizedString("密码将安全保存在本机 Keychain 中", comment: ""))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Button(action: connect) {
-                Text("连接")
+                Text(NSLocalizedString("连接", comment: ""))
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
@@ -823,16 +816,16 @@ private struct ServerSettingsView: View {
 
     var body: some View {
         Form {
-            Section("鼠标控制") {
-                Picker("控制模式", selection: $session.mouseControlMode) {
+            Section(NSLocalizedString("鼠标控制", comment: "")) {
+                Picker(NSLocalizedString("控制模式", comment: ""), selection: $session.mouseControlMode) {
                     ForEach(MouseControlMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
             }
-            Section("画面偏好") {
-                Picker("偏好模式", selection: $session.videoAdaptationPolicy) {
+            Section(NSLocalizedString("画面偏好", comment: "")) {
+                Picker(NSLocalizedString("偏好模式", comment: ""), selection: $session.videoAdaptationPolicy) {
                     ForEach(VideoAdaptationPolicy.allCases) { policy in
                         Text(policy.title).tag(policy)
                     }
@@ -840,18 +833,18 @@ private struct ServerSettingsView: View {
                 .pickerStyle(.segmented)
             }
             Section {
-                Toggle("连接建立后锁定横屏", isOn: $session.autoLandscape)
+                Toggle(NSLocalizedString("连接建立后锁定横屏", comment: ""), isOn: $session.autoLandscape)
             } header: {
-                Text("屏幕方向")
+                Text(NSLocalizedString("屏幕方向", comment: ""))
             } footer: {
-                Text("默认关闭。开启后，iPhone 连接时进入并保持横屏；关闭时跟随设备方向。iPad 不受影响。")
+                Text(NSLocalizedString("默认关闭。开启后，iPhone 连接时进入并保持横屏；关闭时跟随设备方向。iPad 不受影响。", comment: ""))
             }
             Section {
                 DisclosureGroup(isExpanded: $serverConfigurationExpanded) {
-                    Toggle("使用自定义服务器", isOn: $usesCustomServer)
+                    Toggle(NSLocalizedString("使用自定义服务器", comment: ""), isOn: $usesCustomServer)
                     if usesCustomServer {
-                        LabeledContent("地址") {
-                            TextField("填写服务器地址", text: $customServerHost)
+                        LabeledContent(NSLocalizedString("地址", comment: "")) {
+                            TextField(NSLocalizedString("填写服务器地址", comment: ""), text: $customServerHost)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .keyboardType(.URL)
@@ -859,21 +852,21 @@ private struct ServerSettingsView: View {
                                 .focused($focusedServerField, equals: .host)
                                 .submitLabel(.next)
                                 .onSubmit { focusedServerField = .port }
-                                .accessibilityLabel("服务器地址")
+                                .accessibilityLabel(NSLocalizedString("服务器地址", comment: ""))
                         }
-                        LabeledContent("端口") {
-                            TextField("填写端口", text: $customServerPort)
+                        LabeledContent(NSLocalizedString("端口", comment: "")) {
+                            TextField(NSLocalizedString("填写端口", comment: ""), text: $customServerPort)
                                 .keyboardType(.numberPad)
                                 .multilineTextAlignment(.trailing)
                                 .focused($focusedServerField, equals: .port)
-                                .accessibilityLabel("服务器端口")
+                                .accessibilityLabel(NSLocalizedString("服务器端口", comment: ""))
                         }
                     }
                 } label: {
                     HStack {
-                        Text("服务器")
+                        Text(NSLocalizedString("服务器", comment: ""))
                         Spacer()
-                        Text(usesCustomServer ? "自定义" : "默认")
+                        Text(usesCustomServer ? NSLocalizedString("自定义", comment: "") : NSLocalizedString("默认", comment: ""))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -886,9 +879,9 @@ private struct ServerSettingsView: View {
                     Text(warning)
                         .foregroundStyle(.orange)
                 }
-                Text(!session.hasNetworkConsent ? "完成隐私授权后登记本机身份" : session.localIdentity.isEmpty
-                     ? "正在获取本机 ID…"
-                     : "本机 ID  \(session.localIdentity)")
+                Text(!session.hasNetworkConsent ? NSLocalizedString("完成隐私授权后登记本机身份", comment: "") : session.localIdentity.isEmpty
+                     ? NSLocalizedString("正在获取本机 ID…", comment: "")
+                     : String(format: NSLocalizedString("本机 ID  %1$@", comment: ""), String(describing: session.localIdentity)))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -901,20 +894,20 @@ private struct ServerSettingsView: View {
                     ThirdPartyLicensesView(session: session)
                 } label: {
                     HStack {
-                        Text("关于")
+                        Text(NSLocalizedString("关于", comment: ""))
                         Spacer()
                         if appUpdates.updateAvailable {
-                            Text("新版本").foregroundStyle(.secondary)
+                            Text(NSLocalizedString("新版本", comment: "")).foregroundStyle(.secondary)
                             UpdateDot()
                         }
                     }
                 }
-                .accessibilityLabel(appUpdates.updateAvailable ? "关于，有新版本" : "关于")
+                .accessibilityLabel(appUpdates.updateAvailable ? NSLocalizedString("关于，有新版本", comment: "") : NSLocalizedString("关于", comment: ""))
             }
         }
         .readableContentWidth()
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("设置")
+        .navigationTitle(NSLocalizedString("设置", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .background {
@@ -943,7 +936,7 @@ private struct ServerSettingsView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("完成") {
+                Button(NSLocalizedString("完成", comment: "")) {
                     focusedServerField = nil
                 }
             }
@@ -965,11 +958,11 @@ private struct ServerSettingsView: View {
         let host = customServerHost.trimmingCharacters(in: .whitespacesAndNewlines)
         let port = customServerPort.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !host.isEmpty else {
-            serverConfigurationError = "请输入服务器地址，或关闭“使用自定义服务器”。"
+            serverConfigurationError = NSLocalizedString("请输入服务器地址，或关闭“使用自定义服务器”。", comment: "")
             return
         }
         guard let portNumber = Int(port), (1...65535).contains(portNumber) else {
-            serverConfigurationError = "请输入 1–65535 范围内的端口，或关闭“使用自定义服务器”。"
+            serverConfigurationError = NSLocalizedString("请输入 1–65535 范围内的端口，或关闭“使用自定义服务器”。", comment: "")
             return
         }
         serverConfigurationError = nil

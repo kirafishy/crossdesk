@@ -461,8 +461,7 @@ int SettingsManager::Load() {
       std::make_shared<Thumbnail>(owner_.cache_path_ + "/thumbnails/",
                                   owner_.aes128_key_, owner_.aes128_iv_);
 
-  owner_.language_button_value_ = localization::detail::ClampLanguageIndex(
-      static_cast<int>(owner_.config_center_->GetLanguage()));
+  owner_.language_button_value_ = static_cast<int>(owner_.config_center_->GetLanguage());
   owner_.video_encode_format_button_value_ =
       static_cast<int>(owner_.config_center_->GetVideoEncodeFormat());
   owner_.enable_self_hosted_ = owner_.config_center_->IsSelfHosted();

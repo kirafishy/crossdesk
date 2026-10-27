@@ -35,7 +35,7 @@ final class NativeSession implements AutoCloseable {
         default void presence(JSONObject message) { }
         default void announcement(JSONObject message) { }
         default void announcementFailed(String requestId) { }
-        default void passwordRejected() { ended("远端密码错误"); }
+        default void passwordRejected() { ended(L10n.tr("远端密码错误")); }
     }
     // Serializes all peer creation/API calls/destruction, including across activities.
     private static final ExecutorService RTC = Executors.newSingleThreadExecutor(r -> new Thread(r, "CrossDesk RTC"));
@@ -71,8 +71,8 @@ final class NativeSession implements AutoCloseable {
         if(!closed)main.postDelayed(this,1000);
     }};
     private final Runnable timeout = () -> fail(remote.isEmpty()
-            ? "服务器连接超时，请检查服务器地址和网络"
-            : "连接超时，请检查设备 ID、服务器及远端在线状态");
+            ? L10n.tr("服务器连接超时，请检查服务器地址和网络")
+            : L10n.tr("连接超时，请检查设备 ID、服务器及远端在线状态"));
 
     NativeSession(Context context, String host, int port, String remote, String password, Listener listener) {
         this.context = context.getApplicationContext(); this.listener = listener;
@@ -92,10 +92,10 @@ final class NativeSession implements AutoCloseable {
                 File logs = new File(context.getNoBackupFilesDir(), "logs");
                 if (!logs.isDirectory() && !logs.mkdirs()) throw new IllegalStateException("Log directory unavailable");
                 handle = nCreate(this, host, port, identity, logs.getAbsolutePath(), certificates.getAbsolutePath());
-                if (handle == 0) { fail("原生连接初始化失败"); return; }
+                if (handle == 0) { fail(L10n.tr("原生连接初始化失败")); return; }
                 nFileDirectory(handle,new File(documents.directory,"received").getAbsolutePath());
                 if (surface != null && surface.isValid()) nSurface(handle, surface);
-            } catch (Exception error) { fail("安全存储或证书初始化失败，请重试或清除应用数据"); }
+            } catch (Exception error) { fail(L10n.tr("安全存储或证书初始化失败，请重试或清除应用数据")); }
         });
     }
     /** Promote the already registered identity peer to an outgoing desktop session. */
@@ -147,7 +147,7 @@ final class NativeSession implements AutoCloseable {
         if (handle == 0 || joining || remote.isEmpty() || !signalReady || identity.isEmpty()) return;
         joining = true;
         String base = identity.split("@", 2)[0];
-        if (!nConnect(handle, base, remote, password)) fail("无法发起远程连接");
+        if (!nConnect(handle, base, remote, password)) fail(L10n.tr("无法发起远程连接"));
         password = "";
     }
     // Called on arbitrary native callback threads; borrowed payloads were copied by JNI.
@@ -175,10 +175,10 @@ final class NativeSession implements AutoCloseable {
                         publishSignaling();
                         tryJoin();
                     }
-                    if (status == 6) fail("服务器 TLS 证书校验失败");
-                    else if (status == 2) fail("服务器登录失败，请检查服务器地址和网络");
-                    else if (status >= 3 && connected) fail("信令连接中断，请重新连接");
-                    else if (status == 0 || status == 4) ui(() -> listener.status("正在连接信令服务器…"));
+                    if (status == 6) fail(L10n.tr("服务器 TLS 证书校验失败"));
+                    else if (status == 2) fail(L10n.tr("服务器登录失败，请检查服务器地址和网络"));
+                    else if (status >= 3 && connected) fail(L10n.tr("信令连接中断，请重新连接"));
+                    else if (status == 0 || status == 4) ui(() -> listener.status(L10n.tr("正在连接信令服务器…")));
                 } else if (type == 2) {
                     int status = event.getInt("status");
                     if (status == 1) {
@@ -187,12 +187,12 @@ final class NativeSession implements AutoCloseable {
                         audio = new AudioPlayer();
                         nControl(handle, 2, 1);
                         ui(() -> { listener.connected(); if(!closed){statisticsTick.run();fileTick.run();} });
-                    } else if (status == 0 || status == 2) ui(() -> listener.status("正在建立安全连接…"));
+                    } else if (status == 0 || status == 2) ui(() -> listener.status(L10n.tr("正在建立安全连接…")));
                     else if (status == 6) ui(() -> { listener.passwordRejected(); close(); });
                     else {
-                        String[] reasons = {"", "", "", "连接已断开", "连接失败", "远端已关闭连接",
-                                "远端密码错误", "找不到该设备 ID", "远端当前不可用"};
-                        fail(status >= 0 && status < reasons.length ? reasons[status] : "连接已结束");
+                        String[] reasons = {"", "", "", L10n.tr("连接已断开"), L10n.tr("连接失败"), L10n.tr("远端已关闭连接"),
+                                L10n.tr("远端密码错误"), L10n.tr("找不到该设备 ID"), L10n.tr("远端当前不可用")};
+                        fail(status >= 0 && status < reasons.length ? reasons[status] : L10n.tr("连接已结束"));
                     }
                 } else if (type == 4) {
                     if(event.optInt("type",-1)==14){
@@ -228,7 +228,7 @@ final class NativeSession implements AutoCloseable {
                         listener.fileTransfer(name,progress,sending,path.isEmpty()?null:new File(path));});
                 }
             } catch (Exception error) {
-                if (type == 3) fail("设备身份保存失败，请检查安全存储");
+                if (type == 3) fail(L10n.tr("设备身份保存失败，请检查安全存储"));
             }
         });
     }
@@ -303,24 +303,24 @@ final class NativeSession implements AutoCloseable {
     }
     void secureAttention(){execute(()->{
         boolean sent=connected&&nSecureAttention(handle);
-        ui(()->listener.controlFeedback(sent?"已发送 Ctrl+Alt+Del":"指令发送失败，请重试"));
+        ui(()->listener.controlFeedback(sent?L10n.tr("已发送 Ctrl+Alt+Del"):L10n.tr("指令发送失败，请重试")));
     });}
     void sendFile(android.net.Uri uri){
         if(closed)return;
-        if(sendingFile){listener.controlFeedback("请等待当前文件发送完成");return;}
-        sendingFile=true;listener.fileTransfer("正在读取所选文件…",0,true,null);
+        if(sendingFile){listener.controlFeedback(L10n.tr("请等待当前文件发送完成"));return;}
+        sendingFile=true;listener.fileTransfer(L10n.tr("正在读取所选文件…"),0,true,null);
         documents.prepare(uri,new SessionDocuments.Prepared(){
             public void ready(File file,String name){execute(()->{
                 if(!connected||!nSendFile(handle,file.getAbsolutePath(),name.getBytes(StandardCharsets.UTF_8))){
                     file.delete();ui(()->{sendingFile=false;listener.fileTransfer(name,-1,true,null);});
                 }
             });}
-            public void failed(){ui(()->{sendingFile=false;listener.fileTransfer("所选文件（无法读取或空间不足）",-1,true,null);});}
+            public void failed(){ui(()->{sendingFile=false;listener.fileTransfer(L10n.tr("所选文件（无法读取或空间不足）"),-1,true,null);});}
         });
     }
     void saveFile(File file,android.net.Uri destination){
         if(closed)return;
-        documents.save(file,destination,success->ui(()->listener.controlFeedback(success?"文件已保存":"文件保存失败，请重试")));
+        documents.save(file,destination,success->ui(()->listener.controlFeedback(success?L10n.tr("文件已保存"):L10n.tr("文件保存失败，请重试"))));
     }
     @Override public void close() {
         if (closed) return;

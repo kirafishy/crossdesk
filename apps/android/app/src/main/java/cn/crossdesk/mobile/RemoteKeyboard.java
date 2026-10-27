@@ -39,12 +39,12 @@ final class RemoteKeyboard extends LinearLayout {
         header.addView(editor,new FrameLayout.LayoutParams(1,1,Gravity.BOTTOM));
         toolbar=ui.row();toolbar.setGravity(Gravity.CENTER_VERTICAL);toolbar.setPadding(ui.dp(6),0,ui.dp(6),0);
         header.addView(toolbar,new FrameLayout.LayoutParams(-1,-1));
-        switchButton=button("电脑键盘",this::switchKeyboard);switchButton.setPadding(ui.dp(8),0,ui.dp(8),0);
+        switchButton=button(L10n.tr("电脑键盘"),this::switchKeyboard);switchButton.setPadding(ui.dp(8),0,ui.dp(8),0);
         toolbar.addView(switchButton,new LayoutParams(-2,-1));
         LinearLayout pages=ui.row();pages.setGravity(Gravity.CENTER);toolbar.addView(pages,new LayoutParams(0,-1,1));
-        lettersButton=button("字母数字",()->page(false));functionsButton=button("符号功能",()->page(true));
+        lettersButton=button(L10n.tr("字母数字"),()->page(false));functionsButton=button(L10n.tr("符号功能"),()->page(true));
         pages.addView(lettersButton,new LayoutParams(-2,ui.dp(32)));pages.addView(functionsButton,new LayoutParams(-2,ui.dp(32)));
-        FrameLayout hide=new FrameLayout(context);hide.setContentDescription("收起键盘");hide.setClickable(true);hide.setFocusable(true);
+        FrameLayout hide=new FrameLayout(context);hide.setContentDescription(L10n.tr("收起键盘"));hide.setClickable(true);hide.setFocusable(true);
         hide.addView(ui.icon("keyboard_hide",foreground()),new FrameLayout.LayoutParams(ui.dp(24),ui.dp(24),Gravity.CENTER));
         hide.setOnClickListener(v->{feedback(v);close();});toolbar.addView(hide,new LayoutParams(ui.dp(44),ui.dp(44)));
         keys=ui.column();keys.setPadding(ui.dp(3),ui.dp(4),ui.dp(3),ui.dp(4));addView(keys,new LayoutParams(-1,0,1));
@@ -157,7 +157,7 @@ final class RemoteKeyboard extends LinearLayout {
     }
     private void render(){
         setBackgroundColor(dark()?0xFF202124:0xFFE8EAED);
-        switchButton.setText(computer?"系统键盘":"电脑键盘");switchButton.setTextColor(foreground());
+        switchButton.setText(computer?L10n.tr("系统键盘"):L10n.tr("电脑键盘"));switchButton.setTextColor(foreground());
         lettersButton.setVisibility(computer?VISIBLE:GONE);functionsButton.setVisibility(computer?VISIBLE:GONE);
         for(TextView view:new TextView[]{lettersButton,functionsButton}){
             boolean selected=(view==functionsButton)==functions;view.setSelected(selected);
@@ -185,12 +185,12 @@ final class RemoteKeyboard extends LinearLayout {
         LinearLayout line=ui.row();line.setGravity(Gravity.CENTER);
         for(String value:values){
             boolean shift=modifiers.contains(16);String shown=shift&&value.length()==1?shifted(value):value;
-            TextView key=button(shown,()->key(value));key.setPadding(0,0,0,0);
+            TextView key=button(L10n.tr(shown),()->key(value));key.setPadding(0,0,0,0);
             key.setTextSize(value.length()>1?12:18);key.setSingleLine(true);
             int modifier=modifier(value);boolean selected=modifier!=0&&modifiers.contains(modifier);key.setSelected(selected);
             int color=selected?(dark()?0xFF596D8C:0xFFA8C7FA):value.length()>1||value.equals("⇧")||value.equals("⌫")?(dark()?0xFF30343B:0xFFD0D5DC):(dark()?0xFF3C4043:Color.WHITE);
             StateListDrawable background=new StateListDrawable();background.addState(new int[]{android.R.attr.state_pressed},ui.background(dark()?0xFF68717D:0xFFBDC9D8,7));background.addState(new int[]{},ui.background(color,7));key.setBackground(background);
-            if(value.equals("⇧"))key.setContentDescription("Shift");else if(value.equals("⌫"))key.setContentDescription("退格");
+            if(value.equals("⇧"))key.setContentDescription("Shift");else if(value.equals("⌫"))key.setContentDescription(L10n.tr("退格"));
             // Both penultimate rows allocate exactly 1/8 to Shift and Backspace.
             boolean penultimate=values[0].equals("⇧");float weight=value.equals("空格")?4:1;
             if(penultimate)weight=value.equals("⇧")||value.equals("⌫")?1:(6f/(values.length-2));

@@ -82,27 +82,27 @@ struct ThirdPartyLicensesView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("版本", value: appUpdates.currentVersion)
+                LabeledContent(NSLocalizedString("版本", comment: ""), value: appUpdates.currentVersion)
                 if appUpdates.updateAvailable {
                     Link(destination: URL(string: "https://crossdesk.cn")!) {
                         HStack {
                             UpdateDot()
-                            Text("新版本可用：v\(appUpdates.availableVersion)")
+                            Text(String(format: NSLocalizedString("新版本可用：v%1$@", comment: ""), String(describing: appUpdates.availableVersion)))
                             Spacer()
                             Image(systemName: "arrow.up.right")
                         }
                     }
                 }
                 if !session.hasNetworkConsent {
-                    Text("完成隐私授权后可检查更新").foregroundStyle(.secondary)
+                    Text(NSLocalizedString("完成隐私授权后可检查更新", comment: "")).foregroundStyle(.secondary)
                 } else if appUpdates.status == .checking {
-                    Text("正在检查更新…").foregroundStyle(.secondary)
+                    Text(NSLocalizedString("正在检查更新…", comment: "")).foregroundStyle(.secondary)
                 } else if appUpdates.status == .upToDate {
-                    Text("当前已是最新版本").foregroundStyle(.secondary)
+                    Text(NSLocalizedString("当前已是最新版本", comment: "")).foregroundStyle(.secondary)
                 } else if appUpdates.status == .failed {
-                    Text("检查失败，请稍后重试").foregroundStyle(.red)
+                    Text(NSLocalizedString("检查失败，请稍后重试", comment: "")).foregroundStyle(.red)
                 }
-                Button("检查更新") {
+                Button(NSLocalizedString("检查更新", comment: "")) {
                     if session.hasNetworkConsent { appUpdates.checkNow() }
                     else { session.showPrivacyNotice() }
                 }
@@ -112,26 +112,26 @@ struct ThirdPartyLicensesView: View {
             case .success(let catalog):
                 if let application = catalog.components.first(where: { $0.id == "crossdesk" }) {
                     Section {
-                        NavigationLink("软件许可") {
+                        NavigationLink(NSLocalizedString("软件许可", comment: "")) {
                             ComponentLicenseView(component: application)
                         }
-                        NavigationLink("开源组件") {
+                        NavigationLink(NSLocalizedString("开源组件", comment: "")) {
                             OpenSourceComponentsView(catalog: catalog)
                         }
-                        NavigationLink("源码与构建说明") {
+                        NavigationLink(NSLocalizedString("源码与构建说明", comment: "")) {
                             SourceCodeView(application: application)
                         }
                     } footer: {
-                        Text("许可与版权声明可离线查阅。")
+                        Text(NSLocalizedString("许可与版权声明可离线查阅。", comment: ""))
                     }
                 }
             case .failure:
                 VStack(spacing: 12) {
                     Image(systemName: "doc.text.magnifyingglass")
                         .font(.largeTitle)
-                    Text("无法读取开源许可")
+                    Text(NSLocalizedString("无法读取开源许可", comment: ""))
                         .font(.headline)
-                    Text("应用中的许可文件缺失或损坏，请重新安装应用。")
+                    Text(NSLocalizedString("应用中的许可文件缺失或损坏，请重新安装应用。", comment: ""))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
@@ -140,7 +140,7 @@ struct ThirdPartyLicensesView: View {
         }
         .readableContentWidth()
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("关于 CrossDesk")
+        .navigationTitle(NSLocalizedString("关于 CrossDesk", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: session.hasNetworkConsent) { allowed in
             if allowed { appUpdates.checkNow() }
@@ -163,13 +163,13 @@ private struct OpenSourceComponentsView: View {
     var body: some View {
         List {
             if let openFEC = catalog.components.first(where: { $0.id == "openfec" }) {
-                Section("OpenFEC 告知") {
-                    Text("本应用使用 OpenFEC 提供前向纠错功能，遵循 CeCILL-C 1.0 许可。该许可规定了有限保证及责任限制，详情见许可全文。")
+                Section(NSLocalizedString("OpenFEC 告知", comment: "")) {
+                    Text(NSLocalizedString("本应用使用 OpenFEC 提供前向纠错功能，遵循 CeCILL-C 1.0 许可。该许可规定了有限保证及责任限制，详情见许可全文。", comment: ""))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Text("(c) Copyright 2009 - 2012 INRIA - All rights reserved")
                         .font(.footnote)
-                    NavigationLink("OpenFEC 许可与源码") {
+                    NavigationLink(NSLocalizedString("OpenFEC 许可与源码", comment: "")) {
                         ComponentLicenseView(component: openFEC)
                     }
                 }
@@ -188,12 +188,12 @@ private struct OpenSourceComponentsView: View {
                     }
                 }
             } footer: {
-                Text("各组件遵循所列开源许可证，其授予的权利不受本应用普通使用条款限制。查看源码需要网络连接。")
+                Text(NSLocalizedString("各组件遵循所列开源许可证，其授予的权利不受本应用普通使用条款限制。查看源码需要网络连接。", comment: ""))
             }
         }
         .readableContentWidth()
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("开源组件")
+        .navigationTitle(NSLocalizedString("开源组件", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -203,27 +203,27 @@ private struct SourceCodeView: View {
 
     var body: some View {
         List {
-            Section("本版本源码与构建说明") {
+            Section(NSLocalizedString("本版本源码与构建说明", comment: "")) {
                 if let source = SourceMetadata.bundled {
-                    LabeledContent("源码版本", value: source.tag ?? String(source.revision.prefix(12)))
+                    LabeledContent(NSLocalizedString("源码版本", comment: ""), value: source.tag ?? String(source.revision.prefix(12)))
                         .textSelection(.enabled)
                     if source.isModified {
-                        Text("开发版本包含尚未发布的修改，以下链接为基础版本源码。")
+                        Text(NSLocalizedString("开发版本包含尚未发布的修改，以下链接为基础版本源码。", comment: ""))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
-                    Link("查看源码", destination: source.sourceURL)
-                    Link("构建说明", destination: source.buildInstructionsURL)
+                    Link(NSLocalizedString("查看源码", comment: ""), destination: source.sourceURL)
+                    Link(NSLocalizedString("构建说明", comment: ""), destination: source.buildInstructionsURL)
                 } else {
-                    Text("本版本源码信息暂不可用。")
+                    Text(NSLocalizedString("本版本源码信息暂不可用。", comment: ""))
                         .foregroundStyle(.secondary)
-                    Link("项目主页", destination: application.sourceURL)
+                    Link(NSLocalizedString("项目主页", comment: ""), destination: application.sourceURL)
                 }
             }
         }
         .readableContentWidth()
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("源码与构建说明")
+        .navigationTitle(NSLocalizedString("源码与构建说明", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -234,15 +234,15 @@ private struct ComponentLicenseView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("版本", value: component.displayVersion)
+                LabeledContent(NSLocalizedString("版本", comment: ""), value: component.displayVersion)
                     .textSelection(.enabled)
-                LabeledContent("许可", value: component.license)
-                Link("查看源码", destination: component.resolvedSourceURL)
+                LabeledContent(NSLocalizedString("许可", comment: ""), value: component.license)
+                Link(NSLocalizedString("查看源码", comment: ""), destination: component.resolvedSourceURL)
                 if let buildSourceURL = component.resolvedBuildSourceURL {
-                    Link("构建配方与项目补丁", destination: buildSourceURL)
+                    Link(NSLocalizedString("构建配方与项目补丁", comment: ""), destination: buildSourceURL)
                 }
             }
-            Section("许可与版权声明") {
+            Section(NSLocalizedString("许可与版权声明", comment: "")) {
                 ForEach(component.documents) { document in
                     NavigationLink {
                         LicenseTextView(text: document.text)
@@ -263,9 +263,9 @@ private struct ComponentLicenseView: View {
 
     private func documentTitle(_ title: String) -> String {
         switch title {
-        case "Source copyright and license notices": return "版权与许可声明"
-        case "apps/ios/licenses/OPEN_SOURCE_NOTICE.txt": return "开源软件权利说明"
-        case "LICENSE" where component.id == "crossdesk": return "GNU GPL 第 3 版"
+        case "Source copyright and license notices": return NSLocalizedString("版权与许可声明", comment: "")
+        case "apps/ios/licenses/OPEN_SOURCE_NOTICE.txt": return NSLocalizedString("开源软件权利说明", comment: "")
+        case "LICENSE" where component.id == "crossdesk": return NSLocalizedString("GNU GPL 第 3 版", comment: "")
         default: return title
         }
     }

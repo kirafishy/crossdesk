@@ -31,7 +31,7 @@ export component DeviceGroupDialog inherits Rectangle {
         TouchArea {}
         Text {
             x: 18px; y: 16px; height: 24px;
-            text: GalleryStrings.tr("修改分组", "Edit groups", "Изменить группы");
+            text: GalleryStrings.texts[30];
             color: #24272d; font-size: 17px; font-weight: 600;
         }
         Text {
@@ -64,7 +64,7 @@ export component DeviceGroupDialog inherits Rectangle {
                         }
                         Text {
                             x: 39px; width: parent.width - 48px; height: parent.height;
-                            text: option.name == "" ? GalleryStrings.tr("未分组", "Ungrouped", "Без группы") : option.name;
+                            text: option.name == "" ? GalleryStrings.texts[31] : option.name;
                             color: parent.selected ? ControlStyle.selected-text : #30343b;
                             font-weight: parent.selected ? 600 : 400;
                             font-size: 12px; overflow: elide; vertical-alignment: center;
@@ -91,7 +91,7 @@ export component DeviceGroupDialog inherits Rectangle {
             x: 18px; y: group-list.y + group-list.height + 12px;
             width: parent.width - 36px; height: 30px;
             text <=> root.new-group;
-            placeholder-text: GalleryStrings.tr("新建分组（可选）", "New group (optional)", "Новая группа (необязательно)");
+            placeholder-text: GalleryStrings.texts[32];
         }
         if root.error != "": Text {
             x: 18px; y: group-list.y + group-list.height + 48px;
@@ -102,8 +102,8 @@ export component DeviceGroupDialog inherits Rectangle {
             x: 18px; y: parent.height - 46px; width: parent.width - 36px; height: 28px;
             spacing: 10px;
             Rectangle { horizontal-stretch: 1; }
-            CompactButton { width: 72px; height: 28px; text: GalleryStrings.tr("取消", "Cancel", "Отмена"); clicked => { root.cancel(); } }
-            CompactButton { width: 88px; height: 28px; primary: true; text: GalleryStrings.tr("保存", "Save", "Сохранить"); clicked => { root.save(root.new-group); } }
+            CompactButton { width: 72px; height: 28px; text: GalleryStrings.texts[33]; clicked => { root.cancel(); } }
+            CompactButton { width: 88px; height: 28px; primary: true; text: GalleryStrings.texts[34]; clicked => { root.save(root.new-group); } }
         }
     }
 }

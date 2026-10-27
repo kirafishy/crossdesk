@@ -40,7 +40,21 @@ inline int ApplyMainWindowStrings(
     int language_index) {
   const int language =
       localization::detail::ClampLanguageIndex(language_index);
-  window->global<ui::GalleryStrings>().set_language(language);
+  auto& gallery = window->global<ui::GalleryStrings>();
+  gallery.set_language(language);
+  const auto& retry = localization::Literal("请在 {0} 秒后重试", language);
+  const auto split = retry.find("{0}");
+  gallery.set_retry_prefix(Text(retry.substr(0, split)));
+  gallery.set_retry_suffix(Text(split == std::string::npos ? "" : retry.substr(split + 3)));
+  std::vector<slint::SharedString> literals;
+  for (const auto* key : localization::detail::kSlintLiterals)
+    literals.push_back(Text(localization::Literal(key, language)));
+  gallery.set_texts(std::make_shared<slint::VectorModel<slint::SharedString>>(literals));
+  std::vector<slint::SharedString> languages;
+  for (const auto& option : localization::GetSupportedLanguages())
+    languages.push_back(Text(option.display_name));
+  languages.push_back(Text(localization::Literal("跟随系统", language)));
+  window->set_language_options(std::make_shared<slint::VectorModel<slint::SharedString>>(languages));
   auto& strings = window->global<ui::UiStrings>();
   strings.set_window_minimize(Text(localization::window_minimize[language]));
   strings.set_window_close(Text(localization::window_close[language]));

@@ -307,6 +307,8 @@ napi_value Start(napi_env env, napi_callback_info info) {
   stopping = false;
   gui_thread = std::thread([] {
     try {
+      const auto language = Environment().value("language", "en");
+      setenv("LANGUAGE", language.c_str(), 1);
       setenv("SLINT_DEFAULT_FONT", "/system/fonts/HarmonyOS_Sans.ttf", 1);
       setenv("SLINT_FONT_PATH", "/system/fonts/HarmonyOS_Sans_SC.ttf", 1);
       const auto certificates = Environment().value("certificates", "");

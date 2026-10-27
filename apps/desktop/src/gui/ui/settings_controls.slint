@@ -11,6 +11,7 @@ export component SettingsButton inherits FlatSurface {
     in property <bool> quiet: false;
     in property <bool> align-left: false;
     in property <bool> enabled: true;
+    out property <length> label-width: button-label.preferred-width + 2 * root.content-padding + (root.has-icon ? 24px : 0px);
     private property <bool> has-icon: root.icon.width > 0;
     private property <length> content-padding: root.has-icon ? 8px : 12px;
     callback clicked();

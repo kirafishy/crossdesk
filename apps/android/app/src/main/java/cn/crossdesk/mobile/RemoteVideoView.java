@@ -104,7 +104,7 @@ final class RemoteVideoView extends FrameLayout implements SurfaceHolder.Callbac
             }
             return true;
         });
-        setContentDescription("远程桌面：轻触点击，拖动移动，长按右键，双指捏合缩放，放大后双指拖动画面，原始比例下双指上下滑动滚动");
+        setContentDescription(L10n.tr("远程桌面：轻触点击，拖动移动，长按右键，双指捏合缩放，放大后双指拖动画面，原始比例下双指上下滑动滚动"));
     }
     void videoSize(int width, int height) {
         if (width <= 0 || height <= 0) return;
@@ -244,7 +244,7 @@ final class RemoteVideoView extends FrameLayout implements SurfaceHolder.Callbac
         private final Path arrow = new Path();
         private final float arrowWidth = 12, arrowHeight = 15;
         Cursor(Context context) {
-            super(context); setClickable(true); setContentDescription("远程桌面触控区域");
+            super(context); setClickable(true); setContentDescription(L10n.tr("远程桌面触控区域"));
             // Match the iOS RemoteCursorArrowShape in density-independent units.
             arrow.moveTo(arrowWidth*.08f,arrowHeight*.04f);
             arrow.lineTo(arrowWidth*.08f,arrowHeight*.78f);

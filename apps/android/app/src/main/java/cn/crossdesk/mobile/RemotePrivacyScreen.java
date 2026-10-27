@@ -45,9 +45,9 @@ final class RemotePrivacyScreen {
     boolean fresh(long now) { return received && now - receivedAt <= 5000; }
     boolean enabled(long now) { return fresh(now) && state == 3 && overlay && !remotePaused; }
     String buttonTitle(long now) {
-        if (enabled(now)) return "隐私屏已开启";
-        if (fresh(now) && supported && state == 1 && !active()) return "隐私屏已关闭";
-        return "隐私屏";
+        if (enabled(now)) return L10n.tr("隐私屏已开启");
+        if (fresh(now) && supported && state == 1 && !active()) return L10n.tr("隐私屏已关闭");
+        return L10n.tr("隐私屏");
     }
     String feedback(long now) {
         if (!desktopAvailable) return "";
@@ -71,25 +71,25 @@ final class RemotePrivacyScreen {
         return ++requestId;
     }
     void failed(long id) {
-        if (pending && requestId == id) { pending = false; failure = "指令发送失败，请重试"; }
+        if (pending && requestId == id) { pending = false; failure = L10n.tr("指令发送失败，请重试"); }
     }
     void tick(long now) {
         if (pending && now - requestedAt >= 15000) {
-            pending = false; failure = "请求超时，尚未确认电脑的隐私屏状态";
+            pending = false; failure = L10n.tr("请求超时，尚未确认电脑的隐私屏状态");
         }
     }
     String status(long now) {
         if (!failure.isEmpty()) return failure;
-        if (!received) return "等待电脑返回隐私屏状态；旧版电脑端可能不支持";
-        if (!fresh(now)) return "隐私屏状态已过期，等待电脑确认";
-        if (state == 2) return "正在开启隐私屏…";
-        if (state == 4) return "正在关闭隐私屏…";
-        if (pending) return "指令已发送，等待电脑确认…";
-        if (state == 5) return "隐私屏异常";
-        if (!supported || state == 0) return "隐私屏暂不可用";
+        if (!received) return L10n.tr("等待电脑返回隐私屏状态；旧版电脑端可能不支持");
+        if (!fresh(now)) return L10n.tr("隐私屏状态已过期，等待电脑确认");
+        if (state == 2) return L10n.tr("正在开启隐私屏…");
+        if (state == 4) return L10n.tr("正在关闭隐私屏…");
+        if (pending) return L10n.tr("指令已发送，等待电脑确认…");
+        if (state == 5) return L10n.tr("隐私屏异常");
+        if (!supported || state == 0) return L10n.tr("隐私屏暂不可用");
         if (state == 3 && overlay && !remotePaused)
-            return "隐私屏已开启";
-        return state == 1 && !active() ? "隐私屏已关闭" : "隐私屏状态待确认";
+            return L10n.tr("隐私屏已开启");
+        return state == 1 && !active() ? L10n.tr("隐私屏已关闭") : L10n.tr("隐私屏状态待确认");
     }
     String detail(long now) {
         return fresh(now) && (state == 0 || state == 5 || !supported) ? reason : "";

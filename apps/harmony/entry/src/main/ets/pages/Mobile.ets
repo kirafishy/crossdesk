@@ -1,3 +1,4 @@
+import { tr, currentLanguage } from '../mobile/Localization';
 import { common } from '@kit.AbilityKit';
 import { MobileController, MobileState, RemoteDisplay } from '../mobile/MobileController';
 import { MobileRemoteView } from '../mobile/MobileRemoteView';
@@ -69,9 +70,9 @@ struct Mobile {
   }
   private title(): string {
     switch (this.state.page) {
-      case 'settings': return '设置'; case 'privacy': return '隐私与授权';
-      case 'about': return '关于 CrossDesk'; case 'licenses': return '开源组件'; case 'component': return this.component?.name ?? '';
-      case 'source': return '源码与构建说明'; case 'announcements': return '通知公告'; case 'announcement': return '公告详情';
+      case 'settings': return tr("设置"); case 'privacy': return tr("隐私与授权");
+      case 'about': return tr("关于 CrossDesk"); case 'licenses': return tr("开源组件"); case 'component': return this.component?.name ?? '';
+      case 'source': return tr("源码与构建说明"); case 'announcements': return tr("通知公告"); case 'announcement': return tr("公告详情");
       case 'document': return this.state.documentTitle; default: return '';
     }
   }
@@ -80,7 +81,9 @@ struct Mobile {
   private policyParagraphs(body: string): string[] {
     const text = body.replace(/\r\n/g, '\n');
     const start = text.indexOf('## 中文\n'), end = start < 0 ? -1 : text.indexOf('## English', start);
-    const localized = start >= 0 && end > start ? text.substring(start + '## 中文\n'.length, end) : text;
+    const chinese = currentLanguage() === 0 || currentLanguage() === 3;
+    const localized = chinese && start >= 0 && end > start ? text.substring(start + '## 中文\n'.length, end) :
+      !chinese && end >= 0 ? text.substring(end + '## English'.length) : text;
     return localized.split(/\n\s*\n/).map((paragraph: string) => paragraph.trim()).filter((paragraph: string) => !!paragraph && paragraph !== '---');
   }
   private openAnnouncement(item: AnnouncementItem): void { this.controller?.inbox.markRead(item); this.state.announcement = item; this.navigate('announcement'); }
@@ -141,16 +144,16 @@ struct Mobile {
   @Builder
   ConnectionCard() {
     Column({ space: 16 }) {
-      Text('远程桌面').fontSize(20).fontWeight(600).fontColor(MobileTheme.ink).width('100%')
+      Text(tr("远程桌面")).fontSize(20).fontWeight(600).fontColor(MobileTheme.ink).width('100%')
       Row({ space: 10 }) {
-        TextInput({ text: this.formatId(this.state.remote), placeholder: '对端 ID' }).type(InputType.Number).maxLength(11)
+        TextInput({ text: this.formatId(this.state.remote), placeholder: tr("对端 ID") }).type(InputType.Number).maxLength(11)
           .fontSize(20).fontWeight(500).fontColor(MobileTheme.ink).placeholderColor(MobileTheme.secondary)
           .height(54).layoutWeight(1).backgroundColor(MobileTheme.background).borderRadius(12)
           .border({ width: this.idFocused ? 2 : 1, color: this.idFocused ? MobileTheme.blue : MobileTheme.line })
           .padding({ left: 14, right: 14 }).onFocus(() => this.idFocused = true).onBlur(() => this.idFocused = false)
           .onChange((value: string) => this.state.remote = this.deviceId(value)).onSubmit(() => this.controller?.requestConnection(this.state.remote))
         Column() {
-          MobilePrimaryButton({ label: '连接', buttonHeight: 54, available: this.state.remote.length > 0,
+          MobilePrimaryButton({ label: tr("连接"), buttonHeight: 54, available: this.state.remote.length > 0,
             action: () => this.controller?.requestConnection(this.state.remote) })
         }.width(96)
       }.width('100%')
@@ -161,7 +164,7 @@ struct Mobile {
   RecentCard(device: RecentDevice) {
     Column() {
       Stack() {
-        Text(device.platform === 'windows' ? 'Windows' : device.platform === 'macos' ? 'macOS' : device.platform === 'linux' ? 'Linux' : '远程电脑')
+        Text(device.platform === 'windows' ? 'Windows' : device.platform === 'macos' ? 'macOS' : device.platform === 'linux' ? 'Linux' : tr("远程电脑"))
           .fontSize(19).fontWeight(600).fontColor(Color.White).width('100%').height('100%').textAlign(TextAlign.Center)
         if (this.state.previews && device.preview) { Image(`file://${device.preview}`).objectFit(ImageFit.Cover).width('100%').height('100%') }
       }.aspectRatio(16 / 9).width('100%').backgroundColor(device.platform === 'windows' ? '#316AB7' : device.platform === 'macos' ? '#8057B9' : device.platform === 'linux' ? '#AE642B' : '#677587')
@@ -169,8 +172,8 @@ struct Mobile {
         Text(device.name || device.id).fontSize(12).fontWeight(600).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
         Row({ space: 4 }) {
           Text(`ID ${device.id}`).fontSize(10).fontColor(MobileTheme.secondary).layoutWeight(1)
-          if (device.remember) { MobileIcon({ name: 'key', iconExtent: 11, color: MobileTheme.secondary }).accessibilityText('已保存密码') }
-          Text(this.controller?.presence.online(device.id, this.controller?.now() ?? 0) ? '在线' : '离线').fontSize(10)
+          if (device.remember) { MobileIcon({ name: 'key', iconExtent: 11, color: MobileTheme.secondary }).accessibilityText(tr("已保存密码")) }
+          Text(this.controller?.presence.online(device.id, this.controller?.now() ?? 0) ? tr("在线") : tr("离线")).fontSize(10)
             .fontColor(this.controller?.presence.online(device.id, this.controller?.now() ?? 0) ? MobileTheme.green : MobileTheme.secondary)
         }.width('100%')
       }.padding(9).width('100%')
@@ -182,14 +185,14 @@ struct Mobile {
   Recent() {
     Column({ space: 14 }) {
       Row() {
-        Text('最近连接').fontSize(20).fontWeight(600).fontColor(MobileTheme.ink).layoutWeight(1)
-        if (this.state.recent.length) { Text(`${this.state.recent.length} 台设备`).fontSize(12).fontColor(MobileTheme.secondary) }
+        Text(tr("最近连接")).fontSize(20).fontWeight(600).fontColor(MobileTheme.ink).layoutWeight(1)
+        if (this.state.recent.length) { Text(tr("{0} 台设备", [String(this.state.recent.length)])).fontSize(12).fontColor(MobileTheme.secondary) }
       }.width('100%')
       if (this.state.recent.length === 0) {
         Column() {
           MobileIcon({ name: 'history', iconExtent: 34, color: '#B6B6BB' })
-          Text('还没有连接记录').fontSize(17).fontWeight(600).fontColor(MobileTheme.ink).margin({ top: 12, bottom: 8 })
-          Text('成功连接后，这里会显示最近的远程设备。').fontSize(13).lineHeight(19).fontColor(MobileTheme.secondary).textAlign(TextAlign.Center)
+          Text(tr("还没有连接记录")).fontSize(17).fontWeight(600).fontColor(MobileTheme.ink).margin({ top: 12, bottom: 8 })
+          Text(tr("成功连接后，这里会显示最近的远程设备。")).fontSize(13).lineHeight(19).fontColor(MobileTheme.secondary).textAlign(TextAlign.Center)
         }.layoutWeight(1).width('100%').justifyContent(FlexAlign.Center).padding({ left: 6, right: 6 })
       } else {
         Scroll() {
@@ -212,7 +215,7 @@ struct Mobile {
         }.padding({ left: 11, right: 11 }).height(34).backgroundColor(Color.White).borderRadius(17).onClick(() => this.controller?.reconnect())
         Blank()
         Stack({ alignContent: Alignment.TopEnd }) {
-          MobileIconButton({ icon: 'envelope', label: '通知公告', action: () => this.navigate('announcements') })
+          MobileIconButton({ icon: 'envelope', label: tr("通知公告"), action: () => this.navigate('announcements') })
           if (this.state.unread > 0) {
             Text(this.state.unread > 99 ? '99+' : `${this.state.unread}`).fontSize(10).fontWeight(600).fontColor(Color.White)
               .textAlign(TextAlign.Center).padding({ left: 4, right: 4 }).constraintSize({ minWidth: 16 }).height(16)
@@ -220,7 +223,7 @@ struct Mobile {
           }
         }
         Stack({ alignContent: Alignment.TopEnd }) {
-          MobileIconButton({ icon: 'settings', label: '设置', action: () => this.navigate('settings') })
+          MobileIconButton({ icon: 'settings', label: tr("设置"), action: () => this.navigate('settings') })
           if (this.state.update) {
             Text('!').fontSize(10).fontWeight(600).fontColor(Color.White).textAlign(TextAlign.Center).width(16).height(16)
               .backgroundColor(MobileTheme.red).borderRadius(8).translate({ x: 5, y: -3 }).hitTestBehavior(HitTestMode.None)
@@ -246,72 +249,72 @@ struct Mobile {
   @Builder
   PreviewRow() {
     Row({ space: 12 }) {
-      Text('保存远程画面预览').fontSize(16).fontColor(MobileTheme.ink).layoutWeight(1)
+      Text(tr("保存远程画面预览")).fontSize(16).fontColor(MobileTheme.ink).layoutWeight(1)
       Toggle({ type: ToggleType.Switch, isOn: this.previewToggle }).selectedColor(MobileTheme.green)
         .onChange((value: boolean) => {
           this.previewToggle = value;
           if (value && !this.state.previews) this.state.modal = 'previews';
           else if (!value) this.controller?.setPreviews(false);
-        }).accessibilityText('保存远程画面预览')
+        }).accessibilityText(tr("保存远程画面预览"))
     }.constraintSize({ minHeight: 52 }).padding({ left: 16, right: 16, top: 8, bottom: 8 }).width('100%')
   }
   @Builder
   Settings() {
     Column() {
-      this.SectionTitle('鼠标控制')
+      this.SectionTitle(tr("鼠标控制"))
       Column() {
-        MobileSegment({ labels: ['相对位置', '绝对位置'], selection: this.state.relative ? 0 : 1,
+        MobileSegment({ labels: [tr("相对位置"), tr("绝对位置")], selection: this.state.relative ? 0 : 1,
           changed: (i: number) => this.controller?.setRelative(i === 0) })
       }.padding(12).width('100%').backgroundColor(Color.White).borderRadius(26).border({ width: 0.5, color: MobileTheme.line })
-      this.SectionTitle('画面偏好')
+      this.SectionTitle(tr("画面偏好"))
       Column() {
-        MobileSegment({ labels: ['帧率优先', '画质优先', '平衡'], selection: this.state.videoPreference,
+        MobileSegment({ labels: [tr("帧率优先"), tr("画质优先"), tr("平衡")], selection: this.state.videoPreference,
           changed: (i: number) => this.controller?.setPreference(i) })
       }.padding(12).width('100%').backgroundColor(Color.White).borderRadius(26).border({ width: 0.5, color: MobileTheme.line })
-      this.SectionTitle('屏幕方向')
+      this.SectionTitle(tr("屏幕方向"))
       Row() {
-        Text('连接建立后锁定横屏').fontSize(16).fontColor(MobileTheme.ink).layoutWeight(1)
+        Text(tr("连接建立后锁定横屏")).fontSize(16).fontColor(MobileTheme.ink).layoutWeight(1)
         Toggle({ type: ToggleType.Switch, isOn: this.state.autoLandscape }).selectedColor(MobileTheme.green)
-          .onChange((value: boolean) => this.controller?.setAutoLandscape(value)).accessibilityText('连接建立后锁定横屏')
+          .onChange((value: boolean) => this.controller?.setAutoLandscape(value)).accessibilityText(tr("连接建立后锁定横屏"))
       }.padding({ left: 16, right: 16, top: 10, bottom: 10 }).width('100%').backgroundColor(Color.White)
         .borderRadius(26).border({ width: 0.5, color: MobileTheme.line })
-      Text('默认关闭。开启后，手机连接时进入并保持横屏；关闭时跟随设备方向。平板和多窗口不受影响。')
+      Text(tr("默认关闭。开启后，手机连接时进入并保持横屏；关闭时跟随设备方向。平板和多窗口不受影响。"))
         .fontSize(12).fontColor(MobileTheme.secondary).width('100%').padding({ left: 16, right: 16, top: 8, bottom: 12 })
       Column() {
-        this.SettingRow('服务器', this.customServer ? '自定义' : '默认', () => this.serverExpanded = !this.serverExpanded)
+        this.SettingRow(tr("服务器"), this.customServer ? tr("自定义") : tr("默认"), () => this.serverExpanded = !this.serverExpanded)
         if (this.serverExpanded) {
           this.Rule()
           Row() {
-            Text('使用自定义服务器').fontSize(16).fontColor(MobileTheme.ink).layoutWeight(1)
+            Text(tr("使用自定义服务器")).fontSize(16).fontColor(MobileTheme.ink).layoutWeight(1)
             Toggle({ type: ToggleType.Switch, isOn: this.customServer }).selectedColor(MobileTheme.green).onChange((value: boolean) => {
               this.customServer = value;
               if (!value) { this.editingServer = 'api.crossdesk.cn'; this.editingPort = '9099'; this.controller?.saveSettings(this.editingServer, this.editingPort); }
-            }).accessibilityText('使用自定义服务器')
+            }).accessibilityText(tr("使用自定义服务器"))
           }.padding({ left: 16, right: 16, top: 8, bottom: 8 }).width('100%')
           if (this.customServer) {
             Column({ space: 8 }) {
-              TextInput({ text: this.editingServer, placeholder: '服务器地址' }).fontSize(17).height(48).borderRadius(12)
+              TextInput({ text: this.editingServer, placeholder: tr("服务器地址") }).fontSize(17).height(48).borderRadius(12)
                 .backgroundColor(MobileTheme.background).onChange((v: string) => this.editingServer = v)
-              TextInput({ text: this.editingPort, placeholder: '服务器端口' }).fontSize(17).height(48).borderRadius(12)
+              TextInput({ text: this.editingPort, placeholder: tr("服务器端口") }).fontSize(17).height(48).borderRadius(12)
                 .backgroundColor(MobileTheme.background).type(InputType.Number).onChange((v: string) => this.editingPort = v)
-              this.Action('完成', () => { this.saveServer(); })
+              this.Action(tr("完成"), () => { this.saveServer(); })
             }.padding({ left: 12, right: 12, bottom: 12 }).width('100%')
           }
         }
       }.width('100%').backgroundColor(Color.White).borderRadius(26).clip(true).border({ width: 0.5, color: MobileTheme.line }).margin({ top: 28 })
-      Text(this.state.identity ? `本机 ID  ${this.formatId(this.state.identity)}` : this.state.signalText).fontSize(12).fontColor(MobileTheme.secondary)
+      Text(this.state.identity ? tr("本机 ID  {0}", [String(this.formatId(this.state.identity))]) : this.state.signalText).fontSize(12).fontColor(MobileTheme.secondary)
         .textAlign(TextAlign.Center).padding({ left: 16, right: 16, top: 12, bottom: 16 }).width('100%').copyOption(CopyOptions.LocalDevice)
-      this.SectionTitle('隐私')
+      this.SectionTitle(tr("隐私"))
       Column() {
-        this.SettingRow('隐私与授权', this.state.consent ? '已授权' : '未授权', () => this.navigate('privacy'))
+        this.SettingRow(tr("隐私与授权"), this.state.consent ? tr("已授权") : tr("未授权"), () => this.navigate('privacy'))
         this.Rule()
         this.PreviewRow()
         this.Rule()
-        Button({ type: ButtonType.Normal }) { Text('清除预览图').fontSize(16).fontColor(MobileTheme.red).width('100%').textAlign(TextAlign.Start) }
+        Button({ type: ButtonType.Normal }) { Text(tr("清除预览图")).fontSize(16).fontColor(MobileTheme.red).width('100%').textAlign(TextAlign.Start) }
           .height(48).width('100%').padding({ left: 16 }).backgroundColor(Color.White)
           .onClick(() => this.state.modal = 'clearPreviews')
       }.width('100%').backgroundColor(Color.White).borderRadius(26).clip(true).border({ width: 0.5, color: MobileTheme.line })
-      Column() { this.SettingRow('关于', this.state.update ? '新版本 ●' : '', () => this.navigate('about')) }
+      Column() { this.SettingRow(tr("关于"), this.state.update ? tr("新版本 ●") : '', () => this.navigate('about')) }
         .width('100%').backgroundColor(Color.White).borderRadius(26).clip(true).border({ width: 0.5, color: MobileTheme.line }).margin({ top: 28 })
     }.width('100%')
   }
@@ -319,45 +322,45 @@ struct Mobile {
   Privacy() {
     Column() {
       Column() {
-        this.ValueRow('授权状态', this.state.consent ? '已授权' : '未授权')
+        this.ValueRow(tr("授权状态"), this.state.consent ? tr("已授权") : tr("未授权"))
         this.Rule()
-        this.SettingRow('隐私政策', '', () => this.controller?.document('PRIVACY.md', '隐私政策', 'privacy'))
+        this.SettingRow(tr("隐私政策"), '', () => this.controller?.document('PRIVACY.md', tr("隐私政策"), 'privacy'))
       }.width('100%').backgroundColor(Color.White).borderRadius(12).clip(true).border({ width: 0.5, color: MobileTheme.line })
-      this.Footer('设备身份及选择保存的访问密码加密保存在本机。画面预览默认关闭，开启后从下一次连接起保存。剪贴板内容在结束会话时清除。离开应用后通过画中画或后台任务保持会话，可随时返回应用断开。')
-      if (this.state.consent) { this.Action('撤回联网授权', () => this.state.modal = 'revoke', true) }
-      else { MobilePrimaryButton({ label: '阅读并授权', action: () => this.state.modal = 'consent' }) }
+      this.Footer(tr("设备身份及选择保存的访问密码加密保存在本机。画面预览默认关闭，开启后从下一次连接起保存。剪贴板内容在结束会话时清除。离开应用后通过画中画或后台任务保持会话，可随时返回应用断开。"))
+      if (this.state.consent) { this.Action(tr("撤回联网授权"), () => this.state.modal = 'revoke', true) }
+      else { MobilePrimaryButton({ label: tr("阅读并授权"), action: () => this.state.modal = 'consent' }) }
     }.width('100%')
   }
   @Builder
   About() {
     Column() {
       Column() {
-        this.ValueRow('版本', this.state.version)
-        if (this.state.update) { this.Rule(); this.SettingRow('新版本可用', `v${this.state.update}`, () => this.controller?.platform.openLink('https://crossdesk.cn')) }
+        this.ValueRow(tr("版本"), this.state.version)
+        if (this.state.update) { this.Rule(); this.SettingRow(tr("新版本可用"), `v${this.state.update}`, () => this.controller?.platform.openLink('https://crossdesk.cn')) }
         if (this.state.updateStatus) { this.Footer(this.state.updateStatus) }
         this.Rule()
-        this.Action('检查更新', () => this.controller?.checkLocal(true))
+        this.Action(tr("检查更新"), () => this.controller?.checkLocal(true))
       }.width('100%').backgroundColor(Color.White).borderRadius(12).clip(true).border({ width: 0.5, color: MobileTheme.line })
       Column() {
-        this.SettingRow('软件许可', 'GPL-3.0-only', () => this.controller?.document('LICENSE', '软件许可'))
+        this.SettingRow(tr("软件许可"), 'GPL-3.0-only', () => this.controller?.document('LICENSE', tr("软件许可")))
         this.Rule()
-        this.SettingRow('开源软件权利说明', '', () => this.controller?.document('OPEN_SOURCE_NOTICE.txt', '开源软件权利说明'))
+        this.SettingRow(tr("开源软件权利说明"), '', () => this.controller?.document('OPEN_SOURCE_NOTICE.txt', tr("开源软件权利说明")))
         this.Rule()
-        this.SettingRow('开源组件', '', () => this.navigate('licenses'))
+        this.SettingRow(tr("开源组件"), '', () => this.navigate('licenses'))
         this.Rule()
-        this.SettingRow('源码与构建说明', '', () => this.navigate('source'))
+        this.SettingRow(tr("源码与构建说明"), '', () => this.navigate('source'))
       }.backgroundColor(Color.White).borderRadius(12).clip(true).width('100%').border({ width: 0.5, color: MobileTheme.line }).margin({ top: 28 })
-      this.Footer('许可与版权声明可离线查阅。')
+      this.Footer(tr("许可与版权声明可离线查阅。"))
     }.width('100%')
   }
   @Builder
   Announcements() {
     Column({ space: 12 }) {
-      if (!this.state.consent) { Text('同意联网后可查看公告').fontSize(14); this.Action('查看联网说明', () => this.state.modal = 'consent') }
-      if (this.controller?.inbox.failed) { this.Action('加载失败，点击重试', () => this.controller?.inbox.refresh()) }
+      if (!this.state.consent) { Text(tr("同意联网后可查看公告")).fontSize(14); this.Action(tr("查看联网说明"), () => this.state.modal = 'consent') }
+      if (this.controller?.inbox.failed) { this.Action(tr("加载失败，点击重试"), () => this.controller?.inbox.refresh()) }
       if (this.controller?.inbox.loading) { LoadingProgress().width(28).height(28) }
-      if (this.controller?.inbox.saveFailed) { Text('已读或删除状态保存失败，请重试').fontSize(12).fontColor(MobileTheme.red) }
-      if (!this.state.announcements.length && this.controller?.inbox.loaded && !this.controller?.inbox.loading) { Text('暂无公告').fontSize(16).fontColor(MobileTheme.secondary).padding(40) }
+      if (this.controller?.inbox.saveFailed) { Text(tr("已读或删除状态保存失败，请重试")).fontSize(12).fontColor(MobileTheme.red) }
+      if (!this.state.announcements.length && this.controller?.inbox.loaded && !this.controller?.inbox.loading) { Text(tr("暂无公告")).fontSize(16).fontColor(MobileTheme.secondary).padding(40) }
       ForEach(this.state.announcements, (item: AnnouncementItem) => {
         Column({ space: 8 }) {
           Row({ space: 8 }) { if (!item.read) { Row() {}.width(6).height(6).borderRadius(3).backgroundColor(MobileTheme.blue) } Text(item.title).fontSize(17).fontWeight(600).layoutWeight(1) }.width('100%')
@@ -366,7 +369,7 @@ struct Mobile {
         }.padding(18).width('100%').backgroundColor(Color.White).borderRadius(18).border({ width: 0.5, color: MobileTheme.line })
           .onClick(() => this.openAnnouncement(item)).gesture(LongPressGesture().onAction(() => { this.state.announcement = item; this.state.modal = 'deleteAnnouncement'; }))
       }, (item: AnnouncementItem) => `${item.id}:${item.revision}:${item.read}`)
-      if ((this.controller?.inbox.total ?? 0) > this.state.announcements.length) { this.Action('加载更多', () => this.controller?.inbox.more()) }
+      if ((this.controller?.inbox.total ?? 0) > this.state.announcements.length) { this.Action(tr("加载更多"), () => this.controller?.inbox.more()) }
     }.width('100%')
   }
   @Builder
@@ -385,10 +388,10 @@ struct Mobile {
             } else { Span(part.text) }
           })
         }.fontSize(16).lineHeight(25).width('100%').copyOption(CopyOptions.LocalDevice)
-        this.Action('删除公告', () => this.state.modal = 'deleteAnnouncement', true)
+        this.Action(tr("删除公告"), () => this.state.modal = 'deleteAnnouncement', true)
       }.width('100%')
     } else if (this.state.page === 'document') {
-      if (this.state.documentTitle === '隐私政策') { this.PolicyText(this.state.documentText) }
+      if (this.state.documentTitle === tr("隐私政策")) { this.PolicyText(this.state.documentText) }
       else {
       Column({ space: 12 }) {
         ForEach(this.state.documentText.match(/[\s\S]{1,4000}/g) ?? [], (paragraph: string) => {
@@ -398,8 +401,8 @@ struct Mobile {
       }
     } else if (this.state.page === 'licenses') {
       Column() {
-        this.SectionTitle('OpenFEC 告知')
-        Column() { this.Footer('OpenFEC 提供前向纠错能力，遵循 CeCILL-C 1.0 许可。其许可规定了有限保证及责任限制，请阅读组件详情。') }
+        this.SectionTitle(tr("OpenFEC 告知"))
+        Column() { this.Footer(tr("OpenFEC 提供前向纠错能力，遵循 CeCILL-C 1.0 许可。其许可规定了有限保证及责任限制，请阅读组件详情。")) }
           .width('100%').backgroundColor(Color.White).borderRadius(12).border({ width: 0.5, color: MobileTheme.line })
         Column() {
           ForEach(this.licenses, (component: LicenseComponent, index: number) => {
@@ -415,18 +418,18 @@ struct Mobile {
             }.width('100%').padding(0).backgroundColor(Color.White).onClick(() => { this.component = component; this.navigate('component'); })
           }, (component: LicenseComponent) => component.id)
         }.width('100%').backgroundColor(Color.White).borderRadius(12).clip(true).border({ width: 0.5, color: MobileTheme.line }).margin({ top: 28 })
-        this.Footer('各组件遵循所列开源许可证。许可与版权声明可离线查阅，查看源码需要网络连接。')
+        this.Footer(tr("各组件遵循所列开源许可证。许可与版权声明可离线查阅，查看源码需要网络连接。"))
       }.width('100%')
     } else if (this.state.page === 'component') {
       Column() {
         Column() {
-          this.ValueRow('版本', this.component?.version ?? '')
+          this.ValueRow(tr("版本"), this.component?.version ?? '')
           this.Rule()
-          this.ValueRow('许可', this.component?.license ?? '')
+          this.ValueRow(tr("许可"), this.component?.license ?? '')
           this.Rule()
-          this.SettingRow('查看源码', '', () => this.controller?.platform.openLink(this.component?.sourceURL ?? ''))
+          this.SettingRow(tr("查看源码"), '', () => this.controller?.platform.openLink(this.component?.sourceURL ?? ''))
         }.width('100%').backgroundColor(Color.White).borderRadius(12).clip(true).border({ width: 0.5, color: MobileTheme.line })
-        this.SectionTitle('许可与版权声明')
+        this.SectionTitle(tr("许可与版权声明"))
         Column() {
           ForEach(this.component?.documents ?? [], (document: LicenseDocument, index: number) => {
             if (index > 0) { this.Rule() }
@@ -436,16 +439,16 @@ struct Mobile {
       }.width('100%')
     } else if (this.state.page === 'source') {
       Column() {
-        this.SectionTitle('本版本源码与构建说明')
+        this.SectionTitle(tr("本版本源码与构建说明"))
         Column() {
-          this.ValueRow('源码版本', (this.source?.revision ?? '').substring(0, 12))
+          this.ValueRow(tr("源码版本"), (this.source?.revision ?? '').substring(0, 12))
           this.Rule()
           this.ValueRow('MiniRTC', (this.source?.miniRTCRevision ?? '').substring(0, 12))
-          if (this.source?.isModified) { this.Rule(); this.Footer('开发版本包含尚未发布的修改，以下链接为基础版本源码。') }
+          if (this.source?.isModified) { this.Rule(); this.Footer(tr("开发版本包含尚未发布的修改，以下链接为基础版本源码。")) }
           this.Rule()
-          this.SettingRow('查看源码', '', () => this.controller?.platform.openLink(this.source?.sourceURL ?? ''))
+          this.SettingRow(tr("查看源码"), '', () => this.controller?.platform.openLink(this.source?.sourceURL ?? ''))
         }.width('100%').backgroundColor(Color.White).borderRadius(12).clip(true).border({ width: 0.5, color: MobileTheme.line })
-        this.SectionTitle('构建文档')
+        this.SectionTitle(tr("构建文档"))
         Column() {
           ForEach(this.source?.buildDocuments ?? [], (document: LicenseDocument, index: number) => {
             if (index > 0) { this.Rule() }
@@ -462,7 +465,7 @@ struct Mobile {
         Text(title).fontSize(22).fontWeight(600).fontColor(MobileTheme.ink).width('100%')
         if (subtitle) { Text(subtitle).fontSize(15).fontColor(MobileTheme.secondary).width('100%') }
       }.layoutWeight(1)
-      MobileIconButton({ icon: 'close', label: '关闭', iconExtent: 36, iconSize: 20, action: () => this.dismissModal() })
+      MobileIconButton({ icon: 'close', label: tr("关闭"), iconExtent: 36, iconSize: 20, action: () => this.dismissModal() })
     }.width('100%')
   }
   @Builder
@@ -470,24 +473,24 @@ struct Mobile {
     Scroll() {
       Column() {
         Row() {}.width(36).height(5).backgroundColor('#C6C6CB').borderRadius(3).margin({ bottom: 20 })
-        this.SheetHeader('连接远程桌面', `对端 ID  ${this.formatId(this.state.remote)}`)
+        this.SheetHeader(tr("连接远程桌面"), tr("对端 ID  {0}", [String(this.formatId(this.state.remote))]))
         Row() {
-          TextInput({ text: this.state.password, placeholder: '访问密码' }).type(this.showPassword ? InputType.Normal : InputType.Password)
+          TextInput({ text: this.state.password, placeholder: tr("访问密码") }).type(this.showPassword ? InputType.Normal : InputType.Password)
             .showPasswordIcon(false).maxLength(128).fontSize(17).height(50).layoutWeight(1).backgroundColor(Color.Transparent)
             .padding({ left: 14, right: 4 }).onChange((value: string) => this.state.password = value).onSubmit(() => this.controller?.begin(this.state.password))
-          MobileIconButton({ icon: this.showPassword ? 'eye_off' : 'eye', label: this.showPassword ? '隐藏密码' : '显示密码', iconExtent: 44,
+          MobileIconButton({ icon: this.showPassword ? 'eye_off' : 'eye', label: this.showPassword ? tr("隐藏密码") : tr("显示密码"), iconExtent: 44,
             action: () => this.showPassword = !this.showPassword })
         }.width('100%').backgroundColor(Color.White).borderRadius(10).border({ width: 0.5, color: MobileTheme.line }).margin({ top: 18 })
         if (this.state.notice) { Text(this.state.notice).fontSize(13).fontColor(MobileTheme.red).width('100%').margin({ top: 8 }) }
         Row({ space: 12 }) {
           Column({ space: 3 }) {
-            Text('保存密码').fontSize(15).fontWeight(600).fontColor(MobileTheme.ink).width('100%')
-            Text('密码将加密保存在此设备上').fontSize(11).fontColor(MobileTheme.secondary).width('100%')
+            Text(tr("保存密码")).fontSize(15).fontWeight(600).fontColor(MobileTheme.ink).width('100%')
+            Text(tr("密码将加密保存在此设备上")).fontSize(11).fontColor(MobileTheme.secondary).width('100%')
           }.layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.state.remember }).selectedColor(MobileTheme.green)
-            .onChange((value: boolean) => this.state.remember = value).accessibilityText('保存密码')
+            .onChange((value: boolean) => this.state.remember = value).accessibilityText(tr("保存密码"))
         }.width('100%').margin({ top: 18, bottom: 18 })
-        MobilePrimaryButton({ label: '连接', available: this.state.password.length > 0, action: () => this.controller?.begin(this.state.password) })
+        MobilePrimaryButton({ label: tr("连接"), available: this.state.password.length > 0, action: () => this.controller?.begin(this.state.password) })
       }.padding({ left: 22, right: 22, top: 10, bottom: 22 }).width('100%')
     }.width(this.viewWidth < 600 ? '100%' : Math.min(520, this.viewWidth - 48)).constraintSize({ maxHeight: this.viewHeight * 0.92 })
       .backgroundColor(MobileTheme.background).borderRadius(24).scrollBar(BarState.Off)
@@ -506,11 +509,11 @@ struct Mobile {
   @Builder
   ConsentSheet() {
     Column() {
-      Text('隐私政策').fontSize(17).fontWeight(600).fontColor(MobileTheme.ink).height(56).width('100%').textAlign(TextAlign.Center)
+      Text(tr("隐私政策")).fontSize(17).fontWeight(600).fontColor(MobileTheme.ink).height(56).width('100%').textAlign(TextAlign.Center)
       this.Rule()
       Scroll() {
         Column({ space: 12 }) {
-          if (!this.state.privacyAvailable) { Text('隐私政策无法读取，请重新安装应用').fontSize(14).fontColor(MobileTheme.red) }
+          if (!this.state.privacyAvailable) { Text(tr("隐私政策无法读取，请重新安装应用")).fontSize(14).fontColor(MobileTheme.red) }
           this.PolicyText(this.privacyText)
         }.padding(20).width('100%')
       }.layoutWeight(1).width('100%').align(Alignment.Top).scrollBar(BarState.Off)
@@ -518,11 +521,11 @@ struct Mobile {
       Column({ space: 12 }) {
         Row({ space: 8 }) {
           Checkbox({ name: 'consent' }).width(20).height(20).margin(0).select(this.accepted).selectedColor(MobileTheme.blue)
-            .onChange((value: boolean) => this.accepted = value).accessibilityText('我已阅读并同意隐私政策')
-          Text('我已阅读并同意《隐私政策》').fontSize(14).fontColor(MobileTheme.ink).layoutWeight(1).onClick(() => this.accepted = !this.accepted)
+            .onChange((value: boolean) => this.accepted = value).accessibilityText(tr("我已阅读并同意隐私政策"))
+          Text(tr("我已阅读并同意《隐私政策》")).fontSize(14).fontColor(MobileTheme.ink).layoutWeight(1).onClick(() => this.accepted = !this.accepted)
         }.width('100%').constraintSize({ minHeight: 44 })
-        MobilePrimaryButton({ label: '同意并继续', available: this.accepted && this.state.privacyAvailable, action: () => this.controller?.consent() })
-        Button('暂不同意', { type: ButtonType.Normal }).fontSize(16).fontColor(MobileTheme.secondary).height(44).width('100%')
+        MobilePrimaryButton({ label: tr("同意并继续"), available: this.accepted && this.state.privacyAvailable, action: () => this.controller?.consent() })
+        Button(tr("暂不同意"), { type: ButtonType.Normal }).fontSize(16).fontColor(MobileTheme.secondary).height(44).width('100%')
           .backgroundColor(Color.Transparent).onClick(() => this.dismissModal())
       }.padding({ left: 20, right: 20, top: 12, bottom: 12 }).width('100%')
     }.width(this.viewWidth < 600 ? '100%' : Math.min(640, this.viewWidth - 48)).height(Math.min(760, this.viewHeight * 0.9))
@@ -533,42 +536,42 @@ struct Mobile {
     if (this.state.modal === 'connecting') {
       Column({ space: 14 }) {
         LoadingProgress().width(34).height(34).color(MobileTheme.blue)
-        Text('正在连接').fontSize(20).fontWeight(600).fontColor(MobileTheme.ink)
-        Text(this.state.signal === 1 ? '正在建立安全连接…' : this.state.signalText).fontSize(14).fontColor(MobileTheme.secondary).textAlign(TextAlign.Center).constraintSize({ minHeight: 36 })
+        Text(tr("正在连接")).fontSize(20).fontWeight(600).fontColor(MobileTheme.ink)
+        Text(this.state.signal === 1 ? tr("正在建立安全连接…") : this.state.signalText).fontSize(14).fontColor(MobileTheme.secondary).textAlign(TextAlign.Center).constraintSize({ minHeight: 36 })
       }.padding({ left: 26, right: 26, top: 24, bottom: 20 }).width('100%')
       this.Rule()
-      this.Action('取消连接', () => this.controller?.end(''), true)
+      this.Action(tr("取消连接"), () => this.controller?.end(''), true)
     } else if (this.state.modal === 'privacyUnlock') {
       Column({ space: 12 }) {
-        Text('隐私屏已被解锁').fontSize(20).fontWeight(600).fontColor(MobileTheme.ink)
-        Text('被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。')
+        Text(tr("隐私屏已被解锁")).fontSize(20).fontWeight(600).fontColor(MobileTheme.ink)
+        Text(tr("被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。"))
           .fontSize(14).lineHeight(21).fontColor(MobileTheme.secondary).width('100%')
         if (this.state.privacyFeedback) { Text(this.state.privacyFeedback).fontSize(12).fontColor(MobileTheme.secondary) }
       }.padding(24).width('100%')
       this.Rule()
       Row() {
-        Button('确认', { type: ButtonType.Normal }).fontSize(16).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
+        Button(tr("确认"), { type: ButtonType.Normal }).fontSize(16).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
           .backgroundColor(Color.White).onClick(() => this.dismissModal())
         Divider().vertical(true).height(50).strokeWidth(0.5).color(MobileTheme.line)
-        Button('锁定', { type: ButtonType.Normal }).fontSize(16).fontWeight(600).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
+        Button(tr("锁定"), { type: ButtonType.Normal }).fontSize(16).fontWeight(600).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
           .backgroundColor(Color.White).enabled(this.state.privacyCanLock).onClick(() => this.controller?.lockPrivacy())
       }.width('100%')
     } else if (this.state.modal === 'clipboard') {
       Column({ space: 16 }) {
-        this.SheetHeader('剪贴板')
-        Text('发送文本后，点击“粘贴到远端”使用。').fontSize(13).fontColor(MobileTheme.secondary).width('100%')
-        TextArea({ text: this.state.clipboardText, placeholder: '要发送到远端的文本' }).fontSize(15).height(120).borderRadius(12).barState(BarState.Off)
+        this.SheetHeader(tr("剪贴板"))
+        Text(tr("发送文本后，点击“粘贴到远端”使用。")).fontSize(13).fontColor(MobileTheme.secondary).width('100%')
+        TextArea({ text: this.state.clipboardText, placeholder: tr("要发送到远端的文本") }).fontSize(15).height(120).borderRadius(12).barState(BarState.Off)
           .backgroundColor(MobileTheme.background).onChange((value: string) => this.state.clipboardText = value)
-        MobilePrimaryButton({ label: '发送文本', action: () => this.controller?.clipboard() })
+        MobilePrimaryButton({ label: tr("发送文本"), action: () => this.controller?.clipboard() })
         Row({ space: 8 }) {
-          Column() { this.Action('粘贴到远端', () => this.controller?.shortcut(86)) }.layoutWeight(1)
-          Column() { this.Action('复制远端文本', () => this.controller?.copyRemote()) }.layoutWeight(1)
+          Column() { this.Action(tr("粘贴到远端"), () => this.controller?.shortcut(86)) }.layoutWeight(1)
+          Column() { this.Action(tr("复制远端文本"), () => this.controller?.copyRemote()) }.layoutWeight(1)
         }.width('100%')
       }.padding(20).width('100%')
     } else if (this.state.modal === 'displays') {
       Column({ space: 12 }) {
-        this.SheetHeader('显示器')
-        if (!this.state.displays.length) { this.Footer('等待远端屏幕信息') }
+        this.SheetHeader(tr("显示器"))
+        if (!this.state.displays.length) { this.Footer(tr("等待远端屏幕信息")) }
         ForEach(this.state.displays, (screen: RemoteDisplay, index: number) => {
           Button({ type: ButtonType.Normal }) {
             Row({ space: 12 }) {
@@ -584,31 +587,31 @@ struct Mobile {
       Text(this.state.recent.find((d: RecentDevice) => d.id === this.deleteId)?.name || this.formatId(this.deleteId))
         .fontSize(17).fontWeight(600).fontColor(MobileTheme.ink).padding(20).width('100%').textAlign(TextAlign.Center)
       this.Rule()
-      this.Action('连接', () => { this.dismissModal(); this.controller?.requestConnection(this.deleteId); })
+      this.Action(tr("连接"), () => { this.dismissModal(); this.controller?.requestConnection(this.deleteId); })
       this.Rule()
-      this.Action('删除记录', () => this.state.modal = 'delete', true)
+      this.Action(tr("删除记录"), () => this.state.modal = 'delete', true)
       this.Rule()
-      this.Action('取消', () => this.dismissModal())
+      this.Action(tr("取消"), () => this.dismissModal())
     } else {
       Column({ space: 12 }) {
-        Text(this.state.modal === 'notice' ? '连接提示' : this.state.modal === 'upgrade' ? '升级提示' : this.state.modal === 'disconnect' ? '断开远程连接？' :
-          this.state.modal === 'revoke' ? '撤回联网授权？' : this.state.modal === 'previews' ? '保存远程画面预览？' : this.state.modal === 'clearPreviews' ? '清除预览图？' : this.state.modal === 'deleteAnnouncement' ? '删除公告？' : '删除记录？')
+        Text(this.state.modal === 'notice' ? tr("连接提示") : this.state.modal === 'upgrade' ? tr("升级提示") : this.state.modal === 'disconnect' ? tr("断开远程连接？") :
+          this.state.modal === 'revoke' ? tr("撤回联网授权？") : this.state.modal === 'previews' ? tr("保存远程画面预览？") : this.state.modal === 'clearPreviews' ? tr("清除预览图？") : this.state.modal === 'deleteAnnouncement' ? tr("删除公告？") : tr("删除记录？"))
           .fontSize(20).fontWeight(600).fontColor(MobileTheme.ink).textAlign(TextAlign.Center).width('100%')
-        Text(this.state.modal === 'notice' || this.state.modal === 'upgrade' ? this.state.notice : this.state.modal === 'disconnect' ? '断开后将返回首页。' :
-          this.state.modal === 'previews' ? '预览可能包含远程设备上的敏感内容。仅保存在本机，从下一次连接起生效，可随时关闭并清除。' :
-          this.state.modal === 'clearPreviews' ? '将清除此设备保存的所有远程画面预览，保留连接记录和访问密码。' :
-          this.state.modal === 'revoke' ? '将停止远程连接、关闭画面预览保存并清除已有预览。连接记录和密码会保留，重新连接前需再次授权。' :
-          this.state.modal === 'delete' ? '同时删除该设备保存的密码和预览。' : '此公告将从列表中移除。')
+        Text(this.state.modal === 'notice' || this.state.modal === 'upgrade' ? this.state.notice : this.state.modal === 'disconnect' ? tr("断开后将返回首页。") :
+          this.state.modal === 'previews' ? tr("预览可能包含远程设备上的敏感内容。仅保存在本机，从下一次连接起生效，可随时关闭并清除。") :
+          this.state.modal === 'clearPreviews' ? tr("将清除此设备保存的所有远程画面预览，保留连接记录和访问密码。") :
+          this.state.modal === 'revoke' ? tr("将停止远程连接、关闭画面预览保存并清除已有预览。连接记录和密码会保留，重新连接前需再次授权。") :
+          this.state.modal === 'delete' ? tr("同时删除该设备保存的密码和预览。") : tr("此公告将从列表中移除。"))
           .fontSize(14).lineHeight(21).fontColor(MobileTheme.secondary).textAlign(TextAlign.Center).width('100%')
       }.padding(24).width('100%')
       this.Rule()
-      if (this.state.modal === 'notice' || this.state.modal === 'upgrade') { this.Action('知道了', () => this.dismissModal()) }
+      if (this.state.modal === 'notice' || this.state.modal === 'upgrade') { this.Action(tr("知道了"), () => this.dismissModal()) }
       else {
         Row() {
-          Button('取消', { type: ButtonType.Normal }).fontSize(16).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
+          Button(tr("取消"), { type: ButtonType.Normal }).fontSize(16).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
             .backgroundColor(Color.White).onClick(() => this.dismissModal())
           Divider().vertical(true).height(50).strokeWidth(0.5).color(MobileTheme.line)
-          Button(this.state.modal === 'previews' ? '开启' : this.state.modal === 'disconnect' ? '断开连接' : this.state.modal === 'revoke' ? '撤回授权' : this.state.modal === 'clearPreviews' ? '清除' : '删除', { type: ButtonType.Normal })
+          Button(this.state.modal === 'previews' ? tr("开启") : this.state.modal === 'disconnect' ? tr("断开连接") : this.state.modal === 'revoke' ? tr("撤回授权") : this.state.modal === 'clearPreviews' ? tr("清除") : tr("删除"), { type: ButtonType.Normal })
             .fontSize(16).fontWeight(600).fontColor(this.state.modal === 'previews' ? MobileTheme.blue : MobileTheme.red).height(50).layoutWeight(1)
             .backgroundColor(Color.White).onClick(() => this.confirmModal())
         }.width('100%')
@@ -637,11 +640,11 @@ struct Mobile {
       else {
         Column() {
           Row({ space: 0 }) {
-            MobileIconButton({ icon: 'back', label: '返回', iconExtent: 44, iconSize: 22, action: () => this.back() })
+            MobileIconButton({ icon: 'back', label: tr("返回"), iconExtent: 44, iconSize: 22, action: () => this.back() })
             Text(this.title()).fontSize(17).fontWeight(600).fontColor(MobileTheme.ink).layoutWeight(1).textAlign(TextAlign.Center)
               .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
             if (this.state.page === 'announcements') {
-              MobileIconButton({ icon: 'refresh', label: '刷新公告', iconExtent: 44, iconSize: 22, action: () => this.controller?.inbox.refresh() })
+              MobileIconButton({ icon: 'refresh', label: tr("刷新公告"), iconExtent: 44, iconSize: 22, action: () => this.controller?.inbox.refresh() })
             } else { Blank().width(44) }
           }.width('100%').constraintSize({ maxWidth: 720 }).height(56).padding({ left: 12, right: 12 })
           if (this.state.page === 'announcements') {

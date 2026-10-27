@@ -4,11 +4,11 @@ import org.json.JSONObject;
 
 /** Same request/acknowledgement and rollback rules as the iOS controller. */
 final class RemoteVideoSettings {
-    static final String[] PREFERENCES={"帧率优先","画质优先","平衡"};
-    static final String[] DETAILS={
-        "优先保持画面流畅，带宽或编码压力较大时会更积极地降低分辨率。",
-        "始终保持较高分辨率，带宽不足时通过降低帧率来保证画面清晰度。",
-        "兼顾清晰度和流畅度，只在持续压力下逐步降低分辨率。"};
+    static String[] preferences(){return new String[]{L10n.tr("帧率优先"),L10n.tr("画质优先"),L10n.tr("平衡")};}
+    static String[] details(){return new String[]{
+        L10n.tr("优先保持画面流畅，带宽或编码压力较大时会更积极地降低分辨率。"),
+        L10n.tr("始终保持较高分辨率，带宽不足时通过降低帧率来保证画面清晰度。"),
+        L10n.tr("兼顾清晰度和流畅度，只在持续压力下逐步降低分辨率。")};}
     static final class Values {
         final int quality,frameRate,preference;
         Values(int quality,int frameRate,int preference){this.quality=quality;this.frameRate=frameRate;this.preference=preference;}
@@ -54,5 +54,5 @@ final class RemoteVideoSettings {
         }catch(org.json.JSONException ignored){ }
     }
     void expire(long expiredId){if(pending&&expiredId==requestId){selection=applied;pending=false;failed=true;}}
-    String feedback(){return !supported?"连接建立后可调整，需被控端支持。":failed?"调整失败，请重试。":"";}
+    String feedback(){return !supported?L10n.tr("连接建立后可调整，需被控端支持。"):failed?L10n.tr("调整失败，请重试。"):"";}
 }

@@ -21,8 +21,8 @@ struct AnnouncementBadge: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("通知公告")
-            .accessibilityValue(inbox.state.unread > 0 ? "\(inbox.state.unread) 条未读" : "无未读公告")
+            .accessibilityLabel(NSLocalizedString("通知公告", comment: ""))
+            .accessibilityValue(inbox.state.unread > 0 ? String(format: NSLocalizedString("%1$@ 条未读", comment: ""), String(describing: inbox.state.unread)) : NSLocalizedString("无未读公告", comment: ""))
     }
 }
 
@@ -49,14 +49,14 @@ struct AnnouncementInboxView: View {
     var body: some View {
         List {
             if inbox.state.deleteFailed {
-                Text("无法删除这条公告，请重试。")
+                Text(NSLocalizedString("无法删除这条公告，请重试。", comment: ""))
                     .foregroundStyle(.red)
             }
             if inbox.state.failed && session.announcementsConnected {
                 HStack {
-                    Text("公告加载失败，请重试。")
+                    Text(NSLocalizedString("公告加载失败，请重试。", comment: ""))
                     Spacer()
-                    Button("重试") { session.refreshAnnouncements() }
+                    Button(NSLocalizedString("重试", comment: "")) { session.refreshAnnouncements() }
                         .disabled(!session.announcementsConnected)
                 }
             }
@@ -82,42 +82,42 @@ struct AnnouncementInboxView: View {
                         }
                         .padding(.vertical, 5)
                         .accessibilityElement(children: .combine)
-                        .accessibilityValue(item.read ? "已读" : "未读")
+                        .accessibilityValue(item.read ? NSLocalizedString("已读", comment: "") : NSLocalizedString("未读", comment: ""))
                     }
                     .swipeActions {
-                        Button("删除", role: .destructive) { pendingDelete = item }
+                        Button(NSLocalizedString("删除", comment: ""), role: .destructive) { pendingDelete = item }
                     }
                     .contextMenu {
-                        Button("删除公告", role: .destructive) { pendingDelete = item }
+                        Button(NSLocalizedString("删除公告", comment: ""), role: .destructive) { pendingDelete = item }
                     }
                 }
                 if inbox.state.loading {
-                    HStack { Spacer(); ProgressView("加载中…"); Spacer() }
+                    HStack { Spacer(); ProgressView(NSLocalizedString("加载中…", comment: "")); Spacer() }
                 } else if inbox.state.items.count < inbox.state.total && !inbox.state.failed {
-                    Button("加载更多") { inbox.loadMore() }
+                    Button(NSLocalizedString("加载更多", comment: "")) { inbox.loadMore() }
                         .frame(maxWidth: .infinity)
                         .disabled(!session.announcementsConnected)
                         .onAppear { inbox.loadMore() }
                 } else if inbox.state.loaded && inbox.state.total == 0 &&
                             !inbox.state.failed && session.announcementsConnected {
-                    Text("暂无公告")
+                    Text(NSLocalizedString("暂无公告", comment: ""))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 120)
                 }
             } header: {
-                Text("共 \(inbox.state.total) 条 · \(inbox.state.unread) 条未读")
+                Text(String(format: NSLocalizedString("共 %1$@ 条 · %2$@ 条未读", comment: ""), String(describing: inbox.state.total), String(describing: inbox.state.unread)))
             }
         }
         .readableContentWidth()
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("通知公告")
+        .navigationTitle(NSLocalizedString("通知公告", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { session.refreshAnnouncements() } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .accessibilityLabel("刷新公告")
+                .accessibilityLabel(NSLocalizedString("刷新公告", comment: ""))
                 .disabled(inbox.state.loading || !session.announcementsConnected)
             }
         }
@@ -128,17 +128,17 @@ struct AnnouncementInboxView: View {
             }
         }
         .onAppear { session.refreshAnnouncements() }
-        .alert("删除公告", isPresented: Binding(
+        .alert(NSLocalizedString("删除公告", comment: ""), isPresented: Binding(
             get: { pendingDelete != nil },
             set: { if !$0 { pendingDelete = nil } }
         )) {
-            Button("取消", role: .cancel) { pendingDelete = nil }
-            Button("删除", role: .destructive) {
+            Button(NSLocalizedString("取消", comment: ""), role: .cancel) { pendingDelete = nil }
+            Button(NSLocalizedString("删除", comment: ""), role: .destructive) {
                 if let item = pendingDelete { inbox.dismiss(item) }
                 pendingDelete = nil
             }
         } message: {
-            Text("删除这条公告？")
+            Text(NSLocalizedString("删除这条公告？", comment: ""))
         }
     }
 }
@@ -158,13 +158,13 @@ struct AnnouncementDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(verbatim: item.title)
                         .font(.title2.weight(.semibold))
-                    Text("\(AnnouncementDate.string(item)) · \(item.read ? "已读" : "未读")")
+                    Text("\(AnnouncementDate.string(item)) · \(NSLocalizedString(item.read ? "已读" : "未读", comment: ""))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if inbox.state.readSaveFailed {
-                        Text("无法保存本地阅读状态，请重试。")
+                        Text(NSLocalizedString("无法保存本地阅读状态，请重试。", comment: ""))
                             .foregroundStyle(.red)
-                        Button("重试保存阅读状态") { inbox.markRead(item) }
+                        Button(NSLocalizedString("重试保存阅读状态", comment: "")) { inbox.markRead(item) }
                     }
                     Text(AnnouncementText.format(item.body))
                         .textSelection(.enabled)
@@ -178,13 +178,13 @@ struct AnnouncementDetailView: View {
                 .padding(20)
                 .readableContentWidth()
             } else {
-                Text("这条公告已更新或删除，请返回公告列表查看。")
+                Text(NSLocalizedString("这条公告已更新或删除，请返回公告列表查看。", comment: ""))
                     .foregroundStyle(.secondary)
                     .padding(20)
                     .readableContentWidth()
             }
         }
-        .navigationTitle("公告详情")
+        .navigationTitle(NSLocalizedString("公告详情", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if let item { inbox.markRead(item) }

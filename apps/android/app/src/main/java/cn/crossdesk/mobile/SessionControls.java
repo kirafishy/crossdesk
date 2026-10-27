@@ -59,8 +59,8 @@ final class SessionControls extends FrameLayout {
         addView(keyboard,new LayoutParams(-1,ui.dp(44),Gravity.BOTTOM));
         // This container must remain transparent to remote touch outside its controls.
         waiting=ui.column();waiting.setMinimumWidth(ui.dp(200));waiting.setGravity(Gravity.CENTER);waiting.setPadding(ui.dp(20),ui.dp(20),ui.dp(20),ui.dp(20));waiting.setBackground(ui.background(0xB0202024,14));
-        ProgressBar progress=new ProgressBar(context);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));waiting.addView(progress,ui.size(28,28));ui.gap(waiting,12);TextView message=ui.text("等待远端画面…",14,false);message.setTextColor(Color.WHITE);message.setGravity(Gravity.CENTER);waiting.addView(message);addView(waiting,new LayoutParams(-2,-2,Gravity.CENTER));
-        orb=ui.iconButton("display","展开远程控制菜单",()->{if(menu==null)openMenu("controls");else closeMenu();});
+        ProgressBar progress=new ProgressBar(context);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));waiting.addView(progress,ui.size(28,28));ui.gap(waiting,12);TextView message=ui.text(L10n.tr("等待远端画面…"),14,false);message.setTextColor(Color.WHITE);message.setGravity(Gravity.CENTER);waiting.addView(message);addView(waiting,new LayoutParams(-2,-2,Gravity.CENTER));
+        orb=ui.iconButton("display",L10n.tr("展开远程控制菜单"),()->{if(menu==null)openMenu("controls");else closeMenu();});
         ImageView brand=new ImageView(context);brand.setImageResource(R.drawable.mobile_brand);brand.setScaleType(ImageView.ScaleType.CENTER_CROP);brand.setBackground(ui.background(Color.WHITE,23));brand.setClipToOutline(true);brand.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         ((FrameLayout)orb).removeAllViews();((FrameLayout)orb).addView(brand,new LayoutParams(ui.dp(46),ui.dp(46),Gravity.CENTER));
         orb.setBackground(ui.background(0xFFF5F5F7,27));orb.setElevation(ui.dp(7));addView(orb,new LayoutParams(ui.dp(54),ui.dp(54)));
@@ -117,15 +117,15 @@ final class SessionControls extends FrameLayout {
         if(transferLabel!=null){transferLabel.setText(transferStatus);transferLabel.setVisibility(transferStatus.isEmpty()?GONE:VISIBLE);}
         if(saveFileButton!=null)saveFileButton.setVisibility(hasReceivedFile?VISIBLE:GONE);
     }
-    private void closeMenu(){if(menu!=null){removeView(menu);menu=null;menuScroll=null;}if(shield!=null){removeView(shield);shield=null;}videoFeedback=transferLabel=saveFileButton=null;privacyFeedback=privacyCaption=null;privacyButton=null;privacyIcon=null;trafficCells=null;trafficRows=null;networkDetails=null;encryptionLock=encryptionOpen=null;settingRows.clear();orb.setContentDescription("展开远程控制菜单");positionMouse();}
+    private void closeMenu(){if(menu!=null){removeView(menu);menu=null;menuScroll=null;}if(shield!=null){removeView(shield);shield=null;}videoFeedback=transferLabel=saveFileButton=null;privacyFeedback=privacyCaption=null;privacyButton=null;privacyIcon=null;trafficCells=null;trafficRows=null;networkDetails=null;encryptionLock=encryptionOpen=null;settingRows.clear();orb.setContentDescription(L10n.tr("展开远程控制菜单"));positionMouse();}
     private void openMenu(String page){
         cancelMouseInput();
         closeMenu();menuPage=page;shield=new View(getContext());shield.setOnClickListener(v->closeMenu());addView(shield,new LayoutParams(-1,-1));
         menu=ui.column();menu.setPadding(ui.dp(12),ui.dp(12),ui.dp(12),ui.dp(12));ui.card(menu,18);menu.setElevation(ui.dp(12));
         LinearLayout header=ui.row();
-        if(!page.equals("controls"))header.addView(ui.iconButton("back","返回控制栏",()->openMenu("controls")),ui.size(28,32));
-        TextView title=ui.text(page.equals("controls")?"●  已连接":page.equals("video")?"画面设置":"网络状态",14,true);
-        header.addView(title,new LinearLayout.LayoutParams(0,-2,1));header.addView(ui.iconButton("close","关闭控制栏",this::closeMenu),ui.size(30,32));menu.addView(header);ui.gap(menu,9);
+        if(!page.equals("controls"))header.addView(ui.iconButton("back",L10n.tr("返回控制栏"),()->openMenu("controls")),ui.size(28,32));
+        TextView title=ui.text(page.equals("controls")?L10n.tr("●  已连接"):page.equals("video")?L10n.tr("画面设置"):L10n.tr("网络状态"),14,true);
+        header.addView(title,new LinearLayout.LayoutParams(0,-2,1));header.addView(ui.iconButton("close",L10n.tr("关闭控制栏"),this::closeMenu),ui.size(30,32));menu.addView(header);ui.gap(menu,9);
         if(page.equals("video")){videoFeedback=ui.text("",12,false);videoFeedback.setTextColor(SECONDARY);videoFeedback.setPadding(0,0,0,ui.dp(9));menu.addView(videoFeedback);}
         ScrollView scroll=new ScrollView(getContext());menuScroll=scroll;menu.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));LinearLayout body=ui.column();scroll.addView(body);
         if(page.equals("network")){
@@ -133,7 +133,7 @@ final class SessionControls extends FrameLayout {
             scroll.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_INSET);body.setPadding(0,0,ui.dp(6),0);
         }
         if(page.equals("controls")){
-            String[] labels={"键盘",mouseVisible?"收起鼠标":"虚拟鼠标",relative?"相对鼠标":"绝对鼠标","显示器","画面设置",muted?"静音":"声音","发送文件","网络状态","Ctrl+Alt+Del","剪贴板","隐私屏"};
+            String[] labels={L10n.tr("键盘"),mouseVisible?L10n.tr("收起鼠标"):L10n.tr("虚拟鼠标"),relative?L10n.tr("相对鼠标"):L10n.tr("绝对鼠标"),L10n.tr("显示器"),L10n.tr("画面设置"),muted?L10n.tr("静音"):L10n.tr("声音"),L10n.tr("发送文件"),L10n.tr("网络状态"),"Ctrl+Alt+Del",L10n.tr("剪贴板"),L10n.tr("隐私屏")};
             String[] icons={"keyboard","mouse","mouse","display","sliders","audio","folder","chart","lock","clipboard","eye"};
             Runnable[] clicks={()->{closeMenu();toggleKeyboard();},this::toggleMouse,actions::mouse,actions::display,()->openMenu("video"),actions::mute,actions::sendFile,()->openMenu("network"),actions::secureAttention,actions::clipboard,actions::togglePrivacy};
             menuColumns=controlColumns();
@@ -143,22 +143,22 @@ final class SessionControls extends FrameLayout {
                 visibleControls.add(index);
             }
             int controlCount=visibleControls.size();
-            for(int row=0;row<(controlCount+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int position=row*menuColumns+col;if(position>=controlCount){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}int index=visibleControls.get(position);LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));MobileUi.Icon icon=ui.icon(icons[index],INK);control.addView(icon,ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setSingleLine();caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
+            for(int row=0;row<(controlCount+menuColumns-1)/menuColumns;row++){LinearLayout line=ui.row();for(int col=0;col<menuColumns;col++){int position=row*menuColumns+col;if(position>=controlCount){View spacer=new View(getContext());LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(spacer,p);continue;}int index=visibleControls.get(position);LinearLayout control=ui.column();control.setGravity(Gravity.CENTER);control.setBackground(ui.background(0xFFF0F0F2,10));MobileUi.Icon icon=ui.icon(icons[index],INK);control.addView(icon,ui.size(19,19));ui.gap(control,4);TextView caption=ui.text(labels[index],10,false);caption.setMaxLines(2);caption.setAutoSizeTextTypeUniformWithConfiguration(8,10,1,android.util.TypedValue.COMPLEX_UNIT_SP);caption.setGravity(Gravity.CENTER);control.addView(caption);control.setContentDescription(labels[index]);control.setClickable(true);control.setFocusable(true);control.setOnClickListener(v->clicks[index].run());
                     if(index==10){privacyButton=control;privacyIcon=icon;privacyCaption=caption;}
                     LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,ui.dp(52),1);if(col>0)p.leftMargin=ui.dp(7);line.addView(control,p);
                 }body.addView(line);if((row+1)*menuColumns<controlCount)ui.gap(body,7);}
             privacyFeedback=ui.text("",11,false);privacyFeedback.setTextColor(SECONDARY);privacyFeedback.setPadding(0,ui.dp(7),0,0);privacyFeedback.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(privacyFeedback);renderPrivacy();
             ui.gap(body,7);transferLabel=ui.text(transferStatus,11,false);transferLabel.setTextColor(SECONDARY);transferLabel.setAccessibilityLiveRegion(ACCESSIBILITY_LIVE_REGION_POLITE);body.addView(transferLabel);
-            saveFileButton=ui.action("保存收到的文件",BLUE,actions::saveFile);body.addView(saveFileButton);renderFileStatus();
+            saveFileButton=ui.action(L10n.tr("保存收到的文件"),BLUE,actions::saveFile);body.addView(saveFileButton);renderFileStatus();
         }else if(page.equals("network")){
             networkPage(body);
         }else{
-            settingRows.add(new SettingRow(body,0,"画面质量",new String[]{"低","中","高"},new int[]{0,1,2}));ui.gap(body,12);
-            settingRows.add(new SettingRow(body,1,"画面采集帧率",new String[]{"30 fps","60 fps"},new int[]{30,60}));ui.gap(body,12);
-            settingRows.add(new SettingRow(body,2,"画面偏好",RemoteVideoSettings.PREFERENCES,new int[]{0,1,2}));renderVideoSettings();
+            settingRows.add(new SettingRow(body,0,L10n.tr("画面质量"),new String[]{L10n.tr("低"),L10n.tr("中"),L10n.tr("高")},new int[]{0,1,2}));ui.gap(body,12);
+            settingRows.add(new SettingRow(body,1,L10n.tr("画面采集帧率"),new String[]{"30 fps","60 fps"},new int[]{30,60}));ui.gap(body,12);
+            settingRows.add(new SettingRow(body,2,L10n.tr("画面偏好"),RemoteVideoSettings.preferences(),new int[]{0,1,2}));renderVideoSettings();
         }
-        ui.gap(menu,9);TextView disconnect=ui.action("断开连接",Color.WHITE,()->{closeMenu();closeKeyboard();actions.disconnect();});disconnect.setMinHeight(ui.dp(34));disconnect.setTextSize(14);disconnect.setBackground(ui.background(RED,8));menu.addView(disconnect,ui.size(-1,34));
-        addView(menu,new LayoutParams(panelWidth(getWidth()),panelHeight(getHeight())));orb.bringToFront();orb.setContentDescription("收起远程控制菜单");
+        ui.gap(menu,9);TextView disconnect=ui.action(L10n.tr("断开连接"),Color.WHITE,()->{closeMenu();closeKeyboard();actions.disconnect();});disconnect.setMinHeight(ui.dp(34));disconnect.setTextSize(14);disconnect.setBackground(ui.background(RED,8));menu.addView(disconnect,ui.size(-1,34));
+        addView(menu,new LayoutParams(panelWidth(getWidth()),panelHeight(getHeight())));orb.bringToFront();orb.setContentDescription(L10n.tr("收起远程控制菜单"));
         positionMouse();
     }
     private void renderPrivacy(){
@@ -168,7 +168,7 @@ final class SessionControls extends FrameLayout {
         long now=android.os.SystemClock.elapsedRealtime();privacy.tick(now);
         if(privacyFeedback!=null){String feedback=privacy.feedback(now);privacyFeedback.setText(feedback);privacyFeedback.setVisibility(feedback.isEmpty()?GONE:VISIBLE);}
         if(privacyButton==null)return;
-        boolean enabled=privacy.enabled(now);String action=privacy.active()?"关闭隐私屏":"开启隐私屏";
+        boolean enabled=privacy.enabled(now);String action=privacy.active()?L10n.tr("关闭隐私屏"):L10n.tr("开启隐私屏");
         privacyIcon.setName(enabled?"eye_off":"eye");
         privacyCaption.setText(privacy.buttonTitle(now));
         privacyButton.setSelected(enabled);
@@ -183,7 +183,7 @@ final class SessionControls extends FrameLayout {
             group=new SegmentedControl(ui,labels,selectionIndex(),settings.supported,index->actions.videoSettings(field,values[index]));
             group.setPadding(ui.dp(2),ui.dp(2),ui.dp(2),ui.dp(2));body.addView(group);
             for(int i=0;i<labels.length;i++){
-                TextView button=(TextView)group.getChildAt(i);button.setTextSize(12);button.setMinHeight(ui.dp(28));button.setSingleLine();button.setContentDescription(title+"，"+labels[i]);
+                TextView button=(TextView)group.getChildAt(i);button.setTextSize(12);button.setMinHeight(ui.dp(28));button.setSingleLine();button.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,android.util.TypedValue.COMPLEX_UNIT_SP);button.setContentDescription(title+"，"+labels[i]);
                 button.setLayoutParams(new LinearLayout.LayoutParams(0,ui.dp(28),1));
             }
         }
@@ -197,12 +197,12 @@ final class SessionControls extends FrameLayout {
         for(SettingRow row:settingRows)row.render();
     }
     private void networkPage(LinearLayout body){
-        trafficCells=new TextView[4][3];trafficRows=new LinearLayout[4];String[] names={"视频","音频","数据","合计"};
-        LinearLayout heading=trafficRow(body,"",new TextView[3],false);((TextView)heading.getChildAt(1)).setText("接收");((TextView)heading.getChildAt(2)).setText("发送");((TextView)heading.getChildAt(3)).setText("丢包率");
+        trafficCells=new TextView[4][3];trafficRows=new LinearLayout[4];String[] names={L10n.tr("视频"),L10n.tr("音频"),L10n.tr("数据"),L10n.tr("合计")};
+        LinearLayout heading=trafficRow(body,"",new TextView[3],false);((TextView)heading.getChildAt(1)).setText(L10n.tr("接收"));((TextView)heading.getChildAt(2)).setText(L10n.tr("发送"));((TextView)heading.getChildAt(3)).setText(L10n.tr("丢包率"));
         for(int i=0;i<heading.getChildCount();i++)((TextView)heading.getChildAt(i)).setTextColor(SECONDARY);
         for(int i=0;i<4;i++)trafficRows[i]=trafficRow(body,names[i],trafficCells[i],i==3);
         ui.gap(body,10);ui.divider(body);ui.gap(body,10);
-        String[] titles={"帧率","分辨率","画面延时","连接延时（RTT）","连接方式","媒体加密","被控端编码器","控制端解码器"};networkDetails=new TextView[titles.length];
+        String[] titles={L10n.tr("帧率"),L10n.tr("分辨率"),L10n.tr("画面延时"),L10n.tr("连接延时（RTT）"),L10n.tr("连接方式"),L10n.tr("媒体加密"),L10n.tr("被控端编码器"),L10n.tr("控制端解码器")};networkDetails=new TextView[titles.length];
         for(int i=0;i<titles.length;i++){LinearLayout row=ui.row();TextView title=ui.text(titles[i],12,false);title.setTextColor(SECONDARY);row.addView(title,i>=6?new LinearLayout.LayoutParams(-2,-2):new LinearLayout.LayoutParams(0,-2,1));
             if(i==5){encryptionLock=ui.icon("lock",GREEN);encryptionOpen=ui.icon("unlock",SECONDARY);for(View icon:new View[]{encryptionLock,encryptionOpen}){LinearLayout.LayoutParams p=ui.size(14,14);p.rightMargin=ui.dp(4);row.addView(icon,p);}}
             TextView value=ui.text("—",12,false);value.setFontFeatureSettings("tnum");
@@ -219,13 +219,13 @@ final class SessionControls extends FrameLayout {
     }
     private void renderNetwork(){
         if(trafficCells==null)return;
-        String[] names={"视频","音频","数据","合计"};
+        String[] names={L10n.tr("视频"),L10n.tr("音频"),L10n.tr("数据"),L10n.tr("合计")};
         for(int i=0;i<4;i++){
             RemoteNetworkStatistics.Traffic traffic=network.report==null?null:network.report.traffic[i];
             String in=RemoteNetworkStatistics.bitrate(traffic==null?-1:traffic.inbound),out=RemoteNetworkStatistics.bitrate(traffic==null?-1:traffic.outbound),loss=RemoteNetworkStatistics.loss(traffic==null?Double.NaN:traffic.loss);
-            trafficCells[i][0].setText(in);trafficCells[i][1].setText(out);trafficCells[i][2].setText(loss);trafficRows[i].setContentDescription(names[i]+"，接收 "+in+"，发送 "+out+"，丢包率 "+loss);
+            trafficCells[i][0].setText(in);trafficCells[i][1].setText(out);trafficCells[i][2].setText(loss);trafficRows[i].setContentDescription(L10n.format("{0}，接收 {1}，发送 {2}，丢包率 {3}",names[i],in,out,loss));
         }
-        String[] values={network.fps+" FPS",network.resolution(),RemoteNetworkStatistics.latency(network.latency),RemoteNetworkStatistics.latency(network.rtt),network.mode(),network.report==null?"—":network.report.srtp?"SRTP 已启用":"未启用",network.remoteEncoder.isEmpty()?"—":network.remoteEncoder,network.localDecoder.isEmpty()?"—":network.localDecoder};
+        String[] values={network.fps+" FPS",network.resolution(),RemoteNetworkStatistics.latency(network.latency),RemoteNetworkStatistics.latency(network.rtt),network.mode(),network.report==null?"—":network.report.srtp?L10n.tr("SRTP 已启用"):L10n.tr("未启用"),network.remoteEncoder.isEmpty()?"—":network.remoteEncoder,network.localDecoder.isEmpty()?"—":network.localDecoder};
         // Reassigning identical text every statistics tick restarts the marquee.
         for(int i=0;i<values.length;i++)if(!android.text.TextUtils.equals(networkDetails[i].getText(),values[i]))networkDetails[i].setText(values[i]);networkDetails[5].setTextColor(network.report!=null&&network.report.srtp?GREEN:SECONDARY);
         encryptionLock.setVisibility(network.report!=null&&network.report.srtp?VISIBLE:GONE);encryptionOpen.setVisibility(network.report!=null&&!network.report.srtp?VISIBLE:GONE);

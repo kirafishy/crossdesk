@@ -1,7 +1,7 @@
 /*
  * @Author: DI JUNKUN
  * @Date: 2024-05-29
- * Copyright (c) 2024 by DI JUNKUN, All Rights Reserved.
+ * Copyright (c) 2026 by DI JUNKUN, All Rights Reserved.
  */
 #ifndef _LOCALIZATION_H_
 #define _LOCALIZATION_H_
@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "localization_data.h"
+#include "system_language.h"
 
 #if _WIN32
 #include <Windows.h>
@@ -36,80 +37,54 @@ class LocalizedString {
 
 inline const std::vector<LanguageOption>& GetSupportedLanguages() {
   static const std::vector<LanguageOption> kSupportedLanguages = {
-      {"zh-CN", reinterpret_cast<const char*>(u8"中文")},
-      {"en-US", "English"},
-      {"ru-RU", reinterpret_cast<const char*>(u8"Русский")}};
+      {"zh-CN", "简体中文"}, {"en-US", "English"}, {"ru-RU", "Русский"},
+      {"zh-Hant", "繁體中文"}, {"ja", "日本語"}, {"ko", "한국어"},
+      {"de", "Deutsch"}, {"fr", "Français"}, {"es", "Español"},
+      {"pt-BR", "Português (Brasil)"}};
   return kSupportedLanguages;
 }
 
 namespace detail {
 
 inline int ClampLanguageIndex(int language_index) {
-  if (language_index >= 0 &&
-      language_index < static_cast<int>(GetSupportedLanguages().size())) {
-    return language_index;
-  }
-  return 0;
+  if (language_index == kSystemLanguage) return SystemLanguage();
+  return language_index >= 0 && language_index < kSystemLanguage
+             ? language_index : kEnglishLanguage;
 }
 
-using TranslationTable =
-    std::unordered_map<std::string,
-                       std::unordered_map<std::string, std::string>>;
-
-inline std::unordered_map<std::string, std::string> MakeLocalizedValues(
-    const TranslationRow& row) {
-  return {{"zh-CN", reinterpret_cast<const char*>(row.zh)},
-          {"en-US", reinterpret_cast<const char*>(row.en)},
-          {"ru-RU", reinterpret_cast<const char*>(row.ru)}};
-}
-
-inline TranslationTable BuildTranslationTable() {
-  TranslationTable table;
-  for (const auto& row : kTranslationRows) {
-    table[row.key] = MakeLocalizedValues(row);
-  }
-
+using TranslationTable = std::unordered_map<std::string, std::vector<std::string>>;
+inline const TranslationTable& LiteralTable() {
+  static const TranslationTable table = [] {
+    TranslationTable result;
+    for (const auto& row : kTranslationRows)
+      result.emplace(row.key, std::vector<std::string>(std::begin(row.text), std::end(row.text)));
+    return result;
+  }();
   return table;
 }
-
-inline const TranslationTable& GetTranslationTable() {
-  static const TranslationTable table = BuildTranslationTable();
-  return table;
+inline const std::string& GetLiteralText(const std::string& key, int language) {
+  static const std::string empty;
+  const auto it = LiteralTable().find(key);
+  if (it == LiteralTable().end()) return empty;
+  const auto& values = it->second;
+  return values[ClampLanguageIndex(language)];
 }
-
-inline const std::string& GetTranslatedText(const std::string& key,
-                                            int language_index) {
-  static const std::string kEmptyText = "";
-
-  const auto& table = GetTranslationTable();
-  const auto key_it = table.find(key);
-  if (key_it == table.end()) {
-    return kEmptyText;
-  }
-
-  const auto& localized_values = key_it->second;
-  const std::string& language_code =
-      GetSupportedLanguages()[ClampLanguageIndex(language_index)].code;
-
-  const auto exact_it = localized_values.find(language_code);
-  if (exact_it != localized_values.end()) {
-    return exact_it->second;
-  }
-
-  const auto english_it = localized_values.find("en-US");
-  if (english_it != localized_values.end()) {
-    return english_it->second;
-  }
-
-  const auto chinese_it = localized_values.find("zh-CN");
-  if (chinese_it != localized_values.end()) {
-    return chinese_it->second;
-  }
-
-  return kEmptyText;
+inline const std::string& GetTranslatedText(const std::string& key, int language) {
+  static const std::unordered_map<std::string, std::string> names = [] {
+    std::unordered_map<std::string, std::string> result;
+    for (const auto& row : kNamedTranslations) result.emplace(row.name, row.literal);
+    return result;
+  }();
+  static const std::string empty;
+  const auto it = names.find(key);
+  return it == names.end() ? empty : GetLiteralText(it->second, language);
 }
 
 }  // namespace detail
+
+inline const std::string& Literal(const std::string& key, int language) {
+  return detail::GetLiteralText(key, language);
+}
 
 inline const std::string& LocalizedString::operator[](
     int language_index) const {
@@ -130,7 +105,7 @@ inline std::string FormatDisplayLabel(size_t display_index,
   return label;
 }
 
-#define CROSSDESK_DECLARE_LOCALIZED_STRING(name, zh, en, ru) \
+#define CROSSDESK_DECLARE_LOCALIZED_STRING(name) \
   inline const LocalizedString name(#name);
 CROSSDESK_LOCALIZATION_ALL(CROSSDESK_DECLARE_LOCALIZED_STRING)
 #undef CROSSDESK_DECLARE_LOCALIZED_STRING

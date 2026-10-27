@@ -20,7 +20,11 @@ namespace crossdesk {
 
 class ConfigCenter {
  public:
-  enum class LANGUAGE { CHINESE = 0, ENGLISH = 1, RUSSIAN = 2 };
+  enum class LANGUAGE {
+    CHINESE = 0, ENGLISH = 1, RUSSIAN = 2, TRADITIONAL_CHINESE = 3,
+    JAPANESE = 4, KOREAN = 5, GERMAN = 6, FRENCH = 7, SPANISH = 8,
+    BRAZILIAN_PORTUGUESE = 9, SYSTEM = 10
+  };
   enum class CONNECTION_MODE { DEVICE_ID = 0, DIRECT_IP = 1 };
   enum class VIDEO_ENCODE_FORMAT { H264 = 0, AV1 = 1 };
   enum class TURN_MODE {
@@ -93,7 +97,7 @@ class ConfigCenter {
   std::unique_ptr<IniStorage> ini_;
   const char* section_ = "Settings";
 
-  LANGUAGE language_ = LANGUAGE::CHINESE;
+  LANGUAGE language_ = LANGUAGE::SYSTEM;
   CONNECTION_MODE connection_mode_ = CONNECTION_MODE::DEVICE_ID;
   bool enable_ip_direct_ = true;
   ScreenCaptureMethod screen_capture_method_ = ScreenCaptureMethod::Auto;

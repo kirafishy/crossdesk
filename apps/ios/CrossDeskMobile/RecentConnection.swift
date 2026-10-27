@@ -9,7 +9,7 @@ enum RemoteHostPlatform: String, Codable {
         case .macos: return "macOS"
         case .linux: return "Linux"
         case .ios: return "iOS"
-        case .unknown: return "未知"
+        case .unknown: return NSLocalizedString("未知", comment: "")
         }
     }
 }

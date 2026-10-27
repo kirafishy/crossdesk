@@ -65,10 +65,10 @@ component NetworkRow inherits Rectangle {
                     encryption-text := Text {
                         x: 6px; width: parent.width - 12px; height: parent.height;
                         text: !root.device.encryption-known
-                            ? GalleryStrings.tr("待确认", "Unknown", "Неизвестно")
+                            ? GalleryStrings.texts[38]
                             : root.device.encryption-enabled
-                                ? GalleryStrings.tr("已加密", "Encrypted", "Зашифровано")
-                                : GalleryStrings.tr("未加密", "Unencrypted", "Без шифр.");
+                                ? GalleryStrings.texts[39]
+                                : GalleryStrings.texts[40];
                         color: !root.device.encryption-known ? #7a8490
                             : root.device.encryption-enabled ? #18794e : #8a6428;
                         font-size: 10px; horizontal-alignment: center;
@@ -83,7 +83,7 @@ component NetworkRow inherits Rectangle {
             Text {
                 y: root.heading ? 0px : 8px; height: root.heading ? parent.height : 20px;
                 width: parent.width;
-                text: root.heading ? GalleryStrings.tr("画面", "Video", "Видео") : root.device.resolution;
+                text: root.heading ? GalleryStrings.texts[41] : root.device.resolution;
                 font-size: root.heading ? 11px : 12px; font-weight: root.heading ? 600 : 400;
                 color: root.heading ? #6b7785 : #293746;
                 vertical-alignment: center; overflow: elide;
@@ -98,7 +98,7 @@ component NetworkRow inherits Rectangle {
             width: max(100px, root.width * 0.18);
             if root.heading: Text {
                 x: 0px; width: parent.width;
-                text: GalleryStrings.tr("收发速率", "Transfer rate", "Скорость");
+                text: GalleryStrings.texts[42];
                 font-size: 11px; font-weight: 600; color: #6b7785;
                 vertical-alignment: center; overflow: elide;
             }
@@ -126,14 +126,14 @@ component NetworkRow inherits Rectangle {
             Text {
                 y: root.heading ? 0px : 8px; height: root.heading ? parent.height : 20px;
                 width: parent.width;
-                text: root.heading ? GalleryStrings.tr("视频延时", "Video latency", "Задержка видео") : root.device.video-latency;
+                text: root.heading ? GalleryStrings.texts[43] : root.device.video-latency;
                 font-size: root.heading ? 11px : 12px; font-weight: root.heading ? 600 : 400;
                 color: root.heading ? #6b7785 : #293746;
                 vertical-alignment: center; overflow: elide;
             }
             if !root.heading: Text {
                 y: 30px; height: 17px; width: parent.width;
-                text: GalleryStrings.tr("丢包  ", "Loss  ", "Потери  ") + root.device.loss;
+                text: GalleryStrings.texts[44] + root.device.loss;
                 font-size: 11px; color: #7a8490;
                 vertical-alignment: center; overflow: elide;
             }
@@ -155,7 +155,7 @@ component NetworkRow inherits Rectangle {
             width: (parent.width - 12px) / 2;
             encoder-label := Text {
                 height: parent.height; width: self.preferred-width;
-                text: GalleryStrings.tr("被控端编码器  ", "Remote encoder  ", "Удалённый кодер  ");
+                text: GalleryStrings.texts[45];
                 font-size: 10px; color: #586f87; vertical-alignment: center;
             }
             ScrollingText {
@@ -167,7 +167,7 @@ component NetworkRow inherits Rectangle {
             width: (parent.width - 12px) / 2;
             decoder-label := Text {
                 height: parent.height; width: self.preferred-width;
-                text: GalleryStrings.tr("控制端解码器  ", "Local decoder  ", "Локальный декодер  ");
+                text: GalleryStrings.texts[46];
                 font-size: 10px; color: #586f87; vertical-alignment: center;
             }
             ScrollingText {
@@ -182,11 +182,11 @@ component NetworkEmptyState inherits Rectangle {
     VerticalLayout {
         alignment: center; spacing: 8px;
         Text {
-            text: GalleryStrings.tr("暂无已连接设备", "No connected devices", "Нет подключённых устройств");
+            text: GalleryStrings.texts[47];
             font-size: 13px; color: #596878; horizontal-alignment: center;
         }
         Text {
-            text: GalleryStrings.tr("建立连接后，网络和画面信息将在此显示", "Network and video details appear here once connected", "После подключения здесь появятся данные сети и видео");
+            text: GalleryStrings.texts[48];
             font-size: 11px; color: #8a95a1; horizontal-alignment: center;
         }
     }
@@ -216,25 +216,25 @@ export component GalleryNetworkDialog inherits Rectangle {
         }
         Text {
             x: 20px; y: 17px; width: parent.width - 120px; height: 24px;
-            text: GalleryStrings.tr("设备网络状态", "Device network status", "Состояние сети устройств");
+            text: GalleryStrings.texts[49];
             font-size: 17px; font-weight: 600; color: #293746;
         }
         CompactButton {
             border-radius: UiRadius.control;
             x: parent.width - 80px; y: 17px; width: 60px; height: 26px;
-            text: GalleryStrings.tr("关闭", "Close", "Закрыть"); clicked => { root.close(); }
+            text: GalleryStrings.texts[50]; clicked => { root.close(); }
         }
         Text {
             x: 20px; y: 48px; width: parent.width - 40px; height: 18px;
-            text: GalleryStrings.tr("已连接设备 ", "Connected devices ", "Подключённые устройства ") + root.devices.length
-                + GalleryStrings.tr(" 台", "", "");
+            text: GalleryStrings.texts[51] + root.devices.length
+                + GalleryStrings.texts[52];
             font-size: 11px; color: #7a8490; overflow: elide;
         }
         NetworkRow {
             x: 12px; y: 78px; width: parent.width - 38px; height: 30px;
             heading: true; background: #f3f5f8; border-radius: UiRadius.control;
             device: {
-                name: GalleryStrings.tr("设备 / ID", "Device / ID", "Устройство / ID"),
+                name: GalleryStrings.texts[53],
             };
         }
         list := ScrollView {

@@ -127,7 +127,7 @@ final class RemotePreviewStore {
             new AtomicFile(new File(directory,key+".jpg")).delete();
             synchronized(this){
                 boolean saved=index.edit().putStringSet("files",new HashSet<>(files)).commit();
-                if(!saved||new File(directory,key+".jpg").exists())cleanupError="部分预览图未能清除，请重试。";
+                if(!saved||new File(directory,key+".jpg").exists())cleanupError=L10n.tr("部分预览图未能清除，请重试。");
             }
             changed();
         });changed();
@@ -139,7 +139,7 @@ final class RemotePreviewStore {
             try{deleteTree(directory);}catch(IOException error){success=false;}
             synchronized(this){
                 if(epoch!=generation)return;
-                cleaning=false;cleanupError=success?"":"部分预览图未能清除，请重试。";
+                cleaning=false;cleanupError=success?"":L10n.tr("部分预览图未能清除，请重试。");
             }
             changed();
         });

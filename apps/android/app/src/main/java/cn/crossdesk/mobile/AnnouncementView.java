@@ -51,15 +51,15 @@ final class AnnouncementView extends ScrollView {
         TextView text=ui.text(value,14,false);text.setTextColor(color);text.setLineSpacing(ui.dp(3),1);return text;
     }
     private void renderList(){
-        if(inbox.deleteFailed){content.addView(message("无法删除这条公告，请重试。",RED));ui.gap(content,12);}
+        if(inbox.deleteFailed){content.addView(message(L10n.tr("无法删除这条公告，请重试。"),RED));ui.gap(content,12);}
         if(!inbox.isConnected()){
-            content.addView(message("连接服务器后可获取最新公告。",SECONDARY));
-            content.addView(ui.action("连接服务器",BLUE,authorize));ui.gap(content,8);
+            content.addView(message(L10n.tr("连接服务器后可获取最新公告。"),SECONDARY));
+            content.addView(ui.action(L10n.tr("连接服务器"),BLUE,authorize));ui.gap(content,8);
         }else if(inbox.failed){
-            LinearLayout error=ui.row();error.addView(message("公告加载失败，请重试。",SECONDARY),new LinearLayout.LayoutParams(0,-2,1));
-            error.addView(ui.action("重试",BLUE,inbox::refresh),ui.size(64,48));content.addView(error);ui.gap(content,8);
+            LinearLayout error=ui.row();error.addView(message(L10n.tr("公告加载失败，请重试。"),SECONDARY),new LinearLayout.LayoutParams(0,-2,1));
+            error.addView(ui.action(L10n.tr("重试"),BLUE,inbox::refresh),ui.size(64,48));content.addView(error);ui.gap(content,8);
         }
-        countLabel=ui.text("共 "+inbox.total+" 条 · "+inbox.unread+" 条未读",13,false);
+        countLabel=ui.text(L10n.format("共 {0} 条 · {1} 条未读",inbox.total,inbox.unread),13,false);
         countLabel.setTextColor(SECONDARY);countLabel.setPadding(ui.dp(16),ui.dp(8),0,ui.dp(8));content.addView(countLabel);
         LinearLayout card=ui.column();ui.card(card,12);content.addView(card);
         for(AnnouncementInbox.Item item:inbox.items){
@@ -69,11 +69,11 @@ final class AnnouncementView extends ScrollView {
         if(inbox.loading){
             LinearLayout loading=ui.row();loading.setGravity(Gravity.CENTER);loading.setPadding(0,ui.dp(18),0,ui.dp(18));
             ProgressBar spinner=new ProgressBar(getContext());spinner.setIndeterminateTintList(ColorStateList.valueOf(BLUE));loading.addView(spinner,ui.size(20,20));
-            TextView label=message("加载中…",SECONDARY);label.setPadding(ui.dp(10),0,0,0);loading.addView(label);card.addView(loading);
+            TextView label=message(L10n.tr("加载中…"),SECONDARY);label.setPadding(ui.dp(10),0,0,0);loading.addView(label);card.addView(loading);
         }else if(inbox.items.size()<inbox.total&&!inbox.failed){
-            TextView more=ui.action("加载更多",BLUE,inbox::loadMore);more.setEnabled(inbox.isConnected());card.addView(more,ui.size(-1,48));
+            TextView more=ui.action(L10n.tr("加载更多"),BLUE,inbox::loadMore);more.setEnabled(inbox.isConnected());card.addView(more,ui.size(-1,48));
         }else if(inbox.loaded&&inbox.total==0&&!inbox.failed&&inbox.isConnected()){
-            TextView empty=message("暂无公告",SECONDARY);empty.setGravity(Gravity.CENTER);card.addView(empty,ui.size(-1,120));
+            TextView empty=message(L10n.tr("暂无公告"),SECONDARY);empty.setGravity(Gravity.CENTER);card.addView(empty,ui.size(-1,120));
         }
     }
     private View itemRow(AnnouncementInbox.Item item){
@@ -86,23 +86,23 @@ final class AnnouncementView extends ScrollView {
         words.addView(title,ui.size(-1,-2));ui.gap(words,7);TextView date=ui.text(date(item),12,false);date.setTextColor(SECONDARY);words.addView(date);
         top.addView(words,new LinearLayout.LayoutParams(0,-2,1));row.addView(top,new LinearLayout.LayoutParams(0,-2,1));
         TextView chevron=ui.text("›",23,false);chevron.setTextColor(0xFFB7B7BD);chevron.setPadding(ui.dp(10),0,0,0);row.addView(chevron);
-        row.setContentDescription(item.title+"，"+date(item)+"，"+(item.read?"已读":"未读"));row.setFocusable(true);
+        row.setContentDescription(item.title+"，"+date(item)+"，"+(item.read?L10n.tr("已读"):L10n.tr("未读")));row.setFocusable(true);
         row.setOnClickListener(v->open.accept(item));row.setOnLongClickListener(v->{confirmDelete(item);return true;});
         return new SwipeRow(row,()->confirmDelete(item));
     }
     private void confirmDelete(AnnouncementInbox.Item item){
         if(deleteDialog!=null)deleteDialog.dismiss();
-        deleteDialog=new AlertDialog.Builder(getContext()).setTitle("删除公告").setMessage("删除这条公告？")
-            .setNegativeButton("取消",null).setPositiveButton("删除",(dialog,which)->inbox.dismiss(item)).show();
+        deleteDialog=new AlertDialog.Builder(getContext()).setTitle(L10n.tr("删除公告")).setMessage(L10n.tr("删除这条公告？"))
+            .setNegativeButton(L10n.tr("取消"),null).setPositiveButton(L10n.tr("删除"),(dialog,which)->inbox.dismiss(item)).show();
     }
     private void renderDetail(){
         AnnouncementInbox.Item item=inbox.find(id,revision);
-        if(item==null){content.addView(message("这条公告已更新或删除，请返回公告列表查看。",SECONDARY));return;}
+        if(item==null){content.addView(message(L10n.tr("这条公告已更新或删除，请返回公告列表查看。"),SECONDARY));return;}
         content.addView(ui.text(item.title,22,true));ui.gap(content,16);
-        TextView date=ui.text(date(item)+" · "+(item.read?"已读":"未读"),12,false);date.setTextColor(SECONDARY);content.addView(date);ui.gap(content,16);
+        TextView date=ui.text(date(item)+" · "+(item.read?L10n.tr("已读"):L10n.tr("未读")),12,false);date.setTextColor(SECONDARY);content.addView(date);ui.gap(content,16);
         if(inbox.readSaveFailed){
-            content.addView(message("无法保存本地阅读状态，请重试。",RED));
-            content.addView(ui.action("重试保存阅读状态",BLUE,()->inbox.markRead(item)));ui.gap(content,16);
+            content.addView(message(L10n.tr("无法保存本地阅读状态，请重试。"),RED));
+            content.addView(ui.action(L10n.tr("重试保存阅读状态"),BLUE,()->inbox.markRead(item)));ui.gap(content,16);
         }
         TextView body=ui.text("",17,false);body.setText(AnnouncementText.format(item.body));body.setTextIsSelectable(true);
         body.setMovementMethod(LinkMovementMethod.getInstance());body.setLinksClickable(true);body.setLinkTextColor(BLUE);body.setLineSpacing(ui.dp(4),1);
@@ -127,7 +127,7 @@ final class AnnouncementView extends ScrollView {
         trackPull(event);
         if(!pulling)return super.onTouchEvent(event);
         boolean reached=event.getY()-downY>=ui.dp(72);
-        if(event.getActionMasked()==MotionEvent.ACTION_MOVE&&countLabel!=null)countLabel.setText(reached?"松开刷新":"下拉刷新");
+        if(event.getActionMasked()==MotionEvent.ACTION_MOVE&&countLabel!=null)countLabel.setText(reached?L10n.tr("松开刷新"):L10n.tr("下拉刷新"));
         if(event.getActionMasked()==MotionEvent.ACTION_UP||event.getActionMasked()==MotionEvent.ACTION_CANCEL){
             pulling=false;if(reached&&event.getActionMasked()==MotionEvent.ACTION_UP)inbox.refresh();else render();
         }
@@ -142,7 +142,7 @@ final class AnnouncementView extends ScrollView {
         private boolean dragging;
         SwipeRow(View front,Runnable delete){
             super(ui.context);this.front=front;setClipChildren(true);
-            remove=ui.action("删除",Color.WHITE,delete);remove.setBackgroundColor(RED);
+            remove=ui.action(L10n.tr("删除"),Color.WHITE,delete);remove.setBackgroundColor(RED);
             remove.setVisibility(INVISIBLE);
             remove.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);remove.setFocusable(false);
             addView(remove,new FrameLayout.LayoutParams(ui.dp(76),-1,Gravity.END));addView(front,new FrameLayout.LayoutParams(-1,-2));

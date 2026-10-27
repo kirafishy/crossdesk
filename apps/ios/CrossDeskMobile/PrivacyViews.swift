@@ -16,7 +16,7 @@ struct PrivacyConsentView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 consentActions
             }
-            .navigationTitle("隐私政策")
+            .navigationTitle(NSLocalizedString("隐私政策", comment: ""))
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -27,7 +27,7 @@ struct PrivacyConsentView: View {
 
             VStack(spacing: 12) {
                 Toggle(isOn: $hasReadPolicy) {
-                    Text("我已阅读并同意《隐私政策》")
+                    Text(NSLocalizedString("我已阅读并同意《隐私政策》", comment: ""))
                         .font(.subheadline)
                 }
                 .toggleStyle(ConsentCheckboxStyle())
@@ -36,7 +36,7 @@ struct PrivacyConsentView: View {
                     guard hasReadPolicy else { return }
                     session.acceptNetworkConsent()
                 } label: {
-                    Text("同意并继续")
+                    Text(NSLocalizedString("同意并继续", comment: ""))
                         .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 24)
                 }
@@ -48,7 +48,7 @@ struct PrivacyConsentView: View {
                 Button {
                     session.declineNetworkConsent()
                 } label: {
-                    Text("暂不同意")
+                    Text(NSLocalizedString("暂不同意", comment: ""))
                         .font(.body)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .contentShape(Rectangle())
@@ -81,8 +81,8 @@ private struct ConsentCheckboxStyle: ToggleStyle {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("我已阅读并同意隐私政策")
-        .accessibilityValue(configuration.isOn ? "已勾选" : "未勾选")
+        .accessibilityLabel(NSLocalizedString("我已阅读并同意隐私政策", comment: ""))
+        .accessibilityValue(configuration.isOn ? NSLocalizedString("已勾选", comment: "") : NSLocalizedString("未勾选", comment: ""))
     }
 }
 
@@ -97,13 +97,13 @@ struct PrivacySettingsSection: View {
                 PrivacyAuthorizationView(session: session)
             } label: {
                 HStack {
-                    Text("隐私与授权")
+                    Text(NSLocalizedString("隐私与授权", comment: ""))
                     Spacer()
-                    Text(session.hasNetworkConsent ? "已授权" : "未授权")
+                    Text(session.hasNetworkConsent ? NSLocalizedString("已授权", comment: "") : NSLocalizedString("未授权", comment: ""))
                         .foregroundStyle(.secondary)
                 }
             }
-            Toggle("保存远程画面预览", isOn: Binding(
+            Toggle(NSLocalizedString("保存远程画面预览", comment: ""), isOn: Binding(
                 get: { session.savesConnectionThumbnails },
                 set: { enabled in
                     if enabled { confirmThumbnails = true }
@@ -111,7 +111,7 @@ struct PrivacySettingsSection: View {
                 }
             ))
             .disabled(!session.hasNetworkConsent || session.thumbnailCleanupInProgress)
-            Button(session.thumbnailCleanupInProgress ? "正在清除…" : "清除预览图", role: .destructive) {
+            Button(session.thumbnailCleanupInProgress ? NSLocalizedString("正在清除…", comment: "") : NSLocalizedString("清除预览图", comment: ""), role: .destructive) {
                 confirmClear = true
             }
             .disabled(session.thumbnailCleanupInProgress)
@@ -119,21 +119,21 @@ struct PrivacySettingsSection: View {
                 Text(error).font(.footnote).foregroundStyle(.secondary)
             }
         } header: {
-            Text("隐私")
+            Text(NSLocalizedString("隐私", comment: ""))
         }
-        .alert("保存远程画面预览？", isPresented: $confirmThumbnails) {
-            Button("开启保存") { session.setSavesConnectionThumbnails(true) }
-            Button("取消", role: .cancel) { }
+        .alert(NSLocalizedString("保存远程画面预览？", comment: ""), isPresented: $confirmThumbnails) {
+            Button(NSLocalizedString("开启保存", comment: "")) { session.setSavesConnectionThumbnails(true) }
+            Button(NSLocalizedString("取消", comment: ""), role: .cancel) { }
         } message: {
-            Text("预览可能包含远程电脑上的个人或工作信息。开启后，每次连接会自动将一张画面保存在本机并显示在最近连接中。你可以随时关闭并清除。")
+            Text(NSLocalizedString("预览可能包含远程电脑上的个人或工作信息。开启后，每次连接会自动将一张画面保存在本机并显示在最近连接中。你可以随时关闭并清除。", comment: ""))
         }
-        .alert("清除预览图？", isPresented: $confirmClear) {
-            Button("清除", role: .destructive) { session.clearConnectionThumbnails() }
-            Button("取消", role: .cancel) { }
+        .alert(NSLocalizedString("清除预览图？", comment: ""), isPresented: $confirmClear) {
+            Button(NSLocalizedString("清除", comment: ""), role: .destructive) { session.clearConnectionThumbnails() }
+            Button(NSLocalizedString("取消", comment: ""), role: .cancel) { }
         } message: {
             Text(session.savesConnectionThumbnails
-                 ? "将删除本机保存的所有远程预览图，保留连接记录、密码和接收的文件。后续连接仍会保存新的预览图。"
-                 : "将删除本机保存的所有远程预览图，保留连接记录、密码和接收的文件。")
+                 ? NSLocalizedString("将删除本机保存的所有远程预览图，保留连接记录、密码和接收的文件。后续连接仍会保存新的预览图。", comment: "")
+                 : NSLocalizedString("将删除本机保存的所有远程预览图，保留连接记录、密码和接收的文件。", comment: ""))
         }
     }
 }
@@ -145,33 +145,33 @@ private struct PrivacyAuthorizationView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("授权状态", value: session.hasNetworkConsent ? "已授权" : "未授权")
-                NavigationLink("隐私政策") { PrivacyPolicyView() }
+                LabeledContent(NSLocalizedString("授权状态", comment: ""), value: session.hasNetworkConsent ? NSLocalizedString("已授权", comment: "") : NSLocalizedString("未授权", comment: ""))
+                NavigationLink(NSLocalizedString("隐私政策", comment: "")) { PrivacyPolicyView() }
             } footer: {
                 if !session.hasNetworkConsent {
-                    Text("授权后可使用远程连接。")
+                    Text(NSLocalizedString("授权后可使用远程连接。", comment: ""))
                 }
             }
 
             Section {
                 if session.hasNetworkConsent {
-                    Button("撤回隐私授权", role: .destructive) {
+                    Button(NSLocalizedString("撤回隐私授权", comment: ""), role: .destructive) {
                         confirmWithdrawal = true
                     }
                 } else {
-                    Button("阅读并授权") { session.showPrivacyNotice() }
+                    Button(NSLocalizedString("阅读并授权", comment: "")) { session.showPrivacyNotice() }
                 }
             }
         }
         .readableContentWidth()
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("隐私与授权")
+        .navigationTitle(NSLocalizedString("隐私与授权", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
-        .alert("是否撤回隐私授权？", isPresented: $confirmWithdrawal) {
-            Button("撤回授权", role: .destructive) { session.revokeNetworkConsent() }
-            Button("取消", role: .cancel) { }
+        .alert(NSLocalizedString("是否撤回隐私授权？", comment: ""), isPresented: $confirmWithdrawal) {
+            Button(NSLocalizedString("撤回授权", comment: ""), role: .destructive) { session.revokeNetworkConsent() }
+            Button(NSLocalizedString("取消", comment: ""), role: .cancel) { }
         } message: {
-            Text("将停止远程连接、关闭画面预览保存并清除已有预览。连接记录和接收文件会保留，已有服务端数据不会删除。您可随时重新授权。")
+            Text(NSLocalizedString("将停止远程连接、关闭画面预览保存并清除已有预览。连接记录和接收文件会保留，已有服务端数据不会删除。您可随时重新授权。", comment: ""))
         }
     }
 }
@@ -182,15 +182,17 @@ private struct PrivacyPolicyDocument: View {
         guard let url = Bundle.main.url(forResource: "PRIVACY", withExtension: "md"),
               let text = try? String(contentsOf: url, encoding: .utf8),
               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        // The app's interface is Chinese; show the complete Chinese translation.
+        // Keep the published policy intact; use its English version outside Chinese locales.
         if let start = text.range(of: "## 中文\n"),
            let end = text.range(of: "## English", range: start.upperBound..<text.endIndex) {
-            return String(text[start.upperBound..<end.lowerBound])
+            let chinese = Bundle.main.preferredLocalizations.first?.hasPrefix("zh") == true
+            return chinese ? String(text[start.upperBound..<end.lowerBound])
+                : String(text[end.upperBound...])
         }
         return text
     }()
     static var isAvailable: Bool { text != nil }
-    private static let paragraphs = (text ?? "隐私政策暂时无法读取，请拒绝联网并重新安装应用。")
+    private static let paragraphs = (text ?? NSLocalizedString("隐私政策暂时无法读取，请拒绝联网并重新安装应用。", comment: ""))
         .components(separatedBy: "\n\n")
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty && $0 != "---" }
@@ -203,7 +205,7 @@ private struct PrivacyPolicyDocument: View {
                     Text(paragraph.trimmingCharacters(in: CharacterSet(charactersIn: "# ")))
                         .font(.headline)
                         .padding(.top, 4)
-                } else if paragraph.hasPrefix("更新日期：") {
+                } else if paragraph.hasPrefix("更新日期：") || paragraph.hasPrefix("Last updated:") {
                     Text(paragraph)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -226,7 +228,7 @@ struct PrivacyPolicyView: View {
         ScrollView {
             PrivacyPolicyDocument().padding().readableContentWidth()
         }
-        .navigationTitle("隐私政策")
+        .navigationTitle(NSLocalizedString("隐私政策", comment: ""))
         .navigationBarTitleDisplayMode(.inline)
     }
 }

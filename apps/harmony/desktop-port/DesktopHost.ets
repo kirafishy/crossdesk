@@ -1,3 +1,4 @@
+import { i18n } from '@kit.LocalizationKit';
 import native from 'libslint_desktop.so';
 import { TextInputHost } from './TextInputHost';
 import { TrayHost } from './TrayHost';
@@ -128,7 +129,7 @@ export class DesktopHost {
         if (event.op === 'clipboardChanged') DesktopHost.clipboardChanged();
         else DesktopHost.send(event);
       }, hostPermissions);
-      native.start(JSON.stringify({ filesDir: context.filesDir, cacheDir: context.cacheDir,
+      native.start(JSON.stringify({ language: i18n.System.getSystemLanguage(), filesDir: context.filesDir, cacheDir: context.cacheDir,
         width: screen.width, height: screen.height, density: screen.densityPixels,
         displayId: screen.id, displays: screens, name: 'Harmony PC',
         certificates: certificateManager.getCertificateStorePath({ certType: certificateManager.CertType.CA_CERT_SYSTEM }) }));

@@ -1,3 +1,4 @@
+import { tr } from './Localization';
 import { common } from '@kit.AbilityKit';
 import { preferences } from '@kit.ArkData';
 import { asset } from '@kit.AssetStoreKit';
@@ -42,7 +43,7 @@ export class MobileStore {
       return value instanceof Uint8Array ? util.TextDecoder.create('utf-8').decodeWithStream(value) : '';
     } catch (error) {
       if ((error as ErrorWithCode).code === asset.ErrorCode.NOT_FOUND) return '';
-      throw new Error('安全存储不可用，请解锁设备后重试');
+      throw new Error(tr("安全存储不可用，请解锁设备后重试"));
     }
   }
   async saveSecret(key: string, value: string): Promise<void> {
@@ -56,7 +57,7 @@ export class MobileStore {
   }
   async removeSecret(key: string): Promise<void> {
     try { await asset.remove(await this.query(key)); }
-    catch (error) { if ((error as ErrorWithCode).code !== asset.ErrorCode.NOT_FOUND) throw new Error('无法删除已保存的凭据'); }
+    catch (error) { if ((error as ErrorWithCode).code !== asset.ErrorCode.NOT_FOUND) throw new Error(tr("无法删除已保存的凭据")); }
   }
   recent(scope: string): RecentDevice[] {
     try {

@@ -51,7 +51,7 @@ public final class RemoteSessionService extends Service {
     @Override public void onCreate() {
         super.onCreate(); running = this;
         getSystemService(NotificationManager.class).createNotificationChannel(
-                new NotificationChannel(CHANNEL, "远程连接", NotificationManager.IMPORTANCE_LOW));
+                new NotificationChannel(CHANNEL, L10n.tr("远程连接"), NotificationManager.IMPORTANCE_LOW));
         wakeLock = getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "CrossDesk:RemoteSession");
         wakeLock.setReferenceCounted(false);
     }
@@ -60,7 +60,7 @@ public final class RemoteSessionService extends Service {
         if (value == null || value.ended || value.session.isClosed()) { stopSelf(startId); return START_NOT_STICKY; }
         if (intent == null || !value.token.equals(intent.getStringExtra("session"))) return START_NOT_STICKY;
         owned = value;
-        if (STOP.equals(intent.getAction())) { value.finish("已从通知断开远程连接"); return START_NOT_STICKY; }
+        if (STOP.equals(intent.getAction())) { value.finish(L10n.tr("已从通知断开远程连接")); return START_NOT_STICKY; }
         try {
             Notification notification = notification();
             if (Build.VERSION.SDK_INT >= 34) startForeground(NOTIFICATION, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
@@ -68,7 +68,7 @@ public final class RemoteSessionService extends Service {
             update();
         } catch (RuntimeException error) {
             Log.w("CrossDesk", "Background session foreground promotion failed", error);
-            value.finish("后台保活未能启动，请保持应用在前台后重新连接");
+            value.finish(L10n.tr("后台保活未能启动，请保持应用在前台后重新连接"));
         }
         return START_NOT_STICKY;
     }
@@ -80,12 +80,12 @@ public final class RemoteSessionService extends Service {
                 .setData(android.net.Uri.parse("crossdesk-session:" + owned.token)).putExtra("session", owned.token);
         PendingIntent stop = PendingIntent.getService(this, 1, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_remote_session)
-                .setContentTitle("CrossDesk 远程连接")
-                .setContentText(owned.background ? "后台保持连接，点按返回远程桌面" : "已启用后台保活，切换应用可继续保持连接")
+                .setContentTitle(L10n.tr("CrossDesk 远程连接"))
+                .setContentText(owned.background ? L10n.tr("后台保持连接，点按返回远程桌面") : L10n.tr("已启用后台保活，切换应用可继续保持连接"))
                 .setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).setShowWhen(false)
                 .setCategory(Notification.CATEGORY_SERVICE).setVisibility(Notification.VISIBILITY_PRIVATE)
-                .addAction(new Notification.Action.Builder(null, "返回", open).build())
-                .addAction(new Notification.Action.Builder(null, "断开", stop).build()).build();
+                .addAction(new Notification.Action.Builder(null, L10n.tr("返回"), open).build())
+                .addAction(new Notification.Action.Builder(null, L10n.tr("断开"), stop).build()).build();
     }
     @android.annotation.SuppressLint("WakelockTimeout") // Released on foreground return, disconnect, task removal and service destruction.
     private void update() {
@@ -96,14 +96,14 @@ public final class RemoteSessionService extends Service {
     }
     private void releaseWakeLock() { if (wakeLock != null && wakeLock.isHeld()) wakeLock.release(); }
     @Override public void onTaskRemoved(Intent rootIntent) {
-        if (current == owned && owned != null) owned.finish("远程任务已关闭");
+        if (current == owned && owned != null) owned.finish(L10n.tr("远程任务已关闭"));
         stopSelf();
     }
     @Override public void onDestroy() {
         if (running == this) running = null;
         releaseWakeLock(); stopForeground(STOP_FOREGROUND_REMOVE);
         BackgroundSession value = owned;
-        if (current == value && value != null) { current = null; value.finish("后台连接服务已停止，请重新连接"); }
+        if (current == value && value != null) { current = null; value.finish(L10n.tr("后台连接服务已停止，请重新连接")); }
         super.onDestroy();
     }
 }

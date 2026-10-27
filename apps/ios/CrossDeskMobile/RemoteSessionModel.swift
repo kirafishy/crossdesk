@@ -15,17 +15,17 @@ enum MouseControlMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .absolute: return "绝对位置"
-        case .relative: return "相对位置"
+        case .absolute: return NSLocalizedString("绝对位置", comment: "")
+        case .relative: return NSLocalizedString("相对位置", comment: "")
         }
     }
 
     var detail: String {
         switch self {
         case .absolute:
-            return "触摸位置直接对应远端屏幕位置，适合快速定位。"
+            return NSLocalizedString("触摸位置直接对应远端屏幕位置，适合快速定位。", comment: "")
         case .relative:
-            return "像触控板一样滑动光标，点击时操作当前光标位置。"
+            return NSLocalizedString("像触控板一样滑动光标，点击时操作当前光标位置。", comment: "")
         }
     }
 
@@ -53,20 +53,20 @@ enum VideoAdaptationPolicy: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .frameRatePriority: return "帧率优先"
-        case .qualityPriority: return "画质优先"
-        case .balanced: return "平衡"
+        case .frameRatePriority: return NSLocalizedString("帧率优先", comment: "")
+        case .qualityPriority: return NSLocalizedString("画质优先", comment: "")
+        case .balanced: return NSLocalizedString("平衡", comment: "")
         }
     }
 
     var detail: String {
         switch self {
         case .frameRatePriority:
-            return "优先保持画面流畅，带宽或编码压力较大时会更积极地降低分辨率。"
+            return NSLocalizedString("优先保持画面流畅，带宽或编码压力较大时会更积极地降低分辨率。", comment: "")
         case .qualityPriority:
-            return "始终保持较高分辨率，带宽不足时通过降低帧率来保证画面清晰度。"
+            return NSLocalizedString("始终保持较高分辨率，带宽不足时通过降低帧率来保证画面清晰度。", comment: "")
         case .balanced:
-            return "兼顾清晰度和流畅度，只在持续压力下逐步降低分辨率。"
+            return NSLocalizedString("兼顾清晰度和流畅度，只在持续压力下逐步降低分辨率。", comment: "")
         }
     }
 
@@ -321,8 +321,8 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     private var privacyTimer: Timer?
     @Published var remoteID = ""
     @Published var password = ""
-    @Published private(set) var signalStatus = "等待隐私授权"
-    @Published private(set) var connectionStatus = "未连接"
+    @Published private(set) var signalStatus = NSLocalizedString("等待隐私授权", comment: "")
+    @Published private(set) var connectionStatus = NSLocalizedString("未连接", comment: "")
     @Published private(set) var localIdentity = ""
     @Published private(set) var identityStorageWarning: String?
     @Published private(set) var isConnecting = false
@@ -337,7 +337,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     @Published private(set) var hasRemoteCursorState = false
     private var networkStatistics = RemoteNetworkStatistics()
     private var videoFrameID: UInt64 = 0
-    @Published private(set) var displays: [String] = ["显示器 1"]
+    @Published private(set) var displays: [String] = [NSLocalizedString("显示器 1", comment: "")]
     @Published private(set) var displaySizes: [CGSize] = []
     @Published var selectedDisplay = 0
     @Published var audioEnabled = true
@@ -368,7 +368,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     private var remoteVersionCheckAttempted = false
     private var remoteVersionCheckGeneration = UUID()
     private var remoteVersionCheckTask: URLSessionDataTask?
-    private static let remoteUpdateNotice = "被控端版本过低，请升级到最新版本。"
+    private static let remoteUpdateNotice = NSLocalizedString("被控端版本过低，请升级到最新版本。", comment: "")
     private var pendingRememberPassword = false
     private var connectionRecorded = false
     private var shouldCaptureThumbnail = false
@@ -380,7 +380,8 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     private var videoSettingsTimeoutTask: Task<Void, Never>?
     private var pendingPresenceRemoteID: String?
     private var presenceProbeGeneration: UInt64 = 0
-    private var signalConnected = false
+    @Published private(set) var signalConnected = false
+    @Published private(set) var signalHasError = false
     private var presenceIsForeground = false
     private var awaitingPresenceSnapshot = true
     private var presenceUpdatedAt: [String: ContinuousClock.Instant] = [:]
@@ -425,7 +426,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
             self.audioPlayer.setEnabled(playing && self.audioEnabled)
         }
         pictureInPicture.failed = { [weak self] in
-            self?.controlStatus = "画中画未能开启，请保持应用在前台后重试。"
+            self?.controlStatus = NSLocalizedString("画中画未能开启，请保持应用在前台后重试。", comment: "")
         }
         announcements.send = { [weak bridge] data, requestID in
             bridge?.sendAnnouncementRequest(data, requestID: requestID)
@@ -498,7 +499,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         announcements.reset()
         bridgeConfiguration = nil
         localIdentity = ""
-        signalStatus = "等待隐私授权"
+        signalStatus = NSLocalizedString("等待隐私授权", comment: ""); signalHasError = false
         savesConnectionThumbnails = false
         clearConnectionThumbnails()
     }
@@ -526,7 +527,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
             self.thumbnailCleanupInProgress = false
             self.thumbnailCleanupError = success
                 ? nil
-                : "部分预览图未能清除，请重试。"
+                : NSLocalizedString("部分预览图未能清除，请重试。", comment: "")
         }
     }
 
@@ -542,14 +543,14 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     @discardableResult
     func configureBridge() -> Bool {
         guard hasNetworkConsent else {
-            signalStatus = "等待隐私授权"
+            signalStatus = NSLocalizedString("等待隐私授权", comment: ""); signalHasError = false
             return false
         }
         let host = signalHost.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let signal = Int(signalPort),
               (1...65535).contains(signal),
               !host.isEmpty else {
-            signalStatus = "服务器配置无效"
+            signalStatus = NSLocalizedString("服务器配置无效", comment: ""); signalHasError = true
             return false
         }
         let configuration = BridgeConfiguration(host: host, signalPort: signal)
@@ -558,12 +559,12 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
             signalConnected = false
             localIdentity = ""
             announcements.reset()
-            signalStatus = "正在连接信令服务"
+            signalStatus = NSLocalizedString("正在连接信令服务", comment: ""); signalHasError = false
             stopPresenceMonitoring()
             invalidatePresence()
             cancelPendingPresenceConnection()
         } else if signalConnected {
-            signalStatus = "已连接服务器"
+            signalStatus = NSLocalizedString("已连接服务器", comment: ""); signalHasError = false
         }
         bridge.setVideoAdaptationPolicy(videoAdaptationPolicy.bridgeValue)
         bridge.configure(withSignalHost: host,
@@ -585,7 +586,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         connectionFailureMessage = nil
         let identifier = remoteID.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !identifier.isEmpty else {
-            connectionStatus = "请输入远程设备 ID"
+            connectionStatus = NSLocalizedString("请输入远程设备 ID", comment: "")
             return
         }
         remoteID = identifier
@@ -616,7 +617,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         isConnected = false
         sessionVisible = false
         resetRemoteCursorState()
-        connectionStatus = "正在准备连接…"
+        connectionStatus = NSLocalizedString("正在准备连接…", comment: "")
         bridge.connect(toRemoteID: identifier, password: password)
     }
 
@@ -632,7 +633,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         isConnecting = true
         isConnected = false
         sessionVisible = false
-        connectionStatus = "正在确认设备状态…"
+        connectionStatus = NSLocalizedString("正在确认设备状态…", comment: "")
         requestPresenceProbe(identifier)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
@@ -656,7 +657,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         guard pendingPresenceRemoteID != nil else { return }
         cancelPresenceProbe()
         isConnecting = false
-        connectionStatus = "未连接"
+        connectionStatus = NSLocalizedString("未连接", comment: "")
     }
 
     private func requestPresenceProbe(_ identifier: String) {
@@ -671,7 +672,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         isConnecting = false
         isConnected = false
         sessionVisible = false
-        connectionStatus = "设备离线"
+        connectionStatus = NSLocalizedString("设备离线", comment: "")
         deviceOfflineAlertVisible = true
     }
 
@@ -720,10 +721,10 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         resetRemoteCursorState()
         frameCount = 0
         networkStatistics = RemoteNetworkStatistics()
-        displays = ["显示器 1"]
+        displays = [NSLocalizedString("显示器 1", comment: "")]
         displaySizes = []
         selectedDisplay = 0
-        connectionStatus = "未连接"
+        connectionStatus = NSLocalizedString("未连接", comment: "")
         audioPlayer.endSession()
         AppOrientation.endSession()
         appUpdates.checkNow()
@@ -1006,9 +1007,9 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     var videoSettingsFeedback: String {
         if !canChangeVideoSettings {
-            return "连接建立后可调整，需被控端支持。"
+            return NSLocalizedString("连接建立后可调整，需被控端支持。", comment: "")
         }
-        if videoSettings.failed { return "调整失败，请重试。" }
+        if videoSettings.failed { return NSLocalizedString("调整失败，请重试。", comment: "") }
         return ""
     }
 
@@ -1077,20 +1078,20 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     func sendClipboard() {
         guard hasNetworkConsent, isConnected else { return }
         guard let text = UIPasteboard.general.string, !text.isEmpty else {
-            clipboardStatus = "剪贴板中没有文本"
+            clipboardStatus = NSLocalizedString("剪贴板中没有文本", comment: "")
             return
         }
         guard text.lengthOfBytes(using: .utf8) <= 128 * 1024 else {
-            clipboardStatus = "剪贴板文本超过 128 KiB"
+            clipboardStatus = NSLocalizedString("剪贴板文本超过 128 KiB", comment: "")
             return
         }
         bridge.sendClipboardText(text)
-        clipboardStatus = "已发送本机剪贴板"
+        clipboardStatus = NSLocalizedString("已发送本机剪贴板", comment: "")
     }
 
     func sendFile(_ url: URL) {
         guard hasNetworkConsent, isConnected else { return }
-        transferStatus = "正在发送 \(url.lastPathComponent)"
+        transferStatus = String(format: NSLocalizedString("正在发送 %1$@", comment: ""), String(describing: url.lastPathComponent))
         transferProgress = 0
         bridge.sendFile(at: url)
     }
@@ -1129,15 +1130,15 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     func sendSecureAttention() {
         guard hasNetworkConsent, isConnected, remotePlatform == .windows else { return }
         guard remoteServiceAvailable else {
-            controlStatus = "Ctrl+Alt+Del 需要远端启用 Windows 系统服务"
+            controlStatus = NSLocalizedString("Ctrl+Alt+Del 需要远端启用 Windows 系统服务", comment: "")
             return
         }
         bridge.sendSecureAttentionSequence()
-        controlStatus = "正在发送 Ctrl+Alt+Del…"
+        controlStatus = NSLocalizedString("正在发送 Ctrl+Alt+Del…", comment: "")
     }
 
     func fileImportFailed() {
-        transferStatus = "无法读取所选文件，请重试"
+        transferStatus = NSLocalizedString("无法读取所选文件，请重试", comment: "")
         transferProgress = 0
     }
 
@@ -1146,14 +1147,14 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     func sendSystemTextEdit(deleting count: Int, inserting text: String) -> Bool {
         guard hasNetworkConsent, isConnected else { return false }
         guard (0...16 * 1024).contains(count), text.utf8.count <= 16 * 1024, !text.unicodeScalars.contains(where: { $0.value == 0 }) else {
-            keyboardInputStatus = "单次输入最多 16 KiB，且不能包含空字符"
+            keyboardInputStatus = NSLocalizedString("单次输入最多 16 KiB，且不能包含空字符", comment: "")
             return false
         }
         let isASCII = text.unicodeScalars.allSatisfy({
             (0x20...0x7e).contains($0.value) || [9, 10, 13].contains($0.value)
         })
         guard supportsTextInput || isASCII else {
-            keyboardInputStatus = "被控端不支持直接输入中文，请更新 macOS 被控端；也可先复制文字，通过远控菜单的剪贴板发送后粘贴"
+            keyboardInputStatus = NSLocalizedString("被控端不支持直接输入中文，请更新 macOS 被控端；也可先复制文字，通过远控菜单的剪贴板发送后粘贴", comment: "")
             return false
         }
         for _ in 0..<count { sendKeyStroke(0x08) }
@@ -1180,7 +1181,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didChangeIdentityStorageError hasError: Bool) {
         identityStorageWarning = hasError
-            ? "本机登录凭据暂时无法安全存取。请解锁设备后，在设置中点击“应用”重试。"
+            ? NSLocalizedString("本机登录凭据暂时无法安全存取。请解锁设备后，在设置中点击“应用”重试。", comment: "")
             : nil
     }
 
@@ -1191,15 +1192,15 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         announcements.setConnected(signalConnected)
         invalidatePresence()
         switch state.rawValue {
-        case 0: signalStatus = "正在连接信令服务"
-        case 1: signalStatus = "已连接服务器"
-        case 2: signalStatus = "信令连接失败"
-        case 3: signalStatus = "信令连接已关闭"
-        case 4: signalStatus = "信令服务重连中"
-        case 5: signalStatus = "信令服务器已关闭连接"
-        case 6: signalStatus = "TLS 证书校验失败"
-        case 7: signalStatus = "无法访问本机登录凭据，请解锁后重试"
-        default: signalStatus = "未知信令状态"
+        case 0: signalStatus = NSLocalizedString("正在连接信令服务", comment: ""); signalHasError = false
+        case 1: signalStatus = NSLocalizedString("已连接服务器", comment: ""); signalHasError = false
+        case 2: signalStatus = NSLocalizedString("信令连接失败", comment: ""); signalHasError = true
+        case 3: signalStatus = NSLocalizedString("信令连接已关闭", comment: ""); signalHasError = true
+        case 4: signalStatus = NSLocalizedString("信令服务重连中", comment: ""); signalHasError = false
+        case 5: signalStatus = NSLocalizedString("信令服务器已关闭连接", comment: ""); signalHasError = true
+        case 6: signalStatus = NSLocalizedString("TLS 证书校验失败", comment: ""); signalHasError = true
+        case 7: signalStatus = NSLocalizedString("无法访问本机登录凭据，请解锁后重试", comment: ""); signalHasError = true
+        default: signalStatus = NSLocalizedString("未知信令状态", comment: ""); signalHasError = true
         }
         if signalConnected {
             startPresenceMonitoring()
@@ -1226,9 +1227,9 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         }
         isConnecting = [0, 2].contains(state.rawValue)
         switch state.rawValue {
-        case 0: connectionStatus = "正在建立远程连接"
+        case 0: connectionStatus = NSLocalizedString("正在建立远程连接", comment: "")
         case 1:
-            connectionStatus = "已连接"
+            connectionStatus = NSLocalizedString("已连接", comment: "")
             startPrivacyMonitoring()
             sessionVisible = true
             pictureInPicture.beginSession()
@@ -1238,27 +1239,27 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
             audioPlayer.setEnabled(audioEnabled)
             bridge.setAudioEnabled(audioEnabled)
             AppOrientation.beginSession(autoLandscape: autoLandscape)
-        case 2: connectionStatus = "正在收集 ICE 候选"
-        case 3: finishConnection(withError: "网络连接已中断，请重新连接。")
+        case 2: connectionStatus = NSLocalizedString("正在收集 ICE 候选", comment: "")
+        case 3: finishConnection(withError: NSLocalizedString("网络连接已中断，请重新连接。", comment: ""))
         case 4:
-            finishConnection(withError: "P2P/TURN 建链失败，请检查网络后重试。")
+            finishConnection(withError: NSLocalizedString("P2P/TURN 建链失败，请检查网络后重试。", comment: ""))
         case 5:
-            finishConnection(withError: "远程连接已结束。")
+            finishConnection(withError: NSLocalizedString("远程连接已结束。", comment: ""))
         case 6:
-            finishConnection(withError: "访问密码错误，请重新输入。")
+            finishConnection(withError: NSLocalizedString("访问密码错误，请重新输入。", comment: ""))
         case 7:
             if !remoteID.isEmpty {
                 recentConnectionPresence[remoteID] = false
                 presenceUpdatedAt.removeValue(forKey: remoteID)
             }
-            finishConnection(withError: "远程设备 ID 不存在，请检查设备 ID。")
+            finishConnection(withError: NSLocalizedString("远程设备 ID 不存在，请检查设备 ID。", comment: ""))
         case 8:
             if !remoteID.isEmpty {
                 recentConnectionPresence[remoteID] = false
                 presenceUpdatedAt.removeValue(forKey: remoteID)
             }
-            finishConnection(withError: "远程设备当前不可用，请稍后重试。")
-        default: connectionStatus = "未知连接状态"
+            finishConnection(withError: NSLocalizedString("远程设备当前不可用，请稍后重试。", comment: ""))
+        default: connectionStatus = NSLocalizedString("未知连接状态", comment: "")
         }
     }
 
@@ -1383,7 +1384,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         updateActiveConnectionHostInfo(hostName)
         let names = remoteDisplayNames.enumerated().map { index, displayName in
             let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-            return name.isEmpty ? "显示器 \(index + 1)" : name
+            return name.isEmpty ? String(format: NSLocalizedString("显示器 %1$@", comment: ""), String(describing: index + 1)) : name
         }
         if !names.isEmpty {
             displays = names
@@ -1437,7 +1438,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didReceiveClipboardText text: String) {
         guard hasNetworkConsent, isConnected else { return }
         UIPasteboard.general.string = text
-        clipboardStatus = "已接收远端剪贴板"
+        clipboardStatus = NSLocalizedString("已接收远端剪贴板", comment: "")
     }
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didReceiveServiceAvailable available: Bool,
@@ -1449,7 +1450,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didSendSecureAttention success: Bool) {
         guard hasNetworkConsent, isConnected else { return }
-        controlStatus = success ? "已发送 Ctrl+Alt+Del" : "指令发送失败，请重试"
+        controlStatus = success ? NSLocalizedString("已发送 Ctrl+Alt+Del", comment: "") : NSLocalizedString("指令发送失败，请重试", comment: "")
     }
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge,
@@ -1458,19 +1459,19 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
                    sending: Bool) {
         guard hasNetworkConsent, isConnected else { return }
         if progress < 0 {
-            transferStatus = "\(fileName) 传输失败"
+            transferStatus = String(format: NSLocalizedString("%1$@ 传输失败", comment: ""), String(describing: fileName))
             transferProgress = 0
             return
         }
         transferProgress = progress
         let percent = Int((progress * 100).rounded())
-        transferStatus = "\(sending ? "发送" : "接收") \(fileName) · \(percent)%"
+        transferStatus = "\(NSLocalizedString(sending ? "发送" : "接收", comment: "")) \(fileName) · \(percent)%"
     }
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didReceiveFileAt fileURL: URL) {
         guard hasNetworkConsent, isConnected else { return }
         receivedFileURL = fileURL
-        transferStatus = "已接收 \(fileURL.lastPathComponent)"
+        transferStatus = String(format: NSLocalizedString("已接收 %1$@", comment: ""), String(describing: fileURL.lastPathComponent))
         transferProgress = 1
     }
 
@@ -1518,8 +1519,8 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     var videoStatus: String {
         if frameCount > 0 {
-            return "视频 \(Int(frameSize.width))×\(Int(frameSize.height)) · \(frameCount) 帧"
+            return String(format: NSLocalizedString("视频 %1$@×%2$@ · %3$@ 帧", comment: ""), String(describing: Int(frameSize.width)), String(describing: Int(frameSize.height)), String(describing: frameCount))
         }
-        return isConnected ? "正在取回远程画面…" : "等待连接"
+        return isConnected ? NSLocalizedString("正在取回远程画面…", comment: "") : NSLocalizedString("等待连接", comment: "")
     }
 }

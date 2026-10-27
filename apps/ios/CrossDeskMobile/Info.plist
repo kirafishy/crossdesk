@@ -5,7 +5,7 @@
     <key>CFBundleDisplayName</key>
     <string>CrossDesk</string>
     <key>CFBundleDevelopmentRegion</key>
-    <string>zh_CN</string>
+    <string>en</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>

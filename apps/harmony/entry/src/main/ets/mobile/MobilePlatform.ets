@@ -1,3 +1,4 @@
+import { tr } from './Localization';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { common, wantAgent } from '@kit.AbilityKit';
 import { PiPWindow, window, display } from '@kit.ArkUI';
@@ -34,7 +35,7 @@ export class MobilePlatform {
   private feedback: (message: string) => void;
   private backgroundCancelled: () => void = () => {
     this.backgroundActive = false;
-    if (this.active && !this.foreground && !this.pipActive && !this.choosing) this.ended('系统已停止后台会话');
+    if (this.active && !this.foreground && !this.pipActive && !this.choosing) this.ended(tr("系统已停止后台会话"));
   };
   constructor(context: common.UIAbilityContext, ended: (reason: string) => void, release: () => void, feedback: (message: string) => void) {
     this.context = context; this.ended = ended; this.release = release; this.feedback = feedback;
@@ -82,7 +83,7 @@ export class MobilePlatform {
         if (state === PiPWindow.PiPState.STOPPED) {
           this.pipActive = false;
           this.onVisibility(this.foreground);
-          if (!this.foreground && !this.choosing && this.active) this.ended('画中画已关闭');
+          if (!this.foreground && !this.choosing && this.active) this.ended(tr("画中画已关闭"));
         }
       });
     } catch { /* A continuous data-transfer task remains the fallback. */ }
@@ -104,7 +105,7 @@ export class MobilePlatform {
     }
     await this.backgroundQueue;
     if (generation === this.generation && !this.foreground && this.active && !this.backgroundActive && !this.pipActive && !this.choosing)
-      this.ended('系统未允许后台会话，连接已断开');
+      this.ended(tr("系统未允许后台会话，连接已断开"));
   }
   resume(): void { this.foreground = true; this.dismissPiP(); this.orientation(this.active); this.onVisibility(true); }
   private async dismissPiP(): Promise<void> {
@@ -164,7 +165,7 @@ export class MobilePlatform {
       try { await fs.copyFile(input.fd, path); } finally { await fs.close(input); }
       if (generation !== this.generation || !this.active) { await fs.unlink(path); return undefined; }
       return { path: path, name: name };
-    } catch { if (path) try { await fs.unlink(path); } catch {} this.feedback('无法读取所选文件或存储空间不足'); return undefined; }
+    } catch { if (path) try { await fs.unlink(path); } catch {} this.feedback(tr("无法读取所选文件或存储空间不足")); return undefined; }
     finally { if (generation === this.generation) this.setChoosing(false); }
   }
   async save(path: string, name: string): Promise<void> {
@@ -177,8 +178,8 @@ export class MobilePlatform {
       if (!uris.length || generation !== this.generation || !this.active) return;
       const output = await fs.open(uris[0], fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
       try { await fs.copyFile(path, output.fd); } finally { await fs.close(output); }
-      if (generation === this.generation) this.feedback('文件已保存');
-    } catch { if (generation === this.generation) this.feedback('文件保存失败，请重试'); }
+      if (generation === this.generation) this.feedback(tr("文件已保存"));
+    } catch { if (generation === this.generation) this.feedback(tr("文件保存失败，请重试")); }
     finally { if (generation === this.generation) this.setChoosing(false); }
   }
   async version(): Promise<string | undefined> {
@@ -196,7 +197,7 @@ export class MobilePlatform {
   cancelRequests(): void { for (const request of this.requests) request.destroy(); this.requests = []; }
   openLink(url: string): void {
     if (!isAnnouncementURL(url)) return;
-    this.context.startAbility({ action: 'ohos.want.action.viewData', uri: url }).catch(() => this.feedback('无法打开网页'));
+    this.context.startAbility({ action: 'ohos.want.action.viewData', uri: url }).catch(() => this.feedback(tr("无法打开网页")));
   }
 }
 export interface PreparedFile { path: string; name: string; }

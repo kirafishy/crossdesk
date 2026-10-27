@@ -24,7 +24,7 @@ final class RemoteNetworkStatistics {
         final Report report;final int fps,width,height;final double latency,rtt;
         final String remoteEncoder,localDecoder;
         Snapshot(Report report,int fps,int width,int height,double latency,double rtt,String remoteEncoder,String localDecoder){this.report=report;this.fps=fps;this.width=width;this.height=height;this.latency=latency;this.rtt=rtt;this.remoteEncoder=remoteEncoder;this.localDecoder=localDecoder;}
-        String mode(){return report==null?"—":report.mode==0?"P2P 直连":report.mode==1?"TURN 中继":"—";}
+        String mode(){return report==null?"—":report.mode==0?L10n.tr("P2P 直连"):report.mode==1?L10n.tr("TURN 中继"):"—";}
         String resolution(){return width>0&&height>0?width+" × "+height:"—";}
     }
     private static final class Frame {

@@ -37,11 +37,11 @@ struct RemotePrivacyScreen {
         return fresh(at: now) && s.state == 3 && s.overlayActive && !s.remotePaused
     }
     func buttonTitle(at now: TimeInterval) -> String {
-        if enabled(at: now) { return "隐私屏已开启" }
+        if enabled(at: now) { return NSLocalizedString("隐私屏已开启", comment: "") }
         if fresh(at: now), let s = snapshot, s.supported && s.state == 1 && !active {
-            return "隐私屏已关闭"
+            return NSLocalizedString("隐私屏已关闭", comment: "")
         }
-        return "隐私屏"
+        return NSLocalizedString("隐私屏", comment: "")
     }
     func feedback(at now: TimeInterval) -> String {
         if !desktopAvailable { return "" }
@@ -87,26 +87,26 @@ struct RemotePrivacyScreen {
         return requestID
     }
     mutating func failed(request: UInt32) {
-        if pending && requestID == request { pending = false; failure = "指令发送失败，请重试" }
+        if pending && requestID == request { pending = false; failure = NSLocalizedString("指令发送失败，请重试", comment: "") }
     }
     mutating func tick(at now: TimeInterval) {
         if pending && now - requestedAt >= 15 {
-            pending = false; failure = "请求超时，尚未确认电脑的隐私屏状态"
+            pending = false; failure = NSLocalizedString("请求超时，尚未确认电脑的隐私屏状态", comment: "")
         }
     }
     func status(at now: TimeInterval) -> String {
         if !failure.isEmpty { return failure }
-        guard let s = snapshot else { return "等待电脑返回隐私屏状态；旧版电脑端可能不支持" }
-        if !fresh(at: now) { return "隐私屏状态已过期，等待电脑确认" }
-        if s.state == 2 { return "正在开启隐私屏…" }
-        if s.state == 4 { return "正在关闭隐私屏…" }
-        if pending { return "指令已发送，等待电脑确认…" }
-        if s.state == 5 { return "隐私屏异常" }
-        if !s.supported || s.state == 0 { return "隐私屏暂不可用" }
+        guard let s = snapshot else { return NSLocalizedString("等待电脑返回隐私屏状态；旧版电脑端可能不支持", comment: "") }
+        if !fresh(at: now) { return NSLocalizedString("隐私屏状态已过期，等待电脑确认", comment: "") }
+        if s.state == 2 { return NSLocalizedString("正在开启隐私屏…", comment: "") }
+        if s.state == 4 { return NSLocalizedString("正在关闭隐私屏…", comment: "") }
+        if pending { return NSLocalizedString("指令已发送，等待电脑确认…", comment: "") }
+        if s.state == 5 { return NSLocalizedString("隐私屏异常", comment: "") }
+        if !s.supported || s.state == 0 { return NSLocalizedString("隐私屏暂不可用", comment: "") }
         if s.state == 3 && s.overlayActive && !s.remotePaused {
-            return "隐私屏已开启"
+            return NSLocalizedString("隐私屏已开启", comment: "")
         }
-        return s.state == 1 && !active ? "隐私屏已关闭" : "隐私屏状态待确认"
+        return s.state == 1 && !active ? NSLocalizedString("隐私屏已关闭", comment: "") : NSLocalizedString("隐私屏状态待确认", comment: "")
     }
     func detail(at now: TimeInterval) -> String {
         guard let s = snapshot, fresh(at: now), s.state == 0 || s.state == 5 || !s.supported else { return "" }

@@ -1,3 +1,4 @@
+import { tr } from './Localization';
 // Platform-independent controller rules ported from the Android client.
 // Keep gesture geometry, acknowledgement ordering and expiry behavior identical.
 export function clamp(value: number, low: number, high: number): number {
@@ -96,7 +97,7 @@ export class VideoSettings {
     this.pending = false; this.failed = !accepted; this.selection = this.applied;
   }
   expire(id: number): void { if (this.pending && id === this.requestId) { this.pending = false; this.failed = true; this.selection = this.applied; } }
-  feedback(): string { return !this.supported ? '连接建立后可调整，需被控端支持。' : this.failed ? '调整失败，请重试。' : this.pending ? '等待电脑端确认…' : ''; }
+  feedback(): string { return !this.supported ? tr("连接建立后可调整，需被控端支持。") : this.failed ? tr("调整失败，请重试。") : this.pending ? tr("等待电脑端确认…") : ''; }
 }
 export interface Traffic { inbound: number; outbound: number; loss: number; }
 export interface NetworkReport { rtt: number; mode: number; srtp: boolean; decoder?: string; video: Traffic; audio: Traffic; data: Traffic; total: Traffic; }
@@ -133,7 +134,7 @@ export class NetworkStatistics {
     return count ? valid.reduce((n: number, f: FrameSample) => n + f.latency * f.latencyCount, 0) / count : -1;
   }
   current(now: number): NetworkReport | undefined { return now - this.reportTime < 3000 ? this.report : undefined; }
-  mode(now: number): string { const report = this.current(now); return !report ? '—' : report.mode === 0 ? 'P2P 直连' : report.mode === 1 ? 'TURN 中继' : '—'; }
+  mode(now: number): string { const report = this.current(now); return !report ? '—' : report.mode === 0 ? tr("P2P 直连") : report.mode === 1 ? tr("TURN 中继") : '—'; }
   static rate(n: number): string { return !Number.isFinite(n) || n < 0 ? '—' : n >= 1000000 ? `${(n / 1000000).toFixed(1)} Mbps` : n >= 1000 ? `${(n / 1000).toFixed(0)} Kbps` : `${n} bps`; }
   static loss(n: number): string { return Number.isFinite(n) && n >= 0 ? `${(n * 100).toFixed(1)}%` : '—'; }
   static delay(n: number): string { return !Number.isFinite(n) || n < 0 ? '—' : n < 1 ? '<1 ms' : `${n.toFixed(0)} ms`; }

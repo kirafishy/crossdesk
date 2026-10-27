@@ -1201,9 +1201,8 @@ void GuiApplication::InitializeSettings() {
   settings_.LoadRecentConnectionAliases();
   localization_language_index_ =
       localization::detail::ClampLanguageIndex(language_button_value_);
-  language_button_value_ = localization_language_index_;
   localization_language_ =
-      static_cast<ConfigCenter::LANGUAGE>(localization_language_index_);
+      static_cast<ConfigCenter::LANGUAGE>(language_button_value_);
   privacy_.SetText({
       localization::privacy_screen_unlock_hint[localization_language_index_]});
 }
@@ -1563,11 +1562,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     if (config_center_->SetConnectionMode(mode) != 0) {
       LOG_WARN("Could not save connection mode preference");
       main->set_offline_warning(UiText(
-          localization_language_index_ == 0
-              ? "无法保存连接模式，下次启动可能不会恢复当前模式。"
-          : localization_language_index_ == 2
-              ? "Не удалось сохранить режим подключения. При следующем запуске он может не восстановиться."
-              : "Could not save the connection mode. It may not be restored on the next launch."));
+          localization::Literal("无法保存连接模式，下次启动可能不会恢复当前模式。", localization_language_index_)));
     }
   });
   main->on_toggle_gallery_fullscreen(
@@ -3078,13 +3073,9 @@ void GuiApplication::UpdateLocalization() {
     return;
   }
 #if _WIN32
-  // All views refer to static literals; selecting the text needs no allocation
-  // and only runs when the language changes. Tick still checks connection state.
-  ui_->shutdown_reason = language == 0
-      ? L"远程控制连接中，保留连接以确认或取消关机。"
-      : language == 2
-          ? L"Удалённый сеанс активен. Соединение сохранено для подтверждения или отмены выключения."
-          : L"Remote session active. Keeping the connection available to confirm or cancel shutdown.";
+  static std::vector<std::wstring> shutdown_reasons(localization::GetSupportedLanguages().size());
+  ui_->shutdown_reason = localization::GetWindowsLocalizedLabel(
+      language, "shutdown_reason", L"Remote session active.", shutdown_reasons);
 #endif
   ui_localization::ApplyMainWindowStrings(ui_->main, language);
   ui_localization::ApplyStreamWindowStrings(ui_->main, language);
@@ -3247,13 +3238,12 @@ void GuiApplication::SyncMainWindow() {
 
   // Keep this filter separate from DeskHub's current group, keyed by name so
   // adding/removing groups does not silently select a different one by index.
-  const auto tr_group = [this](const char* zh, const char* en, const char* ru) {
-    return UiText(localization_language_index_ == 0 ? zh
-                  : localization_language_index_ == 2 ? ru : en);
+  const auto tr_group = [this](const char* zh) {
+    return UiText(localization::Literal(zh, localization_language_index_).c_str());
   };
   std::vector<slint::SharedString> recent_groups{
-      tr_group("全部设备", "All devices", "Все устройства"),
-      tr_group("未分组", "Ungrouped", "Без группы")};
+      tr_group("全部设备"),
+      tr_group("未分组")};
   const bool lan_mode = ui_->main->get_lan_mode();
   int recent_group_index = 0;
   if (!lan_mode && ui_->recent_group_filter) {
@@ -4565,9 +4555,7 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   // common save succeeds. Restore the previous wall file if it fails.
   if (!wall_settings || (wall_changed && !updated_wall.Save(ui_->gallery_path))) {
     main->set_gallery_settings_error(UiText(
-        localization_language_index_ == 0 ? "保存失败，请重试"
-        : localization_language_index_ == 2 ? "Не удалось сохранить. Повторите попытку"
-                                            : "Could not save; try again"));
+        localization::Literal("保存失败，请重试", localization_language_index_)));
     main->set_settings_tab(1);
     return false;
   }
@@ -4586,9 +4574,7 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
     if (wall_changed && !ui_->gallery.Save(ui_->gallery_path))
       LOG_ERROR("Failed to restore DeskHub settings after IP direct save failure");
     main->set_settings_save_error(UiText(
-        localization_language_index_ == 0 ? "无法保存 IP 连接设置，请重试。"
-        : localization_language_index_ == 2 ? "Не удалось сохранить настройки подключения по IP. Повторите попытку."
-                                            : "Could not save IP connection settings. Try again."));
+        localization::Literal("无法保存 IP 连接设置，请重试。", localization_language_index_)));
     return false;
   }
 #if defined(_WIN32) || defined(__APPLE__) || (defined(__linux__) && !defined(__OHOS__))
@@ -4596,22 +4582,18 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
     if (wall_changed && !ui_->gallery.Save(ui_->gallery_path))
       LOG_ERROR("Failed to restore DeskHub settings after lock preference save failure");
     main->set_settings_save_error(UiText(
-        localization_language_index_ == 0 ? "无法保存断开后锁屏设置，请重试。"
-        : localization_language_index_ == 2 ? "Не удалось сохранить настройку блокировки при отключении. Повторите попытку."
-                                            : "Could not save lock-on-disconnect settings. Try again."));
+        localization::Literal("无法保存断开后锁屏设置，请重试。", localization_language_index_)));
     return false;
   }
 #endif
   if (config_center_->SetPrivacyLocalUnlock(main->get_privacy_local_unlock_allowed()) != 0) {
     if (wall_changed) ui_->gallery.Save(ui_->gallery_path);
     main->set_settings_save_error(UiText(
-        localization_language_index_ == 0 ? "无法保存隐私屏解锁设置，请重试。"
-        : localization_language_index_ == 2 ? "Не удалось сохранить настройку разблокировки. Повторите попытку."
-                                            : "Could not save privacy unlock settings. Try again."));
+        localization::Literal("无法保存隐私屏解锁设置，请重试。", localization_language_index_)));
     return false;
   }
   language_button_value_ =
-      localization::detail::ClampLanguageIndex(main->get_language_index());
+      std::clamp(main->get_language_index(), 0, localization::kSystemLanguage);
   video_encode_format_button_value_ = std::clamp(main->get_codec_index(), 0, 1);
   enable_self_hosted_ = main->get_self_hosted_enabled();
 #if !defined(__OHOS__)
@@ -4621,7 +4603,7 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
 
   localization_language_ =
       static_cast<ConfigCenter::LANGUAGE>(language_button_value_);
-  localization_language_index_ = language_button_value_;
+  localization_language_index_ = localization::detail::ClampLanguageIndex(language_button_value_);
   config_center_->SetLanguage(localization_language_);
   privacy_.SetText(
       {localization::privacy_screen_unlock_hint[localization_language_index_],
@@ -4773,10 +4755,7 @@ void GuiApplication::ConnectFromUi(const std::string& input) {
   const std::string remote_id = CompactPeerId(input);
   if (!gallery::Workspace::ValidId(remote_id)) {
     ui_->main->set_connection_input_error(
-        UiText(localization_language_index_ == 0 ? "请输入有效的 9 位设备 ID"
-               : localization_language_index_ == 2
-                   ? "Введите корректный 9-значный ID устройства"
-                   : "Enter a valid 9-digit device ID"));
+        UiText(localization::Literal("请输入有效的 9 位设备 ID", localization_language_index_)));
     return;
   }
   ui_->main->set_connection_input_error("");
@@ -5330,41 +5309,31 @@ bool GuiApplication::AddGalleryDevice(const std::string& input,
                                       const std::string& password,
                                       const std::string& group,
                                       bool remember_password) {
-  const auto error = [this](const char* zh, const char* en, const char* ru) {
+  const auto error = [this](const char* zh) {
     ui_->wall->set_gallery_notice(UiText(
-        localization_language_index_ == 0 ? zh
-        : localization_language_index_ == 2 ? ru : en));
+        localization::Literal(zh, localization_language_index_).c_str()));
     return false;
   };
   const auto id = gallery::Workspace::NormalizeId(input);
   if (!gallery::Workspace::ValidId(id))
-    return error("请输入有效的 9 位设备 ID",
-                 "Enter a valid 9-digit device ID",
-                 "Введите корректный 9-значный ID устройства");
+    return error("请输入有效的 9 位设备 ID");
   if (password.empty() || password.size() > 6 ||
       password.find_first_not_of(
           "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz") !=
           std::string::npos)
-    return error("请输入 1–6 位英文字母或数字密码",
-                 "Use 1–6 letters (A–Z, a–z) or digits (0–9)",
-                 "Пароль: 1–6 латинских букв или цифр");
+    return error("请输入 1–6 位英文字母或数字密码");
   if (!signal_connected_)
-    return error("尚未连接服务器，请稍后重试",
-                 "Not connected to the server; try again shortly",
-                 "Нет соединения с сервером. Повторите позже");
+    return error("尚未连接服务器，请稍后重试");
   using State = SlintUi::BatchOperation::State;
   for (const auto& operation : ui_->batch_operations)
     if (operation.id == id && operation.action == "connect" &&
         (operation.state == State::Queued || operation.state == State::Running))
-      return error("该设备正在连接，请稍候",
-                   "This device is already connecting",
-                   "Устройство уже подключается");
+      return error("该设备正在连接，请稍候");
 
   auto updated = ui_->gallery;
   updated.Add(id, Trim(group));
   if (!updated.Save(ui_->gallery_path))
-    return error("保存失败，请重试", "Could not save; try again",
-                 "Не удалось сохранить. Повторите попытку");
+    return error("保存失败，请重试");
   ui_->gallery = std::move(updated);
   ui_->gallery_hidden_active_ids.erase(id);
   if (auto props = FindRemoteSession(id)) {
@@ -5406,9 +5375,7 @@ bool GuiApplication::ImportGalleryRecent(const std::string& input_group) {
   updated.AddMany(ids, group);
   if (!updated.Save(ui_->gallery_path)) {
     ui_->wall->set_gallery_notice(UiText(
-        localization_language_index_ == 0 ? "保存失败，请重试"
-        : localization_language_index_ == 2 ? "Не удалось сохранить. Повторите попытку"
-                                            : "Could not save; try again"));
+        localization::Literal("保存失败，请重试", localization_language_index_)));
     return false;
   }
   ui_->gallery = std::move(updated);
@@ -5488,9 +5455,7 @@ bool GuiApplication::SaveDeviceGroups(const std::string& new_group,
   auto updated = ui_->gallery;
   if (!updated.SetGroups(id, names) || !updated.Save(ui_->gallery_path)) {
     main->set_device_group_error(UiText(
-        localization_language_index_ == 0 ? "保存失败，请重试"
-        : localization_language_index_ == 2 ? "Не удалось сохранить. Повторите попытку"
-                                            : "Could not save; try again"));
+        localization::Literal("保存失败，请重试", localization_language_index_)));
     return false;
   }
   // Removing an empty group shifts indices. Retain the filter by name instead
@@ -5528,10 +5493,8 @@ void GuiApplication::GalleryAction(const std::string& action,
     ui_->gallery_network_synced = {};
     return;
   }
-  const auto tr = [this](const char* zh, const char* en, const char* ru) {
-    return UiText(localization_language_index_ == 0   ? zh
-                  : localization_language_index_ == 2 ? ru
-                                                      : en);
+  const auto tr = [this](const char* zh) {
+    return UiText(localization::Literal(zh, localization_language_index_).c_str());
   };
   if (action == "recent-open") {
     ReleaseControl();
@@ -5749,7 +5712,7 @@ void GuiApplication::GalleryAction(const std::string& action,
       SyncGallery();
     };
     if (action == "file") {
-      OpenFileDialog(std::string(tr("选择分发文件", "Select a file to send", "Выберите файл для отправки")),
+      OpenFileDialog(std::string(tr("选择分发文件")),
           [enqueue](std::string file) {
             if (!file.empty()) enqueue(file);
           });
@@ -6026,11 +5989,8 @@ void GuiApplication::SyncGallery() {
     ui_->wall->set_gallery_recent_available(available);
     ui_->wall->set_gallery_recent_selected(selected);
   }
-  const auto tr = [this](const char* zh, const char* en,
-                         const char* ru) -> std::string {
-    return localization_language_index_ == 0   ? zh
-           : localization_language_index_ == 2 ? ru
-                                               : en;
+  const auto tr = [this](const char* zh) -> std::string {
+    return localization::Literal(zh, localization_language_index_).c_str();
   };
   const auto name = [this](const std::string& id) {
     for (const auto& [_, recent] : recent_connections_)
@@ -6070,10 +6030,10 @@ void GuiApplication::SyncGallery() {
       device.id = UiText(FormatPeerId(id.c_str()));
       const auto mode = props->traversal_mode_.load();
       device.mode = UiText(mode == TraversalMode::P2P
-          ? tr("直连", "Direct", "Прямой")
+          ? tr("直连")
           : mode == TraversalMode::UnknownMode
-              ? tr("等待统计", "Awaiting stats", "Ожидание статистики")
-              : tr("中继", "Relay", "Ретрансляция"));
+              ? tr("等待统计")
+              : tr("中继"));
       device.inbound = device.outbound = device.loss = "—";
       device.video_latency = "—";
       // Prefer the wall's own frame path. An independently displayed stream
@@ -6241,7 +6201,7 @@ void GuiApplication::SyncGallery() {
     label += member.group;
   }
   std::vector<slint::SharedString> groups{
-      UiText(tr("全部设备", "All devices", "Все устройства"))};
+      UiText(tr("全部设备"))};
   for (const auto& group : wall.groups) groups.push_back(UiText(group));
   const auto old_groups = ui_->wall->get_gallery_groups();
   bool changed_groups = !old_groups || old_groups->row_count() != groups.size();
@@ -6325,8 +6285,8 @@ void GuiApplication::SyncGallery() {
     tile.online = tile.connected || online.value_or(false);
     tile.presence_known = tile.connected || online.has_value();
     tile.status = UiText(
-        tile.connected ? tr("等待画面", "Waiting for video", "Ожидание видео")
-                       : tr("未连接", "Not connected", "Нет соединения"));
+        tile.connected ? tr("等待画面")
+                       : tr("未连接"));
     const bool queued = !tile.connected && std::any_of(
         ui_->batch_operations.begin(), ui_->batch_operations.end(),
         [&](const auto& operation) {
@@ -6335,9 +6295,9 @@ void GuiApplication::SyncGallery() {
         });
     // A queued retry takes precedence over errors from the previous session.
     if (queued)
-      tile.status = UiText(tr("队列中", "Queued", "В очереди"));
+      tile.status = UiText(tr("队列中"));
     else if (props && props->connection_auth_.Get().password_required)
-      tile.status = UiText(tr("需要密码", "Password required", "Нужен пароль"));
+      tile.status = UiText(tr("需要密码"));
     else if (props && !tile.connected)
       tile.status = UiText(ConnectionStatusText(
           props->connection_status_.load(), localization_language_index_));
@@ -6365,8 +6325,8 @@ void GuiApplication::SyncGallery() {
         tile.has_frame = true;
         tile.stale = now - props->gallery_frame_at_ > 5s;
         tile.status =
-            UiText(tile.stale ? tr("画面已停留", "Frame stale", "Кадр устарел")
-                              : tr("只读预览", "View only", "Просмотр"));
+            UiText(tile.stale ? tr("画面已停留")
+                              : tr("只读预览"));
       }
     }
     return tile;

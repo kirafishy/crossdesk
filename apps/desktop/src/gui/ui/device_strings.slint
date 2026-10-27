@@ -1,10 +1,24 @@
 export global GalleryStrings {
     in-out property <int> language: 0;
+    in-out property <[string]> texts;
+    in-out property <string> retry-prefix;
+    in-out property <string> retry-suffix;
+    public pure function retry-after(seconds: int) -> string {
+        return self.retry-prefix + seconds + self.retry-suffix;
+    }
+    // Compatibility for embedding callers with their own three-language text.
     public pure function tr(zh: string, en: string, ru: string) -> string {
         return self.language == 0 ? zh : self.language == 2 ? ru : en;
     }
     public pure function device-count(count: int) -> string {
         if self.language == 0 { return count + " 台设备"; }
+        if self.language == 3 { return count + " 臺裝置"; }
+        if self.language == 4 { return count + " 台"; }
+        if self.language == 5 { return count + "개 기기"; }
+        if self.language == 6 { return count + (count == 1 ? " Gerät" : " Geräte"); }
+        if self.language == 7 { return count + (count == 1 ? " appareil" : " appareils"); }
+        if self.language == 8 { return count + (count == 1 ? " dispositivo" : " dispositivos"); }
+        if self.language == 9 { return count + (count == 1 ? " dispositivo" : " dispositivos"); }
         if self.language == 2 {
             let last-two = mod(count, 100);
             let last = mod(count, 10);

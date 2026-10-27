@@ -29,8 +29,8 @@ struct RemoteNetworkSnapshot {
 
     var connectionMode: String {
         switch report?.mode {
-        case .direct: return "P2P 直连"
-        case .relay: return "TURN 中继"
+        case .direct: return NSLocalizedString("P2P 直连", comment: "")
+        case .relay: return NSLocalizedString("TURN 中继", comment: "")
         default: return "—"
         }
     }

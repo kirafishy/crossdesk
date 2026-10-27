@@ -1,3 +1,4 @@
+import { tr } from './Localization';
 import { LengthMetricsUnit } from '@kit.ArkUI';
 
 export class MobileTheme {
@@ -86,7 +87,7 @@ export struct MobileIconButton {
 }
 @Component
 export struct MobilePrimaryButton {
-  label: string = '连接';
+  label: string = tr("连接");
   @Prop available: boolean = true;
   arrow: boolean = false;
   buttonHeight: number = 48;
@@ -94,7 +95,7 @@ export struct MobilePrimaryButton {
   build() {
     Button({ type: ButtonType.Normal, stateEffect: true }) {
       Row({ space: 8 }) {
-        Text(this.label).fontSize(16).fontWeight(600).fontColor(Color.White)
+        Text(this.label).fontSize(16).minFontSize(11).maxFontSize(16).maxLines(2).textAlign(TextAlign.Center).fontWeight(600).fontColor(Color.White)
         if (this.arrow) { MobileIcon({ name: 'arrow', iconExtent: 18, color: '#FFFFFF' }) }
       }.justifyContent(FlexAlign.Center).width('100%')
     }.height(this.buttonHeight).width('100%').padding({ left: 12, right: 12 }).borderRadius(12)
@@ -118,7 +119,7 @@ export struct MobileSegment {
         .backgroundColor(Color.White).borderRadius(7).shadow({ radius: 2, color: '#18000000', offsetY: 1 }).translate({ x: 2 + this.selected * Math.max(0, this.viewWidth - 4) / Math.max(1, this.labels.length) })
       Row() {
         ForEach(this.labels, (label: string, index: number) => {
-          Text(label).fontSize(12).fontWeight(this.selection === index ? 600 : 400).fontColor(MobileTheme.ink)
+          Text(label).fontSize(12).minFontSize(9).maxFontSize(12).maxLines(2).fontWeight(this.selection === index ? 600 : 400).fontColor(MobileTheme.ink)
             .textAlign(TextAlign.Center).height(32).layoutWeight(1).enabled(this.available)
             .accessibilityLevel('yes').accessibilityText(label).accessibilitySelected(this.selection === index)
             .onClick(() => this.changed(index))
