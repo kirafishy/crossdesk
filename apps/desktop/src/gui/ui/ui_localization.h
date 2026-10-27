@@ -105,6 +105,7 @@ inline int ApplyMainWindowStrings(
   strings.set_daemon(Text(localization::enable_daemon[language]));
   strings.set_save_remote_previews(Text(localization::save_remote_previews[language]));
   strings.set_unknown_platform(Text(localization::unknown_platform[language]));
+  strings.set_privacy_local_unlock(Text(localization::privacy_local_unlock[language]));
   strings.set_privacy_on_connect(Text(localization::privacy_on_connect[language]));
   strings.set_lock_on_disconnect(Text(localization::lock_on_disconnect[language]));
   strings.set_file_save_path(
@@ -206,6 +207,10 @@ inline int ApplyStreamWindowStrings(
   strings.set_remote_update_dismiss(Text(localization::remote_update_dismiss[language]));
   strings.set_select_display(Text(localization::select_display[language]));
   strings.set_send_shortcut(Text(localization::send_shortcut[language]));
+  strings.set_privacy_unlocked_title(Text(localization::privacy_unlocked_title[language]));
+  strings.set_privacy_unlocked_message(Text(localization::privacy_unlocked_message[language]));
+  strings.set_privacy_unlock_confirm(Text(localization::privacy_unlock_confirm[language]));
+  strings.set_privacy_unlock_lock(Text(localization::privacy_unlock_lock[language]));
   strings.set_privacy_enable(Text(localization::privacy_enable[language]));
   strings.set_privacy_disable(Text(localization::privacy_disable[language]));
   strings.set_control_mouse(Text(localization::control_mouse[language]));

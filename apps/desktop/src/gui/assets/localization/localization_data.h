@@ -404,6 +404,12 @@ struct TranslationRow {
   X(wayland_notice_acknowledge, u8"我知道了", "Got it", u8"Понятно")            \
   X(show_main_window, u8"显示主界面", "Show Main Window",                    \
     u8"Показать главное окно")                                                \
+  X(privacy_local_unlock, u8"允许被控时解锁隐私屏:", "Allow privacy screen unlock while controlled:", u8"Разрешить разблокировку приватного экрана при удалённом управлении:") \
+  X(privacy_screen_locked_hint, u8"隐私屏已开启，本机解锁已禁用", "Privacy screen is on. Local unlocking is disabled.", u8"Приватный экран включён. Локальная разблокировка отключена.") \
+  X(privacy_unlocked_title, u8"隐私屏已被解锁", "Privacy screen unlocked", u8"Приватный экран разблокирован") \
+  X(privacy_unlocked_message, u8"被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。", "The remote privacy screen was unlocked using the local shortcut. Lock it again to restore privacy and disable local shortcut unlocking.", u8"Приватный экран отключён локальным сочетанием клавиш. Заблокируйте его снова, чтобы восстановить защиту и запретить локальную разблокировку.") \
+  X(privacy_unlock_confirm, u8"确认", "Confirm", u8"Подтвердить") \
+  X(privacy_unlock_lock, u8"锁定", "Lock", u8"Заблокировать") \
   X(privacy_screen_unlock_hint, u8"按下快捷键，解除隐私屏",                    \
     "To turn off the privacy screen, press",                                 \
     u8"Чтобы отключить приватный экран, нажмите")                             \

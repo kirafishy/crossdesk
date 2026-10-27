@@ -1044,6 +1044,7 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
 }
 
 - (void)sendPrivacyCommand:(BOOL)enable
+                      lock:(BOOL)lock
            blockLocalInput:(BOOL)blockLocalInput
                  requestID:(uint32_t)requestID {
   const uint64_t generation = _activeControllerGeneration.load();
@@ -1051,7 +1052,8 @@ Params MakeParams(const RTCState &state, const std::string &user_id,
     if (![self isControllerGenerationActive:generation]) return;
     RemoteAction action{};
     action.type = ControlType::privacy_command;
-    action.pc = {enable ? crossdesk::PrivacyCommandFlag::enable
+    action.pc = {lock ? crossdesk::PrivacyCommandFlag::lock
+                        : enable ? crossdesk::PrivacyCommandFlag::enable
                         : crossdesk::PrivacyCommandFlag::disable,
                  static_cast<bool>(blockLocalInput)};
     const auto message = action.to_json();

@@ -1106,12 +1106,14 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         privacyTimer = timer
     }
 
-    func togglePrivacyScreen() {
+    func lockPrivacyScreen() { sendPrivacyScreen(lock: true) }
+    func togglePrivacyScreen() { sendPrivacyScreen(lock: false) }
+    private func sendPrivacyScreen(lock: Bool) {
         guard hasNetworkConsent, isConnected else { return }
         privacyClock = ProcessInfo.processInfo.systemUptime
         let enable = !privacyScreen.active
-        guard let request = privacyScreen.begin(at: privacyClock) else { return }
-        bridge.sendPrivacyCommand(enable, blockLocalInput: true, requestID: request)
+        guard let request = privacyScreen.begin(at: privacyClock, lock: lock) else { return }
+        bridge.sendPrivacyCommand(enable, lock: lock, blockLocalInput: true, requestID: request)
     }
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didReceivePrivacyStatus data: Data) {

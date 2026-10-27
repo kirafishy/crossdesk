@@ -22,6 +22,8 @@ enum class LinuxPrivacyCommand : uint8_t {
   enable_blocking,
   recover,
   heartbeat,
+  allow_local_unlock,
+  forbid_local_unlock,
 };
 
 struct LinuxPrivacyReply {

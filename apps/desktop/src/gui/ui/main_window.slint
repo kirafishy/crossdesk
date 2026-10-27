@@ -81,6 +81,7 @@ export global UiStrings {
     in-out property <string> daemon: "Run in background";
     in-out property <string> save-remote-previews: "Save remote screen previews:";
     in-out property <string> unknown-platform: "Unknown platform";
+    in-out property <string> privacy-local-unlock: "Allow privacy screen unlock while controlled:";
     in-out property <string> privacy-on-connect: "Privacy screen on connect";
     in-out property <string> lock-on-disconnect: "Lock screen on disconnect";
     in-out property <string> file-save-path: "File save path";
@@ -651,6 +652,7 @@ export component MainWindow inherits Window {
     // Show the preference on every platform; only adapted hosts can change it.
     in property <bool> privacy-setting-available: false;
     in-out property <bool> privacy-on-connect-enabled: true;
+    in-out property <bool> privacy-local-unlock-allowed: true;
     in property <bool> lock-on-disconnect-available: false;
     in-out property <bool> lock-on-disconnect-enabled: true;
     in-out property <string> file-save-path: "";
@@ -2728,8 +2730,9 @@ export component MainWindow inherits Window {
                             font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {
-                            title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 2;
+                            title: GalleryStrings.tr("隐私保护", "Privacy", "Приватность"); rows: 3;
                             SettingsToggleRow { label: UiStrings.privacy-on-connect; checked <=> root.privacy-on-connect-enabled; enabled: root.privacy-setting-available; }
+                            SettingsToggleRow { label: UiStrings.privacy-local-unlock; checked <=> root.privacy-local-unlock-allowed; enabled: root.privacy-setting-available; }
                             SettingsToggleRow { label: UiStrings.lock-on-disconnect; checked <=> root.lock-on-disconnect-enabled; enabled: root.lock-on-disconnect-available; divider: false; }
                         }
                         Text {

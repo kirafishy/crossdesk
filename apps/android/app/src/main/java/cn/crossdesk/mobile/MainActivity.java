@@ -79,6 +79,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     private AlertDialog connectionDialog;
     private String pendingConnectionMessage="";
     private AlertDialog remoteUpdateDialog;
+    private AlertDialog privacyUnlockDialog;
     private RemoteVersionCheck remoteVersionCheck;
     private String host, connectedRemote="", hostPlatform="", remoteClipboard="", pendingPassword="", page="home";
     private int port,selectedDisplay;
@@ -350,6 +351,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     }
     private void confirmDisconnect(){disconnectDialog=new AlertDialog.Builder(this).setTitle("断开远程连接？").setMessage("断开后将返回首页").setNegativeButton("取消",null).setPositiveButton("断开连接",(d,w)->end("")).show();}
     private void end(String reason){
+        dismissPrivacyUnlockDialog();
         remoteOrientation.end();
         if(backgroundSession!=null){BackgroundSession retained=backgroundSession;backgroundSession=null;retained.detach(this);retained.finish(reason);}
         boolean closeWindow=isInPictureInPictureMode();
@@ -658,11 +660,42 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             if(foreground&&preferences.getBoolean("networkConsent",false))remoteVersionCheck.hostInfo(info);
         }
     }
-    @Override public void privacyChanged(){if(controls!=null&&session!=null)controls.privacyScreen(session.privacyScreen);}
+    private void dismissPrivacyUnlockDialog() {
+        if (privacyUnlockDialog != null) { privacyUnlockDialog.dismiss(); privacyUnlockDialog = null; }
+    }
+    @Override public void privacyChanged() {
+        if (controls != null && session != null) controls.privacyScreen(session.privacyScreen);
+        if (!ready || session == null || !session.privacyScreen.unlockNotice) {
+            dismissPrivacyUnlockDialog(); return;
+        }
+        if (!foreground || pictureInPictureUi || isInPictureInPictureMode() || isFinishing()) return;
+        if (privacyUnlockDialog == null) {
+            releaseKeys();
+            if (controls != null) { controls.closeKeyboard(); controls.cancelMouseInput(); }
+            if (video != null) video.releaseMouse();
+            privacyUnlockDialog = new AlertDialog.Builder(this).setTitle("隐私屏已被解锁")
+                .setMessage("被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。")
+                .setNegativeButton("确认", (dialog, which) -> {
+                    if (session != null) session.privacyScreen.unlockNotice = false;
+                    dismissPrivacyUnlockDialog();
+                }).setPositiveButton("锁定", null).create();
+            privacyUnlockDialog.setCancelable(false);
+            privacyUnlockDialog.show();
+            privacyUnlockDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                if (session != null) session.lockPrivacy();
+            });
+        }
+        String feedback = session.privacyScreen.feedback(android.os.SystemClock.elapsedRealtime());
+        privacyUnlockDialog.setMessage("被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。"
+            + (feedback.isEmpty() ? "" : "\n\n" + feedback));
+        privacyUnlockDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(
+            session.privacyScreen.canLock(android.os.SystemClock.elapsedRealtime()));
+    }
     @Override public void videoSize(int width,int height){videoWidth=width;videoHeight=height;if(video!=null)video.videoSize(width,height);if(controls!=null)controls.videoSize(width,height);pictureInPicture.videoSize(width,height);updatePictureInPicture();}
     @Override public void clipboard(String value){remoteClipboard=value;}
     @Override public void statistics(RemoteNetworkStatistics.Snapshot value){if(controls!=null)controls.statistics(value);if(value.fps>0)capturePreviewIfNeeded();}
     @Override public boolean dispatchKeyEvent(KeyEvent event){
+        if (privacyUnlockDialog != null) return super.dispatchKeyEvent(event);
         int code=KeyMap.windowsCode(event.getKeyCode());View focus=getCurrentFocus();
         boolean remoteEditor=focus instanceof RemoteKeyboardInput;
         boolean desktopKey=event.isCtrlPressed()||event.isAltPressed()||event.isMetaPressed()||pressed.contains(code)
@@ -790,7 +823,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     // onStart marks a new visit; focus/resume callbacks must not reopen a refused notice.
     @Override protected void onPause(){releaseKeys();if(controls!=null)controls.cancelMouseInput();if(video!=null)video.releaseMouse();super.onPause();}
     @Override protected void onStart(){super.onStart();foreground=true;restoreBackgroundSession();appUpdates.setEnabled(preferences.getBoolean("networkConsent",false));if(!preferences.getBoolean("networkConsent",false))consent(this::renderSignaling);ensureSignaling();showConnectionMessage();}
-    @Override protected void onStop(){if(controls!=null)controls.closeKeyboard();foreground=false;appUpdates.setEnabled(false);if(privacyDialog!=null)privacyDialog.dismiss();pageHost.finish();
+    @Override protected void onStop(){dismissPrivacyUnlockDialog();if(controls!=null)controls.closeKeyboard();foreground=false;appUpdates.setEnabled(false);if(privacyDialog!=null)privacyDialog.dismiss();pageHost.finish();
         if(connectionDialog!=null)connectionDialog.dismiss();
         // Closing native PiP is an explicit end, not a request for invisible
         // fallback. An unavailable/failed PiP can hand its live session off.
@@ -801,7 +834,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             resetRemoteVersionCheck();if(disconnectDialog!=null)disconnectDialog.dismiss();
         }else if(documentSession==null||documentSession!=session||isFinishing()){if(session!=null)end(isFinishing()?"":"远程窗口已关闭，或后台保活未能启动，会话已结束");stopSignaling();}
         super.onStop();}
-    @Override protected void onDestroy(){mainHandler.removeCallbacks(documentTimeout);documentSession=null;documentToSave=null;appUpdates.setEnabled(false);pageHost.finish();resetRemoteVersionCheck();cancelVideoSettingsTimeout();previews.removeListener(previewChanged);if(privacyDialog!=null)privacyDialog.dismiss();if(previewDialog!=null)previewDialog.dismiss();announcementInbox.close();if(disconnectDialog!=null)disconnectDialog.dismiss();if(passwordDialog!=null)passwordDialog.dismiss();if(progressDialog!=null)progressDialog.dismiss();
+    @Override protected void onDestroy(){dismissPrivacyUnlockDialog();mainHandler.removeCallbacks(documentTimeout);documentSession=null;documentToSave=null;appUpdates.setEnabled(false);pageHost.finish();resetRemoteVersionCheck();cancelVideoSettingsTimeout();previews.removeListener(previewChanged);if(privacyDialog!=null)privacyDialog.dismiss();if(previewDialog!=null)previewDialog.dismiss();announcementInbox.close();if(disconnectDialog!=null)disconnectDialog.dismiss();if(passwordDialog!=null)passwordDialog.dismiss();if(progressDialog!=null)progressDialog.dismiss();
         if(connectionDialog!=null)connectionDialog.dismiss();
         boolean retained=!isFinishing()&&backgroundSession!=null&&!backgroundSession.ended&&RemoteSessionService.current()==backgroundSession;
         if(backgroundSession!=null)backgroundSession.detach(this);

@@ -23,7 +23,8 @@ class PrivacyController {
   PrivacyController& operator=(const PrivacyController&) = delete;
   PrivacyStatus Snapshot() const;
   void SetText(const PrivacyScreenText& text);
-  void Enable(bool block_input);
+  void Enable(bool block_input, bool wait_for_recovery = false);
+  void RejectCommand(const std::string& reason);
   void EnableOnConnection();
   // Preserve automatic session intent while Windows shows another desktop.
   void SuspendForDesktop();
@@ -50,6 +51,7 @@ class PrivacyController {
   std::unique_ptr<PrivacyBackend> backend_;
   PrivacyStatus status_{};
   PrivacyScreenText text_;
+  bool text_pending_ = false;
   std::atomic<bool> engaged_{false};
   bool quit_ = false;
   bool enable_pending_ = false;

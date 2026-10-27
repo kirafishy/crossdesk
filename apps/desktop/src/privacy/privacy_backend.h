@@ -14,6 +14,8 @@ namespace crossdesk {
 
 struct PrivacyScreenText {
   std::string unlock_hint = "To turn off the privacy screen, press";
+  std::string locked_hint = "Privacy screen is on. Local unlocking is disabled.";
+  bool allow_local_unlock = true;
 };
 
 struct PrivacyCapabilities {
@@ -38,6 +40,8 @@ class PrivacyBackend {
   virtual PrivacyCapabilities Query() = 0;
   virtual bool Enable(bool block_input, const PrivacyScreenText& text,
                       std::string& error) = 0;
+  // Update a live cover and its local shortcut policy without exposing the desktop.
+  virtual void UpdateText(const PrivacyScreenText& text) {}
   virtual void Recover() = 0;
   virtual bool IsRecovered() const = 0;
   virtual bool RecoveryPending() const { return false; }

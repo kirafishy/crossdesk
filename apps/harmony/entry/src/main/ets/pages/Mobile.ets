@@ -91,6 +91,7 @@ struct Mobile {
     return saved;
   }
   private dismissModal(): void {
+    if (this.state.modal === 'privacyUnlock') this.controller?.dismissPrivacyUnlock();
     if (this.state.modal === 'password') { this.state.password = ''; this.showPassword = false; }
     this.previewToggle = this.state.previews; this.state.modal = '';
   }
@@ -537,6 +538,21 @@ struct Mobile {
       }.padding({ left: 26, right: 26, top: 24, bottom: 20 }).width('100%')
       this.Rule()
       this.Action('取消连接', () => this.controller?.end(''), true)
+    } else if (this.state.modal === 'privacyUnlock') {
+      Column({ space: 12 }) {
+        Text('隐私屏已被解锁').fontSize(20).fontWeight(600).fontColor(MobileTheme.ink)
+        Text('被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。')
+          .fontSize(14).lineHeight(21).fontColor(MobileTheme.secondary).width('100%')
+        if (this.state.privacyFeedback) { Text(this.state.privacyFeedback).fontSize(12).fontColor(MobileTheme.secondary) }
+      }.padding(24).width('100%')
+      this.Rule()
+      Row() {
+        Button('确认', { type: ButtonType.Normal }).fontSize(16).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
+          .backgroundColor(Color.White).onClick(() => this.dismissModal())
+        Divider().vertical(true).height(50).strokeWidth(0.5).color(MobileTheme.line)
+        Button('锁定', { type: ButtonType.Normal }).fontSize(16).fontWeight(600).fontColor(MobileTheme.blue).height(50).layoutWeight(1)
+          .backgroundColor(Color.White).enabled(this.state.privacyCanLock).onClick(() => this.controller?.lockPrivacy())
+      }.width('100%')
     } else if (this.state.modal === 'clipboard') {
       Column({ space: 16 }) {
         this.SheetHeader('剪贴板')

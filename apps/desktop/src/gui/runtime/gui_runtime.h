@@ -162,6 +162,7 @@ class GuiRuntime : protected gui_detail::GuiState {
   DisconnectLockPolicy disconnect_lock_;
   std::mutex privacy_commands_mutex_;
   std::deque<std::pair<std::string, PrivacyCommand>> privacy_commands_;
+  bool privacy_settings_changed_ = false;
   uint32_t last_privacy_revision_ = 0;
   uint64_t last_privacy_status_tick_ = 0;
   ClipboardController clipboard_;

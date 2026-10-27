@@ -49,6 +49,7 @@ class ConfigCenter {
   int SetAutostart(bool enable_autostart);
   int SetDaemon(bool enable_daemon);
   int SetPrivacyScreen(bool enable_privacy_screen);
+  int SetPrivacyLocalUnlock(bool allowed);
   int SetLockOnDisconnect(bool enabled);
   int SetSaveRemotePreviews(bool enabled);
   int SetPortableServicePromptSuppressed(bool suppressed);
@@ -73,6 +74,7 @@ class ConfigCenter {
   bool IsEnableAutostart() const;
   bool IsEnableDaemon() const;
   bool IsEnablePrivacyScreen() const;
+  bool IsPrivacyLocalUnlockAllowed() const;
   bool IsLockOnDisconnect() const;
   bool IsSaveRemotePreviews() const;
   bool IsPortableServicePromptSuppressed() const;
@@ -105,6 +107,7 @@ class ConfigCenter {
   bool enable_autostart_ = false;
   bool enable_daemon_ = false;
   std::atomic<bool> enable_privacy_screen_{true};
+  std::atomic<bool> privacy_local_unlock_allowed_{true};
   std::atomic<bool> lock_on_disconnect_{true};
   std::atomic<bool> save_remote_previews_{true};
   bool portable_service_prompt_suppressed_ = false;

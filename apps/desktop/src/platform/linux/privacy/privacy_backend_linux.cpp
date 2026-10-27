@@ -63,10 +63,12 @@ class LinuxPrivacyBackend final : public PrivacyBackend {
                                         : "Checking Linux privacy support"};
   }
 
-  bool Enable(bool block_input, const PrivacyScreenText&,
+  bool Enable(bool block_input, const PrivacyScreenText& text,
               std::string& error) override {
     failure_.clear();
     emergency_ = false;
+    UpdateText(text);
+    if (!failure_.empty()) { error = failure_; return false; }
     if (!Send(block_input ? LinuxPrivacyCommand::enable_blocking
                           : LinuxPrivacyCommand::enable)) {
       error = failure_;
@@ -80,6 +82,11 @@ class LinuxPrivacyBackend final : public PrivacyBackend {
     return true;
   }
 
+  void UpdateText(const PrivacyScreenText& text) override {
+    if (socket_ >= 0 && !Send(text.allow_local_unlock ? LinuxPrivacyCommand::allow_local_unlock
+                                                    : LinuxPrivacyCommand::forbid_local_unlock))
+      failure_ = "Cannot update the local privacy unlock setting";
+  }
   void Recover() override {
     ReadReplies();
     if (recovered_) {

@@ -157,7 +157,7 @@ struct ServiceCommand {
 };
 
 enum class PrivacyState { unsupported, off, starting, on, stopping, failed };
-enum class PrivacyCommandFlag { query, enable, disable };
+enum class PrivacyCommandFlag { query, enable, disable, lock };
 struct PrivacyCommand {
   PrivacyCommandFlag flag;
   bool block_local_input;
@@ -171,6 +171,8 @@ struct PrivacyStatus {
   bool remote_paused;
   uint32_t revision;
   char reason[256];
+  // Monotonic event counter retained across status heartbeats and recovery.
+  uint32_t local_unlock_revision;
 };
 
 struct VideoSettings {

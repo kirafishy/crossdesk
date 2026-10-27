@@ -1504,6 +1504,7 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   main->set_save_remote_previews(config_center_->IsSaveRemotePreviews());
   main->set_privacy_on_connect_enabled(
       config_center_->IsEnablePrivacyScreen());
+  main->set_privacy_local_unlock_allowed(config_center_->IsPrivacyLocalUnlockAllowed());
   main->set_lock_on_disconnect_enabled(config_center_->IsLockOnDisconnect());
 #ifdef _WIN32
   main->set_capture_method_visible(true);
@@ -2155,9 +2156,9 @@ void GuiApplication::BindStreamCallbacks() {
     SendReliableDataFrame(props->peer_, message.c_str(), message.size(),
                           props->control_data_label_.c_str());
   });
-  stream->on_toggle_privacy([this] {
+  const auto send_privacy = [this](bool relock) {
     auto props = SelectedSession();
-    if (!props || !props->peer_ || !props->control_mouse_ ||
+    if (!props || !props->peer_ || (!relock && !props->control_mouse_) ||
         props->connection_status_.load() != ConnectionStatus::Connected) return;
     RemoteAction action{};
     action.type = ControlType::privacy_command;
@@ -2168,9 +2169,12 @@ void GuiApplication::BindStreamCallbacks() {
       const auto controls = GetPrivacyControlState(
           status, props->privacy_status_received_, props->privacy_command_pending_,
           now - props->privacy_status_tick_, now - props->privacy_command_tick_);
-      if (!props->privacy_desktop_available_ || !controls.can_toggle) return;
-      action.pc.flag = controls.active ? PrivacyCommandFlag::disable
-                                      : PrivacyCommandFlag::enable;
+      const bool can_lock = props->privacy_status_received_ && status.supported &&
+          now - props->privacy_status_tick_ <= 5000 &&
+          (!props->privacy_command_pending_ || now - props->privacy_command_tick_ >= 15000);
+      if (!props->privacy_desktop_available_ || !(relock ? can_lock : controls.can_toggle)) return;
+      action.pc.flag = relock ? PrivacyCommandFlag::lock
+          : controls.active ? PrivacyCommandFlag::disable : PrivacyCommandFlag::enable;
       action.pc.block_local_input = true;
       props->privacy_command_pending_ = true;
       props->privacy_command_tick_ = now;
@@ -2181,8 +2185,16 @@ void GuiApplication::BindStreamCallbacks() {
                               props->control_data_label_.c_str()) != 0) {
       std::lock_guard lock(props->privacy_status_mutex_);
       props->privacy_command_pending_ = false;
-      props->privacy_status_received_ = false;
+      if (!relock) props->privacy_status_received_ = false;
       LOG_WARN("Privacy command send failed, remote_id={}", props->remote_id_);
+    }
+  };
+  stream->on_toggle_privacy([send_privacy] { send_privacy(false); });
+  stream->on_lock_privacy([send_privacy] { send_privacy(true); });
+  stream->on_dismiss_privacy_unlock([this] {
+    if (auto props = SelectedSession()) {
+      std::lock_guard lock(props->privacy_status_mutex_);
+      props->privacy_unlock_notice_ = false;
     }
   });
   stream->on_toggle_mouse_control([this] {
@@ -2590,6 +2602,11 @@ void GuiApplication::Tick() {
   HandlePendingPresenceProbe();
   HandlePresenceProbeTimeout();
   HandlePrivacy();
+  if (privacy_settings_changed_) {
+    for (const auto& window : {ui_->main, ui_->wall})
+      window->set_privacy_local_unlock_allowed(config_center_->IsPrivacyLocalUnlockAllowed());
+    privacy_settings_changed_ = false;
+  }
   HandleScreenLock();
   HandleWindowsServiceIntegration();
 #if (defined(__linux__) && !defined(__OHOS__)) && !defined(__APPLE__)
@@ -3569,9 +3586,9 @@ void GuiApplication::SyncXWaylandWindowActivation() {
 #endif
 
 void GuiApplication::SetStreamKeyboardFocus(bool focused) {
-  // The local upgrade dialog owns input even while the native window is active.
+  // Local dialogs own input even while the native window is active.
   if (focused && ui_ && ui_->stream &&
-      (*ui_->stream)->get_remote_update_visible()) {
+      (*ui_->stream)->get_modal_visible()) {
     focused = false;
   }
   if (focus_on_stream_window_ == focused) {
@@ -3826,6 +3843,11 @@ void GuiApplication::SyncStreamWindow() {
         now - props->privacy_status_tick_, now - props->privacy_command_tick_);
     const bool connected =
         props->connection_status_.load() == ConnectionStatus::Connected;
+    (*ui_->stream)->set_privacy_unlock_visible(connected && props->privacy_unlock_notice_);
+    (*ui_->stream)->set_privacy_can_lock(connected && props->privacy_desktop_available_ &&
+        props->privacy_status_received_ && status.supported &&
+        now - props->privacy_status_tick_ <= 5000 &&
+        (!props->privacy_command_pending_ || now - props->privacy_command_tick_ >= 15000));
     (*ui_->stream)->set_privacy_active(controls.active);
     (*ui_->stream)->set_privacy_off(connected && controls.off);
     (*ui_->stream)->set_privacy_unsupported(controls.unsupported);
@@ -4580,6 +4602,14 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
     return false;
   }
 #endif
+  if (config_center_->SetPrivacyLocalUnlock(main->get_privacy_local_unlock_allowed()) != 0) {
+    if (wall_changed) ui_->gallery.Save(ui_->gallery_path);
+    main->set_settings_save_error(UiText(
+        localization_language_index_ == 0 ? "无法保存隐私屏解锁设置，请重试。"
+        : localization_language_index_ == 2 ? "Не удалось сохранить настройку разблокировки. Повторите попытку."
+                                            : "Could not save privacy unlock settings. Try again."));
+    return false;
+  }
   language_button_value_ =
       localization::detail::ClampLanguageIndex(main->get_language_index());
   video_encode_format_button_value_ = std::clamp(main->get_codec_index(), 0, 1);
@@ -4594,7 +4624,9 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   localization_language_index_ = language_button_value_;
   config_center_->SetLanguage(localization_language_);
   privacy_.SetText(
-      {localization::privacy_screen_unlock_hint[localization_language_index_]});
+      {localization::privacy_screen_unlock_hint[localization_language_index_],
+       localization::privacy_screen_locked_hint[localization_language_index_],
+       config_center_->IsPrivacyLocalUnlockAllowed()});
   config_center_->SetVideoEncodeFormat(
       static_cast<ConfigCenter::VIDEO_ENCODE_FORMAT>(
           video_encode_format_button_value_));
@@ -4667,7 +4699,9 @@ void GuiApplication::ApplySettingsFromConfig(bool reconnect) {
   enable_self_hosted_ = config_center_->IsSelfHosted();
   enable_autostart_ = config_center_->IsEnableAutostart();
   enable_daemon_ = config_center_->IsEnableDaemon();
-  privacy_.SetText({localization::privacy_screen_unlock_hint[localization_language_index_]});
+  privacy_.SetText({localization::privacy_screen_unlock_hint[localization_language_index_],
+       localization::privacy_screen_locked_hint[localization_language_index_],
+       config_center_->IsPrivacyLocalUnlockAllowed()});
   const auto path = config_center_->GetFileTransferSavePath();
   std::snprintf(file_transfer_save_path_buf_, sizeof(file_transfer_save_path_buf_), "%s", path.c_str());
   const auto host = config_center_->GetSignalServerHost();

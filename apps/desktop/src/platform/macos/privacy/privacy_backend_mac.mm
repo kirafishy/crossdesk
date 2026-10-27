@@ -200,6 +200,7 @@ class MacPrivacyBackend final : public PrivacyBackend {
     const auto caps = Query();
     if (!caps.overlay) { error = caps.reason; return false; }
     block_input_ = block_input;
+    allow_local_unlock_ = text.allow_local_unlock;
     emergency_ = false;
     tap_failed_ = false;
     CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp) |
@@ -239,7 +240,8 @@ class MacPrivacyBackend final : public PrivacyBackend {
           m.frame = screen.frame;
           NSView* content = CreateMacPrivacyCoverView(
               NSMakeRect(0, 0, m.frame.size.width, m.frame.size.height),
-              [NSString stringWithUTF8String:text.unlock_hint.c_str()]);
+              [NSString stringWithUTF8String:(text.allow_local_unlock ? text.unlock_hint : text.locked_hint).c_str()],
+              text.allow_local_unlock);
           if (!content) {
             state->failure = "Could not load the CrossDesk privacy screen logo";
             break;
@@ -259,6 +261,17 @@ class MacPrivacyBackend final : public PrivacyBackend {
       }
     });
     return true;
+  }
+  void UpdateText(const PrivacyScreenText& text) override {
+    allow_local_unlock_ = text.allow_local_unlock;
+    auto state = state_;
+    OnMain([state, text] {
+      std::lock_guard lock(state->mutex);
+      for (const auto& monitor : state->monitors)
+        UpdateMacPrivacyCoverView(monitor.cover.contentView,
+            [NSString stringWithUTF8String:(text.allow_local_unlock ? text.unlock_hint : text.locked_hint).c_str()],
+            text.allow_local_unlock);
+    });
   }
   void Recover() override {
     if (tap_) { CGEventTapEnable(tap_, false); CFMachPortInvalidate(tap_); }
@@ -359,7 +372,7 @@ class MacPrivacyBackend final : public PrivacyBackend {
         CGEventGetIntegerValueField(event, kCGEventSourceUnixProcessID) == getpid()) return event;
     const auto flags = CGEventGetFlags(event);
     const auto chord = kCGEventFlagMaskControl | kCGEventFlagMaskAlternate | kCGEventFlagMaskShift;
-    if (type == kCGEventKeyDown && (flags & chord) == chord &&
+    if (self->allow_local_unlock_ && type == kCGEventKeyDown && (flags & chord) == chord &&
         CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 53) {
       self->emergency_ = true;
       return nullptr;
@@ -372,6 +385,7 @@ class MacPrivacyBackend final : public PrivacyBackend {
   CFMachPortRef tap_ = nullptr;
   CFRunLoopSourceRef tap_source_ = nullptr;
   bool block_input_ = false;
+  bool allow_local_unlock_ = true;
   bool emergency_ = false;
   bool tap_failed_ = false;
 };

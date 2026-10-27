@@ -284,13 +284,15 @@ final class NativeSession implements AutoCloseable {
         if (type == 2 && player != null) player.setEnabled(value != 0);
         execute(() -> { if (connected){nControl(handle, type, value);if(type==4)networkStatistics.resetVideo();} });
     }
-    void togglePrivacy() {
+    void lockPrivacy() { sendPrivacy(true); }
+    void togglePrivacy() { sendPrivacy(false); }
+    private void sendPrivacy(boolean lock) {
         if(closed||!connected)return;
         boolean enable=!privacyScreen.active();
-        long request=privacyScreen.begin(android.os.SystemClock.elapsedRealtime());
+        long request=privacyScreen.begin(android.os.SystemClock.elapsedRealtime(),lock);
         if(request<0)return;
         listener.privacyChanged();
-        execute(()->{if(connected&&!nPrivacy(handle,enable?1:2,true))ui(()->{
+        execute(()->{if(connected&&!nPrivacy(handle,lock?3:enable?1:2,true))ui(()->{
             privacyScreen.failed(request);listener.privacyChanged();
         });});
     }

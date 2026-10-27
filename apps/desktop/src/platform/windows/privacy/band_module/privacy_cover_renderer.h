@@ -13,7 +13,7 @@ namespace crossdesk {
 
 // Paints the local, opaque cover. The caller owns the HWND and its DPI context.
 bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
-                      const wchar_t* unlock_hint);
+                      const wchar_t* unlock_hint, bool allow_local_unlock = true);
 
 }  // namespace crossdesk
 

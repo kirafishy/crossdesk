@@ -181,18 +181,27 @@ struct RemoteSessionView: View {
             floatingStatusControls
                 .zIndex(30)
 
+            if session.isConnected && session.privacyScreen.unlockNotice {
+                privacyUnlockOverlay.zIndex(60)
+            }
             if disconnectConfirmationVisible {
                 disconnectConfirmationOverlay
                     .zIndex(50)
             }
         }
         .alert("升级提示", isPresented: Binding(
-            get: { session.remoteUpdateMessage != nil },
-            set: { if !$0 { session.dismissRemoteUpdate() } }
+            get: { !session.privacyScreen.unlockNotice && session.remoteUpdateMessage != nil },
+            set: { if !$0 && !session.privacyScreen.unlockNotice { session.dismissRemoteUpdate() } }
         )) {
             Button("知道了", role: .cancel) { session.dismissRemoteUpdate() }
         } message: {
             Text(session.remoteUpdateMessage ?? "")
+        }
+        .onChange(of: session.privacyScreen.unlockNotice) { visible in
+            if visible {
+                mouseInput.releaseAll()
+                keyboardInputVisible = false
+            }
         }
         .onAppear {
             mouseInput.send = { x, y, flag, wheel in
@@ -266,6 +275,35 @@ struct RemoteSessionView: View {
                 session.fileImportFailed()
             }
         }
+    }
+
+    private var privacyUnlockOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.28).ignoresSafeArea().contentShape(Rectangle()).onTapGesture { }
+            VStack(spacing: 0) {
+                VStack(spacing: 12) {
+                    Text("隐私屏已被解锁").font(.headline)
+                    Text("被控端已通过组合键解除隐私屏。点击“锁定”将重新开启隐私屏，并禁止本机使用组合键解锁。")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                    let feedback = session.privacyScreen.feedback(at: session.privacyClock)
+                    if !feedback.isEmpty { Text(feedback).font(.caption).foregroundStyle(.secondary) }
+                }.padding(24)
+                Divider()
+                HStack(spacing: 0) {
+                    Button("确认") { session.privacyScreen.unlockNotice = false }
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                    Divider().frame(height: 48)
+                    Button("锁定") { session.lockPrivacyScreen() }
+                        .fontWeight(.semibold).frame(maxWidth: .infinity, minHeight: 48)
+                        .disabled(!session.privacyScreen.canLock(at: session.privacyClock))
+                }
+            }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: .black.opacity(0.2), radius: 18, y: 7)
+            .frame(maxWidth: 380).padding(20)
+        }
+        .accessibilityAddTraits(.isModal)
     }
 
     private var disconnectConfirmationOverlay: some View {

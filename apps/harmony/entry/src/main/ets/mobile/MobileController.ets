@@ -81,6 +81,7 @@ export class MobileState {
   privacyEnabled: boolean = false;
   privacyActive: boolean = false;
   privacyCanToggle: boolean = false;
+  privacyCanLock: boolean = false;
   privacyVisible: boolean = true;
   networkTime: number = 0;
   unread: number = 0;
@@ -266,9 +267,9 @@ export class MobileController {
     if (this.foreground && this.state.consent) this.checkLocal();
   }
   release(): void { this.releaseInput(); this.send({ op: 'release' }); }
-  pointer(x: number, y: number, flag: number, scroll: number): void { this.send({ op: 'pointer', x: x, y: y, flag: flag, scroll: scroll }); }
-  physicalKey(code: number, down: boolean): void { this.send({ op: 'key', code: code, down: down }); }
-  key(code: number, down: boolean): void { this.send({ op: 'virtualKey', code: code, down: down }); }
+  pointer(x: number, y: number, flag: number, scroll: number): void { if (this.state.modal === 'privacyUnlock') return; this.send({ op: 'pointer', x: x, y: y, flag: flag, scroll: scroll }); }
+  physicalKey(code: number, down: boolean): void { if (this.state.modal === 'privacyUnlock') return; this.send({ op: 'key', code: code, down: down }); }
+  key(code: number, down: boolean): void { if (this.state.modal === 'privacyUnlock') return; this.send({ op: 'virtualKey', code: code, down: down }); }
   chord(code: number, modifiers: number[] = []): void {
     modifiers.forEach((key: number) => this.key(key, true)); this.key(code, true); this.key(code, false);
     modifiers.slice().reverse().forEach((key: number) => this.key(key, false));
@@ -352,11 +353,17 @@ export class MobileController {
       this.state.documentTitle = title; this.state.documentBack = back; this.state.page = 'document'; this.state.modal = '';
     } catch { this.toast('无法读取文档'); }
   }
-  togglePrivacy(): void {
+  dismissPrivacyUnlock(): void {
+    this.privacyScreen.unlockNotice = false;
+    if (this.state.modal === 'privacyUnlock') this.state.modal = '';
+  }
+  lockPrivacy(): void { this.sendPrivacy(true); }
+  togglePrivacy(): void { this.sendPrivacy(false); }
+  private sendPrivacy(lock: boolean): void {
     if (!this.state.ready || !this.state.consent) return;
-    const enable = !this.privacyScreen.active(), request = this.privacyScreen.begin(this.now());
+    const enable = !this.privacyScreen.active(), request = this.privacyScreen.begin(this.now(), lock);
     if (request < 0) return;
-    this.send({ op: 'privacy', flag: enable ? 1 : 2, request: request,
+    this.send({ op: 'privacy', flag: lock ? 3 : enable ? 1 : 2, request: request,
       blockLocalInput: true });
     this.syncPrivacy();
   }
@@ -365,6 +372,13 @@ export class MobileController {
     this.state.privacyStatus = this.privacyScreen.status(now); this.state.privacyFeedback = this.privacyScreen.feedback(now);
     this.state.privacyButtonTitle = this.privacyScreen.buttonTitle(now);
     this.state.privacyVisible = this.privacyScreen.desktopAvailable;
+    this.state.privacyCanLock = this.privacyScreen.canLock(now);
+    if (this.foreground && this.state.ready && this.privacyScreen.unlockNotice && !this.state.modal) {
+      this.release();
+      this.state.modal = 'privacyUnlock';
+    } else if (!this.privacyScreen.unlockNotice && this.state.modal === 'privacyUnlock') {
+      this.state.modal = '';
+    }
     this.state.privacyEnabled = this.privacyScreen.enabled(now);
     this.state.privacyActive = this.privacyScreen.active(); this.state.privacyCanToggle = this.privacyScreen.canToggle(now);
   }

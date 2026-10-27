@@ -43,7 +43,11 @@ PrivacyStatus PrivacyController::Snapshot() const {
 }
 void PrivacyController::SetText(const PrivacyScreenText& text) {
   std::lock_guard lock(mutex_);
+  if (text_.unlock_hint == text.unlock_hint && text_.locked_hint == text.locked_hint &&
+      text_.allow_local_unlock == text.allow_local_unlock) return;
   text_ = text;
+  text_pending_ = true;
+  WakeLocked();
 }
 void PrivacyController::SetState(PrivacyState state, const std::string& reason) {
   status_.state = state;
@@ -54,9 +58,28 @@ void PrivacyController::SetState(PrivacyState state, const std::string& reason) 
   LOG_INFO("Privacy: state={}, overlay={}, input_blocked={}, reason={}",
            static_cast<int>(state), status_.overlay_active, status_.input_blocked, reason);
 }
-void PrivacyController::Enable(bool block_input) {
+void PrivacyController::RejectCommand(const std::string& reason) {
   std::lock_guard lock(mutex_);
-  if (quit_ || engaged_.load() || disable_pending_) return;
+  if (disable_pending_) {
+    failure_ = reason;
+    SetState(PrivacyState::failed, reason);
+  } else if (engaged_.load()) {
+    // A rejected command must not remove an already working cover.
+    SetState(status_.state, reason);
+  } else {
+    SetState(PrivacyState::failed, reason);
+  }
+}
+void PrivacyController::Enable(bool block_input, bool wait_for_recovery) {
+  std::lock_guard lock(mutex_);
+  if (quit_) return;
+  if (engaged_.load() && !disable_pending_) {
+    // Another controller may have restored privacy before this lock arrived.
+    // Acknowledge it so this controller does not wait for a nonexistent transition.
+    if (wait_for_recovery) SetState(status_.state, status_.reason);
+    return;
+  }
+  if (disable_pending_ && !wait_for_recovery) return;
   if (!status_.supported || (block_input && !status_.input_block_supported)) {
     SetState(PrivacyState::unsupported, "Privacy screen is unavailable");
     return;
@@ -227,9 +250,17 @@ void PrivacyController::Run(Factory factory) {
           }
         }
       }
+      if (text_pending_ && backend_) {
+        const auto text = text_;
+        text_pending_ = false;
+        lock.unlock();
+        backend_->UpdateText(text);
+        lock.lock();
+      }
       const auto health = backend_ ? backend_->Poll() : PrivacyHealth{};
       if (engaged_.load() && !disable_pending_) {
-        if (health.emergency_exit) {
+        if (health.emergency_exit && text_.allow_local_unlock) {
+          ++status_.local_unlock_revision;
           automatic_enable_ = false;
           resume_after_unlock_ = false;
           failure_.clear();

@@ -14,7 +14,8 @@
 namespace crossdesk {
 
 constexpr uint32_t kPrivacyBandMagic = 0x43534231;
-constexpr uint32_t kPrivacyBandVersion = 3;
+constexpr uint32_t kPrivacyBandVersion = 4;
+constexpr UINT kPrivacyTextChanged = WM_APP + 72;
 constexpr DWORD kPrivacyWindowBand = 18;  // ZBID_ABOVELOCK_UX, current desktop.
 constexpr size_t kPrivacyMaxMonitors = 64;
 constexpr wchar_t kPrivacyBandBootstrap[] = L"CROSSDESK_PRIVACY_BAND_BOOTSTRAP";
@@ -40,6 +41,8 @@ struct PrivacyBandShared {
   alignas(8) volatile LONG64 heartbeat = 0;
   wchar_t operation[128]{};
   wchar_t unlock_hint[128]{};
+  wchar_t locked_hint[128]{};
+  volatile LONG allow_local_unlock = 1;
   uint32_t count = 0;
   PrivacyBandWindow windows[kPrivacyMaxMonitors]{};
 };

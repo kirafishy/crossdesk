@@ -37,7 +37,7 @@ bool Select(HDC dc, HGDIOBJ object) {
 }  // namespace
 
 bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
-                      const wchar_t* unlock_hint) {
+                      const wchar_t* unlock_hint, bool allow_local_unlock) {
   if (!FillRect(dc, &rect, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH))))
     return false;
   const int width = rect.right - rect.left;
@@ -68,6 +68,7 @@ bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
   }};
   constexpr UINT flags = DT_LEFT | DT_WORDBREAK | DT_NOPREFIX;
   for (size_t i = 0; i < lines.size(); ++i) {
+    if (i == 1 && !allow_local_unlock) continue;
     auto& line = lines[i];
     resources.fonts[i] =
         CreateFontW(-px(line.size), 0, 0, 0, line.weight, FALSE, FALSE, FALSE,
@@ -81,7 +82,7 @@ bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
   }
   const int content_height =
       static_cast<int>(lines[0].bounds.bottom + lines[1].bounds.bottom) +
-      px(12);
+      (allow_local_unlock ? px(12) : 0);
   // Match the icon width to the name; each side keeps its own height.
   const int brand_gap = px(6);
   const int brand_width = static_cast<int>(lines[kBrandLine].bounds.right);
@@ -110,6 +111,7 @@ bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
                  DT_CENTER | DT_SINGLELINE | DT_NOPREFIX))
     return false;
   for (size_t i = 0; i < kInstructionLines; ++i) {
+    if (i == 1 && !allow_local_unlock) continue;
     const auto& line = lines[i];
     if (!Select(dc, resources.fonts[i])) return false;
     RECT bounds{left, top, left + text_width, top + line.bounds.bottom};

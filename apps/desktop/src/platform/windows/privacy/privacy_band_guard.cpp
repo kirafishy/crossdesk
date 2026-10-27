@@ -153,6 +153,11 @@ bool PrivacyBandGuard::Start(const PrivacyScreenText& text,
                            text.unlock_hint.c_str(), -1, shared_->unlock_hint,
                            static_cast<int>(std::size(shared_->unlock_hint))))
     return Failed("Encode privacy screen text", error);
+  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                           text.locked_hint.c_str(), -1, shared_->locked_hint,
+                           static_cast<int>(std::size(shared_->locked_hint))))
+    return Failed("Encode locked privacy screen text", error);
+  shared_->allow_local_unlock = text.allow_local_unlock;
   shared_->parent_pid = GetCurrentProcessId();
   HANDLE handles[] = {parent.value, stop_, ready_, mapping_};
   std::wstring bootstrap;
@@ -297,6 +302,16 @@ bool PrivacyBandGuard::Windows(std::vector<PrivacyBandWindow>& windows,
     }
   }
   return retry();
+}
+
+void PrivacyBandGuard::SetLocalUnlockAllowed(bool allowed) {
+  if (!shared_ || InterlockedExchange(&shared_->allow_local_unlock, allowed) == allowed) return;
+  std::vector<PrivacyBandWindow> windows;
+  std::string error;
+  if (Windows(windows, error))
+    for (const auto& window : windows)
+      PostMessageW(reinterpret_cast<HWND>(static_cast<uintptr_t>(window.hwnd)),
+                   kPrivacyTextChanged, 0, 0);
 }
 
 bool PrivacyBandGuard::Stop(std::string& error) {

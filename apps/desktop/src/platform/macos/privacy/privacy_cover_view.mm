@@ -52,6 +52,7 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
 @interface CrossDeskPrivacyCoverView : NSView
 @property(nonatomic, strong) NSImage* logo;
 @property(nonatomic, copy) NSString* unlockHint;
+@property(nonatomic) BOOL allowLocalUnlock;
 @end
 
 @implementation CrossDeskPrivacyCoverView
@@ -77,7 +78,7 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
   const CGFloat logo_size = std::ceil(brand.size.width);
   const CGFloat brand_height = TextHeight(brand, logo_size);
   const CGFloat hint_height = TextHeight(hint, text_width);
-  const CGFloat shortcut_height = TextHeight(shortcut, text_width);
+  const CGFloat shortcut_height = self.allowLocalUnlock ? TextHeight(shortcut, text_width) : 0;
   const CGFloat bottom = height - margin;
   const CGFloat logo_top = bottom - brand_height - 6 * scale - logo_size;
   [self.logo drawInRect:NSMakeRect(margin, logo_top, logo_size, logo_size)
@@ -86,19 +87,26 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
   [brand drawWithRect:NSMakeRect(margin, bottom - brand_height, logo_size, brand_height)
              options:kTextOptions];
   const CGFloat text_left = margin + logo_size + 24 * scale;
-  [hint drawWithRect:NSMakeRect(text_left, bottom - shortcut_height - 12 * scale - hint_height,
+  [hint drawWithRect:NSMakeRect(text_left, bottom - shortcut_height - (self.allowLocalUnlock ? 12 * scale : 0) - hint_height,
                                text_width, hint_height) options:kTextOptions];
-  [shortcut drawWithRect:NSMakeRect(text_left, bottom - shortcut_height,
+  if (self.allowLocalUnlock) [shortcut drawWithRect:NSMakeRect(text_left, bottom - shortcut_height,
                                    text_width, shortcut_height) options:kTextOptions];
 }
 @end
 
 namespace crossdesk {
-NSView* CreateMacPrivacyCoverView(NSRect frame, NSString* unlock_hint) {
+void UpdateMacPrivacyCoverView(NSView* view, NSString* hint, bool allow_local_unlock) {
+  auto* cover = static_cast<CrossDeskPrivacyCoverView*>(view);
+  cover.unlockHint = hint;
+  cover.allowLocalUnlock = allow_local_unlock;
+  cover.needsDisplay = YES;
+}
+NSView* CreateMacPrivacyCoverView(NSRect frame, NSString* unlock_hint, bool allow_local_unlock) {
   NSImage* logo = LoadPrivacyLogo();
   if (!logo) return nil;
   auto* view = [[CrossDeskPrivacyCoverView alloc] initWithFrame:frame];
   view.logo = logo;
+  view.allowLocalUnlock = allow_local_unlock;
   view.unlockHint = unlock_hint ?: @"To turn off the privacy screen, press";
   view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   return view;

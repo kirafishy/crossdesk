@@ -224,7 +224,8 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
           {"overlay_active", action.ps.overlay_active},
           {"input_blocked", action.ps.input_blocked},
           {"remote_paused", action.ps.remote_paused},
-          {"revision", action.ps.revision}, {"reason", action.ps.reason}};
+          {"revision", action.ps.revision}, {"reason", action.ps.reason},
+          {"local_unlock_revision", action.ps.local_unlock_revision}};
       break;
     case ControlType::host_infomation: {
       json displays = json::array();
@@ -409,7 +410,7 @@ bool RemoteAction::FromJson(const std::string& json_string,
       case ControlType::privacy_command: {
         const auto& command = object.at("privacy_command");
         const int flag = command.at("flag").get<int>();
-        if (flag < 0 || flag > 2) return false;
+        if (flag < 0 || flag > 3) return false;
         output.pc.flag = static_cast<PrivacyCommandFlag>(flag);
         output.pc.block_local_input = command.at("block_local_input").get<bool>();
         break;
@@ -427,6 +428,12 @@ bool RemoteAction::FromJson(const std::string& json_string,
         output.ps.input_blocked = status.at("input_blocked").get<bool>();
         output.ps.remote_paused = status.at("remote_paused").get<bool>();
         output.ps.revision = status.at("revision").get<uint32_t>();
+        output.ps.local_unlock_revision = 0;
+        if (const auto event = status.find("local_unlock_revision"); event != status.end()) {
+          if (!event->is_number_integer() || event->get<int64_t>() < 0 ||
+              event->get<uint64_t>() > UINT32_MAX) return false;
+          output.ps.local_unlock_revision = event->get<uint32_t>();
+        }
         std::memcpy(output.ps.reason, reason.c_str(), reason.size() + 1);
         // Never render a contradictory success from a malformed peer.
         if (output.ps.state == PrivacyState::on &&

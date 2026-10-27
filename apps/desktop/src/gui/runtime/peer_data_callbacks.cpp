@@ -316,6 +316,12 @@ void PeerEventHandler::OnReceiveDataBuffer(
       std::lock_guard lock(props->privacy_status_mutex_);
       if (!props->privacy_status_received_ ||
           static_cast<int32_t>(remote_action.ps.revision - props->privacy_status_.revision) >= 0) {
+        if (props->privacy_status_received_ &&
+            static_cast<int32_t>(remote_action.ps.local_unlock_revision -
+                                 props->privacy_status_.local_unlock_revision) > 0)
+          props->privacy_unlock_notice_ = true;
+        if (remote_action.ps.state == PrivacyState::on)
+          props->privacy_unlock_notice_ = false;
         props->privacy_status_ = remote_action.ps;
         props->privacy_status_received_ = true;
         props->privacy_status_tick_ = SDL_GetTicks();

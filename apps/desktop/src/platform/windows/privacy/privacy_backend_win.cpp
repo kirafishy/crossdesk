@@ -120,6 +120,7 @@ class WindowsPrivacyBackend final : public PrivacyBackend {
     }
     if (!Initialize(error)) return false;
     emergency_ = false;
+    allow_local_unlock_ = text.allow_local_unlock;
     health_error_.clear();
     if (!RegisterHotKey(sink_, kHotkeyId,
                         MOD_CONTROL | MOD_ALT | MOD_SHIFT | MOD_NOREPEAT,
@@ -149,6 +150,10 @@ class WindowsPrivacyBackend final : public PrivacyBackend {
     return true;
   }
 
+  void UpdateText(const PrivacyScreenText& text) override {
+    allow_local_unlock_ = text.allow_local_unlock;
+    band_guard_.SetLocalUnlockAllowed(text.allow_local_unlock);
+  }
   void Recover() override {
     for (auto& hook : window_events_) {
       if (UnhookWinEvent(hook))
@@ -475,7 +480,8 @@ class WindowsPrivacyBackend final : public PrivacyBackend {
     auto self = reinterpret_cast<WindowsPrivacyBackend*>(
         GetWindowLongPtrW(hwnd, GWLP_USERDATA));
     if (msg == WM_HOTKEY || msg == kEmergency) {
-      if (self && hwnd == self->sink_) self->emergency_ = true;
+      if (self && hwnd == self->sink_ && self->allow_local_unlock_)
+        self->emergency_ = true;
       return 0;
     }
     if (msg == WM_MOUSEACTIVATE) return MA_NOACTIVATE;
@@ -522,6 +528,7 @@ class WindowsPrivacyBackend final : public PrivacyBackend {
   std::unique_ptr<ScopedWindowsPhysicalCoordinates> dpi_scope_;
   bool registered_ = false;
   bool hotkey_ = false;
+  bool allow_local_unlock_ = true;
   bool emergency_ = false;
   bool layout_changed_ = false;
   bool topology_pending_ = false;

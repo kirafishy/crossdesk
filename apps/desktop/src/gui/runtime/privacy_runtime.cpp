@@ -10,6 +10,7 @@
 #include <shared_mutex>
 
 #include "rd_log.h"
+#include "localization.h"
 #include "runtime/gui_runtime.h"
 
 namespace crossdesk {
@@ -71,6 +72,14 @@ void GuiRuntime::QueuePrivacyCommand(const std::string& remote_id,
 }
 
 void GuiRuntime::HandlePrivacy() {
+  const auto sync_text = [this] {
+    const int language = localization::detail::ClampLanguageIndex(
+        static_cast<int>(config_center_->GetLanguage()));
+    privacy_.SetText({localization::privacy_screen_unlock_hint[language],
+                      localization::privacy_screen_locked_hint[language],
+                      config_center_->IsPrivacyLocalUnlockAllowed()});
+  };
+  sync_text();
   std::deque<std::pair<std::string, PrivacyCommand>> commands;
   {
     std::lock_guard lock(privacy_commands_mutex_);
@@ -87,6 +96,16 @@ void GuiRuntime::HandlePrivacy() {
     if (command.flag == PrivacyCommandFlag::enable) {
       if (privacy_sessions_.CanEnable())
         privacy_.Enable(command.block_local_input);
+    } else if (command.flag == PrivacyCommandFlag::lock) {
+      if (privacy_sessions_.CanEnable()) {
+        if (config_center_->SetPrivacyLocalUnlock(false) == 0) {
+          privacy_settings_changed_ = true;
+          sync_text();
+          privacy_.Enable(true, true);
+        } else {
+          privacy_.RejectCommand("Could not save the local privacy unlock setting; try again");
+        }
+      }
     } else if (command.flag == PrivacyCommandFlag::disable) {
       privacy_.Disable();
     }

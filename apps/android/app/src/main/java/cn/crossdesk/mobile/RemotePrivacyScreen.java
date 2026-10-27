@@ -6,6 +6,8 @@ import org.json.JSONObject;
 final class RemotePrivacyScreen {
     boolean desktopAvailable = true;
     boolean received, supported, inputBlockSupported, overlay, inputBlocked, remotePaused, pending;
+    boolean unlockNotice;
+    long localUnlockRevision;
     int state;
     long revision, requestRevision, requestId, receivedAt, requestedAt;
     String reason = "", failure = "";
@@ -28,6 +30,11 @@ final class RemotePrivacyScreen {
             if (next == 3 && (!support || !cover || paused)) return;
             boolean blockSupport = value.getBoolean("input_block_supported"), blocked = value.getBoolean("input_blocked");
             String detail = value.getString("reason");
+            long unlock = value.has("local_unlock_revision") ? value.getLong("local_unlock_revision") : 0;
+            if (unlock < 0 || unlock > 0xffffffffL) return;
+            if (received && (int)(unlock - localUnlockRevision) > 0) unlockNotice = true;
+            if (next == 3) unlockNotice = false;
+            localUnlockRevision = unlock;
             state = next; revision = rev; supported = support; overlay = cover; remotePaused = paused;
             inputBlockSupported = blockSupport; inputBlocked = blocked; reason = detail;
             received = true; receivedAt = now; failure = "";
@@ -53,9 +60,13 @@ final class RemotePrivacyScreen {
     boolean canToggle(long now) {
         return desktopAvailable && !pending && fresh(now) && state != 4 && (active() || supported && state == 1);
     }
-    long begin(long now) {
+    boolean canLock(long now) {
+        return desktopAvailable && !pending && fresh(now) && supported;
+    }
+    long begin(long now) { return begin(now, false); }
+    long begin(long now, boolean lock) {
         tick(now);
-        if (!canToggle(now)) return -1;
+        if (!(lock ? canLock(now) : canToggle(now))) return -1;
         pending = true; requestedAt = now; requestRevision = revision; failure = "";
         return ++requestId;
     }

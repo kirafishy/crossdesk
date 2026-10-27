@@ -1,13 +1,14 @@
 export interface PrivacyStatus {
   state: number; supported: boolean; input_block_supported: boolean;
   overlay_active: boolean; input_blocked: boolean; remote_paused: boolean;
-  revision: number; reason: string;
+  revision: number; reason: string; local_unlock_revision?: number;
 }
 
 export class RemotePrivacyScreen {
   desktopAvailable: boolean = true;
   snapshot?: PrivacyStatus;
   pending: boolean = false;
+  unlockNotice: boolean = false;
   requestId: number = 0;
   private requestRevision: number = 0;
   private receivedAt: number = 0;
@@ -26,6 +27,10 @@ export class RemotePrivacyScreen {
       typeof s.remote_paused !== 'boolean' || typeof s.reason !== 'string' || s.reason.includes('\0')) return;
     if (s.state === 3 && (!s.supported || !s.overlay_active || s.remote_paused)) return;
     if (this.snapshot && ((s.revision - this.snapshot.revision) | 0) < 0) return;
+    const unlock = s.local_unlock_revision ?? 0;
+    if (!Number.isInteger(unlock) || unlock < 0 || unlock > 0xffffffff) return;
+    if (this.snapshot && ((unlock - (this.snapshot.local_unlock_revision ?? 0)) | 0) > 0) this.unlockNotice = true;
+    if (s.state === 3) this.unlockNotice = false;
     this.snapshot = s; this.receivedAt = now; this.failure = '';
     if (this.pending && ((s.revision - this.requestRevision) | 0) > 0 && s.state !== 2 && s.state !== 4) this.pending = false;
   }
@@ -57,9 +62,12 @@ export class RemotePrivacyScreen {
     const s = this.snapshot;
     return this.desktopAvailable && s !== undefined && !this.pending && this.fresh(now) && s.state !== 4 && (this.active() || s.supported && s.state === 1);
   }
-  begin(now: number): number {
+  canLock(now: number): boolean {
+    return this.desktopAvailable && !this.pending && this.fresh(now) && this.snapshot?.supported === true;
+  }
+  begin(now: number, lock: boolean = false): number {
     this.tick(now);
-    if (!this.canToggle(now) || !this.snapshot) return -1;
+    if (!(lock ? this.canLock(now) : this.canToggle(now)) || !this.snapshot) return -1;
     this.pending = true; this.requestedAt = now; this.requestRevision = this.snapshot.revision; this.failure = '';
     this.requestId = (this.requestId + 1) >>> 0;
     return this.requestId;

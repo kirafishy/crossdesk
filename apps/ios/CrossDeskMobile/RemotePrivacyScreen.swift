@@ -9,11 +9,13 @@ struct RemotePrivacyStatus: Decodable {
     let remotePaused: Bool
     let revision: UInt32
     let reason: String
+    let localUnlockRevision: UInt32?
 }
 
 struct RemotePrivacyScreen {
     private(set) var desktopAvailable = true
     private(set) var snapshot: RemotePrivacyStatus?
+    var unlockNotice = false
     private(set) var pending = false
     private(set) var requestID: UInt32 = 0
     private var requestRevision: UInt32 = 0
@@ -64,14 +66,22 @@ struct RemotePrivacyScreen {
               !s.reason.contains("\0"),
               s.state != 3 || (s.supported && s.overlayActive && !s.remotePaused) else { return }
         if let previous = snapshot, Int32(bitPattern: s.revision &- previous.revision) < 0 { return }
+        if let previous = snapshot,
+           Int32(bitPattern: (s.localUnlockRevision ?? 0) &- (previous.localUnlockRevision ?? 0)) > 0 {
+            unlockNotice = true
+        }
+        if s.state == 3 { unlockNotice = false }
         snapshot = s; receivedAt = now; failure = ""
         if pending && Int32(bitPattern: s.revision &- requestRevision) > 0 && ![2, 4].contains(s.state) {
             pending = false
         }
     }
-    mutating func begin(at now: TimeInterval) -> UInt32? {
+    func canLock(at now: TimeInterval) -> Bool {
+        desktopAvailable && !pending && fresh(at: now) && snapshot?.supported == true
+    }
+    mutating func begin(at now: TimeInterval, lock: Bool = false) -> UInt32? {
         tick(at: now)
-        guard canToggle(at: now), let s = snapshot else { return nil }
+        guard (lock ? canLock(at: now) : canToggle(at: now)), let s = snapshot else { return nil }
         pending = true; requestedAt = now; requestRevision = s.revision; failure = ""
         requestID &+= 1
         return requestID

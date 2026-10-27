@@ -14,7 +14,7 @@
 
 namespace crossdesk::mobile_controller {
 inline std::string PrivacyMessage(int flag, bool block_local_input) {
-  if (flag < 0 || flag > 2) return {};
+  if (flag < 0 || flag > 3) return {};
   RemoteAction action{};
   action.type = privacy_command;
   action.pc = {static_cast<PrivacyCommandFlag>(flag), block_local_input};

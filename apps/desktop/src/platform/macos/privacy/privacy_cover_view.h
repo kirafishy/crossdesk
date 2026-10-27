@@ -11,7 +11,8 @@
 
 namespace crossdesk {
 // Returns nil if the CrossDesk icon resource cannot be loaded.
-NSView* CreateMacPrivacyCoverView(NSRect frame, NSString* unlock_hint);
+NSView* CreateMacPrivacyCoverView(NSRect frame, NSString* hint, bool allow_local_unlock = true);
+void UpdateMacPrivacyCoverView(NSView* view, NSString* hint, bool allow_local_unlock);
 }
 
 #endif

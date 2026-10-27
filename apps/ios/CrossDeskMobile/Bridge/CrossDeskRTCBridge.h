@@ -195,6 +195,7 @@ typedef struct {
 - (void)sendFileAtURL:(NSURL *)fileURL;
 - (void)sendSecureAttentionSequence;
 - (void)sendPrivacyCommand:(BOOL)enable
+                      lock:(BOOL)lock
            blockLocalInput:(BOOL)blockLocalInput
                  requestID:(uint32_t)requestID;
 

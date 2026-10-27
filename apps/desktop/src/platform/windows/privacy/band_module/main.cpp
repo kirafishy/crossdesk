@@ -190,6 +190,10 @@ class Windows {
       return TRUE;
     }
     if (message == WM_CLOSE) return 0;
+    if (message == kPrivacyTextChanged) {
+      InvalidateRect(hwnd, nullptr, TRUE);
+      return 0;
+    }
     if ((message == WM_DISPLAYCHANGE || message == WM_DPICHANGED) && self) {
       self->changed = true;
       InvalidateRect(hwnd, nullptr, TRUE);
@@ -200,8 +204,12 @@ class Windows {
       HDC dc = BeginPaint(hwnd, &paint);
       RECT rect{};
       GetClientRect(hwnd, &rect);
+      const bool allow_unlock = self &&
+          InterlockedCompareExchange(&self->shared_->allow_local_unlock, 0, 0);
       if (self && !DrawPrivacyCover(dc, rect, PrivacyWindowDpi(hwnd), module,
-                                    self->shared_->unlock_hint)) {
+                                    allow_unlock ? self->shared_->unlock_hint
+                                                 : self->shared_->locked_hint,
+                                    allow_unlock)) {
         self->paint_failed_ = true;
         self->Fail(L"Paint privacy logo and unlock instructions");
       }

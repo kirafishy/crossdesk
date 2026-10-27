@@ -129,6 +129,8 @@ class NativePrivacy {
                   "blocking is unavailable");
   }
 
+  void SetLocalUnlockAllowed(bool allowed) { allow_local_unlock_ = allowed; }
+
   void Enable(bool block_input) {
     ++reply_.generation;
     reply_.failure[0] = '\0';
@@ -570,7 +572,7 @@ class NativePrivacy {
         shift |= symbol == XK_Shift_L || symbol == XK_Shift_R;
       }
     }
-    if (down && ctrl && alt && shift &&
+    if (allow_local_unlock_ && down && ctrl && alt && shift &&
         XkbKeycodeToKeysym(display_, keycode, 0, 0) == XK_F12) {
       reply_.emergency = true;
       Recover();
@@ -624,6 +626,7 @@ class NativePrivacy {
   std::vector<Window> hidden_roots_;
   std::map<int, std::array<bool, 256>> keys_;
   LinuxPrivacyReply reply_;
+  bool allow_local_unlock_ = true;
   Clock::time_point checked_{};
 };
 }  // namespace
@@ -675,6 +678,12 @@ int RunLinuxPrivacyGuard() {
           break;
         case LinuxPrivacyCommand::recover:
           privacy.Recover();
+          break;
+        case LinuxPrivacyCommand::allow_local_unlock:
+          privacy.SetLocalUnlockAllowed(true);
+          break;
+        case LinuxPrivacyCommand::forbid_local_unlock:
+          privacy.SetLocalUnlockAllowed(false);
           break;
         case LinuxPrivacyCommand::heartbeat:
           break;

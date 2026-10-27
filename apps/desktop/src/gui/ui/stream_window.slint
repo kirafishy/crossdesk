@@ -47,6 +47,10 @@ export global StreamStrings {
 
     in-out property <string> select-display: "Select Display";
     in-out property <string> send-shortcut: "Send Shortcut";
+    in-out property <string> privacy-unlocked-title: "Privacy screen unlocked";
+    in-out property <string> privacy-unlocked-message: "The remote privacy screen was unlocked using the local shortcut. Lock it again to restore privacy and disable local shortcut unlocking.";
+    in-out property <string> privacy-unlock-confirm: "Confirm";
+    in-out property <string> privacy-unlock-lock: "Lock";
     in-out property <string> privacy-enable: "Enable privacy screen";
     in-out property <string> privacy-disable: "Turn privacy off / recover";
     in-out property <string> control-mouse: "Control Mouse";
@@ -296,6 +300,11 @@ export component StreamWindow inherits Window {
     in property <string> status-text: "";
     in property <string> receiving-text: "";
     in property <bool> remote-update-visible: false;
+    in property <bool> privacy-unlock-visible: false;
+    in property <bool> privacy-can-lock: false;
+    out property <bool> modal-visible: root.remote-update-visible || root.privacy-unlock-visible;
+    callback dismiss-privacy-unlock;
+    callback lock-privacy;
     callback dismiss-remote-update;
     in property <[string]> displays;
     in-out property <int> selected-display: 0;
@@ -491,8 +500,8 @@ export component StreamWindow inherits Window {
     changed mouse-control-enabled => {
         if !root.mouse-control-enabled { root.cancel-remote-pointer(); }
     }
-    changed remote-update-visible => {
-        if root.remote-update-visible {
+    changed modal-visible => {
+        if root.modal-visible {
             root.close-control-menus();
             root.control-drag-pending = false;
             root.end-control-drag();
@@ -502,7 +511,7 @@ export component StreamWindow inherits Window {
         // adapter and aborts the process; defer focus to the event loop.
         input-focus-timer.running = true;
         input-focus-timer.restart();
-        root.keyboard-focus-changed(!root.remote-update-visible);
+        root.keyboard-focus-changed(!root.modal-visible);
     }
     input-focus-timer := Timer {
         interval: 1ms;
@@ -617,7 +626,7 @@ export component StreamWindow inherits Window {
                 root.set-remote-button(button, false);
                 root.pointer-input(button, kind, x, y);
             }
-        } else if root.window-active && root.mouse-control-enabled && !root.remote-update-visible {
+        } else if root.window-active && root.mouse-control-enabled && !root.modal-visible {
             let remote-target = root.remote-pointer-active
                 || (!root.control-menu-open && !root.is-local-control-area(x, y));
             if kind == PointerEventKind.down && remote-target
@@ -653,7 +662,7 @@ export component StreamWindow inherits Window {
             // so a captured drag can never also toggle the toolbar.
             let toggle-expanded = kind == PointerEventKind.up && root.control-drag-pending
                 && !root.control-dragging
-                && root.window-active && !root.remote-update-visible
+                && root.window-active && !root.modal-visible
                 && x >= control.x + logo-button.x && x < control.x + logo-button.x + logo-button.width
                 && y >= control.y + logo-button.y && y < control.y + logo-button.y + logo-button.height;
             root.control-drag-pending = false;
@@ -702,7 +711,7 @@ export component StreamWindow inherits Window {
     }
 
     is-local-control-area(pointer-x, pointer-y) => {
-        if root.remote-update-visible { return true; }
+        if root.modal-visible { return true; }
         let over-control = pointer-x >= root.control-surface-x
             && pointer-x <= root.control-surface-x + root.control-surface-width
             && pointer-y >= control.y
@@ -1015,11 +1024,11 @@ export component StreamWindow inherits Window {
 
             drop-zone := DropArea {
                 can-drop(event) => {
-                    return !root.remote-update-visible && root.can-drop-file(event.data)
+                    return !root.modal-visible && root.can-drop-file(event.data)
                         ? DragAction.copy : DragAction.none;
                 }
                 dropped(event) => {
-                    if root.remote-update-visible { return DragAction.none; }
+                    if root.modal-visible { return DragAction.none; }
                     root.file-dropped(event.data);
                     return DragAction.copy;
                 }
@@ -1030,16 +1039,16 @@ export component StreamWindow inherits Window {
                 focus-gained => { root.keyboard-focus-changed(true); }
                 focus-lost => { root.keyboard-focus-changed(false); }
                 key-pressed(event) => {
-                    if !root.remote-update-visible {
+                    if !root.modal-visible {
                         root.key-input(event.text, true, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta);
                     }
                     accept
                 }
                 key-released(event) => {
-                    if root.remote-update-visible {
+                    if root.modal-visible {
                         // Dismiss on release so the same key cannot reach the peer.
                         if event.text == Key.Escape || event.text == Key.Return {
-                            root.dismiss-remote-update();
+                            if root.privacy-unlock-visible { root.dismiss-privacy-unlock(); } else { root.dismiss-remote-update(); }
                         }
                     } else {
                         root.key-input(event.text, false, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta);
@@ -1743,7 +1752,7 @@ export component StreamWindow inherits Window {
                 }
             }
 
-            if root.remote-update-visible: Rectangle {
+            if root.modal-visible: Rectangle {
                 width: parent.width; height: parent.height;
                 background: #0c162c52;
                 z: 13;
@@ -1752,8 +1761,43 @@ export component StreamWindow inherits Window {
                     scroll-event(event) => { accept }
                 }
             }
+            if root.privacy-unlock-visible: DialogSurface {
+                x: (parent.width - self.width) / 2;
+                y: max(16px, (parent.height - self.height) / 2);
+                width: min(460px, parent.width - 32px);
+                height: unlock-message.y + unlock-message.height + 84px;
+                outline-color: UiSurface.edge;
+                border-radius: UiRadius.surface;
+                z: 14;
+                TouchArea { scroll-event(event) => { accept } }
+                unlock-title := Text {
+                    x: 24px; y: 24px; width: parent.width - 48px;
+                    height: max(28px, self.preferred-height);
+                    text: StreamStrings.privacy-unlocked-title;
+                    color: #1b2433; font-size: 20px; font-weight: 600; wrap: word-wrap;
+                }
+                unlock-message := Text {
+                    x: 24px; y: unlock-title.y + unlock-title.height + 8px;
+                    width: parent.width - 48px; height: max(22px, self.preferred-height);
+                    text: StreamStrings.privacy-unlocked-message;
+                    color: #667085; font-size: 15px; wrap: word-wrap;
+                }
+                SecondaryButton {
+                    x: parent.width - 244px; y: parent.height - 60px;
+                    width: 104px; height: 36px;
+                    text: StreamStrings.privacy-unlock-confirm;
+                    clicked => { root.dismiss-privacy-unlock(); }
+                }
+                PrimaryButton {
+                    x: parent.width - 128px; y: parent.height - 60px;
+                    width: 104px; height: 36px;
+                    text: StreamStrings.privacy-unlock-lock;
+                    enabled: root.privacy-can-lock;
+                    clicked => { root.lock-privacy(); }
+                }
+            }
             remote-update-banner := DialogSurface {
-                visible: root.remote-update-visible;
+                visible: root.remote-update-visible && !root.privacy-unlock-visible;
                 x: (parent.width - self.width) / 2;
                 y: min(max(64px, parent.height * 0.18), max(16px, parent.height - self.height - 16px));
                 width: min(400px, parent.width - 48px);
