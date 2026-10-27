@@ -14,7 +14,6 @@ import sys
 APP = Path(__file__).resolve().parents[1]
 ROOT = APP.parents[1]
 CACHE = APP / '.native'
-PACKAGE_REVISION = '2eedd731d1e7e377bc0eea970b9f0c120ca5f00d'
 
 
 def run(args, *, cwd=APP, env=None):
@@ -37,8 +36,7 @@ def environment():
     env = os.environ.copy()
     env.update(NODE_HOME=str(studio / 'tools/node'), DEVECO_SDK_HOME=str(sdk),
                JAVA_HOME=str(studio / 'jbr/Contents/Home'),
-               XMAKE_PKG_INSTALLDIR=str(CACHE / 'packages'),
-               XMAKE_GLOBALDIR=str(CACHE / 'global'), NO_COLOR='1')
+               XMAKE_PKG_INSTALLDIR=str(CACHE / 'packages'), NO_COLOR='1')
     env['PATH'] = os.pathsep.join([str(CACHE / 'venv/bin'), str(studio / 'tools/node/bin'),
                                   str(studio / 'tools/ohpm/bin'),
                                   str(native / 'build-tools/cmake/bin'), env.get('PATH', '')])
@@ -55,20 +53,8 @@ def bootstrap(env):
         run([venv / 'bin/python', '-m', 'pip', 'install', 'setuptools==80.9.0',
              'wheel==0.45.1', 'meson==1.12.1'], env=env)
         (venv / '.crossdesk-tools-v1').touch()
-    repository = CACHE / 'global/.xmake/repositories/xmake-repo'
-    if not (repository / '.git').exists():
-        repository.parent.mkdir(parents=True, exist_ok=True)
-        seed = Path.home() / '.xmake/repositories/xmake-repo'
-        source = seed if (seed / '.git').exists() else 'https://github.com/xmake-io/xmake-repo.git'
-        run(['git', 'clone', '--no-hardlinks', source, repository], env=env)
-    run(['git', 'remote', 'set-url', 'origin', 'https://github.com/xmake-io/xmake-repo.git'], cwd=repository, env=env)
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repository, text=True).strip()
-    if revision != PACKAGE_REVISION:
-        run(['git', 'fetch', 'origin', PACKAGE_REVISION], cwd=repository, env=env)
-        run(['git', 'checkout', '--detach', PACKAGE_REVISION], cwd=repository, env=env)
-    # Mark this pinned checkout as ready so Xmake's first-run repository update
-    # cannot replace it with a mirror or advance it beyond PACKAGE_REVISION.
-    (repository / 'updated').touch()
+    # Repository selection/updates follow Xmake, as on Windows/macOS/Linux.
+    # The SDK, installed packages and build products remain platform-specific.
 
 
 def mobile_project():

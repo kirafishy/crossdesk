@@ -13,6 +13,8 @@
 
 ## 构建
 
+依赖仓库沿用 Windows/macOS/Linux 的 Xmake 策略：使用默认仓库或调用环境指定的 `XMAKE_GLOBALDIR` / `XMAKE_MAIN_REPO`，不固定或校验仓库提交。鸿蒙 PC 与移动端共用此规则，SDK、编译产物和依赖安装缓存仍按平台隔离。
+
 在仓库根目录执行，当前构建脚本面向 macOS：
 
 ```bash

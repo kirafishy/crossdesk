@@ -72,7 +72,7 @@ Release 构建使用 `./gradlew :app:assembleRelease`，默认输出未签名 AP
 首次构建会下载并从源码编译依赖，耗时取决于网络。后续编译复用缓存。Android 直接编译 `deps/submodules/minirtc` 中的源码；构建产物和依赖缓存位于 `.native/`，Xmake 工程配置位于 `native/.xmake/`，与桌面和 iOS 分开保存：
 
 - Gradle 9.3.1、AGP 9.1.0、NDK r28c 固定在工程中。
-- Xmake 包仓库固定到 `eda39de3fb99b420c168f1ab9ab2d1791e11b662`。
+- Xmake 依赖仓库沿用 PC 端策略：使用默认仓库或调用环境指定的仓库，不固定或校验仓库提交。Android 编译产物和安装包缓存仍独立保存。
 - `scripts/build_native.py` 调用独立的 `native/xmake.lua`，直接包含 MiniRTC 子模块的构建定义。构建过程不复制 MiniRTC 源码，也不应用补丁。
 - MiniRTC 源码内的 Android 分支启用 OpenH264、SVT-AV1 和 dav1d 软件编解码及依赖配方，兼容 OpenFEC 的 Android 头文件，并关闭 UPnP。SVT-AV1 使用内置 ARM CPU 能力检测；当前应用作为控制端只接收视频，库同时提供 AV1 编码能力。TLS 校验位于 MiniRTC 内部。STUN、TURN UDP/TCP 与直接连接仍由 MiniRTC 提供。
 - MiniRTC 的 `thirdparty/openssl/xmake.lua` 统一维护 iOS 和 Android 配方；Android 显式使用 NDK 的归档索引工具，避免 macOS `ranlib` 损坏 ELF 静态库。
@@ -98,7 +98,7 @@ git push origin android-v1.6.1-20261010
 
 已有 Release 需要补传服务器或刷新下载信息时，可手动运行 `Update version.json from Release` 并填写已有 `source_tag`，无需重新构建。
 
-工作流使用 Ubuntu 24.04、JDK 17、Python 3.13、SDK 36、Build Tools 36.0.0、NDK r28c，并使用最低支持的 Xmake 3.1.1 验证构建；本地允许使用更新的 Xmake。Gradle 使用工程内的 Wrapper，原生构建器固定 Xmake 包仓库版本。SDK/NDK 使用独立目录缓存，按宿主系统、架构和工具链版本区分；命中缓存时跳过 SDK 安装，未命中时在安装完成后立即保存，即使后续 APK 构建失败，下次也可复用。Xmake 可执行环境、固定版本的包仓库和 pip 下载也有各自的缓存；Ubuntu 系统工具只安装缺失项。
+工作流使用 Ubuntu 24.04、JDK 17、Python 3.13、SDK 36、Build Tools 36.0.0、NDK r28c，并使用最低支持的 Xmake 3.1.1 验证构建；本地允许使用更新的 Xmake。Gradle 使用工程内的 Wrapper，原生构建器沿用 PC 端的 Xmake 仓库选择方式。SDK/NDK 使用独立目录缓存，按宿主系统、架构和工具链版本区分；命中缓存时跳过 SDK 安装，未命中时在安装完成后立即保存，即使后续 APK 构建失败，下次也可复用。Xmake 可执行环境和 pip 下载也有各自的缓存；Ubuntu 系统工具只安装缺失项。
 
 Gradle 缓存与 Android 原生依赖缓存分别管理；原生缓存按宿主架构、构建脚本及 MiniRTC 配方区分，不复用桌面或 iOS 的配置和目标文件。GitHub 托管 runner 每次启动仍是新环境；第一次运行或缓存失效时需要安装。不同分支和标签可读取默认分支的缓存，因此建议先在默认分支运行一次 `Build Android` 预热，再创建发布标签。
 

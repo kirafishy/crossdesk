@@ -11,7 +11,6 @@ ANDROID = Path(__file__).resolve().parents[1]
 ROOT = ANDROID.parents[1]
 SOURCE = ROOT / 'deps/submodules/minirtc'
 CACHE = ANDROID / '.native'
-PACKAGE_REVISION = 'eda39de3fb99b420c168f1ab9ab2d1791e11b662'
 XMAKE_MIN_VERSION = (3, 1, 1)
 
 
@@ -38,18 +37,12 @@ def main():
         raise SystemExit('Initialize the MiniRTC submodule before building.')
     env = os.environ.copy()
     env['XMAKE_PKG_INSTALLDIR'] = str(CACHE / 'packages')
-    env['XMAKE_GLOBALDIR'] = str(CACHE / 'global')
     env['ANDROID_NDK_HOME'] = str(ndk)
     env['ANDROID_NDK_ROOT'] = str(ndk)
     env['NO_COLOR'] = '1'
     work = ANDROID / 'native'
-    repository = CACHE / 'global/.xmake/repositories/xmake-repo'
-    if not (repository / '.git').is_dir():
-        subprocess.run([xmake, 'repo', '--update'], cwd=work, env=env, check=True)
-    revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repository, text=True).strip()
-    if revision != PACKAGE_REVISION:
-        subprocess.run(['git', 'fetch', 'origin', PACKAGE_REVISION], cwd=repository, check=True)
-        subprocess.run(['git', 'checkout', '--detach', PACKAGE_REVISION], cwd=repository, check=True)
+    # Use the desktop repository policy; Xmake manages recipe initialization
+    # and updates. Only installed Android packages/build products are isolated.
     subprocess.run([xmake, 'f', '-P', str(work), '-y', '-p', 'android', '-a', 'arm64-v8a',
                     '-m', 'release', '--ndk=' + str(ndk), '--ndk_sdkver=26',
                     '--runtimes=c++_static', '--policies=package.precompiled:n',

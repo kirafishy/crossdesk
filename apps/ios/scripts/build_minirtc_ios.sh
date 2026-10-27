@@ -67,9 +67,14 @@ fi
 XMAKE_DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
 XMAKE_TOOLCHAIN_BIN="${XMAKE_DEVELOPER_DIR}/Toolchains/XcodeDefault.xctoolchain/usr/bin"
 run_xmake() {
+  # Match desktop repository selection: use Xmake defaults unless explicitly
+  # overridden by the caller. Only compiled iOS packages use a separate cache.
   local xmake_env=()
   if [[ -n "${XMAKE_GLOBALDIR:-}" ]]; then
     xmake_env+=("XMAKE_GLOBALDIR=${XMAKE_GLOBALDIR}")
+  fi
+  if [[ -n "${XMAKE_MAIN_REPO:-}" ]]; then
+    xmake_env+=("XMAKE_MAIN_REPO=${XMAKE_MAIN_REPO}")
   fi
   /usr/bin/env -i \
     HOME="${HOME}" \
@@ -89,10 +94,10 @@ run_xmake() {
 
 OUTPUT_DIR="${IOS_DIR}/Vendor/${SDK_NAME}/${CONFIG_NAME}"
 OUTPUT_LIBRARY="${OUTPUT_DIR}/libCrossDeskMiniRTC.a"
-XMAKE_REPOSITORY_DIR="$(run_xmake lua -c 'import("core.base.global"); print(path.join(global.directory(), "repositories", "xmake-repo"))')"
 mkdir -p "${OUTPUT_DIR}"
-print -r -- "${XMAKE_REPOSITORY_DIR}" > "${OUTPUT_DIR}/xmake-repository.txt"
 run_xmake --version > "${OUTPUT_DIR}/xmake-version.txt"
+python3 -B "${SCRIPT_DIR}/verify_native_build.py" \
+  --xmake-version "${OUTPUT_DIR}/xmake-version.txt"
 MINIRTC_BUILD_DIR="${IOS_DIR}/.xmake/minirtc-build${CACHE_SUFFIX}"
 MINIRTC_LIBRARY="${MINIRTC_BUILD_DIR}/iphoneos/arm64/${MODE}/libminirtc.a"
 WIRE_BUILD_DIR="${IOS_DIR}/.xmake/wire-build${CACHE_SUFFIX}"
@@ -109,7 +114,7 @@ fi
 # Still configure on every invocation: Xmake must see manifest edits and restore
 # the iOS configuration if MiniRTC was built standalone for another platform.
 CONFIG_SIGNATURE="$(print -r -- "${XMAKE_BIN}" "${XMAKE_DEVELOPER_DIR}" \
-  "${MODE}" "${ARCH_NAME}" "${SDK_NAME}" "${APPLE_DEVICE}" "16.0" "${XMAKE_PKG_INSTALLDIR}" "${MINIRTC_ENABLE_AOM}"
+  "${MODE}" "${ARCH_NAME}" "${SDK_NAME}" "${APPLE_DEVICE}" "16.0" "${XMAKE_PKG_INSTALLDIR}" "${MINIRTC_ENABLE_AOM}" "${XMAKE_GLOBALDIR:-}" "${XMAKE_MAIN_REPO:-}"
   run_xmake --version | sed -n '1p'
   DEVELOPER_DIR="${XMAKE_DEVELOPER_DIR}" xcodebuild -version
   DEVELOPER_DIR="${XMAKE_DEVELOPER_DIR}" xcrun --sdk "${SDK_NAME}" --show-sdk-path

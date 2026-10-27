@@ -134,14 +134,8 @@ jobs:
           actions-cache-folder: .xmake-toolchain-cache
           actions-cache-key: ${{ runner.os }}-${{ runner.arch }}-ubuntu24.04-android-xmake${{ env.XMAKE_MIN_VERSION }}
 
-      - name: Cache Xmake package repository
-        uses: actions/cache@v5
-        with:
-          path: apps/android/.native/global/.xmake/repositories/xmake-repo
-          key: ${{ runner.os }}-${{ runner.arch }}-android-xmake-repo-v1-${{ hashFiles('apps/android/scripts/build_native.py') }}
-
-      # Cache installed packages only. build_native.py checks Xmake >= 3.1.1 and pins
-      # its own package repository; never reuse another platform's build/config.
+      # Repository selection follows desktop Xmake behavior. Keep installed
+      # packages isolated; never reuse another platform's build/config.
       - name: Cache native dependencies
         uses: actions/cache@v5
         with:

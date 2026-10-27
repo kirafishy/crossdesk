@@ -72,22 +72,17 @@ tag's numeric version. Use the source tag or commit recorded in the app to
 identify its exact source.
 
 Install [Xmake](https://xmake.io/guide/quick-start.html) 3.1.1 or newer,
-CMake, and a current Python 3 with setuptools/wheel. Pin the package repository
-in a separate Xmake global directory before building:
+CMake, and a current Python 3 with setuptools/wheel. Repository selection follows
+the Windows/macOS/Linux desktop build: Xmake uses its default package repository,
+or an explicit `XMAKE_GLOBALDIR` / `XMAKE_MAIN_REPO` supplied by the caller.
+No repository commit is pinned, checked out, or required to have a clean worktree.
+You can build directly from Xcode without preparing a separate recipe checkout.
 
-```sh
-export XMAKE_GLOBALDIR="$HOME/.cache/crossdesk/xmake-ios"
-xmake repo --update
-git -C "$XMAKE_GLOBALDIR/.xmake/repositories/xmake-repo" fetch origin 121109352da272cd1a3d4ed52f2dcda34f839955
-git -C "$XMAKE_GLOBALDIR/.xmake/repositories/xmake-repo" checkout --detach 121109352da272cd1a3d4ed52f2dcda34f839955
-```
-
-Keep `XMAKE_GLOBALDIR` set for command-line Xcode builds. For builds launched
-from the Xcode app, set it as a user-defined build setting on the target, or
-pin the default `~/.xmake/repositories/xmake-repo` instead. The build checks
-the minimum Xmake version, package repository commit and reviewed recipe hashes.
-Application dependencies are built from source, with Xmake precompiled
-package downloads disabled.
+Installed iOS packages and device/simulator build products still have separate
+caches to avoid mixing target architectures and deployment settings. The build
+retains the minimum Xmake version check, Xmake's source-download verification,
+and native archive input checks. Application dependencies are built from source,
+with Xmake precompiled package downloads disabled.
 
 1. Open `apps/ios/CrossDeskMobile.xcodeproj` and select the `CrossDeskMobile`
    target and scheme.
@@ -391,7 +386,7 @@ the resource when the notices need to change; regeneration does not select a
 new dependency version.
 
 `scripts/verify_native_build.py` independently checks the native archive input
-hashes and pinned Xmake toolchain after compilation. These checks do not read
+hashes and the minimum supported Xmake version after compilation. These checks do not read
 the license catalog. Downloaded source archives retain their SHA-256 checks
 when manually regenerating notices.
 

@@ -53,7 +53,6 @@ jobs:
       EXPECTED_IOS_SDK: "26.5"
       # Exercise the minimum supported version; local builds may use newer Xmake.
       XMAKE_MIN_VERSION: "3.1.1"
-      XMAKE_REPO_REVISION: "121109352da272cd1a3d4ed52f2dcda34f839955"
 
     steps:
       - name: Extract version number
@@ -160,9 +159,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: apps/ios/.xmake/packages
-          key: "${{ runner.os }}-xmake${{ env.XMAKE_MIN_VERSION }}-deps-ios-arm64-source-v1-xcode26.6-xrepo1211093-min16-${{ github.run_id }}"
+          key: "${{ runner.os }}-xmake${{ env.XMAKE_MIN_VERSION }}-deps-ios-arm64-source-v2-xcode26.6-min16-${{ hashFiles('apps/ios/scripts/build_minirtc_ios.sh', 'xmake.lua', 'deps/submodules/minirtc/xmake.lua', 'deps/submodules/minirtc/thirdparty/**') }}-${{ github.run_id }}"
           restore-keys: |
-            ${{ runner.os }}-xmake${{ env.XMAKE_MIN_VERSION }}-deps-ios-arm64-source-v1-xcode26.6-xrepo1211093-min16-
+            ${{ runner.os }}-xmake${{ env.XMAKE_MIN_VERSION }}-deps-ios-arm64-source-v2-xcode26.6-min16-${{ hashFiles('apps/ios/scripts/build_minirtc_ios.sh', 'xmake.lua', 'deps/submodules/minirtc/xmake.lua', 'deps/submodules/minirtc/thirdparty/**') }}-
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -180,15 +179,6 @@ jobs:
           xmake --version | tee "${RUNNER_TEMP}/xmake-version.txt"
           python3 -B apps/ios/scripts/verify_native_build.py \
             --xmake-version "${RUNNER_TEMP}/xmake-version.txt"
-
-      - name: Pin xmake package repository
-        shell: bash
-        run: |
-          xmake repo -u
-          XMAKE_REPO_DIR="${HOME}/.xmake/repositories/xmake-repo"
-          git -C "${XMAKE_REPO_DIR}" fetch --depth=1 origin "${XMAKE_REPO_REVISION}"
-          git -C "${XMAKE_REPO_DIR}" checkout --detach "${XMAKE_REPO_REVISION}"
-          test "$(git -C "${XMAKE_REPO_DIR}" rev-parse HEAD)" = "${XMAKE_REPO_REVISION}"
 
       - name: Build CrossDesk Mobile
         shell: bash

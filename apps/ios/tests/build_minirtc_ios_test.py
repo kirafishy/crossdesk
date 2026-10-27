@@ -22,6 +22,9 @@ class NativeBuildTest(unittest.TestCase):
         source = Path(__file__).resolve().parents[1] / "scripts/build_minirtc_ios.sh"
         self.script = scripts / source.name
         shutil.copy2(source, self.script)
+        # This fixture exercises archive/configuration behavior with fake Xmake.
+        # Keep the version-check dependency inside the same temporary sandbox.
+        (scripts / "verify_native_build.py").write_text("# Toolchain validation is outside this fixture's scope.\n")
         (self.root / "xmake.lua").write_text('-- fixture\n')
         (self.root / "deps/submodules/minirtc").mkdir(parents=True)
         self.bin = self.root / "bin"
