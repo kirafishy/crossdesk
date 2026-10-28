@@ -69,16 +69,9 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
   const CGFloat margin = 32 * scale, text_width = 398 * scale;
   NSColor* foreground = [NSColor colorWithSRGBRed:245.0 / 255 green:247.0 / 255
                                            blue:250.0 / 255 alpha:1];
-  NSColor* muted = [NSColor colorWithSRGBRed:181.0 / 255 green:190.0 / 255
-                                      blue:204.0 / 255 alpha:1];
   NSAttributedString* brand = Text(@"CrossDesk", 14 * scale, NSFontWeightSemibold, foreground);
-  NSAttributedString* hint = Text(self.unlockHint, 16 * scale, NSFontWeightRegular, muted);
-  NSAttributedString* shortcut = Text(@"Control + Option + Shift + Esc", 24 * scale,
-                                      NSFontWeightSemibold, foreground);
   const CGFloat logo_size = std::ceil(brand.size.width);
   const CGFloat brand_height = TextHeight(brand, logo_size);
-  const CGFloat hint_height = TextHeight(hint, text_width);
-  const CGFloat shortcut_height = self.allowLocalUnlock ? TextHeight(shortcut, text_width) : 0;
   const CGFloat bottom = height - margin;
   const CGFloat logo_top = bottom - brand_height - 6 * scale - logo_size;
   [self.logo drawInRect:NSMakeRect(margin, logo_top, logo_size, logo_size)
@@ -86,10 +79,18 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
               fraction:1 respectFlipped:YES hints:@{NSImageHintInterpolation: @(NSImageInterpolationHigh)}];
   [brand drawWithRect:NSMakeRect(margin, bottom - brand_height, logo_size, brand_height)
              options:kTextOptions];
+  if (!self.allowLocalUnlock) return;
+  NSColor* muted = [NSColor colorWithSRGBRed:181.0 / 255 green:190.0 / 255
+                                      blue:204.0 / 255 alpha:1];
+  NSAttributedString* hint = Text(self.unlockHint, 16 * scale, NSFontWeightRegular, muted);
+  NSAttributedString* shortcut = Text(@"Control + Option + Shift + Esc", 24 * scale,
+                                      NSFontWeightSemibold, foreground);
+  const CGFloat hint_height = TextHeight(hint, text_width);
+  const CGFloat shortcut_height = TextHeight(shortcut, text_width);
   const CGFloat text_left = margin + logo_size + 24 * scale;
-  [hint drawWithRect:NSMakeRect(text_left, bottom - shortcut_height - (self.allowLocalUnlock ? 12 * scale : 0) - hint_height,
+  [hint drawWithRect:NSMakeRect(text_left, bottom - shortcut_height - 12 * scale - hint_height,
                                text_width, hint_height) options:kTextOptions];
-  if (self.allowLocalUnlock) [shortcut drawWithRect:NSMakeRect(text_left, bottom - shortcut_height,
+  [shortcut drawWithRect:NSMakeRect(text_left, bottom - shortcut_height,
                                    text_width, shortcut_height) options:kTextOptions];
 }
 @end

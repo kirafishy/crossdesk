@@ -68,7 +68,7 @@ bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
   }};
   constexpr UINT flags = DT_LEFT | DT_WORDBREAK | DT_NOPREFIX;
   for (size_t i = 0; i < lines.size(); ++i) {
-    if (i == 1 && !allow_local_unlock) continue;
+    if (i < kInstructionLines && !allow_local_unlock) continue;
     auto& line = lines[i];
     resources.fonts[i] =
         CreateFontW(-px(line.size), 0, 0, 0, line.weight, FALSE, FALSE, FALSE,
@@ -110,8 +110,8 @@ bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
   if (!DrawTextW(dc, lines[kBrandLine].text, -1, &brand_bounds,
                  DT_CENTER | DT_SINGLELINE | DT_NOPREFIX))
     return false;
+  if (!allow_local_unlock) return true;
   for (size_t i = 0; i < kInstructionLines; ++i) {
-    if (i == 1 && !allow_local_unlock) continue;
     const auto& line = lines[i];
     if (!Select(dc, resources.fonts[i])) return false;
     RECT bounds{left, top, left + text_width, top + line.bounds.bottom};
