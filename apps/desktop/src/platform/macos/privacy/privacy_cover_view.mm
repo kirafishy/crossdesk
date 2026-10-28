@@ -3,6 +3,7 @@
 #include "privacy_cover_view.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace {
@@ -32,9 +33,11 @@ NSImage* LoadPrivacyLogo() {
   return nil;
 }
 
-NSAttributedString* Text(NSString* value, CGFloat size, NSFontWeight weight, NSColor* color) {
+NSAttributedString* Text(NSString* value, CGFloat size, NSFontWeight weight, NSColor* color,
+                         NSTextAlignment alignment = NSTextAlignmentLeft) {
   NSMutableParagraphStyle* paragraph = [[NSMutableParagraphStyle alloc] init];
   paragraph.lineBreakMode = NSLineBreakByWordWrapping;
+  paragraph.alignment = alignment;
   return [[NSAttributedString alloc] initWithString:value attributes:@{
       NSFontAttributeName: [NSFont systemFontOfSize:size weight:weight],
       NSForegroundColorAttributeName: color,
@@ -48,21 +51,58 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
                                     options:kTextOptions].size.height);
 }
 
-NSAttributedString* BrandText(CGFloat scale) {
-  NSFont* font = [NSFont fontWithName:@"Arial-BoldMT" size:29 * scale];
-  if (!font) font = [NSFont boldSystemFontOfSize:29 * scale];
-  auto* brand = [[NSMutableAttributedString alloc] initWithString:@"CrossDesk"
-      attributes:@{NSFontAttributeName: font,
-                   NSForegroundColorAttributeName:
-                       [NSColor colorWithSRGBRed:69.0 / 255 green:135.0 / 255
-                                           blue:219.0 / 255 alpha:1]}];
-  [brand addAttribute:NSForegroundColorAttributeName
-                value:[NSColor colorWithSRGBRed:37.0 / 255 green:83.0 / 255
-                                          blue:151.0 / 255 alpha:1]
-                range:NSMakeRange(5, 4)];
-  [brand addAttribute:NSKernAttributeName value:@(scale) range:NSMakeRange(4, 1)];
-  return brand;
+void DrawUnlockInstructions(NSString* value, NSSize size, CGFloat scale,
+                            CGFloat brand_top) {
+  NSColor* foreground = [NSColor colorWithSRGBRed:229.0 / 255 green:233.0 / 255
+                                           blue:240.0 / 255 alpha:1];
+  NSColor* muted = [NSColor colorWithSRGBRed:166.0 / 255 green:174.0 / 255
+                                      blue:186.0 / 255 alpha:1];
+  NSAttributedString* hint = Text(value, 17 * scale, NSFontWeightRegular, muted,
+                                   NSTextAlignmentCenter);
+  NSAttributedString* plus = Text(@"+", 16 * scale, NSFontWeightRegular, muted);
+  const CGFloat text_width = 420 * scale;
+  const CGFloat hint_height = TextHeight(hint, text_width);
+  const CGFloat key_height = 44 * scale, key_gap = 28 * scale;
+  const CGFloat line_gap = 16 * scale;
+  NSArray<NSString*>* keys = @[@"Control", @"Option", @"Shift", @"Esc"];
+  NSMutableArray<NSAttributedString*>* labels = [NSMutableArray array];
+  std::array<CGFloat, 4> widths{};
+  CGFloat row_width = key_gap * (keys.count - 1);
+  for (NSUInteger i = 0; i < keys.count; ++i) {
+    NSAttributedString* label = Text(keys[i], 16 * scale, NSFontWeightSemibold, foreground);
+    [labels addObject:label];
+    widths[i] = std::max(48 * scale, std::ceil(label.size.width) + 28 * scale);
+    row_width += widths[i];
+  }
+  const CGFloat content_height = hint_height + line_gap + key_height;
+  // Center the instructions independently of the footer, leaving room on short displays.
+  const CGFloat top = std::max(32 * scale, std::min((size.height - content_height) / 2,
+      brand_top - 32 * scale - content_height));
+  [hint drawWithRect:NSMakeRect((size.width - text_width) / 2, top, text_width, hint_height)
+             options:kTextOptions];
+  const CGFloat key_top = top + hint_height + line_gap;
+  CGFloat left = (size.width - row_width) / 2;
+  for (NSUInteger i = 0; i < keys.count; ++i) {
+    NSRect bounds = NSMakeRect(left, key_top, widths[i], key_height);
+    NSBezierPath* key = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, scale / 2, scale / 2)
+                                                     xRadius:8 * scale yRadius:8 * scale];
+    [[NSColor colorWithSRGBRed:16.0 / 255 green:19.0 / 255 blue:24.0 / 255 alpha:1] setFill];
+    [key fill];
+    [[NSColor colorWithSRGBRed:52.0 / 255 green:58.0 / 255 blue:68.0 / 255 alpha:1] setStroke];
+    key.lineWidth = scale;
+    [key stroke];
+    NSAttributedString* label = labels[i];
+    [label drawAtPoint:NSMakePoint(left + (widths[i] - label.size.width) / 2,
+                                  key_top + (key_height - label.size.height) / 2)];
+    left += widths[i];
+    if (i + 1 < keys.count) {
+      [plus drawAtPoint:NSMakePoint(left + (key_gap - plus.size.width) / 2,
+                                   key_top + (key_height - plus.size.height) / 2)];
+      left += key_gap;
+    }
+  }
 }
+
 }
 
 @interface CrossDeskPrivacyCoverView : NSView
@@ -81,38 +121,26 @@ NSAttributedString* BrandText(CGFloat scale) {
   if (width <= 0 || height <= 0) return;
   // Match the Windows cover's sizes, colors and bottom-left alignment.
   // AppKit coordinates are points; Retina backing scale is applied by AppKit.
-  const CGFloat scale = std::min({CGFloat(1), width / 768, height / 200});
-  const CGFloat margin = 32 * scale, text_width = 398 * scale;
-  NSColor* foreground = [NSColor colorWithSRGBRed:245.0 / 255 green:247.0 / 255
-                                           blue:250.0 / 255 alpha:1];
-  // Match the horizontal, two-tone wordmark in docs/images/crossdesk-banner.svg.
-  NSAttributedString* brand = BrandText(scale);
-  const CGFloat logo_size = 48 * scale;
+  const CGFloat scale = std::min({CGFloat(1), width / 960, height / 280});
+  const CGFloat margin = 32 * scale, brand_gap = 8 * scale;
+  NSAttributedString* brand = Text(@"CrossDesk远程控制中", 29 * scale,
+                                   NSFontWeightSemibold, NSColor.whiteColor);
+  const CGFloat logo_size = 60 * scale;
   const CGFloat brand_text_width = std::ceil(brand.size.width);
   const CGFloat brand_text_height = std::ceil(brand.size.height);
-  const CGFloat brand_width = logo_size + 8 * scale + brand_text_width;
-  const CGFloat bottom = height - margin;
-  const CGFloat logo_top = bottom - logo_size;
+  // Keep the corner branding fixed when local unlocking is toggled.
+  const CGFloat brand_bottom = height - margin;
+  const CGFloat logo_top = brand_bottom - logo_size;
   [self.logo drawInRect:NSMakeRect(margin, logo_top, logo_size, logo_size)
               fromRect:NSZeroRect operation:NSCompositingOperationSourceOver
               fraction:1 respectFlipped:YES hints:@{NSImageHintInterpolation: @(NSImageInterpolationHigh)}];
-  [brand drawWithRect:NSMakeRect(margin + logo_size + 8 * scale,
-                                bottom - brand_text_height,
+  const CGFloat text_left = margin + logo_size + brand_gap;
+  [brand drawWithRect:NSMakeRect(text_left, brand_bottom - brand_text_height,
                                 brand_text_width, brand_text_height)
              options:kTextOptions];
   if (!self.allowLocalUnlock) return;
-  NSColor* muted = [NSColor colorWithSRGBRed:181.0 / 255 green:190.0 / 255
-                                      blue:204.0 / 255 alpha:1];
-  NSAttributedString* hint = Text(self.unlockHint, 16 * scale, NSFontWeightRegular, muted);
-  NSAttributedString* shortcut = Text(@"Control + Option + Shift + Esc", 24 * scale,
-                                      NSFontWeightSemibold, foreground);
-  const CGFloat hint_height = TextHeight(hint, text_width);
-  const CGFloat shortcut_height = TextHeight(shortcut, text_width);
-  const CGFloat text_left = margin + brand_width + 24 * scale;
-  [hint drawWithRect:NSMakeRect(text_left, bottom - shortcut_height - 12 * scale - hint_height,
-                               text_width, hint_height) options:kTextOptions];
-  [shortcut drawWithRect:NSMakeRect(text_left, bottom - shortcut_height,
-                                   text_width, shortcut_height) options:kTextOptions];
+  DrawUnlockInstructions(self.unlockHint, self.bounds.size, scale,
+                         brand_bottom - std::max(logo_size, brand_text_height));
 }
 @end
 
