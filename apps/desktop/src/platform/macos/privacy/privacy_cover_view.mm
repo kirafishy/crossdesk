@@ -47,6 +47,22 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
   return std::ceil([text boundingRectWithSize:NSMakeSize(width, CGFLOAT_MAX)
                                     options:kTextOptions].size.height);
 }
+
+NSAttributedString* BrandText(CGFloat scale) {
+  NSFont* font = [NSFont fontWithName:@"Arial-BoldMT" size:29 * scale];
+  if (!font) font = [NSFont boldSystemFontOfSize:29 * scale];
+  auto* brand = [[NSMutableAttributedString alloc] initWithString:@"CrossDesk"
+      attributes:@{NSFontAttributeName: font,
+                   NSForegroundColorAttributeName:
+                       [NSColor colorWithSRGBRed:69.0 / 255 green:135.0 / 255
+                                           blue:219.0 / 255 alpha:1]}];
+  [brand addAttribute:NSForegroundColorAttributeName
+                value:[NSColor colorWithSRGBRed:37.0 / 255 green:83.0 / 255
+                                          blue:151.0 / 255 alpha:1]
+                range:NSMakeRange(5, 4)];
+  [brand addAttribute:NSKernAttributeName value:@(scale) range:NSMakeRange(4, 1)];
+  return brand;
+}
 }
 
 @interface CrossDeskPrivacyCoverView : NSView
@@ -65,19 +81,24 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
   if (width <= 0 || height <= 0) return;
   // Match the Windows cover's sizes, colors and bottom-left alignment.
   // AppKit coordinates are points; Retina backing scale is applied by AppKit.
-  const CGFloat scale = std::min({CGFloat(1), width / 640, height / 200});
+  const CGFloat scale = std::min({CGFloat(1), width / 768, height / 200});
   const CGFloat margin = 32 * scale, text_width = 398 * scale;
   NSColor* foreground = [NSColor colorWithSRGBRed:245.0 / 255 green:247.0 / 255
                                            blue:250.0 / 255 alpha:1];
-  NSAttributedString* brand = Text(@"CrossDesk", 14 * scale, NSFontWeightSemibold, foreground);
-  const CGFloat logo_size = std::ceil(brand.size.width);
-  const CGFloat brand_height = TextHeight(brand, logo_size);
+  // Match the horizontal, two-tone wordmark in docs/images/crossdesk-banner.svg.
+  NSAttributedString* brand = BrandText(scale);
+  const CGFloat logo_size = 48 * scale;
+  const CGFloat brand_text_width = std::ceil(brand.size.width);
+  const CGFloat brand_text_height = std::ceil(brand.size.height);
+  const CGFloat brand_width = logo_size + 8 * scale + brand_text_width;
   const CGFloat bottom = height - margin;
-  const CGFloat logo_top = bottom - brand_height - 6 * scale - logo_size;
+  const CGFloat logo_top = bottom - logo_size;
   [self.logo drawInRect:NSMakeRect(margin, logo_top, logo_size, logo_size)
               fromRect:NSZeroRect operation:NSCompositingOperationSourceOver
               fraction:1 respectFlipped:YES hints:@{NSImageHintInterpolation: @(NSImageInterpolationHigh)}];
-  [brand drawWithRect:NSMakeRect(margin, bottom - brand_height, logo_size, brand_height)
+  [brand drawWithRect:NSMakeRect(margin + logo_size + 8 * scale,
+                                bottom - brand_text_height,
+                                brand_text_width, brand_text_height)
              options:kTextOptions];
   if (!self.allowLocalUnlock) return;
   NSColor* muted = [NSColor colorWithSRGBRed:181.0 / 255 green:190.0 / 255
@@ -87,7 +108,7 @@ CGFloat TextHeight(NSAttributedString* text, CGFloat width) {
                                       NSFontWeightSemibold, foreground);
   const CGFloat hint_height = TextHeight(hint, text_width);
   const CGFloat shortcut_height = TextHeight(shortcut, text_width);
-  const CGFloat text_left = margin + logo_size + 24 * scale;
+  const CGFloat text_left = margin + brand_width + 24 * scale;
   [hint drawWithRect:NSMakeRect(text_left, bottom - shortcut_height - 12 * scale - hint_height,
                                text_width, hint_height) options:kTextOptions];
   [shortcut drawWithRect:NSMakeRect(text_left, bottom - shortcut_height,
