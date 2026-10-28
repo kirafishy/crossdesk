@@ -69,7 +69,7 @@ bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
   std::array<Line, kInstructionLines + 1> lines{{
       {unlock_hint, 17, FW_NORMAL, RGB(166, 174, 186)},
       {L"+", 16, FW_SEMIBOLD, RGB(229, 233, 240)},
-      {L"CrossDesk远程控制中", 29, FW_SEMIBOLD, RGB(255, 255, 255)},
+      {L" CrossDesk 远程控制中", 29, FW_SEMIBOLD, RGB(255, 255, 255)},
   }};
   constexpr UINT flags = DT_CENTER | DT_WORDBREAK | DT_NOPREFIX;
   constexpr UINT brand_flags = DT_LEFT | DT_SINGLELINE | DT_NOPREFIX;
@@ -132,7 +132,7 @@ bool DrawPrivacyCover(HDC dc, const RECT& rect, UINT dpi, HINSTANCE module,
   }
   const int content_height = static_cast<int>(lines[0].bounds.bottom) + line_gap + key_height;
   // Center the instructions independently of the footer, leaving room on short displays.
-  const int top = (std::min)(rect.top + (height - content_height) / 2,
+  const int top = (std::min)(static_cast<int>(rect.top) + (height - content_height) / 2,
       brand_bottom - brand_height - px(32) - content_height);
   if (top < rect.top + margin || (std::max)(row_width, text_width) + 2 * margin > width)
     return false;

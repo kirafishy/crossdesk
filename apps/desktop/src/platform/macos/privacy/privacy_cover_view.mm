@@ -123,7 +123,7 @@ void DrawUnlockInstructions(NSString* value, NSSize size, CGFloat scale,
   // AppKit coordinates are points; Retina backing scale is applied by AppKit.
   const CGFloat scale = std::min({CGFloat(1), width / 960, height / 280});
   const CGFloat margin = 32 * scale, brand_gap = 8 * scale;
-  NSAttributedString* brand = Text(@"CrossDesk远程控制中", 29 * scale,
+  NSAttributedString* brand = Text(@" CrossDesk 远程控制中", 29 * scale,
                                    NSFontWeightSemibold, NSColor.whiteColor);
   const CGFloat logo_size = 60 * scale;
   const CGFloat brand_text_width = std::ceil(brand.size.width);
