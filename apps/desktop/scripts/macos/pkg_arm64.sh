@@ -132,6 +132,10 @@ find "${APP_BUNDLE}" -name '._*' -delete
 
 echo ".app created successfully."
 
+mkdir -p build_pkg_scripts
+cp "${SCRIPT_DIR}/tcc_postinstall.sh" build_pkg_scripts/postinstall
+chmod +x build_pkg_scripts/postinstall
+
 mkdir -p build_pkg_resources
 cat > build_pkg_resources/welcome.html <<EOF
 <!doctype html>
@@ -161,6 +165,7 @@ cat > build_pkg_resources/welcome.html <<EOF
     <h1>欢迎安装 ${INSTALLER_TITLE}</h1>
     <p>CrossDesk 将安装到“应用程序”文件夹。</p>
     <p>首次启动时，CrossDesk 会引导你在系统设置中授予必要权限，包括辅助功能、录屏与系统录音等。</p>
+    <p>为避免旧版本授权残留造成状态误判，安装后可能需要重新授权。</p>
     <p>安装完成后，请从“应用程序”文件夹启动 CrossDesk。</p>
 </body>
 </html>
@@ -172,6 +177,7 @@ pkgbuild \
   --version "${APP_VERSION}" \
   --install-location "/Applications" \
   --component "${APP_BUNDLE}" \
+  --scripts build_pkg_scripts \
   build_pkg_temp/${APP_NAME}-component.pkg
 
 cat > build_pkg_temp/Distribution <<EOF
@@ -244,7 +250,7 @@ APPLESCRIPT
 fi
 echo "Set icon finished"
 
-rm -rf build_pkg_temp build_pkg_resources "${APP_BUNDLE}"
+rm -rf build_pkg_temp build_pkg_scripts build_pkg_resources "${APP_BUNDLE}"
 
 echo "PKG package created successfully."
 echo "installer ${PKG_NAME}"
