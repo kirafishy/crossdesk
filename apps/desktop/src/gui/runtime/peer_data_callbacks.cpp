@@ -25,6 +25,7 @@
 #include "platform.h"
 #include "rd_log.h"
 #include "runtime/gui_runtime.h"
+#include "web_clipboard_protocol.h"
 #ifdef __OHOS__
 #include "platform/harmony/input/system_shortcuts.h"
 #endif
@@ -137,8 +138,14 @@ void PeerEventHandler::OnReceiveDataBuffer(
   if (runtime->unattended_host_ &&
       (source_id == runtime->file_label_ ||
        source_id == runtime->file_feedback_label_ ||
-       source_id == runtime->clipboard_label_))
+       source_id == runtime->clipboard_label_ ||
+       source_id == web_clipboard::kStream))
     return;
+  if (source_id == web_clipboard::kStream) {
+    runtime->clipboard_.ReceiveWeb(
+        data, size, handler->ConnectionKey(user_id, user_id_size), handler);
+    return;
+  }
   if (source_id == runtime->file_label_) {
     runtime->transfers_.Receive(data, size, handler,
                                 handler->ConnectionKey(user_id, user_id_size));

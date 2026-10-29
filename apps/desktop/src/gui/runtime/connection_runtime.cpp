@@ -220,6 +220,7 @@ void GuiRuntime::HandleServerControllerDisconnected(
                                           std::memory_order_relaxed);
 #endif
   }
+  clipboard_.ForgetWeb(remote_id);
   if (has_connected_controller) {
     remote_client_id_ = remaining_controller_id;
     return;

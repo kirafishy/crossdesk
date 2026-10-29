@@ -10,10 +10,12 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <unordered_map>
 
 namespace crossdesk::gui_detail {
 struct RemoteSession;
@@ -22,6 +24,7 @@ struct RemoteSession;
 namespace crossdesk {
 
 class GuiRuntime;
+class PeerEventHandler;
 
 // Owns clipboard synchronization state and keeps feedback-loop prevention out
 // of the main UI coordinator.
@@ -35,11 +38,20 @@ public:
   void Initialize();
   void Shutdown();
   void QueueRemoteText(const char* data, size_t size,
-                       const std::string& remote_id = {});
+                       const std::string& remote_id = {},
+                       std::function<void(bool)> complete = {},
+                       std::function<bool()> allowed = {});
   void ApplyPendingRemoteText();
   void HandleLocalUpdate();
+  void ReceiveWeb(const char* data, size_t size, const std::string& remote_id,
+                   PeerEventHandler* source);
+  void ForgetWeb(const std::string& remote_id);
 
 private:
+  struct WebSession;
+  bool WebSessionActive(const std::string& remote_id,
+                         const std::shared_ptr<WebSession>& session);
+  int SendToController(const std::string& remote_id, const std::string& text);
   int SendToPeers(const std::string &text);
   void SendDeferredLocalText();
 
@@ -51,10 +63,14 @@ private:
   std::string pending_remote_id_;
   std::weak_ptr<gui_detail::RemoteSession> pending_session_;
   uint64_t pending_generation_ = 0;
+  std::function<void(bool)> pending_complete_;
+  std::function<bool()> pending_allowed_;
   std::string last_text_;
   // UI thread only. Retain the destination of a local copy while its stream
   // window is unfocused; last_text_ holds the latest value to send on return.
   std::weak_ptr<gui_detail::RemoteSession> deferred_local_session_;
+  std::mutex web_sessions_mutex_;
+  std::unordered_map<std::string, std::shared_ptr<WebSession>> web_sessions_;
 };
 
 } // namespace crossdesk

@@ -10,6 +10,7 @@
 
 #include "rd_log.h"
 #include "runtime/gui_runtime.h"
+#include "web_clipboard_protocol.h"
 
 namespace crossdesk {
 namespace {
@@ -19,6 +20,12 @@ namespace {
 constexpr size_t kMaxClipboardTextBytes = 128 * 1024;
 
 } // namespace
+
+struct ClipboardController::WebSession {
+  std::weak_ptr<PeerEventHandler> events;
+  web_clipboard::Assembler assembler;
+  std::atomic<bool> ready{false};
+};
 
 ClipboardController::ClipboardController(GuiRuntime &owner) : owner_(owner) {}
 
@@ -44,12 +51,115 @@ void ClipboardController::Initialize() {
 void ClipboardController::Shutdown() {
   events_enabled_.store(false, std::memory_order_release);
   deferred_local_session_.reset();
+  {
+    std::lock_guard lock(web_sessions_mutex_);
+    web_sessions_.clear();
+  }
   std::lock_guard<std::mutex> lock(pending_mutex_);
   pending_remote_text_.reset();
+  pending_complete_ = {};
+  pending_allowed_ = {};
+}
+
+bool ClipboardController::WebSessionActive(
+    const std::string& remote_id, const std::shared_ptr<WebSession>& session) {
+  if (!session || !events_enabled_.load(std::memory_order_acquire) ||
+      !owner_.IsAuthorizedController(remote_id)) return false;
+  const auto events = session->events.lock();
+  if (!events || events != owner_.ControllerEvents(remote_id) ||
+      !events->DataAllowed()) return false;
+  std::lock_guard lock(web_sessions_mutex_);
+  const auto found = web_sessions_.find(remote_id);
+  return found != web_sessions_.end() && found->second == session;
+}
+
+void ClipboardController::ForgetWeb(const std::string& remote_id) {
+  std::lock_guard lock(web_sessions_mutex_);
+  web_sessions_.erase(remote_id);
+}
+
+void ClipboardController::ReceiveWeb(const char* data, size_t size,
+                                      const std::string& remote_id,
+                                      PeerEventHandler* source) {
+  namespace clip = web_clipboard;
+  if (!events_enabled_.load(std::memory_order_acquire) || owner_.unattended_host_ ||
+      !owner_.IsAuthorizedController(remote_id) || !data ||
+      size < clip::kHeaderBytes || size > clip::kHeaderBytes + clip::kChunkBytes)
+    return;
+  const auto events = owner_.ControllerEvents(remote_id);
+  if (!events || events.get() != source || !events->DataAllowed()) return;
+  const auto kind = clip::Read32(data), request = clip::Read32(data + 4);
+  const bool hello = kind == clip::kHello && !request && size == clip::kHeaderBytes &&
+                     clip::Read32(data + 8) == clip::kVersion && !clip::Read32(data + 12);
+  std::shared_ptr<WebSession> session;
+  std::string message;
+  {
+    std::lock_guard lock(web_sessions_mutex_);
+    if (!events_enabled_.load(std::memory_order_relaxed)) return;
+    auto found = web_sessions_.find(remote_id);
+    if (hello) {
+      // A new application handshake also invalidates unfinished writes from
+      // an earlier channel on the same controller connection.
+      session = std::make_shared<WebSession>();
+      session->events = events;
+      web_sessions_[remote_id] = session;
+    } else {
+      if (found == web_sessions_.end() || found->second->events.lock() != events) return;
+      session = found->second;
+    }
+    if (!hello) {
+      if (!session->ready.load(std::memory_order_acquire) ||
+          kind != clip::kText || !request) return;
+      message = session->assembler.Receive(std::string_view(data, size));
+    }
+  }
+  if (hello) {
+    if (!WebSessionActive(remote_id, session)) return;
+    const auto ready = clip::Frame(clip::kReady, 0, clip::kVersion);
+    if (owner_.SendControllerData(remote_id, ready.data(), ready.size(),
+                                  clip::kStream) == 0)
+      session->ready.store(true, std::memory_order_release);
+    return;
+  }
+  if (message.empty()) return;
+  const std::weak_ptr<WebSession> weak = session;
+  auto allowed = [this, remote_id, weak] {
+    return WebSessionActive(remote_id, weak.lock());
+  };
+  auto complete = [this, remote_id, request, allowed](bool applied) {
+    if (!allowed()) return;
+    const auto ack = clip::Frame(applied ? clip::kApplied : clip::kRejected, request);
+    owner_.SendControllerData(remote_id, ack.data(), ack.size(), clip::kStream);
+  };
+  QueueRemoteText(message.data() + clip::kHeaderBytes,
+                 message.size() - clip::kHeaderBytes, {},
+                 std::move(complete), std::move(allowed));
+}
+
+int ClipboardController::SendToController(const std::string& remote_id,
+                                          const std::string& text) {
+  std::shared_ptr<WebSession> session;
+  {
+    std::lock_guard lock(web_sessions_mutex_);
+    const auto found = web_sessions_.find(remote_id);
+    if (found != web_sessions_.end()) session = found->second;
+  }
+  if (!session) return owner_.SendControllerData(
+      remote_id, text.data(), text.size(), owner_.clipboard_label_.c_str());
+  if (!session->ready.load(std::memory_order_acquire)) return 0;
+  // Framing belongs to CrossDesk. Keep each complete packet within 16 KiB.
+  return web_clipboard::SendText(text, 0, 16 * 1024,
+      [this, &remote_id, &session](const std::string& frame) {
+        return WebSessionActive(remote_id, session) &&
+               owner_.SendControllerData(remote_id, frame.data(), frame.size(),
+                                        web_clipboard::kStream) == 0;
+      }) ? 0 : -1;
 }
 
 void ClipboardController::QueueRemoteText(const char* data, size_t size,
-                                          const std::string& remote_id) {
+                                          const std::string& remote_id,
+                                          std::function<void(bool)> complete,
+                                          std::function<bool()> allowed) {
   if (!events_enabled_.load(std::memory_order_acquire)) {
     return;
   }
@@ -70,6 +180,7 @@ void ClipboardController::QueueRemoteText(const char* data, size_t size,
   if (!remote_id.empty() && (!session || !session->clipboard_allowed_.load()))
     return;
   const auto generation = session ? session->input_generation_.load() : 0;
+  std::function<void(bool)> superseded;
   {
     std::lock_guard<std::mutex> lock(pending_mutex_);
     if (!events_enabled_.load(std::memory_order_relaxed)) {
@@ -81,7 +192,11 @@ void ClipboardController::QueueRemoteText(const char* data, size_t size,
     pending_remote_id_ = remote_id;
     pending_session_ = session;
     pending_generation_ = generation;
+    superseded = std::move(pending_complete_);
+    pending_complete_ = std::move(complete);
+    pending_allowed_ = std::move(allowed);
   }
+  if (superseded) superseded(false);
 
   SDL_Event event{};
   event.type = event_type_;
@@ -101,27 +216,38 @@ void ClipboardController::ApplyPendingRemoteText() {
   std::string source_id;
   std::weak_ptr<gui_detail::RemoteSession> source_session;
   uint64_t generation = 0;
+  std::function<void(bool)> complete;
+  std::function<bool()> allowed;
   {
     std::lock_guard<std::mutex> lock(pending_mutex_);
     pending_text.swap(pending_remote_text_);
     source_id.swap(pending_remote_id_);
     source_session.swap(pending_session_);
     generation = pending_generation_;
+    complete.swap(pending_complete_);
+    allowed.swap(pending_allowed_);
   }
   if (!source_id.empty()) {
     auto props = owner_.FindRemoteSession(source_id);
     if (!props || props != source_session.lock() ||
         !props->clipboard_allowed_.load() ||
-        props->input_generation_.load() != generation)
+        props->input_generation_.load() != generation) {
+      if (complete) complete(false);
       return;
+    }
   }
-  if (!pending_text || *pending_text == last_text_) {
+  if (!pending_text || (allowed && !allowed())) {
+    if (complete) complete(false);
     return;
   }
 
   // SDL clipboard functions must run on the thread that initialized SDL.
+  // Browser writes must also refresh an unchanged baseline: the local OS
+  // clipboard may have changed since the last poll.
+  if (!complete && *pending_text == last_text_) return;
   if (!SDL_SetClipboardText(pending_text->c_str())) {
     LOG_ERROR("Failed to set remote clipboard text: {}", SDL_GetError());
+    if (complete) complete(false);
     return;
   }
 
@@ -129,6 +255,7 @@ void ClipboardController::ApplyPendingRemoteText() {
   // the baseline first so that event cannot echo the text back to the sender.
   last_text_ = std::move(*pending_text);
   deferred_local_session_.reset();
+  if (complete) complete(true);
 }
 
 void ClipboardController::HandleLocalUpdate() {
@@ -228,8 +355,7 @@ int ClipboardController::SendToPeers(const std::string &text) {
 
   lock.unlock();
   for (const auto& id : owner_.ConnectedControllers()) {
-    const int ret = owner_.SendControllerData(id, text.data(), text.size(),
-                                              owner_.clipboard_label_.c_str());
+    const int ret = SendToController(id, text);
     if (ret != 0) return ret;
   }
 

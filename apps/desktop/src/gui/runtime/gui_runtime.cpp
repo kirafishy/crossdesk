@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <display_stream_id.h>
+#include <web_clipboard_protocol.h>
 #include "localization.h"
 #include "platform/video_renderer.h"
 #include "rd_log.h"
@@ -308,6 +309,8 @@ int GuiRuntime::CreateConnectionPeer() {
     AddDataStream(peer_, file_label_.c_str(), true);
     AddDataStream(peer_, file_feedback_label_.c_str(), true);
     AddDataStream(peer_, clipboard_label_.c_str(), true);
+    if (!unattended_host_)
+      AddDataStream(peer_, web_clipboard::kStream, true);
     return 0;
   } else {
     return -1;
