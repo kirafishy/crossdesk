@@ -127,4 +127,43 @@ fi
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 
+# A distribution build must not silently fall back to an ad-hoc/development
+# identity, omit a secure timestamp, or leave its updater/runtime unsigned.
+APP_SIGNATURE="$(codesign --display --verbose=4 "$APP_BUNDLE" 2>&1)"
+if [[ "${CROSSDESK_MACOS_SIGN_IDENTITY:--}" != "-" ||
+      "$APP_SIGNATURE" == *"Authority=Developer ID Application: "* ]]; then
+    EXPECTED_TEAM="$(printf '%s\n' "$APP_SIGNATURE" | sed -n 's/^TeamIdentifier=//p')"
+    verify_distribution_signature() {
+        local target="$1"
+        local signature=""
+        codesign --verify --strict --verbose=2 \
+            -R='anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists' \
+            "$target"
+        signature="$(codesign --display --verbose=4 "$target" 2>&1)"
+        if ! printf '%s\n' "$signature" | grep -q '^CodeDirectory .*flags=.*runtime'; then
+            echo "Hardened Runtime is missing: $target" >&2
+            return 1
+        fi
+        if ! printf '%s\n' "$signature" | grep -q '^Timestamp='; then
+            echo "Secure signing timestamp is missing: $target" >&2
+            return 1
+        fi
+        if ! printf '%s\n' "$signature" | grep -Fxq "TeamIdentifier=$EXPECTED_TEAM"; then
+            echo "Signing team mismatch: $target" >&2
+            return 1
+        fi
+        if [[ "${CROSSDESK_MACOS_SIGN_IDENTITY:--}" != "-" ]] &&
+           ! printf '%s\n' "$signature" | grep -Fxq "Authority=$CROSSDESK_MACOS_SIGN_IDENTITY"; then
+            echo "Unexpected signing identity: $target" >&2
+            return 1
+        fi
+    }
+
+    verify_distribution_signature "$APP_BUNDLE"
+    verify_distribution_signature "$UPDATER"
+    while IFS= read -r -d '' library; do
+        verify_distribution_signature "$library"
+    done < <(find "$FRAMEWORKS_DIR" -type f -name '*.dylib' -print0)
+fi
+
 echo "Verified $APP_BUNDLE ($EXPECTED_ARCH, macOS $BINARY_MIN_VERSION+)"

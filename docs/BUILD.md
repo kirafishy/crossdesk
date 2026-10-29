@@ -59,6 +59,67 @@ xmake r crossdesk
 
 打包脚本会生成包含 Slint 运行库的 `.app` 和 `.pkg`。屏幕录制、辅助功能授权与应用路径及签名有关；测试被控能力时请使用固定路径下的应用包。
 
+### Developer ID 签名与公证
+
+默认打包对应用使用 ad-hoc 签名，不签名安装包，适用于本地开发。对外分发时，需要在钥匙串安装同一团队的 `Developer ID Application`、`Developer ID Installer` 证书及对应私钥，并设置以下环境变量（替换证书名称与团队 ID）：
+
+```bash
+export CROSSDESK_MACOS_SIGN_IDENTITY='Developer ID Application: Your Organization (TEAMID)'
+export CROSSDESK_MACOS_INSTALLER_IDENTITY='Developer ID Installer: Your Organization (TEAMID)'
+
+# 仅首次配置：按提示输入 Apple ID 和 App 专用密码，保存到本机钥匙串。
+xcrun notarytool store-credentials crossdesk-notary --team-id TEAMID
+export CROSSDESK_MACOS_NOTARY_PROFILE=crossdesk-notary
+
+# 先完成上面的 release 编译；Intel 改用 pkg_x64.sh。
+./apps/desktop/scripts/macos/pkg_arm64.sh 1.4.3
+```
+
+脚本依次签署 Slint 动态库、更新器与应用，启用 Hardened Runtime、安全时间戳及所需资源权限，再使用 Installer 证书签署 `.pkg`。配置公证 Profile 后会提交 Apple 公证，仅在返回 `Accepted` 后附加票据并校验 Gatekeeper。未配置 Profile 时只生成已签名但未公证的安装包；签名与公证不代替用户对屏幕录制、辅助功能等权限的授权。
+
+已有签名安装包可以单独提交公证：
+
+```bash
+CROSSDESK_MACOS_NOTARY_PROFILE=crossdesk-notary \
+  bash apps/desktop/scripts/macos/notarize_pkg.sh crossdesk-macos-arm64-1.4.3.pkg
+```
+
+上传成功后会立即显示提交 ID，并保存 `.notary-submit.json`；公证结果及日志保存在安装包旁的 `.notary.json`、`.notary-log.json` 文件中。失败或超时会终止打包并保留产物及提交 ID。默认等待 30 分钟，可用 `CROSSDESK_MACOS_NOTARY_TIMEOUT` 调整。超时后可用 `xcrun notarytool wait <提交ID> --keychain-profile crossdesk-notary` 继续等待，确认 `Accepted` 后执行 `xcrun stapler staple <安装包>`、`xcrun stapler validate <安装包>` 和 `spctl --assess --type install --verbose=2 <安装包>`。
+
+若加速上传出现连接超时，可设置 `CROSSDESK_MACOS_NOTARY_S3_ACCELERATION=false`，使用普通 S3 上传通道重试；默认值为 `true`。上传失败也可能已在 Apple 端创建记录，重试前先用 `xcrun notarytool history --keychain-profile crossdesk-notary` 检查提交历史。
+
+自定义钥匙串可通过 `CROSSDESK_MACOS_KEYCHAIN` 指定，证书私钥与公证 Profile 都需要存放在该钥匙串。不要将私钥、P12 文件或密码提交到仓库。苹果说明：[Developer ID 证书](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/)、[公证要求](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)。
+
+### GitHub Actions 自动签名与公证
+
+[Build and Release 工作流](../.github/workflows/build.yml) 对 `v*` 发布标签自动启用 macOS 签名、公证与票据附加；手动运行时可勾选 `sign_macos`。普通分支推送及未勾选的手动构建沿用 ad-hoc 签名。两种架构均在各自 runner 上完成处理，只有公证及 Gatekeeper 校验成功的签名构建才上传正式产物；缺少 Secrets 或公证失败会阻止发布。
+
+先在本机“钥匙串访问 → 我的证书”中，分别将 `Developer ID Application` 和 `Developer ID Installer` **连同对应私钥**导出为两个 `.p12` 文件，并为这两个文件设置相同的导出密码。只有 `.cer` 证书文件不能用于 CI 签名。文件保存在工程之外，例如 `~/Downloads/crossdesk-application.p12` 和 `~/Downloads/crossdesk-installer.p12`。
+
+在 GitHub 仓库 **Settings → Secrets and variables → Actions → New repository secret** 中配置：
+
+| Secret | 内容 |
+| --- | --- |
+| `MACOS_APP_CERTIFICATE_P12_BASE64` | Application 证书及私钥的 `.p12` 文件的 Base64 |
+| `MACOS_INSTALLER_CERTIFICATE_P12_BASE64` | Installer 证书及私钥的 `.p12` 文件的 Base64 |
+| `MACOS_P12_PASSWORD` | 导出两个 `.p12` 时设置的共同密码 |
+| `APPLE_ID` | 拥有该开发团队权限的 Apple 账户邮箱 |
+| `APPLE_APP_SPECIFIC_PASSWORD` | 为公证生成的 App 专用密码 |
+| `APPLE_TEAM_ID` | 两张证书所属的 10 位团队 ID |
+
+在本机分别执行以下命令，将剪贴板内容粘贴到对应的 Base64 Secret。先保存第一项，再执行第二条命令：
+
+```bash
+base64 -i "$HOME/Downloads/crossdesk-application.p12" | pbcopy
+base64 -i "$HOME/Downloads/crossdesk-installer.p12" | pbcopy
+```
+
+本机保存的 `crossdesk-notary` 钥匙串 Profile 不会同步到 GitHub runner。工作流使用上述 Secrets 在临时钥匙串中重建 Profile，自动选择与团队 ID 匹配的有效证书，配置签名工具无需交互访问这些临时私钥，并在任务结束时删除证书和公证凭据。无需额外设置钥匙串密码 Secret，也无需为当前 Developer ID 分发流程配置 provisioning profile。
+
+配置后先手动运行工作流：填写 `desktop_version`，勾选 `sign_macos`，确认 ARM64、Intel 的 `Notarize and staple macOS installer` 步骤均成功，再推送发布标签。需要先将工作流和配套脚本提交、推送到 GitHub，新的开关和步骤才会生效。
+
+CI 最多等待公证 60 分钟；若 Apple 仍在处理，任务失败并阻止发布，但会保留 `macos-pending-notarization-*` 安装包及 `macos-notarization-*` JSON 诊断产物 14 天。下载产物后，按上一节用已保存的提交 ID 查询并附加票据，无需重复上传同一个包。不要将 pending 产物当作已经完成公证的发布包。自动签名流程不改变安装器当前的权限重置逻辑；辅助功能授权是否保留还需单独调整安装脚本。
+
 ## Linux
 
 Linux 构建支持 Ubuntu 20.04 及以上版本的 amd64 和 arm64。发布安装包以

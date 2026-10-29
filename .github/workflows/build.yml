@@ -24,6 +24,11 @@ on:
         required: false
         type: boolean
         default: false
+      sign_macos:
+        description: "Sign and notarize macOS installers (automatic for v* release tags)."
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -220,7 +225,9 @@ jobs:
       VERSION_NUM: ${{ needs.prepare-version.outputs.version }}
       MACOSX_DEPLOYMENT_TARGET: "14.0"
       EXPECTED_MACOS_SDK: "26.5"
+      MACOS_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.sign_macos) }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: x64
@@ -237,6 +244,27 @@ jobs:
             package_script: ./apps/desktop/scripts/macos/pkg_arm64.sh
 
     steps:
+      - name: Validate macOS signing secrets
+        if: env.MACOS_SIGNING_REQUIRED == 'true'
+        shell: bash
+        env:
+          MACOS_APP_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_APP_CERTIFICATE_P12_BASE64 }}
+          MACOS_INSTALLER_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_INSTALLER_CERTIFICATE_P12_BASE64 }}
+          MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=0
+          for name in MACOS_APP_CERTIFICATE_P12_BASE64 MACOS_INSTALLER_CERTIFICATE_P12_BASE64 \
+            MACOS_P12_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required Actions secret: ${name}"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Select Xcode 26.6
         shell: bash
         run: |
@@ -275,7 +303,21 @@ jobs:
           xmake f --target_minver=${MACOSX_DEPLOYMENT_TARGET} --CROSSDESK_VERSION=${VERSION_NUM} --USE_CUDA=false -vyD
           xmake b -vy crossdesk
 
+      - name: Import Developer ID certificates and notarization credentials
+        id: macos_signing
+        if: env.MACOS_SIGNING_REQUIRED == 'true'
+        shell: bash
+        env:
+          MACOS_APP_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_APP_CERTIFICATE_P12_BASE64 }}
+          MACOS_INSTALLER_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_INSTALLER_CERTIFICATE_P12_BASE64 }}
+          MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash .github/scripts/setup_macos_signing.sh
+
       - name: Package CrossDesk app
+        id: macos_package
         run: |
           chmod +x ${{ matrix.package_script }}
           ${{ matrix.package_script }} ${VERSION_NUM}
@@ -296,16 +338,55 @@ jobs:
 
           ./apps/desktop/scripts/macos/verify_app.sh "${APP_PATH}" "${{ matrix.binary_arch }}" "${EXPECTED_MACOS_SDK}"
 
+      - name: Notarize and staple macOS installer
+        id: macos_notarization
+        if: env.MACOS_SIGNING_REQUIRED == 'true'
+        timeout-minutes: 65
+        shell: bash
+        env:
+          CROSSDESK_MACOS_NOTARY_PROFILE: ${{ steps.macos_signing.outputs.notary_profile }}
+          CROSSDESK_MACOS_NOTARY_TIMEOUT: 60m
+          CROSSDESK_MACOS_NOTARY_S3_ACCELERATION: "false"
+        run: |
+          bash ./apps/desktop/scripts/macos/notarize_pkg.sh \
+            "crossdesk-macos-${{ matrix.arch }}-${VERSION_NUM}.pkg"
+
+      - name: Upload macOS notarization diagnostics
+        if: always() && env.MACOS_SIGNING_REQUIRED == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-notarization-${{ matrix.arch }}-${{ env.VERSION_NUM }}
+          path: crossdesk-macos-${{ matrix.arch }}-${{ env.VERSION_NUM }}.pkg.notary*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Preserve signed installer after notarization failure
+        if: failure() && env.MACOS_SIGNING_REQUIRED == 'true' && steps.macos_package.outcome == 'success'
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-pending-notarization-${{ matrix.arch }}-${{ env.VERSION_NUM }}
+          path: crossdesk-macos-${{ matrix.arch }}-${{ env.VERSION_NUM }}.pkg
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v6
         with:
           name: crossdesk-macos-${{ matrix.arch }}-${{ env.VERSION_NUM }}
           path: crossdesk-macos-${{ matrix.arch }}-${{ env.VERSION_NUM }}.pkg
+          if-no-files-found: error
 
       - name: Move files to release dir
         run: |
           mkdir -p release
           cp crossdesk-macos-${{ matrix.arch }}-${{ env.VERSION_NUM }}.pkg release/
+
+      - name: Remove macOS signing credentials
+        if: always() && env.MACOS_SIGNING_REQUIRED == 'true'
+        shell: bash
+        run: |
+          security delete-keychain "${RUNNER_TEMP}/crossdesk-macos-signing/signing.keychain-db" 2>/dev/null || true
+          rm -rf "${RUNNER_TEMP:?}/crossdesk-macos-signing"
 
   # iOS (also available as a standalone workflow)
   build-ios:

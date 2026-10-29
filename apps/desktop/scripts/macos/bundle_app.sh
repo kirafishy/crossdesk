@@ -127,9 +127,9 @@ fi
 # The package cache remains intact for debugging and other consumers.
 strip -S -x "$FRAMEWORKS_DIR/$SLINT_NAME"
 
-# install_name_tool and strip invalidate the linker's ad-hoc signature. Sign nested code
-# first, then seal the complete app bundle so local packages remain launchable.
-codesign --force --sign - "$FRAMEWORKS_DIR/$SLINT_NAME"
-codesign --force --deep --sign - "$APP_BUNDLE"
+# install_name_tool and strip invalidate existing signatures. Sign only after
+# all bundle changes, using Developer ID when configured or ad-hoc for local use.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "$SCRIPT_DIR/sign_app.sh" "$APP_BUNDLE"
 
 echo "Bundled Slint runtime: $SLINT_LIBRARY"

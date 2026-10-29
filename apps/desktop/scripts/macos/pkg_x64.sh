@@ -13,6 +13,31 @@ IDENTIFIER="cn.crossdesk.app"
 ICON_PATH="${PROJECT_ROOT}/apps/desktop/resources/macos/crossdesk.icns"
 MACOS_MIN_VERSION="14.0"
 
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 <version>" >&2
+    exit 2
+fi
+
+# For distribution, configure both full Developer ID certificate names.
+# Setting CROSSDESK_MACOS_NOTARY_PROFILE also notarizes and staples the pkg.
+PRODUCT_SIGN_ARGS=()
+if [[ -n "${CROSSDESK_MACOS_INSTALLER_IDENTITY:-}" || -n "${CROSSDESK_MACOS_NOTARY_PROFILE:-}" ||
+      "${CROSSDESK_MACOS_SIGN_IDENTITY:--}" != "-" ]]; then
+    if [[ "${CROSSDESK_MACOS_SIGN_IDENTITY:-}" != "Developer ID Application: "* ||
+          "${CROSSDESK_MACOS_INSTALLER_IDENTITY:-}" != "Developer ID Installer: "* ]]; then
+        echo "Signed packaging requires CROSSDESK_MACOS_SIGN_IDENTITY and CROSSDESK_MACOS_INSTALLER_IDENTITY." >&2
+        exit 1
+    fi
+    if [[ "${CROSSDESK_MACOS_SIGN_IDENTITY##* (}" != "${CROSSDESK_MACOS_INSTALLER_IDENTITY##* (}" ]]; then
+        echo "Application and installer certificates must belong to the same team." >&2
+        exit 1
+    fi
+    PRODUCT_SIGN_ARGS+=(--sign "$CROSSDESK_MACOS_INSTALLER_IDENTITY" --timestamp)
+    if [[ -n "${CROSSDESK_MACOS_KEYCHAIN:-}" ]]; then
+        PRODUCT_SIGN_ARGS+=(--keychain "$CROSSDESK_MACOS_KEYCHAIN")
+    fi
+fi
+
 cd "$PROJECT_ROOT"
 
 normalize_app_version() {
@@ -175,12 +200,22 @@ cat > build_pkg_temp/Distribution <<EOF
 EOF
 
 productbuild \
+  ${PRODUCT_SIGN_ARGS[@]+"${PRODUCT_SIGN_ARGS[@]}"} \
   --distribution build_pkg_temp/Distribution \
   --package-path build_pkg_temp \
   --resources build_pkg_resources \
   "${PKG_NAME}"
 
 echo "PKG package created: ${PKG_NAME}"
+
+if [[ -n "${CROSSDESK_MACOS_INSTALLER_IDENTITY:-}" ]]; then
+    pkgutil --check-signature "${PKG_NAME}"
+fi
+if [[ -n "${CROSSDESK_MACOS_NOTARY_PROFILE:-}" ]]; then
+    bash "${SCRIPT_DIR}/notarize_pkg.sh" "${PKG_NAME}"
+elif [[ -n "${CROSSDESK_MACOS_INSTALLER_IDENTITY:-}" ]]; then
+    echo "Package is signed but not notarized. Set CROSSDESK_MACOS_NOTARY_PROFILE before public distribution."
+fi
 
 # Set custom icon for PKG file
 if [ -f "${ICON_PATH}" ]; then
@@ -215,8 +250,7 @@ APPLESCRIPT
 fi
 echo "Set icon finished"
 
-rm -rf build_pkg_temp build_pkg_scripts build_pkg_resources ${APP_BUNDLE}
+rm -rf build_pkg_temp build_pkg_scripts build_pkg_resources "${APP_BUNDLE}"
 
 echo "PKG package created successfully."
-echo "package ${APP_BUNDLE}"
 echo "installer ${PKG_NAME}"

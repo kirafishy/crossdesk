@@ -56,6 +56,67 @@ The current CI sets macOS 14.0 as the minimum target for both Intel and Apple Si
 
 The scripts create an `.app` and `.pkg` containing the Slint runtime. Screen Recording and Accessibility grants depend on the app path and signature; use a consistent application bundle when testing host functionality.
 
+### Developer ID signing and notarization
+
+By default, packaging uses ad-hoc app signatures and leaves the installer unsigned for local development. For distribution, install both `Developer ID Application` and `Developer ID Installer` certificates and their private keys from the same team in your keychain. Configure their full names and your team ID:
+
+```bash
+export CROSSDESK_MACOS_SIGN_IDENTITY='Developer ID Application: Your Organization (TEAMID)'
+export CROSSDESK_MACOS_INSTALLER_IDENTITY='Developer ID Installer: Your Organization (TEAMID)'
+
+# One-time setup: enter your Apple ID and app-specific password when prompted.
+xcrun notarytool store-credentials crossdesk-notary --team-id TEAMID
+export CROSSDESK_MACOS_NOTARY_PROFILE=crossdesk-notary
+
+# Build in release mode first, as above. Use pkg_x64.sh for Intel.
+./apps/desktop/scripts/macos/pkg_arm64.sh 1.4.3
+```
+
+The scripts sign the Slint runtime, updater and app, enable Hardened Runtime with secure timestamps and required resource entitlements, and sign the `.pkg` using the Installer certificate. When a notary profile is configured, they submit to Apple, staple only an `Accepted` result, and verify Gatekeeper assessment. Without a profile, the result is signed but not notarized. Signing and notarization do not replace user consent for Screen Recording, Accessibility or other protected resources.
+
+To notarize an existing signed installer separately:
+
+```bash
+CROSSDESK_MACOS_NOTARY_PROFILE=crossdesk-notary \
+  bash apps/desktop/scripts/macos/notarize_pkg.sh crossdesk-macos-arm64-1.4.3.pkg
+```
+
+After a successful upload, the submission ID is printed immediately and saved in `.notary-submit.json`. The result and log are saved next to the installer as `.notary.json` and `.notary-log.json`. Failure or timeout stops packaging and preserves the artifact and submission ID. The default wait is 30 minutes; override it with `CROSSDESK_MACOS_NOTARY_TIMEOUT`. After a timeout, resume waiting with `xcrun notarytool wait <submission-id> --keychain-profile crossdesk-notary`; after confirming `Accepted`, run `xcrun stapler staple <package>`, `xcrun stapler validate <package>` and `spctl --assess --type install --verbose=2 <package>`.
+
+If accelerated uploads time out, set `CROSSDESK_MACOS_NOTARY_S3_ACCELERATION=false` to retry using the standard S3 upload endpoint; the default is `true`. A failed upload may still allocate a submission record at Apple, so check `xcrun notarytool history --keychain-profile crossdesk-notary` before retrying.
+
+Set `CROSSDESK_MACOS_KEYCHAIN` to use a custom keychain containing both signing identities and the notary profile. Never commit private keys, P12 files or passwords. See Apple's [Developer ID certificate guide](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) and [notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
+
+### Signing and notarization in GitHub Actions
+
+The [Build and Release workflow](../.github/workflows/build.yml) automatically signs, notarizes and staples macOS installers for `v*` release tags. Manual runs can enable `sign_macos`; ordinary branch pushes and unchecked manual runs retain ad-hoc signing. Each architecture is processed on its own runner. Signed builds upload their normal artifacts only after notarization and Gatekeeper verification succeed; missing secrets or notarization failures block publication.
+
+In **Keychain Access → My Certificates**, export the `Developer ID Application` and `Developer ID Installer` identities **with their private keys** into two `.p12` files, using the same export password for both. A `.cer` file alone is insufficient. Keep these files outside the repository, for example `~/Downloads/crossdesk-application.p12` and `~/Downloads/crossdesk-installer.p12`.
+
+Add these repository secrets under **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+| --- | --- |
+| `MACOS_APP_CERTIFICATE_P12_BASE64` | Base64 of the Application certificate/private-key `.p12` |
+| `MACOS_INSTALLER_CERTIFICATE_P12_BASE64` | Base64 of the Installer certificate/private-key `.p12` |
+| `MACOS_P12_PASSWORD` | Shared export password for both `.p12` files |
+| `APPLE_ID` | Apple account email with access to the developer team |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password generated for notarization |
+| `APPLE_TEAM_ID` | The 10-character team ID of both certificates |
+
+Run these commands separately and paste each clipboard value into its corresponding Base64 secret. Save the first secret before running the second command:
+
+```bash
+base64 -i "$HOME/Downloads/crossdesk-application.p12" | pbcopy
+base64 -i "$HOME/Downloads/crossdesk-installer.p12" | pbcopy
+```
+
+Your local `crossdesk-notary` profile does not synchronize to GitHub runners. The workflow recreates it in a temporary keychain, selects valid identities matching the team ID, allows signing tools to access only those imported keys without interactive prompts, and deletes signing/notarization credentials at the end of the job. No extra keychain password secret or provisioning profile is required for the current Developer ID distribution setup.
+
+After committing and pushing the workflow and supporting scripts, first run it manually with `desktop_version` set and `sign_macos` enabled. Confirm that `Notarize and staple macOS installer` succeeds for both ARM64 and Intel before pushing a release tag.
+
+CI waits up to 60 minutes for notarization. If Apple is still processing, the job fails and blocks publication, while preserving `macos-pending-notarization-*` installer artifacts and `macos-notarization-*` JSON diagnostics for 14 days. Download them and use the saved submission ID as described above to resume checking and staple the package without uploading it again. Pending artifacts are not completed notarized releases. CI signing does not change the installer's existing permission-reset behavior; preserving Accessibility grants requires a separate installer change.
+
 ## Linux
 
 Linux builds support Ubuntu 20.04 or later on amd64 and arm64. Release packages
