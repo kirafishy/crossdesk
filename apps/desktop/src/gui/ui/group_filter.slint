@@ -26,6 +26,9 @@ export component GroupFilter inherits FlatSurface {
     private property <bool> has-divider: root.system-count > 0 && root.model.length > root.system-count;
     private property <length> list-height: root.model.length * 26px + (root.has-divider ? 6px : 0px);
     private property <length> visible-height: min(root.list-height, 162px);
+    // Fluent's scrollbar expands to 14px over the viewport on hover.
+    // Leave a 4px gap between its full track and the option rows.
+    private property <length> scrollbar-gutter: root.list-height > root.visible-height ? 18px : 0px;
     private property <length> scroll-y: 0px;
     private property <bool> popup-animation-enabled: false;
     private property <float> popup-progress: 0;
@@ -147,13 +150,16 @@ export component GroupFilter inherits FlatSurface {
                 background: white;
                 clip: true;
                 outline-color: root.normal-outline-color; border-radius: UiRadius.menu;
-                ScrollView {
+                list := ScrollView {
                     x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
-                    viewport-width: self.width;
+                    viewport-width: self.visible-width;
                     viewport-height: root.list-height;
                     viewport-y <=> root.scroll-y;
+                    horizontal-scrollbar-policy: always-off;
+                    vertical-scrollbar-policy: as-needed;
                     Rectangle {
-                        width: parent.width; height: root.list-height;
+                        x: 0px; y: 0px;
+                        width: max(0px, list.viewport-width - root.scrollbar-gutter); height: root.list-height;
                         if root.has-divider: SurfaceSeparator {
                             x: 6px; y: root.system-count * 26px + 3px;
                             width: parent.width - 12px; height: 1px; outline-color: UiSurface.separator;
