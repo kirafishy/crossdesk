@@ -79,10 +79,10 @@ public:
   int StartKeyboardCapturer();
   int StopKeyboardCapturer();
 
-  int InitializeAudioOutput();
   int DestroyAudioOutput();
   // Serialized by GuiRuntime::audio_delivery_mutex_. Each peer has its own
   // stream so SDL mixes simultaneous playback and muting clears only that peer.
+  // Open the output on the first frame and close it after the last stream ends.
   void ClearAudio(const std::string& remote_id);
   void PushAudio(const std::string& remote_id, const char *data, size_t size);
 
@@ -102,6 +102,7 @@ public:
   std::vector<HostDisplay> host_display_list() const;
 
 private:
+  int InitializeAudioOutput();
   unsigned ReleaseMouseButtonMask(unsigned mask);
   void DrainCapturedKeyboardInput();
   bool ShouldSendCapturedFrame(std::chrono::steady_clock::time_point now,
@@ -117,6 +118,7 @@ private:
   GuiRuntime &owner_;
   uint32_t output_device_ = 0;
   std::unordered_map<std::string, SDL_AudioStream*> output_streams_;
+  std::chrono::steady_clock::time_point next_audio_output_retry_{};
   ScreenCapturerFactory *screen_capturer_factory_ = nullptr;
   ScreenCapturer *screen_capturer_ = nullptr;
   ScreenSharingPower screen_sharing_power_;

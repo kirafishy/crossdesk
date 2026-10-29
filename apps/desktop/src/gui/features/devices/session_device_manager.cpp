@@ -123,7 +123,6 @@ void SessionDeviceManager::RecordCaptureCadence(
 }
 
 void SessionDeviceManager::Initialize() {
-  if (!owner_.unattended_host_) InitializeAudioOutput();
   screen_capturer_factory_ = new ScreenCapturerFactory();
   device_controller_factory_ = new DeviceControllerFactory();
   keyboard_capturer_ =
@@ -573,6 +572,12 @@ int SessionDeviceManager::StopKeyboardCapturer() {
 }
 
 int SessionDeviceManager::InitializeAudioOutput() {
+  if (output_device_) return 0;
+  const auto now = std::chrono::steady_clock::now();
+  if (now < next_audio_output_retry_) return -1;
+  // A missing/unavailable playback device must not be reopened for every frame.
+  next_audio_output_retry_ = now + std::chrono::seconds(1);
+
   SDL_AudioSpec desired_out{};
   desired_out.freq = 48000;
   desired_out.format = SDL_AUDIO_S16;
@@ -610,7 +615,12 @@ int SessionDeviceManager::InitializeAudioOutput() {
 #endif
   }
 
-  SDL_ResumeAudioDevice(output_device_);
+  if (!SDL_ResumeAudioDevice(output_device_)) {
+    LOG_ERROR("Failed to resume output device: {}", SDL_GetError());
+    DestroyAudioOutput();
+    return -1;
+  }
+  next_audio_output_retry_ = {};
   return 0;
 }
 
@@ -630,11 +640,15 @@ void SessionDeviceManager::ClearAudio(const std::string& remote_id) {
   if (found == output_streams_.end()) return;
   SDL_DestroyAudioStream(found->second);
   output_streams_.erase(found);
+  // An open SDL playback device can keep the Windows audio driver active even
+  // without queued samples. Release it when no peer needs playback anymore.
+  if (output_streams_.empty()) DestroyAudioOutput();
 }
 
 void SessionDeviceManager::PushAudio(const std::string& remote_id,
                                      const char *data, size_t size) {
-  if (!output_device_) return;
+  if (!data || size == 0 || owner_.unattended_host_) return;
+  if (InitializeAudioOutput() != 0) return;
   auto found = output_streams_.find(remote_id);
   if (found == output_streams_.end()) {
     SDL_AudioSpec spec{};
@@ -644,17 +658,20 @@ void SessionDeviceManager::PushAudio(const std::string& remote_id,
     auto* stream = SDL_CreateAudioStream(&spec, &spec);
     if (!stream) {
       LOG_ERROR("Failed to create output stream: {}", SDL_GetError());
+      if (output_streams_.empty()) DestroyAudioOutput();
       return;
     }
     if (!SDL_BindAudioStream(output_device_, stream)) {
       LOG_ERROR("Failed to bind output stream: {}", SDL_GetError());
       SDL_DestroyAudioStream(stream);
+      if (output_streams_.empty()) DestroyAudioOutput();
       return;
     }
     found = output_streams_.emplace(remote_id, stream).first;
   }
   if (!SDL_PutAudioStreamData(found->second, data, static_cast<int>(size))) {
     LOG_ERROR("Failed to push audio data: {}", SDL_GetError());
+    ClearAudio(remote_id);
   }
 }
 
