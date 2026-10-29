@@ -406,8 +406,8 @@ inline constexpr TranslationRow kTranslationRows[] = {
   {"请输入六位密码:", {"请输入六位密码:", "Enter a six-character password:", "Введите пароль из 6 символов:", "請輸入六位密碼:", "6 文字のパスワードを入力します。", "6자리 비밀번호를 입력하세요.", "Geben Sie ein sechsstelliges Passwort ein:", "Saisissez un mot de passe à six caractères :", "Ingrese una contraseña de seis caracteres:", "Digite uma senha de seis caracteres:"}},
   {"请输入密码:", {"请输入密码:", "Please input password:", "Введите пароль:", "請輸入密碼:", "パスワードを入力してください:", "비밀번호를 입력해주세요:", "Bitte geben Sie das Passwort ein:", "Veuillez saisir le mot de passe :", "Por favor ingrese la contraseña:", "Insira a senha:"}},
   {"请输入有效的 9 位设备 ID", {"请输入有效的 9 位设备 ID", "Enter a valid 9-digit device ID", "Введите корректный 9-значный ID устройства", "請輸入有效的 9 位裝置 ID", "有効な9桁のデバイスIDを入力してください", "유효한 9자리 장치 ID를 입력하세요.", "Geben Sie eine gültige 9-stellige Geräte-ID ein", "Entrez un identifiant d'appareil valide à 9 chiffres", "Ingrese una ID de dispositivo válida de 9 dígitos", "Insira um ID de dispositivo válido de 9 dígitos"}},
-  {"请输入有效的 IPv4 或 IPv4:端口", {"请输入有效的 IPv4 或 IPv4:端口", "Enter a valid IPv4 or IPv4:port", "Укажите IPv4 или IPv4:порт", "請輸入有效的 IPv4 或 IPv4:埠", "有効な IPv4 または IPv4:port を入力してください", "유효한 IPv4 또는 IPv4:포트를 입력하세요.", "Geben Sie einen gültigen IPv4- oder IPv4:Port ein", "Entrez un port IPv4 ou IPv4 valide", "Ingrese un IPv4 válido o IPv4:puerto", "Insira um IPv4 ou IPv4:porta válido"}},
-  {"请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。", {"请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。", "Enter a valid IPv4 address such as 192.168.1.20, or IPv4:port (1–65535).", "Введите IPv4, например 192.168.1.20, или IPv4:порт (1–65535).", "請輸入有效的 IPv4，例如 192.168.1.20；指定埠可用 IPv4:埠，埠範圍 1–65535。", "192.168.1.20 または IPv4:port (1 ～ 65535) などの有効な IPv4 アドレスを入力します。", "192.168.1.20 또는 IPv4:포트(1~65535)와 같은 유효한 IPv4 주소를 입력하세요.", "Geben Sie eine gültige IPv4-Adresse ein, z. B. 192.168.1.20 oder IPv4:Port (1–65535).", "Saisissez une adresse IPv4 valide telle que 192.168.1.20 ou IPv4:port (1–65535).", "Ingrese una dirección IPv4 válida como 192.168.1.20 o IPv4:puerto (1–65535).", "Insira um endereço IPv4 válido, como 192.168.1.20 ou IPv4:porta (1–65535)."}},
+  {"请输入有效的 IPv4 或 IPv6 地址", {"请输入有效的 IPv4 或 IPv6 地址", "Enter a valid IPv4 or IPv6 address", "Укажите адрес IPv4 или IPv6", "請輸入有效的 IPv4 或 IPv6 位址", "有効な IPv4 または IPv6 アドレスを入力してください", "올바른 IPv4 또는 IPv6 주소를 입력하세요", "Geben Sie eine gültige IPv4- oder IPv6-Adresse ein", "Saisissez une adresse IPv4 ou IPv6 valide", "Ingrese una dirección IPv4 o IPv6 válida", "Insira um endereço IPv4 ou IPv6 válido"}},
+  {"请输入 IPv4 或 IPv6 地址；指定端口请用 IPv4:端口或 [IPv6]:端口，端口范围 1–65535。链路本地 IPv6 需带本机网卡作用域，如 fe80::1%14。", {"请输入 IPv4 或 IPv6 地址；指定端口请用 IPv4:端口或 [IPv6]:端口，端口范围 1–65535。链路本地 IPv6 需带本机网卡作用域，如 fe80::1%14。", "Enter IPv4 or IPv6; specify a port as IPv4:port or [IPv6]:port (1–65535). Link-local IPv6 needs a local interface zone, e.g. fe80::1%14.", "Введите IPv4 или IPv6. Порт: IPv4:порт или [IPv6]:порт (1–65535). Для link-local IPv6 укажите зону локального интерфейса, например fe80::1%14.", "請輸入 IPv4 或 IPv6 位址；指定連接埠請用 IPv4:埠或 [IPv6]:埠，範圍 1–65535。鏈路本地 IPv6 需帶本機網卡作用域，如 fe80::1%14。", "IPv4 または IPv6 を入力してください。ポートは IPv4:port または [IPv6]:port（1～65535）で指定します。リンクローカル IPv6 には自機のインターフェースゾーンが必要です（例: fe80::1%14）。", "IPv4 또는 IPv6를 입력하세요. 포트는 IPv4:포트 또는 [IPv6]:포트(1–65535)로 지정합니다. 링크 로컬 IPv6에는 로컬 인터페이스 영역이 필요합니다(예: fe80::1%14).", "IPv4 oder IPv6 eingeben; Port als IPv4:Port oder [IPv6]:Port (1–65535). Link-lokales IPv6 benötigt die lokale Schnittstellenzone, z. B. fe80::1%14.", "Saisissez IPv4 ou IPv6 ; port : IPv4:port ou [IPv6]:port (1–65535). IPv6 local au lien nécessite la zone de votre interface locale, par exemple fe80::1%14.", "Ingrese IPv4 o IPv6; puerto: IPv4:puerto o [IPv6]:puerto (1–65535). IPv6 local de enlace requiere la zona de la interfaz local, p. ej. fe80::1%14.", "Insira IPv4 ou IPv6; porta: IPv4:porta ou [IPv6]:porta (1–65535). IPv6 local de enlace exige a zona da interface local, por exemplo fe80::1%14."}},
   {"请输入有效的主机名、IP 或 HTTPS/WSS 信令地址，可包含路径。", {"请输入有效的主机名、IP 或 HTTPS/WSS 信令地址，可包含路径。", "Enter a valid host, IP, or HTTPS/WSS signaling URL. Paths are supported.", "Введите имя хоста, IP или HTTPS/WSS-адрес сигнального сервиса. Путь допустим.", "請輸入有效的主機名、IP 或 HTTPS/WSS 信令地址，可包含路徑。", "有効なホスト、IP、または HTTPS/WSS シグナリング URL を入力します。パスがサポートされています。", "유효한 호스트, IP 또는 HTTPS/WSS 신호 URL을 입력하세요. 경로가 지원됩니다.", "Geben Sie eine gültige Host-, IP- oder HTTPS/WSS-Signalisierungs-URL ein. Pfade werden unterstützt.", "Entrez une URL de signalisation d'hôte, d'adresse IP ou HTTPS/WSS valide. Les chemins sont pris en charge.", "Ingrese un host válido, IP o URL de señalización HTTPS/WSS. Se admiten caminos.", "Insira um URL de sinalização de host, IP ou HTTPS/WSS válido. Caminhos são suportados."}},
   {"请输入连接名称:", {"请输入连接名称:", "Please input connection name:", "Введите имя подключения:", "請輸入連線名稱:", "接続名を入力してください:", "연결 이름을 입력하세요:", "Bitte geben Sie den Verbindungsnamen ein:", "Veuillez saisir le nom de la connexion :", "Ingrese el nombre de la conexión:", "Insira o nome da conexão:"}},
   {"请连接 Wi-Fi 或网线，", {"请连接 Wi-Fi 或网线，", "Connect to Wi-Fi or Ethernet,", "Подключитесь к Wi-Fi или Ethernet", "請連線 Wi-Fi 或網線，", "Wi-Fiまたはイーサネットに接続し、", "Wi-Fi 또는 이더넷에 연결하고,", "Mit WLAN oder Ethernet verbinden,", "Connectez-vous au Wi-Fi ou à Ethernet,", "Conéctese a Wi-Fi o Ethernet,", "Conecte-se a Wi-Fi ou Ethernet,"}},
@@ -492,7 +492,7 @@ inline constexpr TranslationRow kTranslationRows[] = {
   {"高", {"高", "High", "Высокое", "高", "高", "높음", "Hoch", "Élevée", "Alta", "Alta"}},
   {"（仅在交互终端显示）", {"（仅在交互终端显示）", "(shown only in an interactive terminal)", "(виден только в интерактивном терминале)", "（僅在互動終端顯示）", "(対話型端末でのみ表示)", "(대화형 터미널에만 표시됨)", "(wird nur in einem interaktiven Terminal angezeigt)", "(affiché uniquement dans un terminal interactif)", "(se muestra solo en una terminal interactiva)", "(mostrado apenas em um terminal interativo)"}},
   {"：同步键鼠到所有已连接设备", {"：同步键鼠到所有已连接设备", ": mirror input to all connected devices", ": ввод на всех подключённых устройствах", "：同步鍵鼠到所有已連線裝置", ": 接続されているすべてのデバイスへのミラー入力", ": 연결된 모든 장치에 대한 미러 입력", ": Eingang auf alle angeschlossenen Geräte spiegeln", ": entrée miroir sur tous les appareils connectés", ": entrada espejo para todos los dispositivos conectados", ": entrada espelhada para todos os dispositivos conectados"}},
-  {"监听所有 IPv4 接口", {"监听所有 IPv4 接口", "Listen on all IPv4 interfaces", "Все интерфейсы IPv4", "監聽所有 IPv4 介面", "すべての IPv4 で待ち受け", "모든 IPv4 인터페이스 수신", "Alle IPv4-Schnittstellen", "Toutes les interfaces IPv4", "Todas las interfaces IPv4", "Todas as interfaces IPv4"}},
+  {"监听所有 IP 接口", {"监听所有 IP 接口", "Listen on all IP interfaces", "Все IP-интерфейсы", "監聽所有 IP 介面", "すべての IP で待ち受け", "모든 IP 인터페이스 수신", "Alle IP-Schnittstellen", "Toutes les interfaces IP", "Todas las interfaces IP", "Todas as interfaces IP"}},
   {"所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。", {"所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。", "Use one port on all interfaces, including VPNs. Select an actual IP to share. Turn off to restore separate ports per IP.", "Один порт для всех интерфейсов, включая VPN. Для подключения выберите реальный IP. Отключение вернёт отдельные порты для каждого IP.", "所有介面共用一個連接埠，包括 VPN。分享時請選擇實際 IP；關閉後恢復各 IP 的獨立連接埠。", "VPN を含む全インターフェースで同じポートを使います。共有には実際の IP を選択してください。オフにすると IP ごとのポートに戻ります。", "VPN을 포함한 모든 인터페이스가 하나의 포트를 사용합니다. 공유할 실제 IP를 선택하세요. 끄면 IP별 포트가 복원됩니다.", "Ein Port für alle Schnittstellen, einschließlich VPN. Zum Teilen eine tatsächliche IP wählen. Ausschalten stellt die Ports pro IP wieder her.", "Un port commun à toutes les interfaces, VPN inclus. Choisissez une IP réelle à partager. Désactivez pour rétablir les ports propres à chaque IP.", "Un puerto para todas las interfaces, incluidas las VPN. Seleccione una IP real para compartir. Desactive para restaurar los puertos de cada IP.", "Uma porta para todas as interfaces, incluindo VPNs. Selecione um IP real para compartilhar. Desative para restaurar as portas de cada IP."}},
 };
 
@@ -799,7 +799,7 @@ inline constexpr const char* kSlintLiterals[] = {
   "设备正忙，请稍后重试。",
   "访问密码必须为 6 位英文字母或数字，区分大小写。",
   "无法连接，请检查对方 IP、程序是否运行，以及防火墙是否放行。",
-  "请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。",
+  "请输入 IPv4 或 IPv6 地址；指定端口请用 IPv4:端口或 [IPv6]:端口，端口范围 1–65535。链路本地 IPv6 需带本机网卡作用域，如 fe80::1%14。",
   "请输入 1–65535 之间的整数端口。",
   "请点击主界面密码旁的修改按钮设置密码。",
   "IP 连接数量已达上限，请先断开部分连接后重试。",
@@ -837,7 +837,7 @@ inline constexpr const char* kSlintLiterals[] = {
   " 台",
   "设备 / ID",
   "桌面墙",
-  "请输入有效的 IPv4 或 IPv4:端口",
+  "请输入有效的 IPv4 或 IPv6 地址",
   "正在连接…",
   "全部设备",
   "正在读取…",
@@ -988,7 +988,7 @@ inline constexpr const char* kSlintLiterals[] = {
   "未连接",
   "确认断开",
   "确认执行",
-  "监听所有 IPv4 接口",
+  "监听所有 IP 接口",
   "所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。",
 };
 }  // namespace detail

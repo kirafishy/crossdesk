@@ -28,10 +28,13 @@ struct Target {
 unsigned ParsePort(const std::string& value);
 std::pair<std::string, unsigned> ParseEndpoint(const std::string& value,
                                                unsigned default_port);
-bool IsIpv4(const std::string& value);
-inline constexpr char kAllIpv4Interfaces[] = "0.0.0.0";
-// Non-loopback unicast IPv4 addresses, optionally restricted to physical NICs.
-std::vector<Interface> LocalIpv4Interfaces(bool physical_only = false);
+bool IsIpAddress(const std::string& value);
+std::string NormalizeAddress(const std::string& value);
+std::string FormatEndpoint(const std::string& address, unsigned port);
+inline constexpr char kAllInterfaces[] = "::";
+// Non-loopback unicast IPv4/IPv6 addresses, optionally restricted to physical
+// NICs.
+std::vector<Interface> LocalIpInterfaces(bool physical_only = false);
 std::string RandomHex(size_t bytes);
 bool ValidPassword(const std::string& password);
 bool VerifyLanCertificate(X509* cert);

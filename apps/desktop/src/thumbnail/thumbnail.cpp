@@ -181,7 +181,8 @@ bool Thumbnail::ReadRecord(const std::filesystem::path& path,
           connection->lan.device_id.size() != 32 ||
           connection->remote_id != LanRecordId(connection->lan.device_id) ||
           !connection->lan.port || connection->lan.port > 65535 ||
-          connection->lan.address.size() > 15)
+          connection->lan.address.empty() ||
+          connection->lan.address.size() > 128)
         return false;
     } else if (kind != "cloud_id" || !IsRemoteId(connection->remote_id))
       return false;

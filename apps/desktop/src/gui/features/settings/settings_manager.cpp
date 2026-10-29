@@ -27,6 +27,7 @@
 #endif
 
 #include "localization.h"
+#include "network/lan/lan_identity.h"
 #include "rd_log.h"
 #include "runtime/gui_runtime.h"
 
@@ -742,7 +743,7 @@ std::string SettingsManager::RecentConnectionDisplayName(
     return connection.remote_host_name;
   }
   if (!connection.lan.device_id.empty())
-    return connection.lan.address + ":" + std::to_string(connection.lan.port);
+    return lan::FormatEndpoint(connection.lan.address, connection.lan.port);
   return connection.remote_id;
 }
 

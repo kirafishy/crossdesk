@@ -13,6 +13,8 @@
 #include <websocketpp/config/asio_client.hpp>
 #include <websocketpp/server.hpp>
 
+#include "direct_address.h"
+
 namespace crossdesk::lan {
 namespace {
 using Clock = std::chrono::steady_clock;
@@ -25,15 +27,20 @@ constexpr const char* kPath = "/crossdesk/lan/v2";
 constexpr const char* kProtocol = "crossdesk.lan.v2";
 void ValidateListener(const std::string& address, unsigned port) {
   if (port > 65535) throw std::runtime_error("Invalid LAN port");
-  if (address == kAllIpv4Interfaces) return;
-  const auto interfaces = LocalIpv4Interfaces();
-  if (!IsIpv4(address) ||
+  if (address == kAllInterfaces) return;
+  const auto interfaces = LocalIpInterfaces();
+  if (!IsIpAddress(address) ||
       std::none_of(interfaces.begin(), interfaces.end(),
                    [&](const auto& i) { return i.address == address; }))
     throw std::runtime_error("Selected LAN interface is unavailable");
 }
-Error ConfigureAcceptor(asio::ip::tcp::acceptor& acceptor, bool automatic_port) {
+Error ConfigureAcceptor(asio::ip::tcp::acceptor& acceptor, bool automatic_port,
+                        bool ipv6, bool dual_stack) {
   Error error;
+  if (ipv6) {
+    acceptor.set_option(asio::ip::v6_only(!dual_stack), error);
+    if (error) return error;
+  }
 #ifdef _WIN32
   (void)automatic_port;
   acceptor.set_option(asio::socket_base::reuse_address(false), error);
@@ -69,7 +76,7 @@ void CheckExistingEndpoint(const std::string& address, unsigned port) {
   Error result;
   bool timed_out = false;
   socket.async_connect(
-      {asio::ip::make_address_v4(address), static_cast<unsigned short>(port)},
+      {asio::ip::make_address(address), static_cast<unsigned short>(port)},
       [&](const Error& error) {
         result = error;
         deadline.cancel();
@@ -91,29 +98,56 @@ void CheckExistingEndpoint(const std::string& address, unsigned port) {
 }
 void CheckExistingListener(const std::string& address, unsigned port) {
 #ifdef __APPLE__
-  if (address == kAllIpv4Interfaces) {
+  if (address == kAllInterfaces || address == "0.0.0.0") {
     // BSD permits wildcard/specific overlap with SO_REUSEADDR. Probe binds on
     // each exact address to detect specific listeners without sending traffic
     // through VPN adapters which may accept connects to otherwise unused ports.
     // The final wildcard bind detects an existing wildcard listener itself.
     asio::io_context io;
-    auto addresses = LocalIpv4Interfaces();
+    auto addresses = LocalIpInterfaces();
     addresses.push_back({"127.0.0.1"});
+    if (address == kAllInterfaces) addresses.push_back({"::1"});
     for (const auto& interface : addresses) {
+      const auto ip = asio::ip::make_address(interface.address);
+      if (address == "0.0.0.0" && ip.is_v6()) continue;
       asio::ip::tcp::acceptor probe(io);
       Error error;
-      probe.open(asio::ip::tcp::v4(), error);
+      probe.open(ip.is_v6() ? asio::ip::tcp::v6() : asio::ip::tcp::v4(), error);
+      CheckListenError(error);
+      if (ip.is_v6()) probe.set_option(asio::ip::v6_only(true), error);
       CheckListenError(error);
       probe.set_option(asio::socket_base::reuse_address(true), error);
       CheckListenError(error);
-      probe.bind({asio::ip::make_address_v4(interface.address),
-                  static_cast<unsigned short>(port)}, error);
+      probe.bind({ip, static_cast<unsigned short>(port)}, error);
       CheckListenError(error);
     }
     return;
   }
 #endif
   CheckExistingEndpoint(address, port);
+}
+// Fall back only when the host has no usable IPv6 stack. A busy requested
+// port must still be reported, never silently degrade a dual-stack listener.
+bool SupportsDualStack() {
+  asio::io_context io;
+  asio::ip::tcp::acceptor probe(io);
+  Error error;
+  probe.open(asio::ip::tcp::v6(), error);
+  if (!error) probe.set_option(asio::ip::v6_only(false), error);
+  if (!error) probe.bind({asio::ip::address_v6::any(), 0}, error);
+  if (error == asio::error::address_family_not_supported ||
+      error == std::errc::protocol_not_supported ||
+      error == asio::error::no_protocol_option ||
+      error == asio::error::operation_not_supported ||
+      error == std::errc::address_not_available)
+    return false;
+  CheckListenError(error);
+  return true;
+}
+std::string SocketAddress(asio::ip::address address) {
+  if (address.is_v6() && address.to_v6().is_v4_mapped())
+    address = asio::ip::make_address_v4(asio::ip::v4_mapped, address.to_v6());
+  return minirtc::DirectAddressString(address);
 }
 std::shared_ptr<Context> TlsContext() {
   auto context = std::make_shared<Context>(Context::tls);
@@ -286,14 +320,10 @@ struct Transport::Impl {
         Abort(c);
         return;
       }
-      if (!local.address().is_v4() || !remote.address().is_v4()) {
-        Abort(c);
-        return;
-      }
-      c->local_address = local.address().to_string();
-      c->remote_address = remote.address().to_string();
-      const auto interfaces = LocalIpv4Interfaces();
-      if (!IsIpv4(c->remote_address) ||
+      c->local_address = SocketAddress(local.address());
+      c->remote_address = SocketAddress(remote.address());
+      const auto interfaces = LocalIpInterfaces();
+      if (!minirtc::IsDirectAddressPair(c->local_address, c->remote_address) ||
           std::none_of(
               interfaces.begin(), interfaces.end(),
               [&](const auto& i) { return i.address == c->local_address; })) {
@@ -389,7 +419,10 @@ Transport::Listener Transport::Listen(const Identity& identity,
   auto future = promise->get_future();
   asio::post(impl_->io, [this, address, port, context, promise] {
     try {
-      if (port) CheckExistingListener(address, port);
+      const auto binding = address == kAllInterfaces && !SupportsDualStack()
+                               ? std::string("0.0.0.0")
+                               : address;
+      if (port) CheckExistingListener(binding, port);
       auto server = std::make_shared<Server>();
       impl_->Configure(server.get());
       const uint64_t id = impl_->next_id++;
@@ -427,15 +460,16 @@ Transport::Listener Transport::Listen(const Identity& identity,
       });
       auto bound_acceptor = std::make_shared<Server::acceptor_ptr>();
       server->set_tcp_pre_bind_handler(
-          [port, bound_acceptor](Server::acceptor_ptr acceptor) {
+          [port, binding, bound_acceptor](Server::acceptor_ptr acceptor) {
             *bound_acceptor = acceptor;
-            return ConfigureAcceptor(*acceptor, port == 0);
+            return ConfigureAcceptor(*acceptor, port == 0,
+                                     binding.find(':') != std::string::npos,
+                                     binding == kAllInterfaces);
           });
       Error listen_error;
-      server->listen(
-          asio::ip::tcp::endpoint(asio::ip::make_address_v4(address),
-                                  static_cast<unsigned short>(port)),
-          listen_error);
+      server->listen(asio::ip::tcp::endpoint(asio::ip::make_address(binding),
+                                             static_cast<unsigned short>(port)),
+                     listen_error);
       CheckListenError(listen_error);
       const auto actual_port = server->get_local_endpoint(listen_error).port();
       CheckListenError(listen_error);
@@ -474,7 +508,7 @@ void Transport::StopAccept(uint64_t listener) {
   });
 }
 Transport::ChannelPtr Transport::Connect(const Target& target) {
-  if (!IsIpv4(target.address) || target.port == 0 || target.port > 65535)
+  if (!IsIpAddress(target.address) || target.port == 0 || target.port > 65535)
     throw std::runtime_error("Invalid LAN endpoint");
   auto c = std::make_shared<Channel>();
   c->id = impl_->next_id++;
@@ -505,7 +539,7 @@ Transport::ChannelPtr Transport::Connect(const Target& target) {
       client->set_tls_init_handler([context](Hdl) { return context; });
       Error error;
       auto connection = client->get_connection(
-          "wss://" + target.address + ":" + std::to_string(target.port) + kPath,
+          "wss://" + FormatEndpoint(target.address, target.port) + kPath,
           error);
       if (error) {
         impl_->Finish(c);

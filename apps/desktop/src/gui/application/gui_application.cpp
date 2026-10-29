@@ -1787,6 +1787,8 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
       const auto port =
           UiText(std::to_string(lan_->PortFor(std::string(address))));
       main->set_lan_listener_ip(address);
+      main->set_lan_listener_ipv6(std::string(address).find(':') !=
+                                  std::string::npos);
       main->set_lan_listener_port(port);
       main->set_lan_local_port(port);
       main->set_lan_port_dirty(false);
@@ -1808,6 +1810,8 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
       lan_->Configure(std::string(address), port_number);
       const auto normalized_port = UiText(std::to_string(port_number));
       main->set_lan_listener_ip(address);
+      main->set_lan_listener_ipv6(std::string(address).find(':') !=
+                                  std::string::npos);
       main->set_lan_listener_port(normalized_port);
       main->set_lan_local_port(normalized_port);
       main->set_lan_port_dirty(false);
@@ -2502,8 +2506,17 @@ void GuiApplication::Tick() {
     if (changed) {
       std::vector<slint::SharedString> addresses;
       addresses.reserve(available_interfaces.size());
-      for (const auto& network_interface : available_interfaces)
-        addresses.push_back(UiText(network_interface.address));
+      std::vector<slint::SharedString> labels;
+      labels.reserve(available_interfaces.size());
+      for (const auto& network_interface : available_interfaces) {
+        const auto& ip = network_interface.address;
+        addresses.push_back(UiText(ip));
+        labels.push_back(
+            UiText(ip.find(':') == std::string::npos ? ip : "[" + ip + "]"));
+      }
+      ui_->main->set_lan_interface_labels(
+          std::make_shared<slint::VectorModel<slint::SharedString>>(
+              std::move(labels)));
       ui_->main->set_lan_interfaces(
           std::make_shared<slint::VectorModel<slint::SharedString>>(std::move(addresses)));
     }
@@ -2536,6 +2549,8 @@ void GuiApplication::Tick() {
       ui_->main->set_lan_local_port(port);
     }
     ui_->main->set_lan_listener_ip(UiText(display_address));
+    ui_->main->set_lan_listener_ipv6(display_address.find(':') !=
+                                     std::string::npos);
     ui_->main->set_lan_listener_port(port);
     ui_->main->set_lan_interface_index(interface_index);
     ui_->main->set_lan_interface_draft_index(interface_index);
@@ -2551,7 +2566,7 @@ void GuiApplication::Tick() {
         !ui_->main->get_lan_port_editing() && !ui_->main->get_lan_port_dirty()) {
       if (auto issue = lan_->TakeListenerWarning()) {
         ui_->main->set_lan_access_warning_endpoint(
-            UiText(issue->address + ":" + std::to_string(issue->port)));
+            UiText(lan::FormatEndpoint(issue->address, issue->port)));
         ui_->main->set_lan_access_warning(UiText(issue->error));
       }
     }
@@ -3392,9 +3407,10 @@ void GuiApplication::SyncMainWindow() {
     item.display_name =
         UiText(settings_.RecentConnectionDisplayName(connection));
     item.lan = !connection.lan.device_id.empty();
-    item.endpoint = UiText(item.lan ? connection.lan.address + ":" +
-                                          std::to_string(connection.lan.port)
-                                    : "");
+    item.endpoint =
+        UiText(item.lan ? lan::FormatEndpoint(connection.lan.address,
+                                              connection.lan.port)
+                        : "");
     item.online =
         !item.lan && device_presence_cache_.IsOnline(connection.remote_id);
     item.connected = is_connected(connection.remote_id);
@@ -4830,10 +4846,7 @@ void GuiApplication::ConnectFromUi(const std::string& input) {
     for (const auto& [_, recent] : recent_connections_)
       if (recent.remote_id == input && !recent.lan.device_id.empty()) {
         ui_->main->invoke_request_lan_connection(
-            UiText(recent.lan.address +
-                   (recent.lan.port == 52888
-                        ? ""
-                        : ":" + std::to_string(recent.lan.port))));
+            UiText(lan::FormatEndpoint(recent.lan.address, recent.lan.port)));
         return;
       }
     return;

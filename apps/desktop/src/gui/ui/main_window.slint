@@ -454,7 +454,7 @@ export component MainWindow inherits Window {
         root.lan-access-password = "";
         root.lan-remember-password = false;
         let error = root.lan-prepare-connect(address);
-        root.connection-input-error = error == "Enter a numeric IPv4 address or IPv4:port"
+        root.connection-input-error = error == "Invalid LAN endpoint"
             ? GalleryStrings.texts[55]
             : LanStrings.error-message(error);
         if error == "" {
@@ -467,9 +467,11 @@ export component MainWindow inherits Window {
     in-out property <bool> lan-listening;
     in-out property <bool> lan-listen-all: true;
     in-out property <string> lan-listener-ip;
+    in-out property <bool> lan-listener-ipv6;
     in-out property <string> lan-listener-port: "52888";
-    out property <string> lan-listener-address: root.lan-listener-ip == "" ? "" : root.lan-listener-ip + ":" + root.lan-listener-port;
+    out property <string> lan-listener-address: root.lan-listener-ip == "" ? "" : (root.lan-listener-ipv6 ? "[" + root.lan-listener-ip + "]" : root.lan-listener-ip) + ":" + root.lan-listener-port;
     in-out property <[string]> lan-interfaces;
+    in-out property <[string]> lan-interface-labels: root.lan-interfaces;
     in-out property <int> lan-interface-index: 0;
     in-out property <int> lan-interface-draft-index: 0;
     in-out property <string> lan-local-port: "52888";
@@ -497,7 +499,7 @@ export component MainWindow inherits Window {
             root.lan-port-dirty = false;
             return true;
         }
-        root.lan-access-warning-endpoint = root.lan-listener-ip
+        root.lan-access-warning-endpoint = (root.lan-listener-ipv6 ? "[" + root.lan-listener-ip + "]" : root.lan-listener-ip)
             + (root.lan-endpoint-error == "Invalid LAN port" ? "" : ":" + root.lan-local-port);
         root.lan-access-warning = root.lan-endpoint-error;
         return false;
@@ -1294,13 +1296,13 @@ export component MainWindow inherits Window {
                 }
                 local-address-field := FlatSurface {
                     x: 16px; y: 90px; width: parent.width - 32px; height: 40px;
-                    // Size the endpoint as one line; reserve five port digits so
-                    // editing never shifts the IP or changes the font size.
-                    private property <float> lan-font-scale: min(1,
-                        (self.width - 80px) / (lan-ip-metrics.preferred-width + lan-port-metrics.preferred-width));
+                    // Reserve five port digits. Long IPv6 addresses elide at a
+                    // readable size; the picker and Copy retain the full value.
+                    private property <float> lan-font-scale: max(0.75, min(1,
+                        (self.width - 80px) / (lan-ip-metrics.preferred-width + lan-port-metrics.preferred-width)));
                     lan-ip-metrics := Text {
                         visible: false; accessible-role: none;
-                        text: root.lan-interfaces[root.lan-interface-draft-index];
+                        text: root.lan-interface-labels[root.lan-interface-draft-index];
                         font-size: 18px; font-weight: 600;
                     }
                     lan-port-metrics := Text {
@@ -1321,13 +1323,14 @@ export component MainWindow inherits Window {
                     lan-ip-picker := GroupFilter {
                         visible: root.lan-mode;
                         x: 4px; y: 2px;
-                        width: lan-ip-metrics.preferred-width * local-address-field.lan-font-scale + 16px;
+                        width: min(lan-ip-metrics.preferred-width * local-address-field.lan-font-scale + 16px,
+                            parent.width - 64px - lan-port-metrics.preferred-width * local-address-field.lan-font-scale);
                         height: parent.height - 4px;
                         embedded: true; text-size: 18px * local-address-field.lan-font-scale;
                         text-weight: 600; text-color: WorkbenchStyle.text;
                         show-indicator: false;
-                        popup-min-width: 160px;
-                        model: root.lan-interfaces; system-count: 0;
+                        popup-min-width: max(160px, min(root.width - 80px, lan-ip-metrics.preferred-width + 40px));
+                        model: root.lan-interface-labels; system-count: 0;
                         current-index <=> root.lan-interface-draft-index;
                         enabled: root.lan-mode && !root.lan-password-pending && root.lan-interfaces.length > 0;
                         normal-outline-color: UiSurface.edge;

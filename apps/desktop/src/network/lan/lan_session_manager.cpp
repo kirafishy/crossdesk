@@ -25,12 +25,14 @@ bool Id(const Json& value) {
          });
 }
 Json Capabilities() {
-  return Json::array({"host-only-ipv4", "dtls-srtp-all", "password-auth-v1"});
+  return Json::array({"host-only-ipv4", "host-only-ipv6", "dtls-srtp-all",
+                      "password-auth-v1"});
 }
-void Capable(const Json& j) {
+void Capable(const Json& j, bool ipv6) {
   const auto& caps = j.at("capabilities");
   Check(caps.is_array() && caps.size() <= 16);
-  for (const auto& required : Capabilities())
+  for (const auto* required : {ipv6 ? "host-only-ipv6" : "host-only-ipv4",
+                               "dtls-srtp-all", "password-auth-v1"})
     Check(std::find(caps.begin(), caps.end(), required) != caps.end());
 }
 void Wipe(std::string& text) {
@@ -123,14 +125,14 @@ void SessionManager::Configure(const std::string& address, unsigned port) {
   if (!port || port > 65535) throw std::runtime_error("Invalid LAN port");
   if (!Identity::CurrentVerifier(identity_.verifier()))
     throw std::runtime_error("LAN password is not ready");
-  ReplaceListener(identity_.listen_all() ? kAllIpv4Interfaces : address, port,
+  ReplaceListener(identity_.listen_all() ? kAllInterfaces : address, port,
                   true);
 }
 void SessionManager::SetListenAll(bool enabled) {
   if (stopping_ || enabled == identity_.listen_all()) return;
   if (!Identity::CurrentVerifier(identity_.verifier()))
     throw std::runtime_error("LAN password is not ready");
-  const auto interfaces = LocalIpv4Interfaces(!enabled);
+  const auto interfaces = LocalIpInterfaces(!enabled);
   const auto previous = listeners_;
   // Wildcard and per-address listeners can overlap on the same port. Retire
   // acceptors before rebinding; authenticated channels retain their sockets.
@@ -144,7 +146,7 @@ void SessionManager::SetListenAll(bool enabled) {
       ports[address] = listeners_.at(address).port;
     };
     if (enabled)
-      add(kAllIpv4Interfaces);
+      add(kAllInterfaces);
     else
       for (const auto& interface : interfaces) add(interface.address);
     // Publish the mode and all newly allocated ports in one durable write.
@@ -263,8 +265,8 @@ void SessionManager::SetListenerError(const std::string& address, unsigned port,
   listener_warnings_[address] = std::move(issue);
 }
 std::string SessionManager::ListenerError(const std::string& address) const {
-  const auto it = listener_errors_.find(
-      identity_.listen_all() ? kAllIpv4Interfaces : address);
+  const auto it =
+      listener_errors_.find(identity_.listen_all() ? kAllInterfaces : address);
   return it == listener_errors_.end() ? "" : it->second.error;
 }
 std::optional<SessionManager::ListenerIssue> SessionManager::TakeListenerWarning() {
@@ -277,7 +279,7 @@ std::optional<SessionManager::ListenerIssue> SessionManager::TakeListenerWarning
 void SessionManager::RefreshListeners() {
   if (stopping_ || !Identity::CurrentVerifier(identity_.verifier())) return;
   const auto available = [&](const auto& address) {
-    if (identity_.listen_all()) return address == kAllIpv4Interfaces;
+    if (identity_.listen_all()) return address == kAllInterfaces;
     return std::any_of(interfaces_.begin(), interfaces_.end(),
                        [&](const auto& i) { return i.address == address; });
   };
@@ -298,7 +300,7 @@ void SessionManager::RefreshListeners() {
     it = listener_errors_.erase(it);
   }
   const auto desired = identity_.listen_all()
-                           ? std::vector<Interface>{{kAllIpv4Interfaces}}
+                           ? std::vector<Interface>{{kAllInterfaces}}
                            : interfaces_;
   for (const auto& interface : desired) {
     const auto port = identity_.PortFor(interface.address);
@@ -354,7 +356,7 @@ bool SessionManager::Send(const SessionPtr& s, Json j, bool sequenced) {
 int SessionManager::RetryAfter(const std::string& address,
                                unsigned port) const {
   const auto [ip, endpoint_port] = ParseEndpoint(address, port);
-  const auto it = retry_at_.find(ip + ":" + std::to_string(endpoint_port));
+  const auto it = retry_at_.find(FormatEndpoint(ip, endpoint_port));
   const auto now = Clock::now();
   return it == retry_at_.end() || it->second <= now
              ? 0
@@ -446,7 +448,7 @@ void SessionManager::Message(const SessionPtr& s, const std::string& text) {
         else
           ++it;
       if (retry_at_.size() < 64)
-        retry_at_[s->target.address + ":" + std::to_string(s->target.port)] =
+        retry_at_[FormatEndpoint(s->target.address, s->target.port)] =
             now + std::chrono::seconds(j["retry_after"].get<int>());
     }
     Close(s, error);
@@ -477,7 +479,7 @@ void SessionManager::Message(const SessionPtr& s, const std::string& text) {
     Check(type == "auth" && !j.contains("session_id") && !j.contains("seq") &&
           Id(j.at("request_id")) && j.at("password").is_string() &&
           !j.contains("share") && !j.contains("proof"));
-    Capable(j);
+    Capable(j, s->channel->remote_address.find(':') != std::string::npos);
     s->auth_request = j.at("request_id");
     auto& submitted = j["password"].get_ref<std::string&>();
     if (!ValidPassword(submitted)) {
@@ -814,9 +816,9 @@ void SessionManager::Tick() {
   }
   if (!stopping_ && now - interface_check_ >= std::chrono::seconds(2)) {
     interface_check_ = now;
-    const auto local_interfaces = LocalIpv4Interfaces();
+    const auto local_interfaces = LocalIpInterfaces();
     interfaces_ =
-        identity_.listen_all() ? local_interfaces : LocalIpv4Interfaces(true);
+        identity_.listen_all() ? local_interfaces : LocalIpInterfaces(true);
     RefreshListeners();
     for (auto& [_, s] : sessions_)
       if (s->phase != Session::Connecting &&

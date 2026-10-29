@@ -8280,29 +8280,29 @@
       "es": "Ingrese una ID de dispositivo válida de 9 dígitos",
       "pt-BR": "Insira um ID de dispositivo válido de 9 dígitos"
     },
-    "请输入有效的 IPv4 或 IPv4:端口": {
-      "zh-Hans": "请输入有效的 IPv4 或 IPv4:端口",
-      "en": "Enter a valid IPv4 or IPv4:port",
-      "ru": "Укажите IPv4 или IPv4:порт",
-      "zh-Hant": "請輸入有效的 IPv4 或 IPv4:埠",
-      "ja": "有効な IPv4 または IPv4:port を入力してください",
-      "ko": "유효한 IPv4 또는 IPv4:포트를 입력하세요.",
-      "de": "Geben Sie einen gültigen IPv4- oder IPv4:Port ein",
-      "fr": "Entrez un port IPv4 ou IPv4 valide",
-      "es": "Ingrese un IPv4 válido o IPv4:puerto",
-      "pt-BR": "Insira um IPv4 ou IPv4:porta válido"
+    "请输入有效的 IPv4 或 IPv6 地址": {
+      "zh-Hans": "请输入有效的 IPv4 或 IPv6 地址",
+      "en": "Enter a valid IPv4 or IPv6 address",
+      "ru": "Укажите адрес IPv4 или IPv6",
+      "zh-Hant": "請輸入有效的 IPv4 或 IPv6 位址",
+      "ja": "有効な IPv4 または IPv6 アドレスを入力してください",
+      "ko": "올바른 IPv4 또는 IPv6 주소를 입력하세요",
+      "de": "Geben Sie eine gültige IPv4- oder IPv6-Adresse ein",
+      "fr": "Saisissez une adresse IPv4 ou IPv6 valide",
+      "es": "Ingrese una dirección IPv4 o IPv6 válida",
+      "pt-BR": "Insira um endereço IPv4 ou IPv6 válido"
     },
-    "请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。": {
-      "zh-Hans": "请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。",
-      "en": "Enter a valid IPv4 address such as 192.168.1.20, or IPv4:port (1–65535).",
-      "ru": "Введите IPv4, например 192.168.1.20, или IPv4:порт (1–65535).",
-      "zh-Hant": "請輸入有效的 IPv4，例如 192.168.1.20；指定埠可用 IPv4:埠，埠範圍 1–65535。",
-      "ja": "192.168.1.20 または IPv4:port (1 ～ 65535) などの有効な IPv4 アドレスを入力します。",
-      "ko": "192.168.1.20 또는 IPv4:포트(1~65535)와 같은 유효한 IPv4 주소를 입력하세요.",
-      "de": "Geben Sie eine gültige IPv4-Adresse ein, z. B. 192.168.1.20 oder IPv4:Port (1–65535).",
-      "fr": "Saisissez une adresse IPv4 valide telle que 192.168.1.20 ou IPv4:port (1–65535).",
-      "es": "Ingrese una dirección IPv4 válida como 192.168.1.20 o IPv4:puerto (1–65535).",
-      "pt-BR": "Insira um endereço IPv4 válido, como 192.168.1.20 ou IPv4:porta (1–65535)."
+    "请输入 IPv4 或 IPv6 地址；指定端口请用 IPv4:端口或 [IPv6]:端口，端口范围 1–65535。链路本地 IPv6 需带本机网卡作用域，如 fe80::1%14。": {
+      "zh-Hans": "请输入 IPv4 或 IPv6 地址；指定端口请用 IPv4:端口或 [IPv6]:端口，端口范围 1–65535。链路本地 IPv6 需带本机网卡作用域，如 fe80::1%14。",
+      "en": "Enter IPv4 or IPv6; specify a port as IPv4:port or [IPv6]:port (1–65535). Link-local IPv6 needs a local interface zone, e.g. fe80::1%14.",
+      "ru": "Введите IPv4 или IPv6. Порт: IPv4:порт или [IPv6]:порт (1–65535). Для link-local IPv6 укажите зону локального интерфейса, например fe80::1%14.",
+      "zh-Hant": "請輸入 IPv4 或 IPv6 位址；指定連接埠請用 IPv4:埠或 [IPv6]:埠，範圍 1–65535。鏈路本地 IPv6 需帶本機網卡作用域，如 fe80::1%14。",
+      "ja": "IPv4 または IPv6 を入力してください。ポートは IPv4:port または [IPv6]:port（1～65535）で指定します。リンクローカル IPv6 には自機のインターフェースゾーンが必要です（例: fe80::1%14）。",
+      "ko": "IPv4 또는 IPv6를 입력하세요. 포트는 IPv4:포트 또는 [IPv6]:포트(1–65535)로 지정합니다. 링크 로컬 IPv6에는 로컬 인터페이스 영역이 필요합니다(예: fe80::1%14).",
+      "de": "IPv4 oder IPv6 eingeben; Port als IPv4:Port oder [IPv6]:Port (1–65535). Link-lokales IPv6 benötigt die lokale Schnittstellenzone, z. B. fe80::1%14.",
+      "fr": "Saisissez IPv4 ou IPv6 ; port : IPv4:port ou [IPv6]:port (1–65535). IPv6 local au lien nécessite la zone de votre interface locale, par exemple fe80::1%14.",
+      "es": "Ingrese IPv4 o IPv6; puerto: IPv4:puerto o [IPv6]:puerto (1–65535). IPv6 local de enlace requiere la zona de la interfaz local, p. ej. fe80::1%14.",
+      "pt-BR": "Insira IPv4 ou IPv6; porta: IPv4:porta ou [IPv6]:porta (1–65535). IPv6 local de enlace exige a zona da interface local, por exemplo fe80::1%14."
     },
     "请输入有效的主机名、IP 或 HTTPS/WSS 信令地址，可包含路径。": {
       "zh-Hans": "请输入有效的主机名、IP 或 HTTPS/WSS 信令地址，可包含路径。",
@@ -10260,17 +10260,17 @@
       "es": "Sesión remota activa. Se mantiene la conexión para confirmar o cancelar el apagado.",
       "pt-BR": "Sessão remota ativa. A conexão é mantida para confirmar ou cancelar o desligamento."
     },
-    "监听所有 IPv4 接口": {
-      "zh-Hans": "监听所有 IPv4 接口",
-      "en": "Listen on all IPv4 interfaces",
-      "ru": "Все интерфейсы IPv4",
-      "zh-Hant": "監聽所有 IPv4 介面",
-      "ja": "すべての IPv4 で待ち受け",
-      "ko": "모든 IPv4 인터페이스 수신",
-      "de": "Alle IPv4-Schnittstellen",
-      "fr": "Toutes les interfaces IPv4",
-      "es": "Todas las interfaces IPv4",
-      "pt-BR": "Todas as interfaces IPv4"
+    "监听所有 IP 接口": {
+      "zh-Hans": "监听所有 IP 接口",
+      "en": "Listen on all IP interfaces",
+      "ru": "Все IP-интерфейсы",
+      "zh-Hant": "監聽所有 IP 介面",
+      "ja": "すべての IP で待ち受け",
+      "ko": "모든 IP 인터페이스 수신",
+      "de": "Alle IP-Schnittstellen",
+      "fr": "Toutes les interfaces IP",
+      "es": "Todas las interfaces IP",
+      "pt-BR": "Todas as interfaces IP"
     },
     "所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。": {
       "zh-Hans": "所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。",
@@ -10587,7 +10587,7 @@
     "设备正忙，请稍后重试。",
     "访问密码必须为 6 位英文字母或数字，区分大小写。",
     "无法连接，请检查对方 IP、程序是否运行，以及防火墙是否放行。",
-    "请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。",
+    "请输入 IPv4 或 IPv6 地址；指定端口请用 IPv4:端口或 [IPv6]:端口，端口范围 1–65535。链路本地 IPv6 需带本机网卡作用域，如 fe80::1%14。",
     "请输入 1–65535 之间的整数端口。",
     "请点击主界面密码旁的修改按钮设置密码。",
     "IP 连接数量已达上限，请先断开部分连接后重试。",
@@ -10625,7 +10625,7 @@
     " 台",
     "设备 / ID",
     "桌面墙",
-    "请输入有效的 IPv4 或 IPv4:端口",
+    "请输入有效的 IPv4 或 IPv6 地址",
     "正在连接…",
     "全部设备",
     "正在读取…",
@@ -10776,7 +10776,7 @@
     "未连接",
     "确认断开",
     "确认执行",
-    "监听所有 IPv4 接口",
+    "监听所有 IP 接口",
     "所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。"
   ],
   "platforms": {
@@ -11174,8 +11174,8 @@
       "请输入六位密码:",
       "请输入密码:",
       "请输入有效的 9 位设备 ID",
-      "请输入有效的 IPv4 或 IPv4:端口",
-      "请输入有效的 IPv4，例如 192.168.1.20；指定端口可用 IPv4:端口，端口范围 1–65535。",
+      "请输入有效的 IPv4 或 IPv6 地址",
+      "请输入 IPv4 或 IPv6 地址；指定端口请用 IPv4:端口或 [IPv6]:端口，端口范围 1–65535。链路本地 IPv6 需带本机网卡作用域，如 fe80::1%14。",
       "请输入有效的主机名、IP 或 HTTPS/WSS 信令地址，可包含路径。",
       "请输入连接名称:",
       "请连接 Wi-Fi 或网线，",
@@ -11260,7 +11260,7 @@
       "高",
       "（仅在交互终端显示）",
       "：同步键鼠到所有已连接设备",
-      "监听所有 IPv4 接口",
+      "监听所有 IP 接口",
       "所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。"
     ],
     "android": [
