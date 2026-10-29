@@ -96,6 +96,7 @@ function setup_targets()
                 "apps/desktop/src/platform/linux/screen_lock.cpp",
                 "apps/desktop/src/platform/linux/common/*.cpp")
             add_includedirs("apps/desktop/src/platform/linux/common")
+            add_syslinks("Xi", {public = true})
         end
         add_includedirs("apps/desktop/src/common", {public = true})
 

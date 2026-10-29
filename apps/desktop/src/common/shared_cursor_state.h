@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-#include <remote_cursor_shape.h>
+#include <remote_action.h>
 
 namespace crossdesk {
 
@@ -11,9 +11,11 @@ struct SharedCursorState {
   uint64_t generation = 0;
   bool visible = false;
   RemoteCursorShape shape = RemoteCursorShape::default_cursor;
+  CursorRenderMode render_mode = CursorRenderMode::unknown;
+  CursorHiddenReason hidden_reason = CursorHiddenReason::sampling_failed;
 };
 
-void PublishSharedCursorState(bool visible, RemoteCursorShape shape);
+void PublishSharedCursorState(CursorRenderMode mode, RemoteCursorShape shape);
 bool GetSharedCursorState(SharedCursorState* state);
 void ClearSharedCursorState();
 

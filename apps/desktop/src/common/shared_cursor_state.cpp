@@ -13,11 +13,16 @@ bool g_cursor_state_available = false;
 
 }  // namespace
 
-void PublishSharedCursorState(bool visible, RemoteCursorShape shape) {
+void PublishSharedCursorState(CursorRenderMode mode, RemoteCursorShape shape) {
   std::lock_guard<std::mutex> lock(g_cursor_state_mutex);
   ++g_cursor_state.generation;
-  g_cursor_state.visible = visible;
-  g_cursor_state.shape = visible ? shape : RemoteCursorShape::none;
+  g_cursor_state.visible = mode == CursorRenderMode::separate;
+  g_cursor_state.shape = g_cursor_state.visible ? shape : RemoteCursorShape::none;
+  g_cursor_state.render_mode = mode;
+  g_cursor_state.hidden_reason = mode == CursorRenderMode::hidden
+      ? CursorHiddenReason::system_hidden
+      : mode == CursorRenderMode::unknown ? CursorHiddenReason::sampling_failed
+                                         : CursorHiddenReason::unspecified;
   g_cursor_state_available = true;
 }
 
@@ -38,6 +43,8 @@ void ClearSharedCursorState() {
   ++g_cursor_state.generation;
   g_cursor_state.visible = false;
   g_cursor_state.shape = RemoteCursorShape::none;
+  g_cursor_state.render_mode = CursorRenderMode::unknown;
+  g_cursor_state.hidden_reason = CursorHiddenReason::sampling_failed;
   g_cursor_state_available = false;
 }
 

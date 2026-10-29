@@ -489,7 +489,7 @@ bool ScreenCapturerWayland::SelectPortalSource() {
   uint32_t available_cursor_modes = kCursorModeHidden | kCursorModeEmbedded;
   if (!GetAvailableCursorModes(&available_cursor_modes)) {
     LOG_WARN(
-        "Unable to query portal cursor modes; using embedded cursor fallback");
+        "Unable to query portal cursor modes; using hidden/embedded fallback");
   }
 
   uint32_t cursor_mode = 0;
@@ -497,6 +497,10 @@ bool ScreenCapturerWayland::SelectPortalSource() {
   if (!show_cursor_ && (available_cursor_modes & kCursorModeMetadata) != 0) {
     cursor_mode = kCursorModeMetadata;
     cursor_metadata_enabled_ = true;
+  } else if (!show_cursor_ && (available_cursor_modes & kCursorModeHidden) != 0) {
+    // Native controllers can draw a default arrow. Without metadata, do not
+    // rely on an embedded pointer that may disappear with the last mouse.
+    cursor_mode = kCursorModeHidden;
   } else if ((available_cursor_modes & kCursorModeEmbedded) != 0) {
     cursor_mode = kCursorModeEmbedded;
   } else if ((available_cursor_modes & kCursorModeMetadata) != 0) {
@@ -515,11 +519,14 @@ bool ScreenCapturerWayland::SelectPortalSource() {
     // When metadata is unavailable, embedding is the only way to preserve the
     // exact Wayland cursor. Hide the controller-side cursor to avoid a double
     // cursor over the video stream.
-    PublishSharedCursorState(false, RemoteCursorShape::none);
+    PublishSharedCursorState(CursorRenderMode::embedded, RemoteCursorShape::none);
   } else if (!cursor_metadata_enabled_) {
-    // A portal without metadata or embedded cursor support cannot expose the
-    // native Wayland shape. Keep a visible default cursor on the controller.
-    PublishSharedCursorState(true, RemoteCursorShape::default_cursor);
+    // Hidden capture provides no native shape. Keep a visible default cursor
+    // on the controller, independent of whether a local mouse is connected.
+    PublishSharedCursorState(CursorRenderMode::separate,
+                             RemoteCursorShape::default_cursor);
+  } else {
+    PublishSharedCursorState(CursorRenderMode::unknown, RemoteCursorShape::none);
   }
 
   LOG_INFO("Wayland portal cursor mode: {}",

@@ -976,21 +976,23 @@ void ScreenCapturerWayland::HandlePipeWireBuffer() {
         const CursorBitmapResult cursor_result = ReadCursorBitmap(
             *cursor_metadata, *cursor, &cursor_argb, &cursor_view);
         if (cursor_result == CursorBitmapResult::kInvisible) {
-          PublishSharedCursorState(false, RemoteCursorShape::none);
+          PublishSharedCursorState(CursorRenderMode::hidden,
+                                   RemoteCursorShape::none);
           LOG_INFO("PipeWire cursor became invisible, id={}", cursor->id);
         } else if (cursor_result == CursorBitmapResult::kImage) {
           const RemoteCursorShape shape =
               cursor_theme_matcher_
                   ? cursor_theme_matcher_->Match(cursor_view)
                   : RemoteCursorShape::default_cursor;
-          PublishSharedCursorState(true, shape);
+          PublishSharedCursorState(CursorRenderMode::separate, shape);
           LOG_INFO(
               "PipeWire cursor shape update: id={}, size={}x{}, "
               "hotspot=({},{}), shape={}",
               cursor->id, cursor_view.width, cursor_view.height,
               cursor_view.xhot, cursor_view.yhot, static_cast<int>(shape));
         } else if (cursor_result == CursorBitmapResult::kInvalid) {
-          PublishSharedCursorState(true, RemoteCursorShape::default_cursor);
+          PublishSharedCursorState(CursorRenderMode::separate,
+                                   RemoteCursorShape::default_cursor);
           LOG_WARN("Using default shape for malformed PipeWire cursor "
                    "metadata, id={}",
                    cursor->id);

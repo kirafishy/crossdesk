@@ -110,7 +110,9 @@ int ScreenCapturerWayland::Start(bool show_cursor) {
   cursor_metadata_enabled_ = false;
   cursor_metadata_seen_ = false;
   cursor_metadata_missing_buffers_ = 0;
-  ClearSharedCursorState();
+  // Claim the native cursor source before portal negotiation. Unknown data
+  // must not fall through to an unrelated XWayland cursor while we wait.
+  PublishSharedCursorState(CursorRenderMode::unknown, RemoteCursorShape::none);
   paused_ = false;
   pipewire_node_id_ = 0;
   UpdateDisplayGeometry(

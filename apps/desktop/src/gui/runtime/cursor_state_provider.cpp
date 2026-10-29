@@ -71,6 +71,7 @@ bool CursorStateProvider::Sample(const std::vector<DisplayInfo>& displays,
 #include <string>
 
 #include "linux_cursor_shape.h"
+#include "linux_pointer_presence.h"
 #include "platform.h"
 #include "shared_cursor_state.h"
 #include "runtime/cursor_position.h"
@@ -90,7 +91,9 @@ bool CursorHasVisiblePixel(const XFixesCursorImage& image) {
 }  // namespace
 
 struct CursorStateProvider::Impl {
+  const bool wayland = IsWaylandSession();
   Display* display = XOpenDisplay(nullptr);
+  LinuxPointerPresence pointer_presence;
 
   ~Impl() {
     if (display) XCloseDisplay(display);
@@ -103,18 +106,26 @@ CursorStateProvider::~CursorStateProvider() = default;
 bool CursorStateProvider::Sample(const std::vector<DisplayInfo>& displays,
                                  int preferred_display, CursorState* state) {
   if (!state || !impl_) return false;
+  *state = {};
   ResetCursorPosition(state);
 
-  if (IsWaylandSession()) {
-    SharedCursorState shared{};
-    if (GetSharedCursorState(&shared)) {
-      state->seq = 0;
-      state->visible = shared.visible;
-      state->shape = shared.visible ? shared.shape : RemoteCursorShape::none;
-      return true;
+  SharedCursorState shared{};
+  if (impl_->wayland && GetSharedCursorState(&shared)) {
+    // XWayland only knows about X11 surfaces, not the captured Wayland
+    // desktop. Missing native metadata must remain an unavailable sample.
+    state->visible = shared.visible;
+    state->shape = shared.shape;
+    state->render_mode = shared.render_mode;
+    state->hidden_reason = shared.hidden_reason;
+    if (state->render_mode == CursorRenderMode::hidden &&
+        impl_->pointer_presence.NoPointingDevice(nullptr, true)) {
+      state->hidden_reason = CursorHiddenReason::no_pointing_device;
     }
+    return state->render_mode != CursorRenderMode::unknown;
   }
 
+  // Linux may use X11 capture even in a Wayland session. Only an active
+  // portal publishes shared state; preserve X11 sampling for that backend.
   if (!impl_->display) return false;
 
   XFixesCursorImage* image = XFixesGetCursorImage(impl_->display);
@@ -126,6 +137,12 @@ bool CursorStateProvider::Sample(const std::vector<DisplayInfo>& displays,
   state->visible = CursorHasVisiblePixel(*image);
   state->shape = state->visible ? ShapeFromLinuxCursorName(name)
                                 : RemoteCursorShape::none;
+  state->render_mode = state->visible ? CursorRenderMode::separate
+                                      : CursorRenderMode::hidden;
+  state->hidden_reason = state->visible ? CursorHiddenReason::unspecified
+      : impl_->pointer_presence.NoPointingDevice(impl_->display, false)
+          ? CursorHiddenReason::no_pointing_device
+          : CursorHiddenReason::system_hidden;
   NormalizeCursorPosition(image->x, image->y, displays, preferred_display,
                           state);
   XFree(image);
