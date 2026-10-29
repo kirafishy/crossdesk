@@ -51,6 +51,19 @@ security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
+# codesign requires the identity's keychain on the user's search list even
+# when --keychain is supplied. Preserve the runner's existing keychains so
+# certificate-chain lookup continues to work. Deleting our temporary keychain
+# during cleanup also removes its entry from the search list.
+EXISTING_KEYCHAINS="$(security list-keychains -d user)"
+KEYCHAIN_SEARCH_LIST=()
+while IFS= read -r existing_keychain; do
+    [[ -n "$existing_keychain" && "$existing_keychain" != "$KEYCHAIN_PATH" ]] || continue
+    KEYCHAIN_SEARCH_LIST+=("$existing_keychain")
+done <<< "$(printf '%s\n' "$EXISTING_KEYCHAINS" | sed -E 's/^[[:space:]]*"(.*)"[[:space:]]*$/\1/')"
+security list-keychains -d user -s "$KEYCHAIN_PATH" \
+    ${KEYCHAIN_SEARCH_LIST[@]+"${KEYCHAIN_SEARCH_LIST[@]}"}
+
 for certificate in "$APP_P12" "$INSTALLER_P12"; do
     security import "$certificate" -P "$MACOS_P12_PASSWORD" \
         -t cert -f pkcs12 -k "$KEYCHAIN_PATH" \
