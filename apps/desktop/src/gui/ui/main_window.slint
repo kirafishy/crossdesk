@@ -465,6 +465,7 @@ export component MainWindow inherits Window {
         }
     }
     in-out property <bool> lan-listening;
+    in-out property <bool> lan-listen-all: true;
     in-out property <string> lan-listener-ip;
     in-out property <string> lan-listener-port: "52888";
     out property <string> lan-listener-address: root.lan-listener-ip == "" ? "" : root.lan-listener-ip + ":" + root.lan-listener-port;
@@ -634,6 +635,7 @@ export component MainWindow inherits Window {
     in-out property <int> capture-method-index: 0;
     in-out property <int> codec-index: 0;
     in-out property <bool> ip-direct-enabled-draft: true;
+    in-out property <bool> lan-listen-all-draft: true;
     in property <string> settings-save-error;
     in-out property <bool> force-relay-enabled: false;
     in-out property <bool> self-hosted-enabled: false;
@@ -1282,7 +1284,7 @@ export component MainWindow inherits Window {
                     width: lan-edit-port-metrics.preferred-width + 20px; height: 22px;
                     quiet: true; text: lan-edit-port-metrics.text;
                     text-size: 12px; text-color: WorkbenchStyle.accent;
-                    enabled: root.lan-mode && !root.lan-password-pending && root.lan-interfaces.length > 0;
+                    enabled: root.lan-mode && !root.lan-password-pending && (root.lan-listen-all || root.lan-interfaces.length > 0);
                     clicked => {
                         // Moving from the editor to this action is still editing.
                         root.lan-apply-pending = false;
@@ -2720,10 +2722,15 @@ export component MainWindow inherits Window {
                             }
                         }
                         SettingsGroup {
-                            title: GalleryStrings.texts[116]; rows: 3;
+                            title: GalleryStrings.texts[116]; rows: 4;
                             SettingsToggleRow {
                                 label: GalleryStrings.texts[117];
                                 checked <=> root.ip-direct-enabled-draft;
+                            }
+                            SettingsToggleRow {
+                                label: GalleryStrings.texts[206];
+                                checked <=> root.lan-listen-all-draft;
+                                enabled: root.ip-direct-enabled-draft;
                             }
                             SettingsToggleRow { label: UiStrings.force-relay; checked <=> root.force-relay-enabled; enabled: !root.settings-session-active; }
                             SettingsToggleRow {
@@ -2744,7 +2751,7 @@ export component MainWindow inherits Window {
                             }
                         }
                         Text {
-                            text: GalleryStrings.texts[119];
+                            text: GalleryStrings.texts[119] + "\n" + GalleryStrings.texts[207];
                             font-size: 11px; color: WorkbenchStyle.muted; wrap: word-wrap;
                         }
                         SettingsGroup {

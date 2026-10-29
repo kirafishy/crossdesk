@@ -10,6 +10,7 @@
 #include <openssl/x509.h>
 
 #include <filesystem>
+#include <map>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -28,7 +29,9 @@ unsigned ParsePort(const std::string& value);
 std::pair<std::string, unsigned> ParseEndpoint(const std::string& value,
                                                unsigned default_port);
 bool IsIpv4(const std::string& value);
-std::vector<Interface> PhysicalInterfaces();
+inline constexpr char kAllIpv4Interfaces[] = "0.0.0.0";
+// Non-loopback unicast IPv4 addresses, optionally restricted to physical NICs.
+std::vector<Interface> LocalIpv4Interfaces(bool physical_only = false);
 std::string RandomHex(size_t bytes);
 bool ValidPassword(const std::string& password);
 bool VerifyLanCertificate(X509* cert);
@@ -51,6 +54,9 @@ class Identity {
   // their saved port. Selection only controls the address shown in the UI.
   unsigned PortFor(const std::string& address) const;
   bool HasPortFor(const std::string& address) const;
+  bool listen_all() const { return settings().value("listen_all", true); }
+  void SaveListenerMode(bool listen_all,
+                        const std::map<std::string, unsigned>& ports);
   void SelectAddress(const std::string& address);
   const std::string& id() const { return id_; }
   std::filesystem::path certificate() const {

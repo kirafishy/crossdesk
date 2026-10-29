@@ -77,7 +77,7 @@ For self-hosting, both ends must use the same service. See the [user guide](docs
 2. **Enter the address.** On the controller, enter the host's displayed `IP:port`, for example `192.168.1.20:52888`, and click **Connect**. Omitting the port uses **52888**; use the actual port shown on the host.
 3. **Enter the password.** Use the host's **six-character ASCII letter/digit password** shown in Direct IP mode. You can select **Remember password**. Switching modes also switches the recent device list.
 
-Both computers must be reachable over the LAN. Internet access may be available or absent; direct sessions do not depend on a cloud signaling service. The main window lets you select the local IP, edit its port, and change the password. Disabling **Enable direct IP** stops listeners, disconnects direct IP sessions, and hides the mode button. See the [direct IP guide](docs/USER_GUIDE_EN.md#lan-direct).
+Both computers must be reachable over the LAN. Internet access may be available or absent; direct sessions do not depend on a cloud signaling service. The main window lets you select the local IP, edit its port, and change the password. **Listen on all IPv4 interfaces** is enabled by default for VPN and other local interfaces on a shared port; change it under **Settings → General → Network**. Disabling **Enable direct IP** stops listeners, disconnects direct IP sessions, and hides the mode button. See the [direct IP guide](docs/USER_GUIDE_EN.md#lan-direct).
 
 <a id="preview"></a>
 

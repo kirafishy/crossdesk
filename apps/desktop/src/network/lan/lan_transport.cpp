@@ -25,7 +25,8 @@ constexpr const char* kPath = "/crossdesk/lan/v2";
 constexpr const char* kProtocol = "crossdesk.lan.v2";
 void ValidateListener(const std::string& address, unsigned port) {
   if (port > 65535) throw std::runtime_error("Invalid LAN port");
-  const auto interfaces = PhysicalInterfaces();
+  if (address == kAllIpv4Interfaces) return;
+  const auto interfaces = LocalIpv4Interfaces();
   if (!IsIpv4(address) ||
       std::none_of(interfaces.begin(), interfaces.end(),
                    [&](const auto& i) { return i.address == address; }))
@@ -57,7 +58,7 @@ void CheckListenError(const Error& error) {
     throw std::runtime_error("LanPortPermissionDenied");
   throw std::runtime_error("Cannot listen on LAN port: " + error.message());
 }
-void CheckExistingListener(const std::string& address, unsigned port) {
+void CheckExistingEndpoint(const std::string& address, unsigned port) {
 #ifdef __APPLE__
   // BSD permits a specific-address listener alongside a wildcard listener with
   // SO_REUSEADDR. Detect that live listener without treating TIME_WAIT or our
@@ -87,6 +88,32 @@ void CheckExistingListener(const std::string& address, unsigned port) {
   (void)address;
   (void)port;
 #endif
+}
+void CheckExistingListener(const std::string& address, unsigned port) {
+#ifdef __APPLE__
+  if (address == kAllIpv4Interfaces) {
+    // BSD permits wildcard/specific overlap with SO_REUSEADDR. Probe binds on
+    // each exact address to detect specific listeners without sending traffic
+    // through VPN adapters which may accept connects to otherwise unused ports.
+    // The final wildcard bind detects an existing wildcard listener itself.
+    asio::io_context io;
+    auto addresses = LocalIpv4Interfaces();
+    addresses.push_back({"127.0.0.1"});
+    for (const auto& interface : addresses) {
+      asio::ip::tcp::acceptor probe(io);
+      Error error;
+      probe.open(asio::ip::tcp::v4(), error);
+      CheckListenError(error);
+      probe.set_option(asio::socket_base::reuse_address(true), error);
+      CheckListenError(error);
+      probe.bind({asio::ip::make_address_v4(interface.address),
+                  static_cast<unsigned short>(port)}, error);
+      CheckListenError(error);
+    }
+    return;
+  }
+#endif
+  CheckExistingEndpoint(address, port);
 }
 std::shared_ptr<Context> TlsContext() {
   auto context = std::make_shared<Context>(Context::tls);
@@ -265,7 +292,7 @@ struct Transport::Impl {
       }
       c->local_address = local.address().to_string();
       c->remote_address = remote.address().to_string();
-      const auto interfaces = PhysicalInterfaces();
+      const auto interfaces = LocalIpv4Interfaces();
       if (!IsIpv4(c->remote_address) ||
           std::none_of(
               interfaces.begin(), interfaces.end(),

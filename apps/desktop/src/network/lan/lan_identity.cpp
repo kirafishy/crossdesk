@@ -405,7 +405,7 @@ std::pair<std::string, unsigned> ParseEndpoint(const std::string& value,
           "Enter a numeric IPv4 address or IPv4:port");
   return {address, port};
 }
-std::vector<Interface> PhysicalInterfaces() {
+std::vector<Interface> LocalIpv4Interfaces(bool physical_only) {
   std::vector<Interface> result;
 #ifdef _WIN32
   ULONG bytes = 16384;
@@ -424,17 +424,22 @@ std::vector<Interface> PhysicalInterfaces() {
   if (code != NO_ERROR) return result;
   for (auto* a = adapters; a; a = a->Next) {
     if (a->OperStatus != IfOperStatusUp ||
-        (a->IfType != IF_TYPE_ETHERNET_CSMACD &&
-         a->IfType != IF_TYPE_IEEE80211) ||
-        a->PhysicalAddressLength == 0)
+        a->IfType == IF_TYPE_SOFTWARE_LOOPBACK)
       continue;
-    // HardwareInterface rejects software adapters that imitate Ethernet.
-    MIB_IF_ROW2 row{};
-    row.InterfaceLuid = a->Luid;
-    if (GetIfEntry2(&row) != NO_ERROR ||
-        !row.InterfaceAndOperStatusFlags.HardwareInterface)
-      continue;
+    if (physical_only) {
+      if ((a->IfType != IF_TYPE_ETHERNET_CSMACD &&
+           a->IfType != IF_TYPE_IEEE80211) ||
+          a->PhysicalAddressLength == 0)
+        continue;
+      MIB_IF_ROW2 row{};
+      row.InterfaceLuid = a->Luid;
+      if (GetIfEntry2(&row) != NO_ERROR ||
+          !row.InterfaceAndOperStatusFlags.HardwareInterface)
+        continue;
+    }
     for (auto* u = a->FirstUnicastAddress; u; u = u->Next) {
+      if (!u->Address.lpSockaddr || u->Address.lpSockaddr->sa_family != AF_INET)
+        continue;
       char address[INET_ADDRSTRLEN]{};
       inet_ntop(
           AF_INET,
@@ -448,8 +453,8 @@ std::vector<Interface> PhysicalInterfaces() {
   if (getifaddrs(&list) != 0) return result;
   for (auto* a = list; a; a = a->ifa_next) {
     if (!a->ifa_addr || a->ifa_addr->sa_family != AF_INET ||
-        !(a->ifa_flags & IFF_UP) ||
-        (a->ifa_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)))
+        !(a->ifa_flags & IFF_UP) || (a->ifa_flags & IFF_LOOPBACK) ||
+        (physical_only && (a->ifa_flags & IFF_POINTOPOINT)))
       continue;
     bool physical = false;
 #ifdef __APPLE__
@@ -464,7 +469,7 @@ std::vector<Interface> PhysicalInterfaces() {
     physical = std::filesystem::exists(std::filesystem::path("/sys/class/net") /
                                        a->ifa_name / "device");
 #endif
-    if (!physical) continue;
+    if (physical_only && !physical) continue;
     char address[INET_ADDRSTRLEN]{};
     inet_ntop(AF_INET, &reinterpret_cast<sockaddr_in*>(a->ifa_addr)->sin_addr,
               address, sizeof(address));
@@ -472,6 +477,13 @@ std::vector<Interface> PhysicalInterfaces() {
   }
   freeifaddrs(list);
 #endif
+  std::sort(result.begin(), result.end(),
+            [](const auto& a, const auto& b) { return a.address < b.address; });
+  result.erase(std::unique(result.begin(), result.end(),
+                           [](const auto& a, const auto& b) {
+                             return a.address == b.address;
+                           }),
+               result.end());
   return result;
 }
 std::string RandomHex(size_t bytes) {
@@ -533,6 +545,9 @@ void Identity::Load() {
   auto& settings = state_["settings"];
   if (settings.is_null()) settings = nlohmann::json::object();
   Require(settings.is_object(), "Invalid LAN settings");
+  Require(
+      !settings.contains("listen_all") || settings["listen_all"].is_boolean(),
+      "Invalid LAN listener mode");
   const auto address = settings.value("address", std::string{});
   Require(address.empty() || IsIpv4(address), "Invalid LAN listener address");
   if (!settings.contains("ports")) {
@@ -544,7 +559,8 @@ void Identity::Load() {
   }
   Require(settings["ports"].is_object(), "Invalid LAN port settings");
   for (const auto& [ip, port] : settings["ports"].items())
-    Require(IsIpv4(ip) && port.is_number_integer() && port > 0 && port <= 65535,
+    Require((IsIpv4(ip) || ip == kAllIpv4Interfaces) &&
+                port.is_number_integer() && port > 0 && port <= 65535,
             "Invalid LAN port settings");
   settings["address"] = address;
   settings["version"] = 2;
@@ -652,14 +668,16 @@ bool Identity::VerifyPassword(const nlohmann::json& verifier,
 }
 
 void Identity::SaveSettings(const std::string& address, unsigned port) {
-  Require(IsIpv4(address) && port > 0 && port <= 65535,
+  Require((IsIpv4(address) || address == kAllIpv4Interfaces) && port > 0 &&
+              port <= 65535,
           "Invalid LAN listener address");
   auto next = state_;
-  const auto interfaces = PhysicalInterfaces();
-  const auto selected = std::find_if(
-      interfaces.begin(), interfaces.end(),
-      [&](const auto& i) { return i.address == address; });
-  Require(selected != interfaces.end(), "Selected LAN interface is unavailable");
+  const auto interfaces = LocalIpv4Interfaces();
+  const auto selected =
+      std::find_if(interfaces.begin(), interfaces.end(),
+                   [&](const auto& i) { return i.address == address; });
+  Require(address == kAllIpv4Interfaces || selected != interfaces.end(),
+          "Selected LAN interface is unavailable");
   next["settings"]["ports"][address] = port;
   Save(next);
   state_ = std::move(next);
@@ -671,13 +689,26 @@ bool Identity::HasPortFor(const std::string& address) const {
   return state_.at("settings").at("ports").contains(address);
 }
 void Identity::SelectAddress(const std::string& address) {
-  const auto interfaces = PhysicalInterfaces();
+  const auto interfaces = LocalIpv4Interfaces(!listen_all());
   Require(std::any_of(interfaces.begin(), interfaces.end(),
                       [&](const auto& i) { return i.address == address; }),
           "Selected LAN interface is unavailable");
   if (state_["settings"].value("address", "") == address) return;
   auto next = state_;
   next["settings"]["address"] = address;
+  Save(next);
+  state_ = std::move(next);
+}
+void Identity::SaveListenerMode(bool listen_all,
+                                const std::map<std::string, unsigned>& ports) {
+  auto next = state_;
+  next["settings"]["listen_all"] = listen_all;
+  for (const auto& [address, port] : ports) {
+    Require((IsIpv4(address) || address == kAllIpv4Interfaces) && port > 0 &&
+                port <= 65535,
+            "Invalid LAN listener address");
+    next["settings"]["ports"][address] = port;
+  }
   Save(next);
   state_ = std::move(next);
 }

@@ -1529,6 +1529,24 @@ void GuiApplication::ResetSettingsUi(bool gallery_window) {
   main->set_codec_index(video_encode_format_button_value_);
   main->set_ip_direct_enabled_draft(config_center_->IsIpDirectEnabled());
   main->set_settings_save_error("");
+  try {
+    bool listen_all = true;
+    if (lan_) {
+      listen_all = lan_->identity().listen_all();
+    } else {
+      const auto directory = path_manager_->GetConfigPath() / "lan";
+      if (std::filesystem::exists(directory / "identity.json")) {
+        lan::Identity identity(directory);
+        identity.Load();
+        listen_all = identity.listen_all();
+      }
+    }
+    main->set_lan_listen_all(listen_all);
+    main->set_lan_listen_all_draft(listen_all);
+  } catch (const std::exception& error) {
+    main->set_settings_save_error(
+        main->global<ui::LanStrings>().invoke_error_message(UiText(error.what())));
+  }
   main->set_force_relay_enabled(config_center_->IsForceRelay());
   main->set_self_hosted_enabled(enable_self_hosted_);
   main->set_autostart_enabled(enable_autostart_);
@@ -1767,7 +1785,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     try {
       lan_->identity().SelectAddress(std::string(address));
       const auto port =
-          UiText(std::to_string(lan_->identity().PortFor(std::string(address))));
+          UiText(std::to_string(lan_->PortFor(std::string(address))));
       main->set_lan_listener_ip(address);
       main->set_lan_listener_port(port);
       main->set_lan_local_port(port);
@@ -2452,6 +2470,7 @@ void GuiApplication::Tick() {
   TickLan();
   if (LanAvailable()) {
     const auto address = lan_->identity().settings().value("address", "");
+    ui_->main->set_lan_listen_all(lan_->identity().listen_all());
     ui_->main->set_lan_password_pending(lan_->password_pending());
     ui_->main->set_lan_listening(lan_->listening());
     if (lan_connecting_ && lan_connecting_->authorized) {
@@ -2504,7 +2523,7 @@ void GuiApplication::Tick() {
           ? available_interfaces.front().address : "";
     }
     const auto port =
-        UiText(std::to_string(lan_->identity().PortFor(display_address)));
+        UiText(std::to_string(lan_->PortFor(display_address)));
     if (previous_address != display_address) {
       // A disappearing address must not transfer its unfinished port edit to
       // another interface. Explicit selection commits the old edit first.
@@ -2523,7 +2542,8 @@ void GuiApplication::Tick() {
     if (!ui_->main->get_lan_port_editing() && !ui_->main->get_lan_port_dirty())
       ui_->main->set_lan_local_port(port);
     ui_->main->set_lan_listener_error(UiText(
-        display_address.empty() ? "Selected LAN interface is unavailable"
+        display_address.empty() && !lan_->identity().listen_all()
+                                ? "Selected LAN interface is unavailable"
                                 : lan_->ListenerError(display_address)));
     // Show failures one address at a time, without interrupting edits or another
     // dialog. A working listener must not clear another address's error.
@@ -4570,6 +4590,8 @@ bool GuiApplication::ValidateSelfHostedSettingsFromUi(bool gallery_window) {
 
 bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
   const auto previous_server = GetSignalServerSettings(*config_center_);
+  const bool previous_ip_enabled = config_center_->IsIpDirectEnabled();
+  const auto previous_connection_mode = config_center_->GetConnectionMode();
   auto& main = ui_->Window(gallery_window);
   main->set_settings_save_error("");
   const bool has_endpoint = main->get_self_hosted_enabled() ||
@@ -4628,6 +4650,32 @@ bool GuiApplication::SaveSettingsFromUi(bool gallery_window) {
     if (wall_changed) ui_->gallery.Save(ui_->gallery_path);
     main->set_settings_save_error(UiText(
         localization::Literal("无法保存隐私屏解锁设置，请重试。", localization_language_index_)));
+    return false;
+  }
+  try {
+    const bool listen_all = main->get_lan_listen_all_draft();
+    if (LanAvailable() && main->get_ip_direct_enabled_draft()) {
+      lan_->SetListenAll(listen_all);
+    } else if (lan_) {
+      // Persist the preference without rebinding a disabled/stopping listener.
+      if (listen_all != lan_->identity().listen_all())
+        lan_->identity().SaveListenerMode(listen_all, {});
+    } else if (listen_all != main->get_lan_listen_all()) {
+      // Do not open/create an inactive identity when this preference is unchanged.
+      lan::Identity identity(path_manager_->GetConfigPath() / "lan");
+      identity.Load();
+      if (listen_all != identity.listen_all())
+        identity.SaveListenerMode(listen_all, {});
+    }
+  } catch (const std::exception& error) {
+    if (config_center_->SetIpDirectEnabled(previous_ip_enabled) != 0 ||
+        config_center_->SetConnectionMode(previous_connection_mode) != 0)
+      LOG_ERROR("Failed to restore IP availability after listener settings failure");
+    if (wall_changed && !ui_->gallery.Save(ui_->gallery_path))
+      LOG_ERROR("Failed to restore DeskHub settings after listener settings failure");
+    main->set_settings_tab(0);
+    main->set_settings_save_error(
+        main->global<ui::LanStrings>().invoke_error_message(UiText(error.what())));
     return false;
   }
   language_button_value_ =

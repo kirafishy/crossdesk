@@ -79,6 +79,11 @@ class SessionManager {
   Identity& identity() { return identity_; }
   // Refreshed by Tick; UI and listener maintenance share the same snapshot.
   const std::vector<Interface>& interfaces() const { return interfaces_; }
+  void SetListenAll(bool enabled);
+  unsigned PortFor(const std::string& address) const {
+    return identity_.PortFor(identity_.listen_all() ? kAllIpv4Interfaces
+                                                    : address);
+  }
   void Configure(const std::string& address, unsigned port);
   bool password_pending() const { return reset_job_.valid(); }
   void ResetPassword();

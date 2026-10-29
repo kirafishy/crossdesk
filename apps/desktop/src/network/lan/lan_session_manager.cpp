@@ -100,7 +100,8 @@ SessionManager::SessionManager(std::filesystem::path path, Hooks hooks)
       // Migrate the saved password, retaining its value, identity and settings.
       SetPassword(access_password_);
     } else if (identity_.verifier().is_null()) {
-      // Generate the initial password before automatically accepting connections.
+      // Generate the initial password before automatically accepting
+      // connections.
       ResetPassword();
     } else {
       hooks_.error("LAN password is not ready");
@@ -122,7 +123,49 @@ void SessionManager::Configure(const std::string& address, unsigned port) {
   if (!port || port > 65535) throw std::runtime_error("Invalid LAN port");
   if (!Identity::CurrentVerifier(identity_.verifier()))
     throw std::runtime_error("LAN password is not ready");
-  ReplaceListener(address, port, true);
+  ReplaceListener(identity_.listen_all() ? kAllIpv4Interfaces : address, port,
+                  true);
+}
+void SessionManager::SetListenAll(bool enabled) {
+  if (stopping_ || enabled == identity_.listen_all()) return;
+  if (!Identity::CurrentVerifier(identity_.verifier()))
+    throw std::runtime_error("LAN password is not ready");
+  const auto interfaces = LocalIpv4Interfaces(!enabled);
+  const auto previous = listeners_;
+  // Wildcard and per-address listeners can overlap on the same port. Retire
+  // acceptors before rebinding; authenticated channels retain their sockets.
+  for (const auto& [_, listener] : previous) RetireListener(listener.id);
+  listeners_.clear();
+  std::map<std::string, unsigned> ports;
+  try {
+    const auto add = [&](const std::string& address) {
+      ReplaceListener(address, identity_.PortFor(address), false,
+                      !identity_.HasPortFor(address));
+      ports[address] = listeners_.at(address).port;
+    };
+    if (enabled)
+      add(kAllIpv4Interfaces);
+    else
+      for (const auto& interface : interfaces) add(interface.address);
+    // Publish the mode and all newly allocated ports in one durable write.
+    identity_.SaveListenerMode(enabled, ports);
+  } catch (...) {
+    for (const auto& [_, listener] : listeners_) RetireListener(listener.id);
+    listeners_.clear();
+    // Keep the original configuration and restore its exact ports. A failed
+    // restore remains visible and is retried by ordinary listener maintenance.
+    for (const auto& [address, listener] : previous) {
+      try {
+        ReplaceListener(address, listener.port, false);
+      } catch (const std::exception& error) {
+        SetListenerError(address, listener.port, error.what());
+      }
+    }
+    throw;
+  }
+  interfaces_ = interfaces;
+  listener_errors_.clear();
+  listener_warnings_.clear();
 }
 void SessionManager::ReplaceListener(const std::string& address, unsigned port,
                                      bool save, bool allow_fallback) {
@@ -220,7 +263,8 @@ void SessionManager::SetListenerError(const std::string& address, unsigned port,
   listener_warnings_[address] = std::move(issue);
 }
 std::string SessionManager::ListenerError(const std::string& address) const {
-  const auto it = listener_errors_.find(address);
+  const auto it = listener_errors_.find(
+      identity_.listen_all() ? kAllIpv4Interfaces : address);
   return it == listener_errors_.end() ? "" : it->second.error;
 }
 std::optional<SessionManager::ListenerIssue> SessionManager::TakeListenerWarning() {
@@ -233,6 +277,7 @@ std::optional<SessionManager::ListenerIssue> SessionManager::TakeListenerWarning
 void SessionManager::RefreshListeners() {
   if (stopping_ || !Identity::CurrentVerifier(identity_.verifier())) return;
   const auto available = [&](const auto& address) {
+    if (identity_.listen_all()) return address == kAllIpv4Interfaces;
     return std::any_of(interfaces_.begin(), interfaces_.end(),
                        [&](const auto& i) { return i.address == address; });
   };
@@ -252,7 +297,10 @@ void SessionManager::RefreshListeners() {
     listener_warnings_.erase(it->first);
     it = listener_errors_.erase(it);
   }
-  for (const auto& interface : interfaces_) {
+  const auto desired = identity_.listen_all()
+                           ? std::vector<Interface>{{kAllIpv4Interfaces}}
+                           : interfaces_;
+  for (const auto& interface : desired) {
     const auto port = identity_.PortFor(interface.address);
     const bool initialize = !identity_.HasPortFor(interface.address);
     try {
@@ -672,7 +720,10 @@ void SessionManager::Tick() {
   for (auto& event : transport_.Poll()) {
     auto it = sessions_.find(event.channel->id);
     if (it == sessions_.end()) {
-      const auto listener = listeners_.find(event.channel->local_address);
+      const auto listener = std::find_if(
+          listeners_.begin(), listeners_.end(), [&](const auto& entry) {
+            return entry.second.id == event.channel->listener;
+          });
       if (event.kind != Transport::Event::Open || !event.channel->incoming ||
           stopping_ || listener == listeners_.end() ||
           event.channel->listener != listener->second.id) {
@@ -763,12 +814,14 @@ void SessionManager::Tick() {
   }
   if (!stopping_ && now - interface_check_ >= std::chrono::seconds(2)) {
     interface_check_ = now;
-    interfaces_ = PhysicalInterfaces();
+    const auto local_interfaces = LocalIpv4Interfaces();
+    interfaces_ =
+        identity_.listen_all() ? local_interfaces : LocalIpv4Interfaces(true);
     RefreshListeners();
     for (auto& [_, s] : sessions_)
       if (s->phase != Session::Connecting &&
           !s->channel->local_address.empty() &&
-          std::none_of(interfaces_.begin(), interfaces_.end(),
+          std::none_of(local_interfaces.begin(), local_interfaces.end(),
                        [&](const auto& i) {
                          return i.address == s->channel->local_address;
                        }))

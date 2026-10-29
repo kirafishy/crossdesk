@@ -492,6 +492,8 @@ inline constexpr TranslationRow kTranslationRows[] = {
   {"高", {"高", "High", "Высокое", "高", "高", "높음", "Hoch", "Élevée", "Alta", "Alta"}},
   {"（仅在交互终端显示）", {"（仅在交互终端显示）", "(shown only in an interactive terminal)", "(виден только в интерактивном терминале)", "（僅在互動終端顯示）", "(対話型端末でのみ表示)", "(대화형 터미널에만 표시됨)", "(wird nur in einem interaktiven Terminal angezeigt)", "(affiché uniquement dans un terminal interactif)", "(se muestra solo en una terminal interactiva)", "(mostrado apenas em um terminal interativo)"}},
   {"：同步键鼠到所有已连接设备", {"：同步键鼠到所有已连接设备", ": mirror input to all connected devices", ": ввод на всех подключённых устройствах", "：同步鍵鼠到所有已連線裝置", ": 接続されているすべてのデバイスへのミラー入力", ": 연결된 모든 장치에 대한 미러 입력", ": Eingang auf alle angeschlossenen Geräte spiegeln", ": entrée miroir sur tous les appareils connectés", ": entrada espejo para todos los dispositivos conectados", ": entrada espelhada para todos os dispositivos conectados"}},
+  {"监听所有 IPv4 接口", {"监听所有 IPv4 接口", "Listen on all IPv4 interfaces", "Все интерфейсы IPv4", "監聽所有 IPv4 介面", "すべての IPv4 で待ち受け", "모든 IPv4 인터페이스 수신", "Alle IPv4-Schnittstellen", "Toutes les interfaces IPv4", "Todas las interfaces IPv4", "Todas as interfaces IPv4"}},
+  {"所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。", {"所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。", "Use one port on all interfaces, including VPNs. Select an actual IP to share. Turn off to restore separate ports per IP.", "Один порт для всех интерфейсов, включая VPN. Для подключения выберите реальный IP. Отключение вернёт отдельные порты для каждого IP.", "所有介面共用一個連接埠，包括 VPN。分享時請選擇實際 IP；關閉後恢復各 IP 的獨立連接埠。", "VPN を含む全インターフェースで同じポートを使います。共有には実際の IP を選択してください。オフにすると IP ごとのポートに戻ります。", "VPN을 포함한 모든 인터페이스가 하나의 포트를 사용합니다. 공유할 실제 IP를 선택하세요. 끄면 IP별 포트가 복원됩니다.", "Ein Port für alle Schnittstellen, einschließlich VPN. Zum Teilen eine tatsächliche IP wählen. Ausschalten stellt die Ports pro IP wieder her.", "Un port commun à toutes les interfaces, VPN inclus. Choisissez une IP réelle à partager. Désactivez pour rétablir les ports propres à chaque IP.", "Un puerto para todas las interfaces, incluidas las VPN. Seleccione una IP real para compartir. Desactive para restaurar los puertos de cada IP.", "Uma porta para todas as interfaces, incluindo VPNs. Selecione um IP real para compartilhar. Desative para restaurar as portas de cada IP."}},
 };
 
 struct NamedTranslation { const char* name; const char* literal; };
@@ -986,6 +988,8 @@ inline constexpr const char* kSlintLiterals[] = {
   "未连接",
   "确认断开",
   "确认执行",
+  "监听所有 IPv4 接口",
+  "所有接口共用一个端口，包括 VPN。分享时请选择实际 IP；关闭后恢复各 IP 的独立端口。",
 };
 }  // namespace detail
 
