@@ -17,9 +17,9 @@
 
 namespace crossdesk {
 
-// Used by both ordinary and secure-desktop capture. Device absence is only a
-// compatibility hint: a hidden cursor with a null handle, or touch/pen
-// suppression, must retain the application's normal hiding behavior.
+// Used by both ordinary and secure-desktop capture. Confirmed device absence
+// permits a controller-side locator even when no cursor handle is available.
+// Touch/pen suppression and cursors already in the frame retain precedence.
 class WindowsCursorState {
  public:
   void Sample(const CURSORINFO& info, bool embedded, CursorState* state) {
@@ -34,15 +34,18 @@ class WindowsCursorState {
     if (!showing && !embedded) {
       state->hidden_reason = (info.flags & CURSOR_SUPPRESSED)
                                  ? CursorHiddenReason::system_suppressed
-                             : info.hCursor && NoPointingDevice()
+                             : NoPointingDevice()
                                  ? CursorHiddenReason::no_pointing_device
                                  : CursorHiddenReason::system_hidden;
     }
   }
 
  private:
-  // Query only for potentially recoverable hidden cursors, at most once per
-  // second. Require two successful absent observations. Query failures, RDP
+  // A null cursor handle cannot distinguish application hiding from a desktop
+  // without a mouse. Use device presence to gate the locator; the controller
+  // still requires remote pointer input before displaying it.
+  // Query hidden, unsuppressed cursors at most once per second and require two
+  // successful absent observations. Query failures, RDP
   // (whose devices may be absent from Raw Input), and present mice all disallow
   // fallback and break the sequence of absent observations.
   bool NoPointingDevice() {
